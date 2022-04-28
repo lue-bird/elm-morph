@@ -71,14 +71,14 @@ broaden :
     Conversion specific general error
     -> (specific -> general)
 broaden =
-    \codec -> codec.broaden
+    \conversion -> conversion.broaden
 
 
 narrow :
     Conversion specific general error
     -> (general -> Result error specific)
 narrow =
-    \codec -> codec.narrow
+    \conversion -> conversion.narrow
 
 
 expectationMap :
@@ -86,12 +86,12 @@ expectationMap :
     -> Conversion specific general (Error expectation)
     -> Conversion specific general (Error expectationMapped)
 expectationMap expectationChange =
-    \codec ->
-        { broaden = codec |> broaden
+    \conversion ->
+        { broaden = conversion |> broaden
         , narrow =
             \general ->
                 general
-                    |> (codec |> narrow)
+                    |> (conversion |> narrow)
                     |> Result.mapError
                         (\(Expected expectation) ->
                             Expected (expectation |> expectationChange)
@@ -141,24 +141,6 @@ preserving ( to, from ) =
         \unmapped ->
             unmapped |> to |> Ok
     }
-
-
-type alias OnPart whole part =
-    RecordWithoutConstructorFunction
-        { name : String
-        , access : whole -> part
-        , alter : (part -> part) -> whole -> whole
-        }
-
-
-name : OnPart whole_ part -> String
-name =
-    .name
-
-
-access : OnPart whole part -> whole -> part
-access =
-    .access
 
 
 {-| A step in building a `Conversion`
@@ -427,13 +409,13 @@ whole assemble =
 lazy :
     (() -> Conversion specific general error)
     -> Conversion specific general error
-lazy codecLazy =
+lazy conversionLazy =
     { narrow =
         \general ->
-            general |> (codecLazy () |> .narrow)
+            general |> (conversionLazy () |> .narrow)
     , broaden =
         \specific ->
-            specific |> (codecLazy () |> .broaden)
+            specific |> (conversionLazy () |> .broaden)
     }
 
 
@@ -442,16 +424,16 @@ over :
     -> Conversion specific general error
     -> Conversion moreSpecific general error
 over specificChange =
-    \codec ->
+    \conversion ->
         { broaden =
             \specific ->
                 specific
                     |> specificChange.broaden
-                    |> codec.broaden
+                    |> conversion.broaden
         , narrow =
             \general ->
                 general
-                    |> codec.narrow
+                    |> conversion.narrow
                     |> Result.andThen
                         specificChange.narrow
         }
