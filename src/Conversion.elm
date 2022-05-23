@@ -1,54 +1,116 @@
 module Conversion exposing
-    ( Conversion, ConversionPreserving
-    , Error(..)
-    , remain, preserving, validate
-    , ConversionStep, TagOrValue(..)
-    , eatPart, Missing(..), eatVariant
+    ( Conversion
+    , Error(..), errorExpectation, errorExpectationMap
+    , validate, expectationMap
     , broaden, narrow
+    , Transfer
+    , transfer, remain
+    , listToArray, stringToList
     , lazy, over
-    , expectationMap
+    , reverse
+    , Tagged(..), TagOrValue(..), Missing(..)
+    , IntersectionConversionStep
+    , intersection, eatPart
+    , UnionConversionStep
+    , union, eatVariant
     )
 
-{-|
+{-| Prism, Codec, Converter = ...
 
-@docs Conversion, ConversionPreserving
-@docs Error
-
-
-## create
-
-@docs remain, preserving, validate
+@docs Conversion
 
 
-### step
+## fallible
 
-@docs ConversionStep, TagOrValue
-@docs eatPart, Missing, eatVariant
+@docs Error, errorExpectation, errorExpectationMap
+@docs validate, expectationMap
 
 
-## scan
+## fallible scan
 
 @docs broaden, narrow
 
 
+### fallible transform
+
+@docs errorMap
+
+
+## transferring
+
+@docs Transfer
+
+
+### `Transfer` create
+
+@docs transfer, remain
+@docs listToArray, stringToList
+
+
+### `Transfer` scan
+
+use [`broaden`](#broaden) or [`reverse`](#reverse) `|> broaden`
+
+
 ## transform
 
-@docs errorMap, lazy, over
+@docs lazy, over
+
+
+### `Transfer` transform
+
+@docs reverse
+
+
+## step
+
+@docs Tagged, TagOrValue, Missing
+
+
+### intersections
+
+@docs IntersectionConversionStep
+@docs intersection, eatPart
+
+
+### unions
+
+@docs UnionConversionStep
+@docs union, eatVariant
 
 
 ## TODO
 
+draw inspiration from
+
   - [miniBill/elm-codec](https://github.com/miniBill/elm-codec/blob/main/src/Codec.elm)
   - [MartinSStewart/elm-serialize](https://github.com/MartinSStewart/elm-serialize/blob/master/src/Serialize.elm)
-  - [elm/json](https://github.com/elm/json/blob/1.1.3/src/Json/Decode.elm)
 
 -}
 
-import Dict exposing (Dict)
+import Array exposing (Array)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 
 
 {-| Morph functions to a more general format and back.
+
+👀 type `Conversion narrow broad error`:
+
+  - example: `Conversion Email String (StackFilled DeadEnd)`
+
+  - `broaden : narrow -> broad`
+      - Going from a specific type to a general one that possibly can't be turned back easily
+      - Can loose information on the way
+      - example: `Email -> String`
+
+  - `narrow : broad -> Result error narrow`
+      - This is pretty much exactly what a parser looks like!
+      - going from a type to a type
+      - example: `String -> Result (StackFilled DeadEnd) Email`
+
+It's this abstract. No use-case implied.
+Composition, field, variant steps etc. can be defined just as well.
+
 -}
 type alias Conversion narrow broad error =
     RecordWithoutConstructorFunction
@@ -57,14 +119,42 @@ type alias Conversion narrow broad error =
         }
 
 
-{-| Limits arguments to [`Conversion`]s that can `Never` fail.
+
+--
+
+
+{-| An expectation that hasn't been met.
 -}
-type alias ConversionPreserving specific specificMapped =
-    Conversion specific specificMapped Never
-
-
 type Error expectation
     = Expected expectation
+
+
+{-| The expectation that hasn't been met.
+
+    Conversion.Expected 3
+        |> Conversion.errorExpectation
+    --> 3
+
+-}
+errorExpectation : Error expectation -> expectation
+errorExpectation =
+    \(Expected expectation) ->
+        expectation
+
+
+{-| Change the expectation that hasn't been met.
+-}
+errorExpectationMap :
+    (expectation -> expectationMapped)
+    -> Error expectation
+    -> Error expectationMapped
+errorExpectationMap expectationChange =
+    \(Expected expectation) ->
+        Expected (expectation |> expectationChange)
+
+
+
+--
 
 
 broaden :
@@ -93,22 +183,12 @@ expectationMap expectationChange =
                 general
                     |> (conversion |> narrow)
                     |> Result.mapError
-                        (\(Expected expectation) ->
-                            Expected (expectation |> expectationChange)
-                        )
+                        (errorExpectationMap expectationChange)
         }
 
 
 
 --
-
-
-{-| A `Conversion` that doesn't transform the value,
-just brings it to and from elm.
--}
-remain : Conversion value value errorCustom_
-remain =
-    validate Ok
 
 
 {-| Filter specific values.
@@ -125,53 +205,151 @@ validate narrowConvert =
     }
 
 
+
+--
+
+
+{-| Limits arguments to [`Conversion`](#Conversion)s that can `Never` fail while [`narrow`](#narrow)wing, for example
+
+    stringToListConversion : Transfer String (List Char)
+    stringToListConversion =
+        Conversion.transfer
+            ( String.toList, String.fromList )
+
+See [`transfer`](#transfer).
+
+**!** Information can get lost on the way:
+
+    dictToListConversion :
+        Transfer
+            (Dict comparableKey value)
+            (List ( comparableKey, value ))
+    dictToListConversion =
+        Conversion.transfer
+            ( Dict.toList, Dict.fromList )
+
+Still, there's no parsing to transfer one state to the other.
+
+TODO: Its own module and representation independent of `Conversion` for enforceable terminology (`map` instead of `reverse |> broaden`)?
+
+-}
+type alias Transfer specific specificMapped =
+    Conversion specific specificMapped Never
+
+
+{-| A [`Conversion`](#Conversion) that doesn't transform anything.
+
+Same as writing:
+
+  - `transfer ( identity, identity )`
+  - `validate Ok`
+  - `{ narrow = Ok, broaden = identity }`
+
+-}
+remain : Conversion value value error_
+remain =
+    transfer ( identity, identity )
+
+
 {-| Mutual `Conversion`
 between representations
 that have the same structural information
 and can be mapped 1:1 into each other.
+
+    stringToListConversion : Conversion String (List Char) error_
+    stringToListConversion =
+        Conversion.transfer
+            ( String.toList, String.fromList )
+
+Included here:
+
+  - [`stringToList`](#stringToList)
+  - [`listToArray`](#listToArray)
+
 -}
-preserving :
+transfer :
     ( specific -> specificMapped
     , specificMapped -> specific
     )
     -> Conversion specificMapped specific error
-preserving ( to, from ) =
+transfer ( to, from ) =
     { broaden = from
     , narrow =
-        \unmapped ->
-            unmapped |> to |> Ok
+        \mapped ->
+            mapped |> to |> Ok
     }
+
+
+{-| `Transfer` from `List` to `Array`.
+
+    import Array
+
+    [ 0, 1, 2, 3 ]
+        |> (Conversion.listToArray |> Conversion.broaden)
+    --> Array.fromList [ 0, 1, 2, 3 ]
+
+-}
+listToArray : Conversion (List element) (Array element) error_
+listToArray =
+    transfer ( Array.toList, Array.fromList )
+
+
+{-| `Transfer` from `List` to `Array`.
+
+    "0123" |> (Conversion.stringToList |> Conversion.broaden)
+    --> [ '0', '1', '2', '3' ]
+
+-}
+stringToList : Conversion String (List Char) error_
+stringToList =
+    transfer ( String.fromList, String.toList )
+
+
+
+--
 
 
 {-| A step in building a `Conversion`
 between parts & an assembled whole and back.
 -}
-type alias ConversionStep narrow narrowEat broad expectation =
+type alias IntersectionConversionStep narrow tag narrowEat broad fieldValueExpectation =
     RecordWithoutConstructorFunction
         { narrow :
-            broad -> Result (Error expectation) narrowEat
+            broad
+            ->
+                Result
+                    (Error
+                        { fieldsAdditional : List tag
+                        , fieldValues : List (Tagged tag fieldValueExpectation)
+                        }
+                    )
+                    narrowEat
         , broaden : narrow -> broad
         }
 
 
+{-| Consume another part.
+-}
 eatPart :
     ( ( whole -> part
       , tag
       )
-    , Conversion part partBroad (Error partValueExpectation)
+    , Conversion part partBroad (Error fieldValueExpectation)
     )
     ->
-        ConversionStep
+        IntersectionConversionStep
             whole
+            tag
             (part -> wholeAssembleFurther)
             (List (Tagged tag partBroad))
-            (List (Tagged tag (TagOrValue Missing partValueExpectation)))
+            fieldValueExpectation
     ->
-        ConversionStep
+        IntersectionConversionStep
             whole
+            tag
             wholeAssembleFurther
             (List (Tagged tag partBroad))
-            (List (Tagged tag (TagOrValue Missing partValueExpectation)))
+            fieldValueExpectation
 eatPart ( ( accessPart, partTag ), partConversion ) =
     \wholeAssemblyConversion ->
         { narrow =
@@ -183,7 +361,9 @@ eatPart ( ( accessPart, partTag ), partConversion ) =
                     assemblyExpectations =
                         case wholeAssemblyResult of
                             Ok _ ->
-                                []
+                                { fieldValues = []
+                                , fieldsAdditional = []
+                                }
 
                             Err (Expected expectations) ->
                                 expectations
@@ -198,16 +378,20 @@ eatPart ( ( accessPart, partTag ), partConversion ) =
 
                             Err (Expected innerExpectation) ->
                                 Expected
-                                    (assemblyExpectations
-                                        |> (::) (Tagged partTag (Value innerExpectation))
-                                    )
+                                    { assemblyExpectations
+                                        | fieldValues =
+                                            assemblyExpectations.fieldValues
+                                                |> (::) (Tagged partTag innerExpectation)
+                                    }
                                     |> Err
 
                     Nothing ->
                         Expected
-                            (assemblyExpectations
-                                |> (::) (Tagged partTag (Tag Missing))
-                            )
+                            { assemblyExpectations
+                                | fieldsAdditional =
+                                    assemblyExpectations.fieldsAdditional
+                                        |> (::) partTag
+                            }
                             |> Err
         , broaden =
             \wholeNarrow ->
@@ -384,19 +568,39 @@ variantStepNarrow ( variantValueToUnion, variantTag, variantValueNarrow ) =
                             |> Err
 
 
-{-| Assemble from [parts](Conversion#partEat).
+{-| Assemble a combined whole from its [parts](Conversion#partEat).
 -}
-whole :
+intersection :
     narrowAssemble
     ->
-        ConversionStep
+        IntersectionConversionStep
             narrow_
+            tag
             narrowAssemble
             (List (Tagged tag partBroad))
-            foodValueExpectation_
-whole assemble =
+            fieldValueExpectation_
+intersection assemble =
     { narrow = \_ -> assemble |> Ok
     , broaden = \_ -> []
+    }
+
+
+{-| Discriminate a union by [variants](Conversion#variantEat).
+-}
+union :
+    broadenUnion
+    ->
+        UnionConversionStep
+            union_
+            tag_
+            variantValueBroad_
+            broadenUnion
+            variantValueExpectation_
+union discriminate =
+    { narrow =
+        \(Tagged _ _) ->
+            Expected (Tag { oneOf = [] }) |> Err
+    , broaden = discriminate
     }
 
 
@@ -436,4 +640,36 @@ over specificChange =
                     |> conversion.narrow
                     |> Result.andThen
                         specificChange.narrow
+        }
+
+
+{-| Reverse the `Transfer a <-> b`
+by swapping the functions [`narrow`](#narrow) <-> [`broaden`](#broaden).
+
+    [ 'O', 'h', 'a', 'y', 'o' ]
+        |> (Conversion.stringToList
+            |> Conversion.reverse
+            |> Conversion.broaden
+           )
+    --> "Ohayo"
+
+-}
+reverse :
+    Transfer specific specificMapped
+    -> Conversion specificMapped specific error_
+reverse =
+    \transfer_ ->
+        { narrow =
+            \mapped ->
+                mapped
+                    |> (transfer_ |> broaden)
+                    |> Ok
+        , broaden =
+            \specific ->
+                case specific |> (transfer_ |> narrow) of
+                    Ok ok ->
+                        ok
+
+                    Err error ->
+                        error |> never
         }
