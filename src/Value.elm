@@ -11,8 +11,7 @@ module Value exposing
     , DefaultOrCustom(..)
     , Expectation, ExpectationIn(..)
     , LiteralKind
-    , StructureExpectation, Tuple2Expectation, Tuple3Expectation, StructureLinearInsideExpectation, RecordInsideExpectation, VariantTagExpectation(..), VariantInsideExpectation
-    , KindOrInsideExpectation
+    , StructureExpectation, Tuple2Expectation, Tuple3Expectation, KindOrInsideExpectation, StructureLinearInsideExpectation, RecordInsideExpectation, VariantTagExpectation(..), VariantInsideExpectation
     )
 
 {-| elm values as a `case`-able union.
@@ -56,7 +55,7 @@ If you feel especially motivated, throw a PR adding
 @docs DefaultOrCustom
 @docs Expectation, ExpectationIn
 @docs LiteralKind
-@docs StructureExpectation, Tuple2Expectation, Tuple3Expectation, KindOrInside, StructureLinearInsideExpectation, RecordInsideExpectation, VariantTagExpectation, VariantInsideExpectation
+@docs StructureExpectation, Tuple2Expectation, Tuple3Expectation, KindOrInsideExpectation, StructureLinearInsideExpectation, RecordInsideExpectation, VariantTagExpectation, VariantInsideExpectation
 
 -}
 
@@ -185,7 +184,8 @@ type alias LiteralKind =
     Literaly () () () () () ()
 
 
-{-| Failed expectation for the expected [structure](#StructureAny) – [kind or inside](#KindOrInside).
+{-| Failed expectation for the expected [structure](#StructureAny)
+– [kind or inside](#KindOrInsideExpectation).
 -}
 type alias StructureExpectation expectation =
     Structurey
@@ -857,7 +857,7 @@ unionIn moduleOrigin =
         }
 
 
-{-| Finish the [`Conversion.intersection`](Conversion#intersection) |> [`Conversion.eatPart`](Conversion#eatPart) chain.
+{-| Finish the [`Conversion.intersection`](Conversion#intersection) |> [`Conversion.partEat`](Conversion#partEat) chain.
 -}
 intersection :
     Conversion.IntersectionConversionStep
@@ -914,6 +914,8 @@ intersection =
 --
 
 
+{-| `Basics` [`ModuleOrigin`](#ModuleOrigin)
+-}
 moduleBasicsOrigin : ModuleOrigin
 moduleBasicsOrigin =
     ModuleOrigin repositoryElmCoreOrigin "Basics"
@@ -924,8 +926,8 @@ moduleBasicsOrigin =
 bool : Conversion Bool ValueAny (Error expectationCustom_)
 bool =
     Conversion.variantUnion
-        (\true false isTrue ->
-            if isTrue then
+        (\true false boolVariantUnionIsTrue ->
+            if boolVariantUnionIsTrue then
                 true ()
 
             else
@@ -936,6 +938,8 @@ bool =
         |> unionIn moduleBasicsOrigin
 
 
+{-| `Maybe` [`ModuleOrigin`](#ModuleOrigin)
+-}
 moduleMaybeOrigin : ModuleOrigin
 moduleMaybeOrigin =
     ModuleOrigin repositoryElmCoreOrigin "Maybe"
@@ -954,13 +958,15 @@ maybe contentConversion =
                     nothing ()
 
                 Just content ->
-                    just content
+                    content |> just
         )
         |> Conversion.variantEat ( ( Just, "Just" ), contentConversion )
         |> Conversion.variantEat ( ( \() -> Nothing, "Nothing" ), unit )
         |> unionIn moduleMaybeOrigin
 
 
+{-| `Result` [`ModuleOrigin`](#ModuleOrigin)
+-}
 moduleResultOrigin : ModuleOrigin
 moduleResultOrigin =
     ModuleOrigin repositoryElmCoreOrigin "Result"
@@ -978,16 +984,18 @@ result caseConversions =
         (\ok err narrowResult ->
             case narrowResult of
                 Ok value ->
-                    ok value
+                    value |> ok
 
                 Err error ->
-                    err error
+                    error |> err
         )
         |> Conversion.variantEat ( ( Ok, "Ok" ), caseConversions.ok )
         |> Conversion.variantEat ( ( Err, "Err" ), caseConversions.err )
         |> unionIn moduleResultOrigin
 
 
+{-| `Set` [`ModuleOrigin`](#ModuleOrigin)
+-}
 moduleSetOrigin : ModuleOrigin
 moduleSetOrigin =
     ModuleOrigin repositoryElmCoreOrigin "Set"
@@ -1014,6 +1022,8 @@ set elementConversion =
         |> unionIn moduleSetOrigin
 
 
+{-| `Dict` [`ModuleOrigin`](#ModuleOrigin)
+-}
 moduleDictOrigin : ModuleOrigin
 moduleDictOrigin =
     ModuleOrigin repositoryElmCoreOrigin "Dict"
