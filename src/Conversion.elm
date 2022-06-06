@@ -8,11 +8,11 @@ module Conversion exposing
     , listToArray, stringToList
     , lazy, over
     , reverse
-    , Tagged(..), TagOrValue(..), Missing(..)
+    , Tagged(..), TagOrValue(..)
     , IntersectionConversionStep
-    , intersection, eatPart
+    , intersection, partEat
     , UnionConversionStep
-    , union, eatVariant
+    , variantUnion, variantEat
     )
 
 {-| Prism, Codec, Converter = ...
@@ -32,8 +32,6 @@ module Conversion exposing
 
 
 ### fallible transform
-
-@docs errorMap
 
 
 ## transferring
@@ -64,19 +62,19 @@ use [`broaden`](#broaden) or [`reverse`](#reverse) `|> broaden`
 
 ## step
 
-@docs Tagged, TagOrValue, Missing
+@docs Tagged, TagOrValue
 
 
 ### intersections
 
 @docs IntersectionConversionStep
-@docs intersection, eatPart
+@docs intersection, partEat
 
 
 ### unions
 
 @docs UnionConversionStep
-@docs union, eatVariant
+@docs variantUnion, variantEat
 
 
 ## TODO
@@ -157,13 +155,17 @@ errorExpectationMap expectationChange =
 --
 
 
+{-| The function that turns `narrow` into `broad`.
+-}
 broaden :
-    Conversion specific general error
-    -> (specific -> general)
+    Conversion narrow broad error_
+    -> (narrow -> broad)
 broaden =
     \conversion -> conversion.broaden
 
 
+{-| The function that turns `broad` into `narrow` or an `error`.
+-}
 narrow :
     Conversion specific general error
     -> (general -> Result error specific)
@@ -171,6 +173,8 @@ narrow =
     \conversion -> conversion.narrow
 
 
+{-| Take what the `narrow` function [`Expected`](#Error) and adapt it.
+-}
 expectationMap :
     (expectation -> expectationMapped)
     -> Conversion specific general (Error expectation)
@@ -271,7 +275,7 @@ transfer :
     ( specific -> specificMapped
     , specificMapped -> specific
     )
-    -> Conversion specificMapped specific error
+    -> Conversion specificMapped specific error_
 transfer ( to, from ) =
     { broaden = from
     , narrow =
@@ -330,7 +334,7 @@ type alias IntersectionConversionStep narrow tag narrowEat broad fieldValueExpec
 
 {-| Consume another part.
 -}
-eatPart :
+partEat :
     ( ( whole -> part
       , tag
       )
@@ -350,7 +354,7 @@ eatPart :
             wholeAssembleFurther
             (List (Tagged tag partBroad))
             fieldValueExpectation
-eatPart ( ( accessPart, partTag ), partConversion ) =
+partEat ( ( accessPart, partTag ), partConversion ) =
     \wholeAssemblyConversion ->
         { narrow =
             \dictPart ->
@@ -407,19 +411,21 @@ eatPart ( ( accessPart, partTag ), partConversion ) =
         }
 
 
+{-| A missed expectation on either its tag or its value.
+-}
 type TagOrValue tagExpectation valueExpectation
     = Tag tagExpectation
     | Value valueExpectation
 
 
+{-| tag-value pair like a field or a variant.
+-}
 type Tagged tag value
     = Tagged tag value
 
 
-type Missing
-    = Missing
-
-
+{-| Incomplete variant [`Conversion`](#Conversion) builder. See [`variantEat`](#variantEat) & [`variantUnion`](#variantUnion)
+-}
 type alias UnionConversionStep narrowUnion tag variantValueBroad broaden variantValueExpectation =
     { narrow :
         Tagged tag variantValueBroad
@@ -436,7 +442,10 @@ type alias UnionConversionStep narrowUnion tag variantValueBroad broaden variant
     }
 
 
-eatVariant :
+{-| Building one variant value [`Conversion`](#Conversion)
+and feeding it to the [`UnionConversionStep`](#UnionConversionStep).
+-}
+variantEat :
     ( ( variantValue -> narrowUnion
       , tag
       )
@@ -459,7 +468,7 @@ eatVariant :
             variantValueBroad
             narrowUnionEat
             variantValueExpectation
-eatVariant ( ( variantValueToUnion, variantTag ), variantValueConversion ) =
+variantEat ( ( variantValueToUnion, variantTag ), variantValueConversion ) =
     \unionConversionStep ->
         { narrow =
             unionConversionStep.narrow
@@ -568,7 +577,7 @@ variantStepNarrow ( variantValueToUnion, variantTag, variantValueNarrow ) =
                             |> Err
 
 
-{-| Assemble a combined whole from its [parts](Conversion#partEat).
+{-| Assemble a combined whole from its [parts](#partEat).
 -}
 intersection :
     narrowAssemble
@@ -577,7 +586,7 @@ intersection :
             narrow_
             tag
             narrowAssemble
-            (List (Tagged tag partBroad))
+            (List (Tagged tag partBroad_))
             fieldValueExpectation_
 intersection assemble =
     { narrow = \_ -> assemble |> Ok
@@ -587,7 +596,7 @@ intersection assemble =
 
 {-| Discriminate a union by [variants](Conversion#variantEat).
 -}
-union :
+variantUnion :
     broadenUnion
     ->
         UnionConversionStep
@@ -596,7 +605,7 @@ union :
             variantValueBroad_
             broadenUnion
             variantValueExpectation_
-union discriminate =
+variantUnion discriminate =
     { narrow =
         \(Tagged _ _) ->
             Expected (Tag { oneOf = [] }) |> Err
@@ -623,10 +632,20 @@ lazy conversionLazy =
     }
 
 
+{-| Go over an additional step of [`Conversion`](#Conversion) on a broader type.
+
+    ( Set.fromList, Set.toList )
+        |> Conversion.transfer
+        |> Conversion.over
+            (Value.list elementConversion)
+
+You might recognize similarities to the concept of `andThen`.
+
+-}
 over :
-    Conversion moreSpecific specific error
-    -> Conversion specific general error
-    -> Conversion moreSpecific general error
+    Conversion narrow broad error
+    -> Conversion broad broadBroad error
+    -> Conversion narrow broadBroad error
 over specificChange =
     \conversion ->
         { broaden =
