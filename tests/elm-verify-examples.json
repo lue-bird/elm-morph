@@ -1,0 +1,14 @@
+{
+  "root": "../src",
+  "tests": [
+    "Util",
+    "Conversion",
+    "Json",
+    "Parser",
+    "Char.Parser",
+    "Text.Parser",
+    "Parser.Error",
+    "Parser.Expression",
+    "./README.md"
+  ]
+}
