@@ -9,22 +9,53 @@ To add packages that contain rules, add them to this review project using
 
 when inside the directory containing this file.
 
+Rules on radar
+
+  - [`jfmengels/elm-review-cognitive-complexity`](https://dark.elm.dmy.fr/packages/jfmengels/elm-review-cognitive-complexity/latest/CognitiveComplexity)
+      - I currently fear that there will be
+        exceptions where we can't
+        abstract/simplify functions further
+
+## split on
+
+
+
+
+## rejected
+
+    Pipeline.parentheticalApplicationPipelines
+        |> Pipeline.forbid
+        |> Pipeline.that
+            (PipelinePredicate.haveAnyNonInputStepThatIs
+                PipelinePredicate.aSemanticallyInfixFunction
+            )
+        |> Pipeline.andTryToFixThemBy PipelineFix.convertingToRightPizza
+        |> Pipeline.andCallThem "parenthetical application of a semantically-infix function"
+
+because `aSemanticallyInfixFunction` covers `atLeast`/`atMost`/... which can be used here: `Parser.atLeast 3 Char.letter`
+
+  - [`truqu/elm-review-nobooleancase`](https://dark.elm.dmy.fr/packages/truqu/elm-review-nobooleancase/latest/)
+    preferably, I'd completely remove `Bool`s and with it `if ... then ... else ...`
+      - completely covered by elm-review-simplify
+
 -}
 
-import Review.Rule as Rule exposing (Rule)
-import Docs.ReviewLinksAndSections
 import Docs.NoMissing
 import Docs.ReviewAtDocs
-import NoBooleanCase
+import Docs.ReviewLinksAndSections
 import NoDebug.Log
 import NoDebug.TodoOrToString
 import NoExposingEverything
 import NoForbiddenWords
+import NoFunctionOutsideOfModules
 import NoImportingEverything
-import ReviewPipelineStyles
 import NoMissingTypeAnnotation
 import NoMissingTypeExpose
+import NoPrimitiveTypeAlias
+import NoRecordAliasConstructor
 import NoSinglePatternCase
+import NoUnsortedLetDeclarations
+import NoUnsortedTopLevelDeclarations
 import NoUnused.CustomTypeConstructorArgs
 import NoUnused.CustomTypeConstructors
 import NoUnused.Dependencies
@@ -34,27 +65,26 @@ import NoUnused.Parameters
 import NoUnused.Patterns
 import NoUnused.Variables
 import OnlyAllSingleUseTypeVarsEndWith_
+import Review.Rule as Rule exposing (Rule)
+import ReviewPipelineStyles as Pipeline
+import ReviewPipelineStyles.Fixes as PipelineFix
+import ReviewPipelineStyles.Predicates as PipelinePredicate
+import ReviewPipelineStyles.Premade as Pipeline
 import Simplify
-import NoRecordAliasConstructor
-import NoFunctionOutsideOfModules
+import NoAlways
 
 
 config : List Rule
 config =
-    [ Docs.ReviewLinksAndSections.rule
+    [ -- ## documentation
+      Docs.ReviewLinksAndSections.rule
     , Docs.ReviewAtDocs.rule
     , Docs.NoMissing.rule
         { document = Docs.NoMissing.onlyExposed
         , from = Docs.NoMissing.exposedModules
         }
-    , NoDebug.Log.rule
-    , NoDebug.TodoOrToString.rule
-        |> Rule.ignoreErrorsForDirectories [ "tests/" ]
-    , NoExposingEverything.rule
-    , NoForbiddenWords.rule [ "REPLACEME", "TODO", "todo" ]
-    , NoImportingEverything.rule [ "Nats" ]
-    , NoMissingTypeAnnotation.rule
-    , NoMissingTypeExpose.rule
+
+    -- ## simplify
     , NoUnused.CustomTypeConstructors.rule []
     , NoUnused.CustomTypeConstructorArgs.rule
     , NoUnused.Dependencies.rule
@@ -64,7 +94,6 @@ config =
     , NoUnused.Patterns.rule
     , NoUnused.Variables.rule
     , Simplify.rule Simplify.defaults
-    , OnlyAllSingleUseTypeVarsEndWith_.rule
     , NoSinglePatternCase.rule
         (NoSinglePatternCase.fixInArgument
             |> NoSinglePatternCase.ifAsPatternRequired
@@ -73,41 +102,121 @@ config =
                         NoSinglePatternCase.createNewLet
                 )
         )
-    , ReviewPipelineStyles.forbid ReviewPipelineStyles.leftPizzaPipelines
-        |> ReviewPipelineStyles.that ReviewPipelineStyles.haveAnUnnecessaryInputStep
-        |> ReviewPipelineStyles.andTryToFixThemBy ReviewPipelineStyles.eliminatingInputStep
-        |> ReviewPipelineStyles.andCallThem "<| pipeline with simple input"
-    , NoBooleanCase.rule
+
+    -- ## limit
+    , [ [ [ Pipeline.rightPizzaPipelines
+                |> Pipeline.forbid
+                |> Pipeline.that
+                    (PipelinePredicate.haveAnyStepThatIs
+                        PipelinePredicate.aConfusingNonCommutativeFunction
+                    )
+                |> Pipeline.andCallThem
+                    "|> pipeline with confusing non-commutative function"
+          , Pipeline.parentheticalApplicationPipelines
+                |> Pipeline.forbid
+                |> Pipeline.that
+                    (PipelinePredicate.haveAnyStepThatIs
+                        PipelinePredicate.aConfusingNonCommutativePrefixOperator
+                    )
+                |> Pipeline.andCallThem
+                    "parenthetical application with confusing non-commutative prefix operator"
+          ]
+        ]
+            |> List.concat
+      , [ Pipeline.leftPizzaPipelines
+            |> Pipeline.forbid
+            |> Pipeline.andTryToFixThemBy
+                PipelineFix.convertingToParentheticalApplication
+            |> Pipeline.andReportCustomError
+                "<| pipeline"
+                [ "Forbidding `f <| a s` for reasons of simplicity, consistency:"
+                , "  - Pipe data before the function: `food |> op ...`"
+                , "  - Feed arguments after the function: `... |> opWith (a ...) (b ...)`"
+                , "Use the application style `f (a s)` instead"
+                ]
+        , Pipeline.leftCompositionPipelines
+            |> Pipeline.forbid
+            |> Pipeline.andReportCustomError
+                "<< pipeline"
+                [ "Forbidding `g << f` for reasons of simplicity, readability, consistency:"
+                , "  - Keep the order data comes from before and gets piped through functions after: `... |> opF |> opG`"
+                , [ "Establish a subject: `List.map (\\user -> user |> User.badgeAdd ... |> User.levelIncrease)`"
+                  , " for easier readability and scalability (maybe even creating a separate function)"
+                  , " when chaining multiple operations"
+                  ]
+                    |> String.concat
+                ]
+        , Pipeline.rightCompositionPipelines
+            |> Pipeline.forbid
+            |> Pipeline.andReportCustomError
+                ">> pipeline"
+                [ "Forbidding `g >> f` for reasons of simplicity, consistency:"
+                , [ "Establish a subject: `List.map (\\user -> user |> User.badgeAdd ... |> User.levelIncrease)`"
+                  , " for easier readability and scalability (maybe even creating a separate function)"
+                  , " when chaining multiple operations"
+                  ]
+                    |> String.concat
+                ]
+        ]
+      ]
+        |> List.concat
+        |> Pipeline.rule
+    , NoPrimitiveTypeAlias.rule
     , OnlyAllSingleUseTypeVarsEndWith_.rule
     , NoRecordAliasConstructor.rule
+    , NoDebug.TodoOrToString.rule
+        |> Rule.ignoreErrorsForDirectories [ "tests/" ]
+    , NoExposingEverything.rule
+    , NoForbiddenWords.rule forbiddenWords
+    , NoImportingEverything.rule []
+    , NoMissingTypeAnnotation.rule
+    , NoMissingTypeExpose.rule
+    , NoUnsortedTopLevelDeclarations.rule
+        (NoUnsortedTopLevelDeclarations.sortTopLevelDeclarations
+            |> NoUnsortedTopLevelDeclarations.glueHelpersAfter
+            |> NoUnsortedTopLevelDeclarations.glueDependenciesBeforeFirstDependent
+        )
+    , NoUnsortedLetDeclarations.rule
+        (NoUnsortedLetDeclarations.sortLetDeclarations
+            |> NoUnsortedLetDeclarations.glueDependenciesBeforeFirstDependent
+        )
     , NoFunctionOutsideOfModules.rule
-        [ ( [ "Elm.CodeGen.fqTyped"
-            , "Elm.CodeGen.typed"
-            , "Elm.CodeGen.boolAnn"
-            , "Elm.CodeGen.intAnn"
-            , "Elm.CodeGen.floatAnn"
-            , "Elm.CodeGen.stringAnn"
-            , "Elm.CodeGen.charAnn"
-            , "Elm.CodeGen.listAnn"
-            , "Elm.CodeGen.setAnn"
-            , "Elm.CodeGen.dictAnn"
-            , "Elm.CodeGen.maybeAnn"
-            ]
-          , [ "Elm.Code.Type" ]
-          )
-        , ( [ "Elm.CodeGen.fqVal"
-            , "Elm.CodeGen.fqFun"
-            , "Elm.CodeGen.fqConstruct"
-            , "Elm.CodeGen.val"
-            , "Elm.CodeGen.fun"
-            , "Elm.CodeGen.construct"
-            ]
-          , [ "Elm.Code.Expression" ]
-          )
-        , ( [ "Elm.CodeGen.fqNamedPattern"
-            , "Elm.CodeGen.namedPattern"
-            ]
-          , [ "Elm.Code.Pattern" ]
-          )
-        ]
+        [ ( forbiddenFunctionOrValues, [] ) ]
+    , NoAlways.rule
+    , -- could be included in the above
+      NoDebug.Log.rule
     ]
+
+
+forbiddenFunctionOrValues : List String
+forbiddenFunctionOrValues =
+    [ -- use tuple destructuring instead
+      -- for improved descriptiveness
+      "Tuple.first"
+    , "Tuple.second"
+    , -- use `mapFirst |> mapSecond` instead
+      "Tuple.mapBoth"
+    , -- use `String.indexes` instead
+      "String.indices"
+    , -- use a `case` instead
+      "String.isEmpty"
+    , "List.isEmpty"
+    , "List.tail"
+
+    -- use a `Set`, `Dict` or `List.sortWith`
+    , "List.sort"
+    , "List.sortBy"
+    ]
+
+
+forbiddenWords : List String
+forbiddenWords =
+    [ [ "REPLACEME", "replaceme", "replace-me", "ReplaceMe" ]
+    , [ "ToReplace", "TOREPLACE", "to-replace" ]
+    , [ "TODO", "todo", "Todo", "to-do", "ToDo" ]
+    , [ "- []" ]
+    , [ "ToCheck", "to-check" ]
+    , [ "ToFix", "TOFIX" ]
+    , [ "FIXME", "fixme", "FixMe", "Fixme" ]
+    ]
+        |> List.concat
