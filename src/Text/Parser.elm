@@ -1,14 +1,13 @@
 module Text.Parser exposing
-    ( narrowWith, parse
+    ( narrowWith
     , text, caseAny
     , int, number
     , line, lineEnd, lineBeginning
-    , split, splitIncluding
     )
 
 {-| Parsing text
 
-@docs narrowWith, parse
+@docs narrowWith
 
 
 ## match
@@ -25,11 +24,6 @@ module Text.Parser exposing
 
 @docs line, lineEnd, lineBeginning
 
-
-## splitting
-
-@docs split, splitIncluding
-
 Feeling motivated? implement & PR
 
   - date, time, datetime
@@ -41,12 +35,12 @@ Feeling motivated? implement & PR
 
 -}
 
-import Char.Parser as Char exposing (digit, letter)
-import Parser exposing (Parser, andThen, atLeast, atom, atomAny, beginning, between, end, exactly, except, expected, expecting, followedBy, map, notFollowedBy, oneOf, sequence, succeed, take, until)
+import Char.Parser as Char exposing (digit)
+import Parser exposing (Parser, andThen, atLeast, atom, atomAny, between, exactly, expected, expecting, map, oneOf, sequence, succeed, take, until)
 
 
-{-| Parse an input text, and get either an [`Error`](#Error)
-or the parsed value as a result.
+{-| Parse an input text, and get either an [error](Parser#Expected)
+or the parsed narrow value as a `Result`.
 
     import Char.Parser as Char
     import Text.Parser exposing (number)
@@ -65,21 +59,6 @@ or the parsed value as a result.
     --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '1'."
 
 [`narrowWith`](#narrowWith) is the more general version.
-
--}
-parse :
-    String
-    -> Parser Char narrow
-    -> Result (Parser.Error Char) narrow
-parse input =
-    \parser ->
-        input |> narrowWith parser
-
-
-{-| Parse an input, and get either an [`Error`](#Error)
-or a narrow value as a `Result`.
-
-[`parse`](#parse) is a version that specifically parses `String`s.
 
 -}
 narrowWith :
@@ -207,7 +186,6 @@ int =
         , atLeast 1 digit
         ]
         |> map List.concat
-        |> notFollowedBy (atom '.')
         |> map String.fromList
         |> andThen
             (\intString ->
@@ -392,99 +370,3 @@ lineBeginning =
                     ).parse
                         state
     }
-
-
-
--- split
-
-
-{-| Splits the input text by a _separator_ parser into a `List` of `String`s.
-The separators cannot overlap, and are discarded after being matched.
-
-    import Parser exposing (parse, atom)
-
-    -- Split Comma-Separated-Values (CSV) into a `List` of `String`s.
-    split (atom ',')
-        |> parse "a,bc,def"
-    --> Ok [ "a", "bc", "def" ]
-
-    -- Leading/trailing separators are valid and give empty values.
-    split (atom ',')
-        |> parse ",a,,"
-    --> Ok [ "", "a", "", "" ]
-
-    -- An empty input text gives a single empty string element.
-    split (atom ',')
-        |> parse ""
-    --> Ok [ "" ]
-
-TODO: check if API can be rewritten
-
--}
-split : Parser Char separator_ -> Parser Char (List String)
-split separator =
-    succeed (\beforeLast last -> beforeLast ++ [ last ])
-        |> take
-            -- 0 or more values pairs delimited by the separator.
-            (atLeast 0
-                (until separator atomAny
-                    |> map .before
-                    |> map String.fromList
-                )
-            )
-        |> take
-            -- last value with whatever is left
-            (atLeast 0 atomAny |> map String.fromList)
-
-
-{-| Splits the input text by a _separator_ parser into a `List` of `String`s.
-The separators cannot overlap,
-and are interleaved alongside the values in the order found.
-
-    import Parser exposing (map, parse)
-    import Text.Parser exposing (text)
-
-    type Token
-        = Separator
-        | Value String
-
-    -- Note that both values and separators must be of the same type.
-    splitIncluding (text "," |> map (\_ -> Separator)) Value
-        |> parse "a,bc,def"
-    --> Ok [ Value "a", Separator, Value "bc", Separator, Value "def" ]
-
-    -- Leading/trailing separators are valid and give empty values.
-    splitIncluding (text "," |> map (\_ -> Separator)) Value
-        |> parse ",a,,"
-    --> Ok [ Value "", Separator, Value "a", Separator, Value "", Separator, Value "" ]
-
-    -- An empty input text gives a single element from an empty string.
-    splitIncluding (text "," |> map (\_ -> Separator)) Value
-        |> parse ""
-    --> Ok [ Value "" ]
-
-TODO: check if API can be rewritten
-
--}
-splitIncluding :
-    Parser Char separator
-    -> (String -> separator)
-    -> Parser Char (List separator)
-splitIncluding separator f =
-    succeed (\before last -> before ++ [ last ])
-        |> take
-            -- Zero or more value-separator pairs
-            (atLeast 0
-                (until separator atomAny
-                    |> map
-                        (\narrow ->
-                            [ f (narrow.before |> String.fromList), narrow.delimiter ]
-                        )
-                )
-                |> map List.concat
-            )
-        |> take
-            -- Last value with whatever is left
-            (atLeast 0 atomAny
-                |> map (\last -> last |> String.fromList |> f)
-            )
