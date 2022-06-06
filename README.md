@@ -1,8 +1,15 @@
-# elm-value
+# elm-conversion
 
 > build conversions to values you can `case` on
 
+json encoders/decoders are too low-level for serialization,
+explicitly describing how to serialize individual data types that all have the same shape.
+
+Plus it makes it harder to switch to a different format.
+
 ### prior art
+
+There's also an [elm-radio episode on the topic "Codecs"](https://elm-radio.com/episode/codecs/)
 
   - [`bundsol/`: `Boxed`](https://package.elm-lang.org/packages/bundsol/boxed/2.0.0/Boxed)
       - 👎 no box-unbox conversion pairs
@@ -12,8 +19,7 @@
       - 👍 multiple broad results: json, xml, yaml
       - 👎 no encode-decode conversion pairs
   - [`the-sett/decode-generic`](https://dark.elm.dmy.fr/packages/the-sett/decode-generic/latest/Json-Decode-Generic)
-      - 👎 no encode
-      - 👎 no encode-decode conversion pairs
+      - 👎 no encode (so also no encode-decode conversion pairs)
   - [`miniBill/elm-codec`](https://dark.elm.dmy.fr/packages/miniBill/elm-codec/latest/Codec)
       - 👎 no custom errors
   - [`MartinSStewart/elm-serialize`](https://dark.elm.dmy.fr/packages/MartinSStewart/elm-serialize/latest/)
