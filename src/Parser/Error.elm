@@ -1,18 +1,18 @@
 module Parser.Error exposing
-    ( message, dump, dumpCodeSnippet
-    , offsetIn, offsetInString
-    , TextLocation, offsetInLines
+    ( describe
+    , fromLastToFromFirstIn, fromLastToFromFirstInLine
+    , TextLocation, fromLastToFromFirstInLines
     )
 
 {-| Error reporting
 
-@docs message, dump, dumpCodeSnippet
+@docs describe
 
 
 ## offset
 
-@docs offsetIn, offsetInString
-@docs TextLocation, offsetInLines
+@docs fromLastToFromFirstIn, fromLastToFromFirstInLine
+@docs TextLocation, fromLastToFromFirstInLines
 
 -}
 
@@ -39,36 +39,23 @@ type alias TextLocation =
     -- Getting a digit instead of a letter.
     "123"
         |> Text.narrowWith letter
-        |> Result.mapError message
+        |> Result.mapError
+            (expectationMissMessage { source = "123" })
     --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '1'."
 
     -- Running out of input characters.
     ""
         |> Text.narrowWith  letter
-        |> Result.mapError message
+        |> Result.mapError
+            (expectationMissMessage { source = "" })
     --> Err "1:0: I was expecting a letter [a-zA-Z]. I reached the end of the input."
 
 -}
-message : { source : String } -> Parser.Error Char narrow_ -> String
-message source =
-    \error ->
-        case error of
-            Parser.ExpectationMiss expectationMiss ->
-                expectationMiss |> errorMessage source
-
-            Parser.InputRemaining remaining ->
-                [ "I was done parsing when I unexpectedly found remaining input: \""
-                , remaining.input |> Stack.toList |> String.fromList
-                , "\""
-                ]
-                    |> String.concat
-
-
-errorMessage :
+expectationMissMessage :
     { source : String }
     -> Parser.ExpectationMiss Char
     -> String
-errorMessage { source } =
+expectationMissMessage { source } =
     \error ->
         case error.stuckAtFromLast of
             0 ->
@@ -81,10 +68,10 @@ errorMessage { source } =
             stuckAtFromLast ->
                 let
                     stuckAt =
-                        { stuckAtFromLast = stuckAtFromLast } |> offsetInString source
+                        stuckAtFromLast |> fromLastToFromFirstInLine source
                 in
                 [ "At "
-                , stuckAt |> offsetInLines source |> locationToString
+                , stuckAt |> fromLastToFromFirstInLines source |> locationToString
                 , " I was expecting "
                 , error.expected |> expectedToString { source = source }
                 , ". I got stuck on "
@@ -107,7 +94,7 @@ expectedToString source =
             Parser.Expected1In possibilities ->
                 [ "one of these possibilities:\n"
                 , possibilities
-                    |> List.map (dumpCodeSnippet source)
+                    |> List.map (snippet source)
                     |> List.map
                         (\possibility ->
                             "\n  - "
@@ -126,19 +113,19 @@ expectedToString source =
   - 1 for the first input atom
   - input-length for the last input atom
 
-Use [`offsetInString`](#offsetInString) for `String` inputs.
+Use [`fromLastToFromFirstInLine`](#fromLastToFromFirstInLine) for `String` inputs.
 
 -}
-offsetIn : List atom -> { error | stuckAtFromLast : Int } -> Int
-offsetIn inputSource =
-    \error ->
+fromLastToFromFirstIn : List atom_ -> Int -> Int
+fromLastToFromFirstIn inputSource =
+    \fromLast ->
         1
             + ((inputSource |> List.length) - 1)
-            - error.stuckAtFromLast
+            - fromLast
 
 
-offsetInLines : String -> Int -> { line : Int, column : Int }
-offsetInLines source =
+fromLastToFromFirstInLines : String -> Int -> TextLocation
+fromLastToFromFirstInLines source =
     \offset ->
         source
             |> String.lines
@@ -166,12 +153,12 @@ offsetInLines source =
 
 {-| How far parsing got from the beginning of an input source `String`.
 
-Use [`offsetIn`](#offsetIn) for any `List` inputs.
+Use [`fromLastToFromFirstIn`](#fromLastToFromFirstIn) for any `List` inputs.
 
 -}
-offsetInString : String -> { error | stuckAtFromLast : Int } -> Int
-offsetInString inputSource =
-    offsetIn (inputSource |> String.toList)
+fromLastToFromFirstInLine : String -> Int -> Int
+fromLastToFromFirstInLine inputSource =
+    fromLastToFromFirstIn (inputSource |> String.toList)
 
 
 {-| Present the `TextLocation` as `"line:column"`, for example
@@ -276,36 +263,43 @@ locationToString =
     -->     ]
 
 -}
-dump :
+describe :
     { source : String }
     -> Parser.Error Char narrow_
-    -> List String
-dump { source } =
+    -> { message : String, details : List String }
+describe { source } =
     \error ->
-        [ [ error |> message { source = source } ]
-        , case error of
+        case error of
             Parser.ExpectationMiss expectationMiss ->
-                [ expectationMiss.context
-                    |> List.map
-                        (\context ->
-                            [ "  in "
-                            , context.description
-                            , " starting at "
-                            , (source |> String.length)
-                                - context.fromLast
-                                |> offsetInLines source
-                                |> locationToString
-                            ]
-                                |> String.concat
-                        )
-                , expectationMiss |> dumpCodeSnippet { source = source }
-                ]
-                    |> List.concat
+                { message = expectationMiss |> expectationMissMessage { source = source }
+                , details =
+                    [ expectationMiss.context
+                        |> List.map
+                            (\context ->
+                                [ "  in "
+                                , context.description
+                                , " starting at "
+                                , (source |> String.length)
+                                    - context.fromLast
+                                    |> fromLastToFromFirstInLines source
+                                    |> locationToString
+                                ]
+                                    |> String.concat
+                            )
+                    , expectationMiss |> snippet { source = source }
+                    ]
+                        |> List.concat
+                }
 
-            Parser.InputRemaining input ->
-                Debug.todo "input"
-        ]
-            |> List.concat
+            Parser.InputRemaining remaining ->
+                { message =
+                    [ "I was done parsing when I unexpectedly found remaining input: \""
+                    , remaining.input |> Stack.toList |> String.fromList
+                    , "\""
+                    ]
+                        |> String.concat
+                , details = []
+                }
 
 
 {-| Dumps a snippet of the input text that caused the parser to fail.
@@ -369,18 +363,18 @@ dump { source } =
     -->     ]
 
 -}
-dumpCodeSnippet :
+snippet :
     { source : String }
     -> Parser.ExpectationMiss Char
     -> List String
-dumpCodeSnippet { source } =
+snippet { source } =
     \error ->
         let
             errorOffset =
-                error |> offsetInString source
+                error.stuckAtFromLast |> fromLastToFromFirstInLine source
 
             errorLocation =
-                errorOffset |> offsetInLines source
+                errorOffset |> fromLastToFromFirstInLines source
 
             rangeStart =
                 case error.context of
@@ -389,7 +383,7 @@ dumpCodeSnippet { source } =
 
                     context :: _ ->
                         (errorOffset - context.fromLast)
-                            |> offsetInLines source
+                            |> fromLastToFromFirstInLines source
 
             lineNumberWidth =
                 max
