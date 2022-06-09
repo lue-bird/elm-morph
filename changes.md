@@ -19,8 +19,17 @@ Changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
       - `fold`, `foldWhile` remove
           - in favor of `loop`
       - `split`, `splitIncluding`
-        merge into
-        `split : TODO`
+        replace with
+        ```elm
+        split :
+            Parser atom separator
+            ->
+                Parser
+                    atom
+                    { initial : List { part : List atom, separator : separator }
+                    , last : List atom
+                    }
+        ```
   - `Parser.Common` merge → `Text.Parser`
       - `digits` remove
           - in favor of `atLeast 0 Char.Parser.digit` explicitly
