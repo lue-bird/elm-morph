@@ -1,18 +1,18 @@
 module Parser exposing
-    ( Parser, RunningState, Error, Expected(..)
+    ( Parser
+    , Expected(..), ExpectationMiss, Error(..)
     , narrowWith
     , into
     , succeed, expecting, atomAny, atom
-    , beginning, end
     , lazy
     , take, drop
-    , expected, oneOf, andThen, except, map
+    , expected, onFailDown, andThen, except, map
     , atLeast, between, exactly, maybe, sequence
     , until, split
     , loop, LoopStep(..)
     )
 
-{-| A simple, easy to use, general-purpose parser with good error messages out of the box.
+{-| A simple, easy to use, general-purpose parser with good error messages.
 
 Heavily inspired by
 
@@ -20,16 +20,14 @@ Heavily inspired by
   - [`dasch/parser`](https://package.elm-lang.org/packages/dasch/parser/latest/)
   - and especially [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/parser/latest/)
 
-but simplified where possible
-
-Define the data type you want to parse into, then build a parser for that data type.
-
 
 ## example: 2D point
 
-    import Parser exposing (Parser, atLeast, drop, into, parse, succeed, take, atom)
+Define the data type you want to parse into, then build a parser for that data type.
+
+    import Parser exposing (Parser, atLeast, drop, into, succeed, take, atom)
     import Char.Parser as Char
-    import Text.Parser exposing (number)
+    import Text.Parser as Text exposing (number)
     import Parser.Error
 
     type alias Point =
@@ -38,7 +36,7 @@ Define the data type you want to parse into, then build a parser for that data t
         }
 
     -- a successful parse looks like
-    parse "(2.71, 3.14)" point --> Ok { x = 2.71, y = 3.14 }
+    "(2.71, 3.14)" |> Text.narrowWith point --> Ok { x = 2.71, y = 3.14 }
 
     point : Parser Point
     point =
@@ -55,12 +53,12 @@ Define the data type you want to parse into, then build a parser for that data t
                 |> drop (atom ')')
             )
 
-    -- And we can get a nice error message if it fails.
-    point
-        |> parse "(2.71, x)"
+    -- we can get a nice error message if it fails
+    "(2.71, x)"
+        |> Text.narrowWith point
         |> Result.mapError (Parser.Error.dump "filename.txt")
     --> Err
-    -->     [ "[ERROR] filename.txt:1:8: I was expecting a digit [0-9]. I got stuck when I got the character 'x'."
+    -->     [ "[ERROR] filename.txt: line 1:8: I was expecting a digit [0-9]. I got stuck when I got 'x'."
     -->     , "  in Point at line 1:1"
     -->     , ""
     -->     , "1|(2.71, x)"
@@ -68,7 +66,7 @@ Define the data type you want to parse into, then build a parser for that data t
     -->     ]
 
 
-## Usage details documentation
+## usage
 
   - [`Parser`](Parser): creating and chaining parsers
 
@@ -76,13 +74,18 @@ Define the data type you want to parse into, then build a parser for that data t
 
   - [`Text.Parser`](Text-Parser): parsing text
 
-  - [`Parser.Expression`](Parser-Expression):
-    expressions with operator precedence
-
   - [`Parser.Error`](Parser-Error):
     error reporting and formatting
 
-@docs Parser, RunningState, Error, Expected
+Note before we start:
+`Parser` always backtracks and never commits to a specific path!
+
+  - 👍 improves parser code readability
+  - 👍 provides more information on what could be possible to the user
+  - 👎 performs worse as there's more to parse to know it failed
+
+@docs Parser
+@docs Expected, ExpectationMiss, Error
 
 
 ## basic
@@ -94,7 +97,6 @@ Define the data type you want to parse into, then build a parser for that data t
 ## create
 
 @docs succeed, expecting, atomAny, atom
-@docs beginning, end
 
 
 ## recursion
@@ -105,7 +107,7 @@ Define the data type you want to parse into, then build a parser for that data t
 ## chain
 
 @docs take, drop
-@docs expected, oneOf, andThen, except, map
+@docs expected, onFailDown, andThen, except, map
 
 
 ## sequences
@@ -139,24 +141,14 @@ or a value with the next state.
 -}
 type alias Parser atom narrow =
     RecordWithoutConstructorFunction
-        { parse :
-            RunningState atom
+        { narrow :
+            List atom
             ->
                 Result
-                    (Error atom)
-                    { narrow : narrow, state : RunningState atom }
-        }
-
-
-{-| Parsing state storing a `List` of remaining atomic inputs
--}
-type alias RunningState atom =
-    RecordWithoutConstructorFunction
-        { remaining : List atom
-        , lastInput : Maybe atom
-        , -- sometimes called "offset"
-          location : Int
-        , context : List Context
+                    (ExpectationMiss atom)
+                    { narrow : narrow
+                    , input : List atom
+                    }
         }
 
 
@@ -164,20 +156,18 @@ type alias RunningState atom =
 -}
 type alias Context =
     RecordWithoutConstructorFunction
-        { name : String
-        , location : Int
+        { description : String
+        , fromLast : Int
         }
 
 
 {-| Contains the description of an error.
 This includes an error message, the position, and the context stack.
 -}
-type alias Error atom =
+type alias ExpectationMiss atom =
     RecordWithoutConstructorFunction
         { expected : Expected atom
-        , stuckOn : Maybe atom
-        , -- sometimes called "offset"
-          location : Int
+        , stuckAtFromLast : Int
         , context : List Context
         }
 
@@ -186,8 +176,70 @@ type alias Error atom =
 -}
 type Expected atom
     = ExpectedSpecifically atom
-    | ExpectedEnd
+    | Expected1In (List (ExpectationMiss atom))
     | ExpectedCustom String
+
+
+type Error atom narrow
+    = InputRemaining
+        { narrow : narrow
+        , input : List atom
+        }
+    | ExpectationMiss (ExpectationMiss atom)
+
+
+
+--
+
+
+{-| **should not be exposed**
+-}
+expectingInternal :
+    (Expected atom -> Expected atom)
+    -> Parser atom narrow
+    -> Parser atom narrow
+expectingInternal expectedMap =
+    \parser ->
+        { narrow =
+            \input ->
+                parser
+                    |> narrowStepFrom input
+                    |> Result.mapError
+                        (\error ->
+                            { error
+                                | expected = error.expected |> expectedMap
+                            }
+                        )
+        }
+
+
+{-| **should not be exposed**
+-}
+expectedInternal :
+    Expected atom
+    -> Parser atom narrow
+expectedInternal expectation =
+    { narrow =
+        \input ->
+            Err
+                { expected = expectation
+                , stuckAtFromLast = input |> List.length
+                , context = []
+                }
+    }
+
+
+narrowStepFrom :
+    List atom
+    -> Parser atom narrow
+    ->
+        Result
+            (ExpectationMiss atom)
+            { narrow : narrow
+            , input : List atom
+            }
+narrowStepFrom state =
+    \parser -> parser.narrow state
 
 
 
@@ -201,32 +253,36 @@ or the parsed value as a `Result`.
     import Text.Parser exposing (number)
     import Parser.Error
 
-    -- Consumes a single letter, then "bc" are still remaining.
-    parse "abc" Char.letter --> Ok 'a'
+    -- consumes a single letter, then "bc" are still remaining
+    "abc" |> Text.narrowWith Char.letter --> Ok 'a'
 
-    -- We can also parse text into other data types like numbers.
-    parse "3.14" number --> Ok 3.14
+    -- we can also parse text into other data types like numbers
+    "3.14" |> Text.narrowWith number --> Ok 3.14
 
-    -- We get an error message if the parser doesn't match.
-    Char.letter
-        |> parse "123"
+    -- we get an error message if the parser doesn't match
+    "123"
+        |> Text.narrowWith Char.letter
         |> Result.mapError Parser.Error.textMessage
-    --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '1'."
+    --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got '1'."
 
 -}
 narrowWith :
     Parser atom narrow
     -> List atom
-    -> Result (Error atom) narrow
+    -> Result (Error atom narrow) narrow
 narrowWith parser =
     \input ->
-        parser.parse
-            { remaining = input
-            , lastInput = Nothing
-            , location = 1
-            , context = []
-            }
-            |> Result.map .narrow
+        case parser |> narrowStepFrom input of
+            Err expectationMiss ->
+                ExpectationMiss expectationMiss |> Err
+
+            Ok parsed ->
+                case parsed.input of
+                    [] ->
+                        parsed.narrow |> Ok
+
+                    parsedInputRemaining0 :: parsedInputRemaining1Up ->
+                        InputRemaining parsed |> Err
 
 
 {-| Starts a parsing pipeline to parse into a data type.
@@ -254,10 +310,10 @@ this helps to give better error messages.
                 |> drop (atom ')')
             )
 
-    "(12,34)" |> narrowWith point --> Ok { x = 12, y = 34 }
+    "(12,34)" |> Text.narrowWith point --> Ok { x = 12, y = 34 }
 
     -- We can get the error context stack as well as where they started matching.
-    "(a,b)" |> narrowWith point
+    "(a,b)" |> Text.narrowWith point
         |> Result.mapError (\error -> error.context |> List.map .name)
     --> Err [ "Point" ]
 
@@ -266,26 +322,26 @@ into :
     String
     -> Parser atom narrow
     -> Parser atom narrow
-into context parser =
-    { parse =
-        \beforeState ->
-            parser.parse
-                { beforeState
-                    | context =
-                        beforeState.context
-                            |> (::)
-                                { name = context
-                                , location = beforeState.location
-                                }
-                }
+into contextDescription parser =
+    { narrow =
+        \beforeInput ->
+            parser
+                |> narrowStepFrom beforeInput
+                |> Result.mapError
+                    (\error ->
+                        { error
+                            | context =
+                                error.context
+                                    |> (::)
+                                        { description = contextDescription
+                                        , fromLast = beforeInput |> List.length
+                                        }
+                        }
+                    )
                 |> Result.andThen
                     (\after ->
-                        let
-                            afterState =
-                                after.state
-                        in
-                        (succeed after.narrow).parse
-                            { afterState | context = beforeState.context }
+                        succeed after.narrow
+                            |> narrowStepFrom after.input
                     )
     }
 
@@ -297,7 +353,7 @@ take :
     -> Parser atom (next -> applied)
     -> Parser atom applied
 take next =
-    andThen (\f -> next |> map f)
+    andThen (\eat -> next |> map eat)
 
 
 {-| Ignores a parsed value, but it still must match to continue.
@@ -306,12 +362,14 @@ take next =
     import Parser exposing (atom, succeed, atLeast, take, drop)
 
     -- parse a simple email, but we're only interested in the username
-    succeed (\userName -> userName)
-        |> take (atLeast 1 letter)
-        |> drop (atom '@')
-        |> drop (atLeast 1 letter)
-        |> drop (text ".com")
-        |> parse "user@example.com"
+    "user@example.com"
+        |> Text.narrowWith
+            (succeed (\userName -> userName)
+                |> take (atLeast 1 letter)
+                |> drop (atom '@')
+                |> drop (atLeast 1 letter)
+                |> drop (text ".com")
+            )
     --> Ok "user"
 
 -}
@@ -338,7 +396,7 @@ This allows to create self-referential parsers for recursive definitions.
 
     lazyList : Parser LazyList
     lazyList =
-        oneOf [ lazyListEnd, lazyListNext ]
+        onFailDown [ lazyListEnd, lazyListNext ]
 
     lazyListEnd : Parser LazyList
     lazyListEnd =
@@ -348,13 +406,18 @@ This allows to create self-referential parsers for recursive definitions.
     lazyListNext : Parser LazyList
     lazyListNext =
         succeed Next
-            |> take singleAny
+            |> take atomAny
             |> drop (token (text "::"))
             |> take (lazy (\() -> lazyList))
 
-    parse "[]" lazyList --> Ok End
-    parse "a :: []" lazyList --> Ok (Next 'a' End)
-    parse "a :: b :: []" lazyList --> Ok (Next 'a' (Next 'b' End))
+    "[]" |> Text.narrowWith lazyList
+    --> Ok End
+
+    "a :: []" |> Text.narrowWith lazyList
+    --> Ok (Next 'a' End)
+
+    "a :: b :: []" |> Text.narrowWith lazyList
+    --> Ok (Next 'a' (Next 'b' End))
 
 Without `lazy`, you would get an error like:
 
@@ -374,7 +437,8 @@ lazy :
     (() -> Parser atom narrow)
     -> Parser atom narrow
 lazy makeParser =
-    { parse = \state -> (makeParser ()).parse state
+    { narrow =
+        \state -> makeParser () |> narrowStepFrom state
     }
 
 
@@ -383,16 +447,16 @@ lazy makeParser =
 > ℹ️ It's a good idea to use [`Parser.expecting`](Parser#expecting) alongside this function
 > to improve the error messages.
 
-    import Parser exposing (parse)
     import Parser.Error
+    import Text.Parser as Text
 
-    -- Anything except a letter is okay.
-    parse "123" (except letter) --> Ok '1'
-    parse "-123" (except letter) --> Ok '-'
+    -- anything except a letter is okay
+    "123" |> Text.narrowWith (except letter) --> Ok '1'
+    "-123" |> Text.narrowWith (except letter) --> Ok '-'
 
-    -- But a letter is not.
-    except letter
-        |> parse "abc"
+    -- but a letter is not
+    abc"
+        |> Text.narrowWith (except letter)
         |> Result.mapError Parser.Error.textMessage
     --> Err "1:1: I was expecting a different character. I got stuck when I got the character 'a'."
 
@@ -401,14 +465,15 @@ except :
     Parser atom atom
     -> Parser atom atom
 except parser =
-    { parse =
-        \state ->
-            case parser.parse state of
+    { narrow =
+        \input ->
+            case parser |> narrowStepFrom input of
                 Ok exception ->
-                    (expected "a different character").parse exception.state
+                    expected "a different character"
+                        |> narrowStepFrom exception.input
 
                 Err _ ->
-                    atomAny.parse state
+                    atomAny |> narrowStepFrom input
     }
 
 
@@ -416,49 +481,48 @@ except parser =
 
 > ℹ️ Equivalent regular expression: `.`
 
-    import Parser exposing (parse, atomAny)
+    import Parser exposing (atomAny)
     import Parser.Error
+    import Text.Parser as Text
 
     -- can match any character
-    parse "abc" singleAny --> Ok 'a'
-    parse "#hashtag" singleAny --> Ok '#'
+    "abc" |> Text.narrowWith atomAny --> Ok 'a'
+    "#hashtag" |> Text.narrowWith atomAny --> Ok '#'
 
     -- only fails if we run out of inputs
-    singleAny
-        |> parse ""
+    ""
+        |> Text.narrowWith atomAny
         |> Result.mapError Parser.Error.textMessage
     --> Err "1:0: I was expecting a character. I reached the end of the input."
 
 -}
 atomAny : Parser atom atom
 atomAny =
-    { parse =
-        \state ->
-            case state.remaining of
+    { narrow =
+        \input ->
+            case input of
                 [] ->
-                    (expected "at least some input").parse state
+                    expected "at least some input"
+                        |> narrowStepFrom input
 
                 next :: tail ->
-                    (succeed next).parse
-                        { state
-                            | remaining = tail
-                            , lastInput = next |> Just
-                            , location = state.location + 1
-                        }
+                    succeed next
+                        |> narrowStepFrom tail
     }
 
 
-{-| Matches a specific single input.
+{-| Matches a specific single input (= atom).
 
-    import Parser exposing (parse, atom)
+    import Parser exposing (atom)
     import Parser.Error
+    import Text.Parser as Text
 
     -- Match a specific character, case sensitive
-    parse "abc" (atom 'a') --> Ok 'a'
+    "abc" |> Text.narrowWith (atom 'a') --> Ok 'a'
 
     -- It fails if it's not _exactly_ the same
-    atom 'a'
-        |> parse "A"
+    "A"
+        |> Text.narrowWith  (atom 'a')
         |> Result.mapError Parser.Error.textMessage
     --> Err "1:1: I was expecting the character 'a'. I got stuck when I got the character 'A'."
 
@@ -475,7 +539,7 @@ atom expectedSingle =
         )
         atomAny
         |> expectingInternal
-            (ExpectedSpecifically expectedSingle)
+            (\_ -> ExpectedSpecifically expectedSingle)
 
 
 
@@ -488,7 +552,7 @@ atom expectedSingle =
     import Text.Parser exposing (int)
 
     -- Always succeed with "abc" no matter the input text
-    parse "" (succeed "abc") --> Ok "abc"
+    "" |> Text.narrowWith (succeed "abc") --> Ok "abc"
 
     -- This is usually used to start parser pipelines
     type alias Pair =
@@ -503,7 +567,7 @@ atom expectedSingle =
             |> drop (atom ',')
             |> take int
 
-    parse "12,34" pair --> Ok { x = 12, y = 34 }
+    "12,34" |> Text.narrowWith pair --> Ok { x = 12, y = 34 }
 
 One example you'll run into when using other parsers is using
 
@@ -528,8 +592,12 @@ is already nicer, perfect would be
 -}
 succeed : narrow -> Parser atom_ narrow
 succeed narrow =
-    { parse =
-        \state -> { narrow = narrow, state = state } |> Ok
+    { narrow =
+        \state ->
+            { narrow = narrow
+            , input = state
+            }
+                |> Ok
     }
 
 
@@ -550,21 +618,6 @@ expected description =
     expectedInternal (ExpectedCustom description)
 
 
-{-| **should not be exposed**
--}
-expectedInternal : Expected atom -> Parser atom narrow_
-expectedInternal expectation =
-    { parse =
-        \state ->
-            Err
-                { expected = expectation
-                , stuckOn = state.lastInput
-                , location = state.location - 1
-                , context = state.context
-                }
-    }
-
-
 {-| Returns the value of the first parser that matches.
 It tries to match the parsers in order.
 
@@ -579,19 +632,19 @@ If none of the parsers match, it keeps the error message from the last parser.
     import Char.Parser as Char
     import Parser.Error
 
-    -- Try the first parser
-    oneOf [ atom '_', Char.letter ]
-        |> parse "_abc"
+    -- try the first parser
+    "_abc"
+        |> Text.narrowWith (onFailDown [ atom '_', Char.letter ])
     --> Ok '_'
 
-    -- If it doesn't work, try the next
-    oneOf [ atom '_', Char.letter ]
-        |> parse "abc"
+    -- if it doesn't work, try the next
+    "abc"
+        |> Text.narrowWith (onFailDown [ atom '_', Char.letter ])
     --> Ok 'a'
 
-    -- If none of them work, we get the error from the last parser
-    oneOf [ atom '_', Char.letter ]
-        |> parse "123"
+    -- if none of them work, we get the error from the last parser
+    "123"
+        |> Text.narrowWith (onFailDown [ atom '_', Char.letter ])
         |> Result.mapError Parser.Error.textMessage
     --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '1'."
 
@@ -601,52 +654,71 @@ If none of the parsers match, it keeps the error message from the last parser.
     import Char.Parser as Char
     import Parser.Error
 
-    -- Try letters, or else give me some digits
-    oneOf
-        [ atLeast 1 Char.letter
-        , atLeast 1 Char.digit
-        ]
-        |> map String.fromList
-        |> parse "abc"
+    -- try letters, or else give me some digits
+    "abc"
+        |> Text.narrowWith
+            (onFailDown
+                [ atLeast 1 Char.letter
+                , atLeast 1 Char.digit
+                ]
+                |> map String.fromList
+            )
     --> Ok "abc"
 
-    -- We didn't get letters, but we still got digits
-    oneOf
-        [ atLeast 1 Char.letter
-        , atLeast 1 Char.digit
-        ]
-        |> map String.fromList
-        |> parse "123"
+    -- we didn't get letters, but we still got digits
+    "123"
+        |> Text.narrowWith
+            (onFailDown
+                [ atLeast 1 Char.letter
+                , atLeast 1 Char.digit
+                ]
+                |> map String.fromList
+            )
     --> Ok "123"
 
-    -- But if we still fail, give the error message of the fallback parser
-    oneOf
-        [ atLeast 1 Char.letter
-        , atLeast 1 Char.digit
-        ]
-        |> parse "_"
+    -- but if we still fail, give the error message of the fallback parser
+    "_"
+        |> Text.narrowWith
+            (onFailDown
+                [ atLeast 1 Char.letter
+                , atLeast 1 Char.digit
+                ]
+                |> map String.fromList
+            )
         |> Result.mapError Parser.Error.textMessage
     --> Err "1:1: I was expecting at least 1 digit [0-9]. I got stuck when I got the character '_'."
 
 -}
-oneOf :
+onFailDown :
     List (Parser atom narrow)
     -> Parser atom narrow
-oneOf optionParsers =
-    optionParsers
-        |> List.foldl
-            (\soFar parser ->
-                { parse =
-                    \state ->
-                        case parser.parse state of
-                            Ok result ->
-                                result |> Ok
+onFailDown optionParsers =
+    { narrow =
+        \input ->
+            optionParsers
+                |> List.foldl
+                    (\parser soFar ->
+                        case soFar of
+                            Ok soFarOk ->
+                                soFarOk |> Ok
 
-                            Err _ ->
-                                soFar.parse state
-                }
-            )
-            (expected "a parser to match")
+                            Err soFarErrors ->
+                                case parser.narrow input of
+                                    Ok ok ->
+                                        ok |> Ok
+
+                                    Err failure ->
+                                        soFarErrors |> (::) failure |> Err
+                    )
+                    (Err [])
+                |> Result.mapError
+                    (\failedExpectations ->
+                        { context = []
+                        , stuckAtFromLast = input |> List.length
+                        , expected = Expected1In failedExpectations
+                        }
+                    )
+    }
 
 
 {-| Parse one value `andThen` do something with that value,
@@ -660,16 +732,18 @@ or to use the last value for the next parser like a backreference.
     import Parser.Error
 
     -- Get some characters `andThen` interpret them as an `Int`.
-    (atLeast 1 atomAny |> map String.fromList)
-        |> andThen
-            (\chars ->
-                case String.toInt chars of
-                    Just n ->
-                        n |> succeed
-                    Nothing ->
-                        expected "an integer, better use Text.Parser.int"
+    "123"
+        |> Text.narrowWith
+            ((atLeast 1 atomAny |> map String.fromList)
+                |> andThen
+                    (\chars ->
+                        case String.toInt chars of
+                            Just n ->
+                                n |> succeed
+                            Nothing ->
+                                expected "an integer, better use Text.Parser.int"
+                    )
             )
-        |> parse "123"
     --> Ok 123
 
 -}
@@ -678,12 +752,14 @@ andThen :
     -> Parser atom narrow
     -> Parser atom result
 andThen parserFromNarrow parser =
-    { parse =
+    { narrow =
         \state ->
-            parser.parse state
+            parser
+                |> narrowStepFrom state
                 |> Result.andThen
-                    (\next ->
-                        (parserFromNarrow next.narrow).parse next.state
+                    (\result ->
+                        parserFromNarrow result.narrow
+                            |> narrowStepFrom result.input
                     )
     }
 
@@ -700,38 +776,21 @@ parsed value.
 
     import Parser.Error
     import Char.Parser as Char
+    import Text.Parser as Text
 
     -- We can redefine an error message if something goes wrong.
-    atLeast 1 Char.letter
-        |> expecting "a name consisting of letters"
-        |> parse "123"
+    "123"
+        |> Text.narrowWith
+            (atLeast 1 Char.letter
+                |> expecting "a name consisting of letters"
+            )
         |> Result.mapError Parser.Error.textMessage
     --> Err "1:1: I was expecting a name consisting of letters. I got stuck when I got the character '1'."
 
 -}
 expecting : String -> Parser atom narrow -> Parser atom narrow
 expecting description =
-    expectingInternal (ExpectedCustom description)
-
-
-{-| **should not be exposed**
--}
-expectingInternal :
-    Expected atom
-    -> Parser atom narrow
-    -> Parser atom narrow
-expectingInternal expectation =
-    \parser ->
-        { parse =
-            \state ->
-                parser.parse state
-                    |> Result.mapError
-                        (\error ->
-                            { error
-                                | expected = expectation
-                            }
-                        )
-        }
+    expectingInternal (\_ -> ExpectedCustom description)
 
 
 
@@ -740,14 +799,17 @@ expectingInternal expectation =
 
 {-| Transform the narrow result value.
 
-    import Parser exposing (map, parse, atLeast)
+    import Parser exposing (map, atLeast)
     import Char.Parser as Char
+    import Text.Parser as Text
 
     -- Get some letters, and make them lowercase.
-    atLeast 1 Char.letter
-        |> map String.fromList
-        |> map String.toLower
-        |> parse "ABC"
+    "ABC"
+        |> Text.narrowWith
+            (atLeast 1 Char.letter
+                |> map String.fromList
+                |> map String.toLower
+            )
     --> Ok "abc"
 
 -}
@@ -760,87 +822,14 @@ map narrowMap =
 
 
 
--- check
-
-
-{-| Succeeds only if it's the beginning of the input text.
-This does not consume any inputs.
-
-    import Parser exposing (parse)
-    import Char.Parser as Char
-    import Parser.Error
-
-    -- Succeed if we are at the beginning of file
-    beginning
-        |> andThen (\_ -> atLeast 1 Char.letter |> map String.fromList)
-        |> parse "abc"
-    --> Ok "abc"
-
-    -- fail otherwise
-    atLeast 1 Char.letter
-        |> followedBy beginning
-        |> parse "abc123"
-        |> Result.mapError Parser.Error.textMessage
-    --> Err "1:3: I was expecting the beginning of the input text. I got stuck when I got the character 'c'."
-
-TODO: check if should be removed!
-
--}
-beginning : Parser atom_ ()
-beginning =
-    { parse =
-        \state ->
-            case state.lastInput of
-                Nothing ->
-                    (succeed ()).parse state
-
-                Just _ ->
-                    (expected "the beginning of the input").parse state
-    }
-
-
-{-| Succeeds only if there is no more remaining input.
-Does not consume any inputs.
-
-    import Parser exposing (parse, map, end, atLeast)
-    import Char.Parser as Char
-    import Parser.Error
-
-    atLeast 1 Char.letter
-        |> map String.fromList
-        |> followedBy end
-        |> parse "abc"
-    --> Ok "abc"
-
-    atLeast 1 Char.letter
-        |> followedBy end
-        |> parse "abc123"
-        |> Result.mapError Parser.Error.textMessage
-    --> Err "1:4: I was expecting the end of the input, but 3 characters are still remaining. I got stuck when I got the character '1'."
-
--}
-end : Parser atom_ ()
-end =
-    { parse =
-        \state ->
-            case atomAny.parse state of
-                Err _ ->
-                    (succeed ()).parse state
-
-                Ok next ->
-                    (expectedInternal ExpectedEnd).parse
-                        next.state
-    }
-
-
-
 -- sequence
 
 
 {-| Matches a sequence of parsers in order, and gets the result as a `List`.
 
-    import Parser exposing (parse, map, atom)
+    import Parser exposing (map, atom)
     import Char.Parser as Char
+    import Text.Parser as Text
 
     -- all parsers must be of the same type
     "_A5"
@@ -869,58 +858,58 @@ sequence parsers =
     let
         step :
             Parser atom narrow
-            -> { narrow : List narrow, state : RunningState atom }
-            -> Result (Error atom) { narrow : List narrow, state : RunningState atom }
+            ->
+                { narrow : List narrow
+                , input : List atom
+                }
+            ->
+                Result
+                    (ExpectationMiss atom)
+                    { narrow : List narrow
+                    , input : List atom
+                    }
         step stepParser =
             \soFar ->
-                stepParser.parse soFar.state
+                stepParser
+                    |> narrowStepFrom soFar.input
                     |> Result.map
                         (\stepParsed ->
-                            { narrow =
+                            { input = stepParsed.input
+                            , narrow =
                                 soFar.narrow |> (::) stepParsed.narrow
-                            , state = stepParsed.state
                             }
                         )
-
-        parseSequence :
-            RunningState atom
-            -> Result (Error atom) { narrow : List narrow, state : RunningState atom }
-        parseSequence =
-            \initialState ->
-                parsers
-                    |> List.foldr
-                        (\stepParser ->
-                            Result.andThen (step stepParser)
-                        )
-                        ({ narrow = [], state = initialState } |> Ok)
-
-        sequenced : Parser atom (List narrow)
-        sequenced =
-            { parse = parseSequence
-            }
     in
-    sequenced
+    { narrow =
+        \initialInput ->
+            parsers
+                |> List.foldr
+                    (\stepParser ->
+                        Result.andThen (step stepParser)
+                    )
+                    ({ narrow = [], input = initialInput } |> Ok)
+    }
 
 
 {-| Matches an optional value and returns it as a `Maybe`.
 
 > ℹ️ Equivalent regular expression: `?`
 
-    import Parser exposing (parse)
     import Char.Parser exposing (letter)
+    import Text.Parser as Text
 
     -- Maybe we get `Just` a letter
-    maybe letter |> parse "abc" --> Ok (Just 'a')
+    "abc" |> Text.narrowWith (maybe Char.letter) --> Ok (Just 'a')
 
     -- Or maybe we get `Nothing`
-    maybe letter |> parse "123abc" --> Ok Nothing
+    "123abc" |> Text.narrowWith (maybe Char.letter) --> Ok Nothing
 
 -}
 maybe :
     Parser atom narrow
     -> Parser atom (Maybe narrow)
 maybe parser =
-    oneOf
+    onFailDown
         [ map Just parser
         , succeed Nothing
         ]
@@ -930,16 +919,17 @@ maybe parser =
 
 > ℹ️ Equivalent regular expression: `{n}`
 
-    import Parser exposing (parse)
-    import Char.Parser as Char
     import Parser.Error
+    import Char.Parser as Char
+    import Text.Parser as Text
 
-    -- We want `exactly` three letters.
-    parse "abcdef" (exactly 3 Char.letter) --> Ok [ 'a', 'b', 'c' ]
+    -- we want `exactly` three letters
+    "abcdef" |> Text.narrowWith (exactly 3 Char.letter)
+    --> Ok [ 'a', 'b', 'c' ]
 
-    -- Not two or four, we want three.
-    exactly 3 Char.letter
-        |> parse "ab_def"
+    -- not two or four, we want three
+    "ab_def"
+        |> Text.narrowWith (exactly 3 Char.letter)
         |> Result.mapError Parser.Error.textMessage
     --> Err "1:3: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '_'."
 
@@ -956,16 +946,18 @@ exactly n parser =
 
 > ℹ️ Equivalent regular expression: `{min,}`
 
-    import Parser exposing (parse)
-    import Char.Parser as Char
     import Parser.Error
+    import Char.Parser as Char
+    import Text.Parser as Text
 
-    -- We want at least three letters, we are okay with more than three.
-    parse "abcdef" (atLeast 3 Char.letter) --> Ok [ 'a', 'b', 'c', 'd', 'e', 'f' ]
+    -- we want at least three letters, we are okay with more than three
+    "abcdef"
+        |> Text.narrowWith (atLeast 3 Char.letter)
+    --> Ok [ 'a', 'b', 'c', 'd', 'e', 'f' ]
 
-    -- But not two, that's sacrilegious.
-    atLeast 3 Char.letter
-        |> parse "ab_def"
+    -- but not two, that's sacrilegious
+    "ab_def"
+        |> Text.narrowWith (atLeast 3 Char.letter)
         |> Result.mapError Parser.Error.textMessage
     --> Err "1:3: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '_'."
 
@@ -974,35 +966,39 @@ exactly n parser =
 
 > ℹ️ Equivalent regular expression: `*`
 
-    import Parser exposing (parse)
     import Char.Parser as Char
+    import Text.Parser as Text
 
     -- We want as many letters as there are.
-    parse "abc" (atLeast 0 Char.letter) --> Ok [ 'a', 'b', 'c' ]
-    parse "abc123" (atLeast 0 Char.letter) --> Ok [ 'a', 'b', 'c' ]
+    "abc" |> Text.narrowWith (atLeast 0 Char.letter)
+    --> Ok [ 'a', 'b', 'c' ]
 
-    -- Even zero letters is okay.
-    parse "123abc" (atLeast 0 Char.letter) --> Ok []
+    "abc123" |> Text.narrowWith (atLeast 0 Char.letter)
+    --> Ok [ 'a', 'b', 'c' ]
+
+    -- even zero letters is okay
+    "123abc" |> Text.narrowWith (atLeast 0 Char.letter)
+    --> Ok []
 
 
 ### `atLeast 1`
 
 > ℹ️ Equivalent regular expression: `+`
 
-    import Parser exposing (parse)
-    import Char.Parser as Char
     import Parser.Error
+    import Char.Parser as Char
+    import Text.Parser as Text
 
-    -- We want as many letters as there are.
-    parse "abc" (atLeast 1 Char.letter)
+    -- we want as many letters as there are
+    "abc" |> Text.narrowWith (atLeast 1 Char.letter)
     --> Ok [ 'a', 'b', 'c' ]
 
-    parse "abc123" (atLeast 1 Char.letter)
+    "abc123" |> Text.narrowWith (atLeast 1 Char.letter)
     --> Ok [ 'a', 'b', 'c' ]
 
-    -- But we want at least one.
-    atLeast 1 Char.letter
-        |> parse "123abc"
+    -- but we want at least one
+    "123abc"
+        |> Text.narrowWith (atLeast 1 Char.letter)
         |> Result.mapError Parser.Error.textMessage
     --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '1'."
 
@@ -1021,24 +1017,24 @@ atLeast minimum parser =
 
 > ℹ️ Equivalent regular expression: `{min,max}`
 
-    import Parser exposing (parse)
-    import Char.Parser as Char
     import Parser.Error
+    import Char.Parser as Char
+    import Text.Parser as Text
 
-    -- We want between two and four letters.
-    parse "abcdef" (between 2 4 Char.letter)
+    -- we want between two and four letters
+    "abcdef" |> Text.narrowWith (between 2 4 Char.letter)
     --> Ok [ 'a', 'b', 'c', 'd' ]
 
-    parse "abc_ef" (between 2 4 Char.letter)
+    "abc_ef" |> Text.narrowWith (between 2 4 Char.letter)
     --> Ok [ 'a', 'b', 'c' ]
 
-    parse "ab_def" (between 2 4 Char.letter)
+    "ab_def" |> Text.narrowWith (between 2 4 Char.letter)
     --> Ok [ 'a', 'b' ]
 
 
-    -- But less than that is not cool.
-    between 2 3 letter
-        |> parse "a_cdef"
+    -- but less than that is not cool
+    "a_cdef"
+        |> Text.narrowWith (between 2 3 letter)
         |> Result.mapError Parser.Error.textMessage
     --> Err "1:2: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '_'."
 
@@ -1049,37 +1045,45 @@ ALternative to [`maybe`](#maybe) which instead returns a `List`.
 
 > ℹ️ Equivalent regular expression: `?`
 
-    import Parser exposing (parse)
-    import Char.Parser exposing (letter)
+    import Char.Parser as Char
+    import Text.Parser as Text
 
-    -- We want one letter, optionally
-    between 0 1 letter |> parse "abc" --> Ok [ 'a' ]
+    -- we want one letter, optionally
+    "abc" |> Text.narrowWith (between 0 1 Char.letter)
+    --> Ok [ 'a' ]
 
-    -- If we don't get any, that's still okay
-    between 0 1 letter |> parse "123abc" --> Ok []
+    -- if we don't get any, that's still okay
+    "123abc" |> Text.narrowWith (between 0 1 Char.letter)
+    --> Ok []
 
 
 ### example: at most
 
 > ℹ️ Equivalent regular expression: `{0,max}`
 
-    import Parser exposing (parse, atom)
-    import Char.Parser exposing (letter)
+    import Parser exposing (atom)
+    import Char.Parser as Char
+    import Text.Parser as Text
 
-    -- We want a maximum of three letters
-    parse "abcdef" (between 0 3 letter) --> Ok [ 'a', 'b', 'c' ]
+    -- we want a maximum of three letters
+    "abcdef" |> Text.narrowWith (between 0 3 Char.letter)
+    --> Ok [ 'a', 'b', 'c' ]
 
-    -- Less than that is also okay
-    parse "ab_def" (between 0 3 letter) --> Ok [ 'a', 'b' ]
+    -- less than that is also okay
+    "ab_def" |> Text.narrowWith (between 0 3 Char.letter)
+    --> Ok [ 'a', 'b' ]
 
-    -- Even zero letters are fine
-    parse "_bcdef" (between 0 3 letter) --> Ok []
+    -- even zero letters are fine
+    "_bcdef" |> Text.narrowWith (between 0 3 Char.letter)
+    --> Ok []
 
-    -- Make sure we don't consume more than three letters.
-    succeed (\letters -> letters)
-        |> take (between 0 3 letter)
-        |> drop (atom 'd')
-        |> parse "abcdef"
+    -- make sure we don't consume more than three letters
+    "abcdef"
+        |> Text.narrowWith
+            (succeed (\letters -> letters)
+                |> take (between 0 3 Char.letter)
+                |> drop (atom 'd')
+            )
     --> Ok [ 'a', 'b', 'c' ]
 
 -}
@@ -1105,7 +1109,7 @@ atMost maximum =
             { initial = []
             , step =
                 \soFar ->
-                    oneOf
+                    onFailDown
                         [ if (soFar |> List.length) >= maximum then
                             expected ""
 
@@ -1115,7 +1119,7 @@ atMost maximum =
                                     (\parsed ->
                                         succeed (GoOn (parsed :: soFar))
                                     )
-                        , succeed (Done (soFar |> List.reverse))
+                        , succeed (Commit (soFar |> List.reverse))
                         ]
             }
 
@@ -1123,30 +1127,33 @@ atMost maximum =
 {-| Matches a values repeatedly until a delimiter parser matches.
 The delimiter marks the end of the sequence, and it is consumed.
 
-    import Parser exposing (drop, map, parse, succeed, take, atom, end)
-    import Char.Parser as Char
+    import Parser exposing (drop, map, succeed, take, atom, end)
     import Parser.Error
+    import Char.Parser as Char
+    import Text.Parser as Text
 
-    until (atom 'd') Char.letter
-        |> parse "abcdef"
+    "abcdef"
+        |> Text.narrowWith (until (atom 'd') Char.letter)
     --> Ok { before = [ 'a', 'b', 'c' ], delimiter = 'd' }
 
     -- the delimiter _must_ be present
-    until (atom 'd') Char.letter
-        |> parse "abc123"
+    "abc123"
+        |> Text.narrowWith (until (atom 'd') Char.letter)
         |> Result.toMaybe
     --> Nothing
 
-    -- The delimiter is consumed
-    succeed (\tag -> tag)
-        |> drop (atom '<')
-        |> take
-            (until (atom '>') Char.letter
-                |> map .before
-                |> map String.fromList
+    -- the delimiter is consumed
+    "<abc>"
+        |> Text.narrowWith
+            (succeed (\tag -> tag)
+                |> drop (atom '<')
+                |> take
+                    (until (atom '>') Char.letter
+                        |> map .before
+                        |> map String.fromList
+                    )
+                |> drop end
             )
-        |> drop end
-        |> parse "<abc>"
     --> Ok "abc"
 
 -}
@@ -1159,11 +1166,11 @@ until delimiterParser beforeParser =
         { initial = { before = [] }
         , step =
             \{ before } ->
-                oneOf
+                onFailDown
                     [ delimiterParser
                         |> map
                             (\delimiter ->
-                                Done { before = before, delimiter = delimiter }
+                                Commit { before = before, delimiter = delimiter }
                             )
                     , beforeParser
                         |> map
@@ -1176,7 +1183,7 @@ until delimiterParser beforeParser =
 
 type LoopStep partial done
     = GoOn partial
-    | Done done
+    | Commit done
 
 
 {-| A powerful way to recurse over [`Parser`](#Parser)s.
@@ -1184,8 +1191,9 @@ type LoopStep partial done
 
 ### example: fold
 
-    import Parser exposing (Parser, narrowWith, atom, succeed, oneOf, expected, atLeast, take, drop, loop)
+    import Parser exposing (Parser, atom, succeed, onFailDown, expected, atLeast, take, drop, loop)
     import Char.Parser as Char
+    import Text.Parser as Text
     import Text.Parser exposing (number)
 
     sumWhileLessThan : Float -> Parser Char Float
@@ -1194,7 +1202,7 @@ type LoopStep partial done
             { initial = { total = 0 }
             , step =
                 \soFar ->
-                    oneOf
+                    onFailDown
                         [ andThen
                             (\n ->
                                 let
@@ -1210,16 +1218,16 @@ type LoopStep partial done
                                 |> take number
                                 |> drop (atLeast 0 Char.blank)
                             )
-                        , succeed (soFar.total |> Parser.Done)
+                        , succeed (soFar.total |> Parser.Commit)
                         ]
             }
 
     -- The fold stops before we reach a maximum of 6 in the sum
-    "2 3 4" |> narrowWith (sumWhileLessThan 6) --> Ok 5
+    "2 3 4" |> Text.narrowWith (sumWhileLessThan 6) --> Ok 5
 
     -- Make sure we didn't consume too many numbers
     "2 3 4"
-        |> narrowWith
+        |> Text.narrowWith
             (succeed (\sum -> sum)
                 |> take (sumWhileLessThan 6)
                 |> drop (atom '4')
@@ -1234,19 +1242,20 @@ loop :
     }
     -> Parser atom done
 loop parser =
-    { parse =
+    { narrow =
         let
             step partial =
-                \state ->
-                    (parser.step partial).parse state
+                \input ->
+                    parser.step partial
+                        |> narrowStepFrom input
                         |> Result.andThen
                             (\parsed ->
                                 case parsed.narrow of
-                                    Done narrow ->
-                                        (succeed narrow).parse parsed.state
+                                    Commit narrow ->
+                                        succeed narrow |> narrowStepFrom parsed.input
 
                                     GoOn goOnPartial ->
-                                        parsed.state |> step goOnPartial
+                                        parsed.input |> step goOnPartial
                             )
         in
         step parser.initial
@@ -1257,37 +1266,33 @@ loop parser =
 The separators cannot overlap,
 and are interleaved alongside the values in the order found.
 
-    import Parser exposing (map, parse, split)
+    import Parser exposing (map, split)
+    import Text.Parser as Text exposing (text)
 
-    type Token
-        = Separator
-        | Value String
-
-    -- Note that both values and separators must be of the same type.
-    split (text "," |> map (\_ -> Separator)) Value
-        |> parse "a,bc,def"
+    -- note that both values and separators must be of the same type
+    "a,bc,def"
+        |> Text.narrowWith (split (text ","))
         --> Ok
     -->     { initial =
-    -->         [ { part = "a", separator = Separator }
-    -->         , { part = "bc", separator = Separator }
-    -->         , { part = "def", separator = Separator }
+    -->         [ { part = "a", separator = "," }
+    -->         , { part = "bc", separator = "," }
+    -->         , { part = "def", separator = "," }
     -->     , last = ""
     -->     }
 
-    -- Leading/trailing separators are valid and give empty values.
-    split (text "," |> map (\_ -> Separator)) Value
-        |> parse ",a,,"
+    -- leading/trailing separators are valid and give empty values
+    ",a,,"
+        |> Text.narrowWith (split (text ","))
     --> Ok
     -->     { initial =
-    -->         [ { part = "", separator = Separator }
-    -->         , { part = "a", separator = Separator }
-    -->         , { part = "", separator = Separator }
+    -->         [ { part = "", separator = "," }
+    -->         , { part = "a", separator = "," }
+    -->         , { part = "", separator = "," }
     -->     , last = ""
     -->     }
 
-    -- An empty input text gives a single element from an empty string.
-    split (text "," |> map (\_ -> Separator))
-        |> parse ""
+    -- an empty input text gives a single element from an empty string
+    "" |> Text.narrowWith (split (text ","))
     --> Ok { initial = [], last = [] }
 
 -}
@@ -1320,177 +1325,6 @@ split separator =
 
 
 -- zombie
-{- Succeeds only if the input text is followed by a _lookahead_ parser.
-   This does not consume any inputs.
-
-   If you want to consume the inputs or use the matched value in any way,
-   consider using [`Parser.andThen`](Parser#andThen).
-
-   > ℹ️ Equivalent regular expression: `(?=...)` _(positive lookahead)_
-
-       import Parser exposing (parse, succeed)
-       import Char.Parser exposing (digit, letter)
-       import Parser.Error
-
-       -- Succeed only if it's `followedBy` a digit
-       succeed ":)"
-           |> followedBy digit
-           |> parse "123"
-       --> Ok ":)"
-
-       -- Match letters only if it's `followedBy` a digit
-       (atLeast 1 letter |> map String.fromList)
-           |> followedBy digit
-           |> parse "abc123"
-       --> Ok "abc"
-
-       -- Even if we match the letters, fail if the next character is not a digit
-       (atLeast 1 letter |> map String.fromList)
-           |> followedBy digit
-           |> parse "abc@def"
-           |> Result.mapError Parser.Error.textMessage
-       --> Err "1:4: I was expecting a digit [0-9]. I got stuck when I got the character '@'."
-
-   followedBy :
-   Parser atom lookahead\_
-   -> Parser atom narrow
-   -> Parser atom narrow
-   followedBy lookahead =
-   \\parser ->
-   { parse =
-   \\state ->
-   parser.parse state
-   |> Result.andThen
-   (\\parsed ->
-   lookahead.parse parsed.state
-   |> Result.map (\_ -> parsed)
-   )
-   }
-
-   Succeeds only if the input text is _not_ followed by a _lookahead_ parser.
-   This does not consume any inputs.
-
-   > ℹ️ It's a good idea to use [`Parser.expecting`](Parser#expecting) alongside this function
-   > to improve the error messages.
-
-   > ℹ️ Equivalent regular expression: `(?!...)` _(negative lookahead)_
-
-       import Parser exposing (expecting, parse, succeed)
-       import Char.Parser exposing (digit, letter)
-       import Parser.Error
-
-       -- Succeed only if it's `notFollowedBy` a digit.
-       succeed ":)"
-           |> notFollowedBy digit
-           |> parse "abc"
-       --> Ok ":)"
-
-       -- Match letters only if it's `notFollowedBy` a digit.
-       (atLeast 1 letter |> map String.fromList)
-           |> notFollowedBy digit
-           |> expecting "letters not followed by a number"
-           |> parse "abc@def"
-       --> Ok "abc"
-
-       -- Even if we match the letters, fail if the next character is a digit.
-       -- This is the default error message, but you can use `expecting` to improve it.
-       (atLeast 1 letter |> map String.fromList)
-           |> notFollowedBy digit
-           |> parse "abc123"
-           |> Result.mapError Parser.Error.textMessage
-       --> Err "1:4: I was expecting to not match a pattern, but I did. I got stuck when I got the character '1'."
-
-   notFollowedBy :
-   Parser atom lookahead\_
-   -> Parser atom narrow
-   -> Parser atom narrow
-   notFollowedBy lookahead =
-   \\parser ->
-   { parse =
-   \\state ->
-   parser.parse state
-   |> Result.andThen
-   (\\parsed ->
-   case parsed.state |> lookahead.parse of
-   Ok lookaheadParsed ->
-   (expected "to not match a pattern, but I did").parse
-   lookaheadParsed.state
-
-                                   Err _ ->
-                                       parsed |> Ok
-                           )
-           }
-
-   Succeeds only if the last character matches the parser provided.
-   This does not consume any inputs.
-
-       import Parser exposing (parse, atom, atomAny, atLeast, precededBy)
-       import Char.Parser as Char exposing (letter)
-       import Parser.Error
-
-       -- Make sure some letters were preceded by a '_'
-       singleAny
-           |> andThen
-               (\_ ->
-                   precededBy (atom '_') (atLeast 1 letter)
-                       |> map String.fromList
-               )
-           |> parse "_abc"
-       --> Ok "abc"
-
-       -- If it was something different, it fails
-       singleAny
-           |> andThen (\_ -> precededBy (atom '_') (atLeast 1 letter))
-           |> parse "@abc"
-           |> Result.mapError Parser.Error.textMessage
-       --> Err "1:1: I was expecting the character '_'. I got stuck when I got the character '@'."
-
-
-   ### example: `precededBy (except ...)`
-
-       import Parser exposing (parse, atom, atLeast, atomAny, except, andThen)
-       import Char.Parser as Char exposing (letter)
-       import Parser.Error
-
-       -- Make sure some letters were not preceded by a '_'.
-       singleAny
-           |> andThen
-               (\_ ->
-                   precededBy (except (atom '_')) (atLeast 1 letter)
-                       |> map String.fromList
-               )
-           |> parse "@abc"
-       --> Ok "abc"
-
-       -- If it was preceded by '_', it fails.
-       singleAny
-           |> andThen (\_ -> precededBy (except (atom '_')) (atLeast 1 letter))
-           |> parse "_abc"
-           |> Result.mapError Parser.Error.textMessage
-       --> Err "1:1: I was expecting a different character. I got stuck when I got the character '_'."
-
-
-
-       precededBy :
-           Parser atom atom
-           -> Parser atom narrow
-           -> Parser atom narrow
-       precededBy preceding parser =
-           { parse =
-               \state ->
-                   parser.parse state
-                       |> Result.andThen
-                           (\parsed ->
-                               preceding.parse
-                                   { state
-                                       | remaining =
-                                           state.lastInput
-                                               |> Maybe.map List.singleton
-                                               |> Maybe.withDefault []
-                                       , location = state.location - 1
-                                   }
-                                   |> Result.map (\_ -> parsed)
-                           )
-           }
+{-
 
 -}

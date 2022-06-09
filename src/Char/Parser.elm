@@ -15,43 +15,46 @@ module Char.Parser exposing
 @docs letter, caseLower, caseUpper
 
 
-### example: `oneOf [ letter, digit ]`
+### example: `onFailDown [ letter, digit ]`
 
 > ℹ️ Equivalent regular expression: `[a-zA-Z0-9]`
 
-    import Parser exposing (parse, oneOf)
+    import Parser exposing (onFailDown)
+    import Parser.Error
+    import Text.Parser as Text
 
     -- Match a letter or number.
-    oneOf [ letter, digit ] |> parse "abc" --> Ok 'a'
-    oneOf [ letter, digit ] |> parse "ABC" --> Ok 'A'
-    oneOf [ letter, digit ] |> parse "123" --> Ok '1'
+    "abc" |> Text.narrowWith (onFailDown [ letter, digit ])
+    --> Ok 'a'
+    "ABC" |> Text.narrowWith (onFailDown [ letter, digit ])
+    --> Ok 'A'
+    "123" |> Text.narrowWith (onFailDown [ letter, digit ])
+    --> Ok '1'
 
-    -- But anything else makes it fail.
-    import Parser.Error
-
-    oneOf [ letter, digit ]
-        |> parse "_abc"
+    -- but anything else makes it fail
+    "_abc"
+        |> Text.narrowWith (onFailDown [ letter, digit ])
         |> Result.mapError Parser.Error.textMessage
     --> Err "1:1: I was expecting a letter or a digit [a-zA-Z0-9]. I got stuck when I got the character '_'."
 
 -}
 
-import Parser exposing (Parser, andThen, atom, atomAny, expected, expecting, oneOf, succeed)
+import Parser exposing (Parser, andThen, atom, atomAny, expected, expecting, onFailDown, succeed)
 
 
 {-| Matches a specific single character.
 This is case insensitive.
 
-    import Parser exposing (parse)
-    import Char.Parser as Char
     import Parser.Error
+    import Char.Parser as Char
+    import Text.Parser as Text
 
-    -- Match a specific character, case insensitive
-    parse "abc" (Char.caseAny 'a') --> Ok 'a'
-    parse "ABC" (Char.caseAny 'a') --> Ok 'A'
+    -- match a specific character, case insensitive
+    "abc" |> Text.narrowWith (Char.caseAny 'a') --> Ok 'a'
+    "ABC" |> Text.narrowWith (Char.caseAny 'a') --> Ok 'A'
 
-    Char.caseAny 'a'
-        |> parse "123"
+    "123"
+        |> Text.narrowWith (Char.caseAny 'a')
         |> Result.mapError Parser.Error.textMessage
     --> Err "1:1: I was expecting the character 'a' (case insensitive). I got stuck when I got the character '1'."
 
@@ -80,17 +83,16 @@ caseAny expectedCharacter =
 
 > ℹ️ Equivalent regular expression: `[0-9]` or `\d`
 
-    import Parser exposing (parse)
-
-    -- Match a digit.
-    parse "123" digit --> Ok '1'
-    parse "3.14" digit --> Ok '3'
-
-    -- But anything else makes it fail.
     import Parser.Error
+    import Text.Parser as Text
 
-    digit
-        |> parse "abc"
+    -- match a digit
+    "123" |> Text.narrowWith digit --> Ok '1'
+    "3.14" |> Text.narrowWith digit --> Ok '3'
+
+    -- but anything else makes it fail
+    "abc"
+        |> Text.narrowWith digit
         |> Result.mapError Parser.Error.textMessage
     --> Err "1:1: I was expecting a digit [0-9]. I got stuck when I got the character 'a'."
 
@@ -99,15 +101,18 @@ caseAny expectedCharacter =
 
 > ℹ️ Equivalent regular expression: `[0-9]+` or `\d+`
 
-    import Parser exposing (parse, map)
-    import Char.Parser exposing (digit)
+    import Parser exposing (map)
     import Parser.Error
+    import Char.Parser exposing (digit)
+    import Text.Parser as Text
 
-    parse "123abc" (atLeast 1 digit) --> Ok "123"
+    "123abc" |> Text.narrowWith (atLeast 1 digit) --> Ok "123"
 
-    atLeast 1 digit
-        |> map String.fromList
-        |> parse "abc123"
+    "abc123"
+        |> Text.narrowWith
+            (atLeast 1 digit
+                |> map String.fromList
+            )
         |> Result.mapError Parser.Error.textMessage
     --> Err "1:1: I was expecting at least 1 digit [0-9]. I got stuck when I got the character 'a'."
 
@@ -131,17 +136,18 @@ This is case insensitive.
 
 > ℹ️ Equivalent regular expression: `[a-zA-Z]`
 
-    import Parser exposing (parse)
+    import Char.Parser exposing (letter)
+    import Text.Parser as Text
 
-    -- Match any letter, case insensitive.
-    parse "abc" letter --> Ok 'a'
-    parse "ABC" letter --> Ok 'A'
+    -- match any letter, case insensitive
+    "abc" |> Text.narrowWith letter --> Ok 'a'
+    "ABC" |> Text.narrowWith letter --> Ok 'A'
 
     -- But anything else makes it fail.
     import Parser.Error
 
-    letter
-        |> parse "123"
+    "123"
+        |> Text.narrowWith letter
         |> Result.mapError Parser.Error.textMessage
     --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '1'."
 
@@ -150,18 +156,23 @@ This is case insensitive.
 
 > ℹ️ Equivalent regular expression: `[a-zA-Z]+`
 
-    import Parser exposing (atLeast, parse)
+    import Parser exposing (atLeast)
     import Parser.Error
+    import Text.Parser as Text
 
-    -- Match many letters, case insensitive
-    atLeast 1 letter
-        |> map String.fromList
-        |> parse "aBc123"
+    -- match many letters, case insensitive
+    "aBc123"
+        |> Text.narrowWith
+            (atLeast 1 letter
+                |> map String.fromList
+            )
     --> Ok "aBc"
 
-    atLeast 1 letter
-        |> map String.fromList
-        |> parse "123abc"
+    "123abc"
+        |> Text.narrowWith
+            (atLeast 1 letter
+                |> map String.fromList
+            )
         |> Result.mapError Parser.Error.textMessage
     --> Err "1:1: I was expecting at least 1 letters [a-zA-Z]+. I got stuck when I got the character '1'."
 
@@ -185,16 +196,15 @@ This is case sensitive.
 
 > ℹ️ Equivalent regular expression: `[a-z]`
 
-    import Parser exposing (parse)
-
-    -- Match a lowercase letter.
-    parse "abc" lowercase --> Ok 'a'
-
-    -- But anything else makes it fail.
     import Parser.Error
+    import Text.Parser as Text
 
-    lowercase
-        |> parse "ABC"
+    -- match a lowercase letter
+    "abc" |> Text.narrowWith lowercase --> Ok 'a'
+
+    -- but anything else makes it fail
+    "ABC"
+        |> Text.narrowWith lowercase
         |> Result.mapError Parser.Error.textMessage
     --> Err "1:1: I was expecting a lowercase letter [a-z]. I got stuck when I got the character 'A'."
 
@@ -202,9 +212,9 @@ This is case sensitive.
 caseLower : Parser Char Char
 caseLower =
     andThen
-        (\c ->
-            if Char.isLower c then
-                succeed c
+        (\char ->
+            if char |> Char.isLower then
+                succeed char
 
             else
                 expected ""
@@ -219,16 +229,15 @@ This is case sensitive.
 > ℹ️ Equivalent regular expression: `[A-Z]`
 
     import Parser
+    import Parser.Error
     import Text.Parser as Text
 
-    -- Match an uppercase letter.
-    caseUpper |> Text.parse "ABC" --> Ok 'A'
+    -- match an uppercase letter
+    caseUpper |> Text.narrowWith "ABC" --> Ok 'A'
 
-    -- But anything else makes it fail.
-    import Parser.Error
-
-    caseUpper
-        |> Text.parse "abc"
+    -- but anything else makes it fail
+    "abc"
+        |> Text.narrowWith caseUpper
         |> Result.mapError Parser.Error.textMessage
     --> Err "1:1: I was expecting a letter uppercase [A-Z]. I got stuck when I got the character 'a'."
 
@@ -257,38 +266,42 @@ caseUpper =
 
 > ℹ️ Equivalent regular expression: `[ \t\n\r\f]` or `\s`
 
-    import Parser exposing (parse)
+    import Parser.Error
+    import Text.Parser as Text
 
-    -- Match a blank
-    parse "    abc" blank --> Ok ' '
-    parse "\n\t abc" blank --> Ok '\n'
+    -- match a blank
+    "    abc" |> Text.narrowWith blank --> Ok ' '
+    "\n\t abc" |> Text.narrowWith blank --> Ok '\n'
 
     -- But anything else makes it fail.
-    import Parser.Error
 
-    parse "abc" blank
+    "abc"
+        |> Text.narrowWith blank
         |> Result.mapError Parser.Error.textMessage
     --> Err "1:1: I was expecting a blank space or new line. I got stuck when I got the character 'a'."
 
 
 ### example: token surrounded by spaces
 
-    import Parser exposing (succeed, atLeast, drop, take, parse, atom)
+    import Parser exposing (succeed, atLeast, drop, take, atom)
     import Text.Parser as Text
     import Char.Parser as Char
 
-    succeed (\x y -> x + y)
-        |> take Text.int
-        |> drop (atLeast 0 Char.blank)
-        |> drop (atom '+')
-        |> drop (atLeast 0 Char.blank)
-        |> take Text.int
-        |> parse "1  +  2" --> Ok 3
+    "1  +  2"
+        |> Text.narrowWith
+            (succeed (\x y -> x + y)
+                |> take Text.int
+                |> drop (atLeast 0 Char.blank)
+                |> drop (atom '+')
+                |> drop (atLeast 0 Char.blank)
+                |> take Text.int
+            )
+    --> Ok 3
 
 -}
 blank : Parser Char Char
 blank =
-    oneOf
+    onFailDown
         (List.map atom
             [ ' ' -- space
             , '\t' -- tab
@@ -307,21 +320,21 @@ A punctuation character can be any of
 
 > ℹ️ Equivalent regular expression: `[!"#$%&'()*+,-./:;<=>?@[\]^_\\{}~]`
 
-    import Parser exposing (parse)
     import Parser.Error
+    import Text.Parser as Text
 
-    parse "#hashtag" punctuation --> Ok '#'
-    parse "=123" punctuation --> Ok '='
+    "#hashtag" |> Text.narrowWith punctuation --> Ok '#'
+    "=123" |> Text.narrowWith punctuation --> Ok '='
 
-    punctuation
-        |> parse "abc"
+    "abc"
+        |> Text.narrowWith punctuation
         |> Result.mapError Parser.Error.textMessage
     --> Err "1:1: I was expecting a punctuation character. I got stuck when I got the character 'a'."
 
 -}
 punctuation : Parser Char Char
 punctuation =
-    oneOf
+    onFailDown
         (List.map atom
             [ '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/', ':', ';', '<', '=', '>', '?', '@', '[', ']', '^', '_', '\\', '{', '}', '~' ]
         )
