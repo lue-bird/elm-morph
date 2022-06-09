@@ -34,7 +34,7 @@ else `Err` with information on at what indexes elements were `Err`.
 
 -}
 listResultsToValuesOrErrors :
-    List (Result (Conversion.Error expectation) value)
+    List (Result (Conversion.Expected expectation) value)
     -> Result (StructureLinearInsideExpectation expectation) (List value)
 listResultsToValuesOrErrors =
     \results ->

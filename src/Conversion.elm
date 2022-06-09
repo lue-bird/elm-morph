@@ -1,6 +1,6 @@
 module Conversion exposing
     ( Conversion
-    , Error(..), errorExpectation, errorExpectationMap
+    , Expected(..), expectation, errorExpectationMap
     , validate, expectationMap
     , broaden, narrow
     , Transfer
@@ -22,7 +22,7 @@ module Conversion exposing
 
 ## fallible
 
-@docs Error, errorExpectation, errorExpectationMap
+@docs Expected, expectation, errorExpectationMap
 @docs validate, expectationMap
 
 
@@ -76,14 +76,6 @@ use [`broaden`](#broaden) or [`reverse`](#reverse) `|> broaden`
 @docs UnionConversionStep
 @docs variantUnion, variantEat
 
-
-## TODO
-
-draw inspiration from
-
-  - [miniBill/elm-codec](https://github.com/miniBill/elm-codec/blob/main/src/Codec.elm)
-  - [MartinSStewart/elm-serialize](https://github.com/MartinSStewart/elm-serialize/blob/master/src/Serialize.elm)
-
 -}
 
 import Array exposing (Array)
@@ -123,7 +115,7 @@ type alias Conversion narrow broad error =
 
 {-| An expectation that hasn't been met.
 -}
-type Error expectation
+type Expected expectation
     = Expected expectation
 
 
@@ -134,21 +126,20 @@ type Error expectation
     --> 3
 
 -}
-errorExpectation : Error expectation -> expectation
-errorExpectation =
-    \(Expected expectation) ->
-        expectation
+expectation : Expected expectation -> expectation
+expectation =
+    \(Expected expectation_) -> expectation_
 
 
 {-| Change the expectation that hasn't been met.
 -}
 errorExpectationMap :
     (expectation -> expectationMapped)
-    -> Error expectation
-    -> Error expectationMapped
+    -> Expected expectation
+    -> Expected expectationMapped
 errorExpectationMap expectationChange =
-    \(Expected expectation) ->
-        Expected (expectation |> expectationChange)
+    \(Expected expectation_) ->
+        Expected (expectation_ |> expectationChange)
 
 
 
@@ -173,12 +164,12 @@ narrow =
     \conversion -> conversion.narrow
 
 
-{-| Take what the `narrow` function [`Expected`](#Error) and adapt it.
+{-| Take what the `narrow` function [`Expected`](#Expected) and adapt it.
 -}
 expectationMap :
     (expectation -> expectationMapped)
-    -> Conversion specific general (Error expectation)
-    -> Conversion specific general (Error expectationMapped)
+    -> Conversion specific general (Expected expectation)
+    -> Conversion specific general (Expected expectationMapped)
 expectationMap expectationChange =
     \conversion ->
         { broaden = conversion |> broaden
@@ -322,7 +313,7 @@ type alias IntersectionConversionStep narrow tag narrowEat broad fieldValueExpec
             broad
             ->
                 Result
-                    (Error
+                    (Expected
                         { fieldsAdditional : List tag
                         , fieldValues : List (Tagged tag fieldValueExpectation)
                         }
@@ -338,7 +329,7 @@ partEat :
     ( ( whole -> part
       , tag
       )
-    , Conversion part partBroad (Error fieldValueExpectation)
+    , Conversion part partBroad (Expected fieldValueExpectation)
     )
     ->
         IntersectionConversionStep
@@ -431,9 +422,9 @@ type alias UnionConversionStep narrowUnion tag variantValueBroad broaden variant
         Tagged tag variantValueBroad
         ->
             Result
-                (Error
+                (Expected
                     (TagOrValue
-                        { oneOf : List tag }
+                        { possibilities : List tag }
                         variantValueExpectation
                     )
                 )
@@ -452,7 +443,7 @@ variantEat :
     , Conversion
         variantValue
         variantValueBroad
-        (Error variantValueExpectation)
+        (Expected variantValueExpectation)
     )
     ->
         UnionConversionStep
@@ -506,15 +497,15 @@ variantStepNarrow :
     ( variantValue -> narrowUnion
     , tag
     , variantValueBroad
-      -> Result (Error variantValueExpectation) variantValue
+      -> Result (Expected variantValueExpectation) variantValue
     )
     ->
         (Tagged tag variantValueBroad
          ->
             Result
-                (Error
+                (Expected
                     (TagOrValue
-                        { oneOf : List tag }
+                        { possibilities : List tag }
                         variantValueExpectation
                     )
                 )
@@ -524,9 +515,9 @@ variantStepNarrow :
         (Tagged tag variantValueBroad
          ->
             Result
-                (Error
+                (Expected
                     (TagOrValue
-                        { oneOf : List tag }
+                        { possibilities : List tag }
                         variantValueExpectation
                     )
                 )
@@ -565,11 +556,11 @@ variantStepNarrow ( variantValueToUnion, variantTag, variantValueNarrow ) =
                                         []
 
                                     Tag expectations ->
-                                        expectations.oneOf
+                                        expectations.possibilities
                         in
                         Expected
                             (Tag
-                                { oneOf =
+                                { possibilities =
                                     triedTags
                                         |> (::) variantTag
                                 }
@@ -608,7 +599,7 @@ variantUnion :
 variantUnion discriminate =
     { narrow =
         \(Tagged _ _) ->
-            Expected (Tag { oneOf = [] }) |> Err
+            Expected (Tag { possibilities = [] }) |> Err
     , broaden = discriminate
     }
 

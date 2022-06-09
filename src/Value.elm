@@ -144,7 +144,7 @@ type alias RecordOfValueAny =
 {-| Information on what went wrong while `narrow`ing from a [`ValueAny`](#ValueAny).
 -}
 type alias Error expectationCustom =
-    Conversion.Error (Expectation expectationCustom)
+    Conversion.Expected (Expectation expectationCustom)
 
 
 {-| A failed expectation of a different structure kind or an inner part.
@@ -814,8 +814,8 @@ unionIn moduleOrigin =
                                             let
                                                 variantInsideExpectation =
                                                     case expectation of
-                                                        Tag { oneOf } ->
-                                                            VariantTagOneOf (oneOf |> Set.fromList) |> Tag
+                                                        Tag { possibilities } ->
+                                                            VariantTagOneOf (possibilities |> Set.fromList) |> Tag
 
                                                         Value valueExpectation ->
                                                             valueExpectation |> ExpectationIn |> Value

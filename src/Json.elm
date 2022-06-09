@@ -93,7 +93,7 @@ jsValueMagic :
     Conversion
         JsonAny
         JsValueMagic
-        (Conversion.Error { validJsonFormat : String })
+        (Conversion.Expected { validJsonFormat : String })
 jsValueMagic =
     { narrow =
         \jsonMagicBroad ->
