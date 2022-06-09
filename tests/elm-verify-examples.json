@@ -8,7 +8,6 @@
     "Char.Parser",
     "Text.Parser",
     "Parser.Error",
-    "Parser.Expression",
     "./README.md"
   ]
 }
