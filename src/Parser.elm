@@ -122,7 +122,9 @@ Note before we start:
 
 -}
 
+import Hand exposing (Empty, Hand, filled)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
+import Stack exposing (Stacked)
 
 
 
@@ -183,50 +185,13 @@ type Expected atom
 type Error atom narrow
     = InputRemaining
         { narrow : narrow
-        , input : List atom
+        , input : Hand (Stacked atom) Never Empty
         }
     | ExpectationMiss (ExpectationMiss atom)
 
 
 
 --
-
-
-{-| **should not be exposed**
--}
-expectingInternal :
-    (Expected atom -> Expected atom)
-    -> Parser atom narrow
-    -> Parser atom narrow
-expectingInternal expectedMap =
-    \parser ->
-        { narrow =
-            \input ->
-                parser
-                    |> narrowStepFrom input
-                    |> Result.mapError
-                        (\error ->
-                            { error
-                                | expected = error.expected |> expectedMap
-                            }
-                        )
-        }
-
-
-{-| **should not be exposed**
--}
-expectedInternal :
-    Expected atom
-    -> Parser atom narrow
-expectedInternal expectation =
-    { narrow =
-        \input ->
-            Err
-                { expected = expectation
-                , stuckAtFromLast = input |> List.length
-                , context = []
-                }
-    }
 
 
 narrowStepFrom :
@@ -240,10 +205,6 @@ narrowStepFrom :
             }
 narrowStepFrom state =
     \parser -> parser.narrow state
-
-
-
--- basic
 
 
 {-| Parse an input text, and get either an [`Error`](#Error)
@@ -277,12 +238,16 @@ narrowWith parser =
                 ExpectationMiss expectationMiss |> Err
 
             Ok parsed ->
-                case parsed.input of
-                    [] ->
+                case parsed.input |> Stack.fromList of
+                    Hand.Empty _ ->
                         parsed.narrow |> Ok
 
-                    parsedInputRemaining0 :: parsedInputRemaining1Up ->
-                        InputRemaining parsed |> Err
+                    Hand.Filled inputStacked ->
+                        InputRemaining
+                            { narrow = parsed.narrow
+                            , input = inputStacked |> filled
+                            }
+                            |> Err
 
 
 {-| Starts a parsing pipeline to parse into a data type.
@@ -344,6 +309,10 @@ into contextDescription parser =
                             |> narrowStepFrom after.input
                     )
     }
+
+
+
+-- basic
 
 
 {-| Takes a parsed value and feeds it to the return value of the parser.
@@ -511,6 +480,27 @@ atomAny =
     }
 
 
+{-| **should not be exposed**
+-}
+expectingInternal :
+    (Expected atom -> Expected atom)
+    -> Parser atom narrow
+    -> Parser atom narrow
+expectingInternal expectedMap =
+    \parser ->
+        { narrow =
+            \input ->
+                parser
+                    |> narrowStepFrom input
+                    |> Result.mapError
+                        (\error ->
+                            { error
+                                | expected = error.expected |> expectedMap
+                            }
+                        )
+        }
+
+
 {-| Matches a specific single input (= atom).
 
     import Parser exposing (atom)
@@ -540,10 +530,6 @@ atom expectedSingle =
         atomAny
         |> expectingInternal
             (\_ -> ExpectedSpecifically expectedSingle)
-
-
-
--- chain
 
 
 {-| A parser that always succeeds with the given value.
@@ -601,6 +587,10 @@ succeed narrow =
     }
 
 
+
+-- chain
+
+
 {-| Always fail with a given error message.
 
     import Parser.Error
@@ -616,6 +606,22 @@ succeed narrow =
 expected : String -> Parser atom_ narrow_
 expected description =
     expectedInternal (ExpectedCustom description)
+
+
+{-| **should not be exposed**
+-}
+expectedInternal :
+    Expected atom
+    -> Parser atom narrow_
+expectedInternal expectation =
+    { narrow =
+        \input ->
+            Err
+                { expected = expectation
+                , stuckAtFromLast = input |> List.length
+                , context = []
+                }
+    }
 
 
 {-| Returns the value of the first parser that matches.

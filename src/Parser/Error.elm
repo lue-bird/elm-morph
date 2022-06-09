@@ -18,6 +18,7 @@ module Parser.Error exposing
 
 import Parser
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
+import Stack
 
 
 {-| Position withing multiple lines.
@@ -57,7 +58,7 @@ message source =
 
             Parser.InputRemaining remaining ->
                 [ "I was done parsing when I unexpectedly found remaining input: \""
-                , remaining.input |> String.fromList
+                , remaining.input |> Stack.toList |> String.fromList
                 , "\""
                 ]
                     |> String.concat
