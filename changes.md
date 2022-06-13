@@ -1,11 +1,16 @@
+## 2.0.0 plan
+
+  - `atLeast`, `between`, `exactly`, `split` return `typesafe-array`
+
 # change log
 
 ## 1.0.0
 
 Changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/parser/latest/)
 
-  - `Parser.Expression` remove
-  - `Parser.Sequence` merge → `Parser`
+  - `Parser` → `ConversionStep` that can also `build`
+  - `ConversionStep.Expression` remove
+  - `ConversionStep.Sequence` merge → `ConversionStep`
       - `zeroOrMore` remove
           - in favor of `atLeast 0`
       - `oneOrMore` remove
@@ -22,24 +27,25 @@ Changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
         replace with
         ```elm
         split :
-            Parser atom separator
+            ConversionStep atom separator
+            -> ConversionStep atom part
             ->
-                Parser
+                ConversionStep
                     atom
                     { initial : List { part : List atom, separator : separator }
                     , last : List atom
                     }
         ```
-  - `Parser.Common` merge → `Text.Parser`
+  - `ConversionStep.Common` merge → `Text.ConversionStep`
       - `digits` remove
-          - in favor of `atLeast 0 Char.Parser.digit` explicitly
+          - in favor of `atLeast 0 Char.ConversionStep.digit` explicitly
       - `letters` remove
-          - in favor of `atLeast 0 Char.Parser.letter` explicitly
+          - in favor of `atLeast 0 Char.ConversionStep.letter` explicitly
       - `spaces` remove
-          - in favor of `atLeast 0 Char.Parser.blank` explicitly
+          - in favor of `atLeast 0 Char.ConversionStep.blank` explicitly
       - `token` token
           - in favor of
-                import Char.Parser as Char
+                import Char.ConversionStep as Char
                 succeed (\... -> ...)
                     |> drop (atLeast 0 Char.blank)
                     |> take ...
@@ -47,31 +53,31 @@ Changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
             explicitly
       - `textNoCase` name → `caseAny`
       - `line`
-        `: Parser String`
+        `: ConversionStep String`
         →
-        `: Parser Char onLine -> Parser Char onLine`
-  - `Parser.Check` remove
+        `: ConversionStep Char onLine -> ConversionStep Char onLine`
+  - `ConversionStep.Check` remove
       - lookahead/-before remove
       - no `end` in favor of `narrowWith : ... -> Result (ExpectationMiss ... | InputRemaining ...)`
       - only `endOfLine` kept → consuming `lineEnd`
-  - name `Parser.Char` → `Char.Parser`
+  - name `ConversionStep.Char` → `Char.ConversionStep`
       - `anyChar` remove
-          - in favor of `Parser.atomAny`
+          - in favor of `ConversionStep.atomAny`
       - `char` remove
-          - in favor of `Parser.atom`
+          - in favor of `ConversionStep.atom`
       - `charNoCase` name → `caseAny`
       - `lowercase` name → `caseLower`
       - `uppercase` name → `caseUpper`
       - `alphaNum` remove
-          - in favor of `Parser.onFailDown [ letter, digit ]`
+          - in favor of `ConversionStep.onFailDown [ letter, digit ]`
       - `space` name → `blank`
           - to emphasize it can be any whitespace
       - `except` remove
-          - in favor of `Parser.except`
-  - `Parser`
-      - `parse : String -> Parser narrow -> Result Error narrow`
+          - in favor of `ConversionStep.except`
+  - `ConversionStep`
+      - `parse : String -> ConversionStep narrow -> Result Error narrow`
         →
-        `narrowWith : Parser narrow -> String -> Result Error narrow`
+        `narrowWith : ConversionStep narrow -> String -> Result Error narrow`
       - `first |> orElse second` remove
           - in favor of `onFailDown [ first, second ]`
       - can parse any input list (not only `String`)

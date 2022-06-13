@@ -5,7 +5,9 @@ module Conversion exposing
     , broaden, narrow
     , Transfer
     , transfer, remain
-    , listToArray, stringToList
+    , listToArray, arrayToList
+    , stringToList, listToString
+    , map, unmap
     , lazy, over
     , reverse
     , Tagged(..), TagOrValue(..)
@@ -13,6 +15,7 @@ module Conversion exposing
     , intersection, partEat
     , UnionConversionStep
     , variantUnion, variantEat
+    , listElementEachTransfer
     )
 
 {-| Prism, Codec, Converter = ...
@@ -42,12 +45,13 @@ module Conversion exposing
 ### `Transfer` create
 
 @docs transfer, remain
-@docs listToArray, stringToList
+@docs listToArray, arrayToList
+@docs stringToList, listToString
 
 
 ### `Transfer` scan
 
-use [`broaden`](#broaden) or [`reverse`](#reverse) `|> broaden`
+@docs map, unmap
 
 
 ## transform
@@ -164,6 +168,30 @@ narrow =
     \conversion -> conversion.narrow
 
 
+{-| Convert values of the arbitrarily chosen types `unmapped -> mapped`.
+
+    "3456" |> map stringToList --> [ '3', '4', '5', '6' ]
+
+-}
+map : Transfer unmapped mapped -> (unmapped -> mapped)
+map transfer_ =
+    \unmapped ->
+        unmapped |> broaden transfer_
+
+
+{-| [`reverse`](#reverse) `|> map` is equivalent.
+-}
+unmap : Transfer unmapped mapped -> (mapped -> unmapped)
+unmap transfer_ =
+    \mapped ->
+        case mapped |> narrow transfer_ of
+            Ok mappedNarrow ->
+                mappedNarrow
+
+            Err error ->
+                error |> never
+
+
 {-| Take what the `narrow` function [`Expected`](#Expected) and adapt it.
 -}
 expectationMap :
@@ -188,7 +216,9 @@ expectationMap expectationChange =
 
 {-| Filter specific values.
 
-Tip: In general, try to narrow down the type when limiting values.
+In general, try to narrow down the type when limiting values:
+["Parse, don't validate"](https://elm-radio.com/episode/parse-dont-validate/).
+That's a core idea in elm. You'll find lots of legendary resources surrounding this topic.
 
 -}
 validate :
@@ -204,14 +234,22 @@ validate narrowConvert =
 --
 
 
-{-| Limits arguments to [`Conversion`](#Conversion)s that can `Never` fail while [`narrow`](#narrow)wing, for example
+{-| [`map`](#map) & .
+Limits consumed arguments to [`Conversion`](#Conversion)s that can `Never` fail to [`unmap`](#unmap), for example
 
-    stringToListConversion : Transfer String (List Char)
-    stringToListConversion =
-        Conversion.transfer
-            ( String.toList, String.fromList )
+    stringToListTransfer =
+        Conversion.transfer String.toList String.fromList
 
-See [`transfer`](#transfer).
+Don't use `Transfer` to annotate created [`transfer`](#transfer)s!
+
+    Conversion (List Char) String error_
+
+Allows it to be used in more general [`Conversion`](#Conversion) chains where the target value can be an `error_`.
+
+Both type arguments are really equal in "rank",
+so choosing one as the `mapped` and one as the `unmapped` is rather arbitrary.
+
+That's the reason it's a good idea to always expose 2 versions: `aToB` & `bToA`.
 
 **!** Information can get lost on the way:
 
@@ -220,59 +258,63 @@ See [`transfer`](#transfer).
             (Dict comparableKey value)
             (List ( comparableKey, value ))
     dictToListConversion =
-        Conversion.transfer
-            ( Dict.toList, Dict.fromList )
+        Conversion.transfer Dict.toList Dict.fromList
 
 Still, there's no parsing to transfer one state to the other.
 
-TODO: Its own module and representation independent of `Conversion` for enforceable terminology (`map` instead of `reverse |> broaden`)?
-
 -}
-type alias Transfer specific specificMapped =
-    Conversion specific specificMapped Never
+type alias Transfer unmapped mapped =
+    Conversion unmapped mapped Never
 
 
 {-| A [`Conversion`](#Conversion) that doesn't transform anything.
 
 Same as writing:
 
-  - `transfer ( identity, identity )`
-  - `validate Ok`
+  - [`transfer`](#transfer) `identity identity`
+  - [`validate`](#validate) `Ok`
   - `{ narrow = Ok, broaden = identity }`
 
 -}
 remain : Conversion value value error_
 remain =
-    transfer ( identity, identity )
+    transfer identity identity
 
 
-{-| Mutual `Conversion`
+{-| Mutual `Conversion` → [`Transfer`](#Transfer)
 between representations
 that have the same structural information
 and can be mapped 1:1 into each other.
 
-    stringToListConversion : Conversion String (List Char) error_
+    stringToListConversion : Conversion (List Char) String error_
     stringToListConversion =
-        Conversion.transfer
-            ( String.toList, String.fromList )
+        Conversion.transfer String.toList String.fromList
 
 Included here:
 
-  - [`stringToList`](#stringToList)
-  - [`listToArray`](#listToArray)
+  - [`stringToList`](#stringToList), [`listToString`](#listToString)
+  - [`listToArray`](#listToArray), [`arrayToList`](#arrayToList)
 
 -}
 transfer :
-    ( specific -> specificMapped
-    , specificMapped -> specific
-    )
-    -> Conversion specificMapped specific error_
-transfer ( to, from ) =
-    { broaden = from
-    , narrow =
-        \mapped ->
-            mapped |> to |> Ok
+    (unmapped -> mapped)
+    -> (mapped -> unmapped)
+    -> Conversion unmapped mapped error_
+transfer mapTo unmapFrom =
+    { broaden = mapTo
+    , narrow = \mapped -> mapped |> unmapFrom |> Ok
     }
+
+
+{-| `Transfer` each element in a `List`.
+-}
+listElementEachTransfer :
+    Transfer unmapped mapped
+    -> Conversion (List unmapped) (List mapped) error_
+listElementEachTransfer elementTransfer =
+    transfer
+        (List.map (map elementTransfer))
+        (List.map (unmap elementTransfer))
 
 
 {-| `Transfer` from `List` to `Array`.
@@ -280,13 +322,27 @@ transfer ( to, from ) =
     import Array
 
     [ 0, 1, 2, 3 ]
-        |> (Conversion.listToArray |> Conversion.broaden)
+        |> (Conversion.listToArray |> Conversion.map)
     --> Array.fromList [ 0, 1, 2, 3 ]
 
 -}
 listToArray : Conversion (List element) (Array element) error_
 listToArray =
-    transfer ( Array.toList, Array.fromList )
+    transfer Array.fromList Array.toList
+
+
+{-| `Transfer` from `Array` to `List`.
+
+    import Array
+
+    Array.fromList [ 0, 1, 2, 3 ]
+        |> (Conversion.arrayToList |> Conversion.map)
+    --> [ 0, 1, 2, 3 ]
+
+-}
+arrayToList : Conversion (Array element) (List element) error_
+arrayToList =
+    transfer Array.toList Array.fromList
 
 
 {-| `Transfer` from `List` to `Array`.
@@ -297,7 +353,18 @@ listToArray =
 -}
 stringToList : Conversion String (List Char) error_
 stringToList =
-    transfer ( String.fromList, String.toList )
+    transfer String.toList String.fromList
+
+
+{-| `Transfer` from `List` to `Array`.
+
+    "0123" |> (Conversion.stringToList |> Conversion.broaden)
+    --> [ '0', '1', '2', '3' ]
+
+-}
+listToString : Conversion (List Char) String error_
+listToString =
+    stringToList |> reverse
 
 
 
@@ -625,8 +692,7 @@ lazy conversionLazy =
 
 {-| Go over an additional step of [`Conversion`](#Conversion) on a broader type.
 
-    ( Set.fromList, Set.toList )
-        |> Conversion.transfer
+    Conversion.transfer Set.toList Set.fromList
         |> Conversion.over
             (Value.list elementConversion)
 
@@ -635,21 +701,20 @@ You might recognize similarities to the concept of `andThen`.
 -}
 over :
     Conversion narrow broad error
-    -> Conversion broad broadBroad error
-    -> Conversion narrow broadBroad error
+    -> Conversion narrowNarrow narrow error
+    -> Conversion narrowNarrow broad error
 over specificChange =
     \conversion ->
         { broaden =
             \specific ->
                 specific
-                    |> specificChange.broaden
                     |> conversion.broaden
+                    |> specificChange.broaden
         , narrow =
             \general ->
                 general
-                    |> conversion.narrow
-                    |> Result.andThen
-                        specificChange.narrow
+                    |> specificChange.narrow
+                    |> Result.andThen conversion.narrow
         }
 
 
@@ -659,27 +724,20 @@ by swapping the functions [`narrow`](#narrow) <-> [`broaden`](#broaden).
     [ 'O', 'h', 'a', 'y', 'o' ]
         |> (Conversion.stringToList
             |> Conversion.reverse
-            |> Conversion.broaden
+            |> Conversion.map
            )
     --> "Ohayo"
 
+[`unmap`](#unmap) is equivalent to `|> reverse |> map`.
+
 -}
 reverse :
-    Transfer specific specificMapped
-    -> Conversion specificMapped specific error_
+    Transfer unmapped mapped
+    -> Conversion mapped unmapped error_
 reverse =
     \transfer_ ->
         { narrow =
-            \mapped ->
-                mapped
-                    |> (transfer_ |> broaden)
-                    |> Ok
-        , broaden =
-            \specific ->
-                case specific |> (transfer_ |> narrow) of
-                    Ok ok ->
-                        ok
-
-                    Err error ->
-                        error |> never
+            \unmapped ->
+                unmapped |> map transfer_ |> Ok
+        , broaden = unmap transfer_
         }

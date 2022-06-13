@@ -1009,11 +1009,9 @@ set :
 set elementConversion =
     let
         setListConversion =
-            Conversion.over
-                (( Set.fromList, Set.toList )
-                    |> Conversion.transfer
-                )
-                (list elementConversion)
+            Conversion.transfer Set.toList Set.fromList
+                |> Conversion.over
+                    (list elementConversion)
     in
     Conversion.variantUnion
         (\setVariant setNarrow -> setVariant setNarrow)
@@ -1039,15 +1037,13 @@ dict :
 dict nodeConversion =
     let
         dictListConversion =
-            Conversion.over
-                (( Dict.fromList, Dict.toList )
-                    |> Conversion.transfer
-                )
-                (list
-                    (( nodeConversion.key, nodeConversion.value )
-                        |> tuple2
+            Conversion.transfer Dict.toList Dict.fromList
+                |> Conversion.over
+                    (list
+                        (( nodeConversion.key, nodeConversion.value )
+                            |> tuple2
+                        )
                     )
-                )
     in
     Conversion.variantUnion
         (\dictVariant dictNarrow -> dictVariant dictNarrow)
