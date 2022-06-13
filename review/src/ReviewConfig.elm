@@ -32,7 +32,21 @@ Rules on radar
         |> Pipeline.andTryToFixThemBy PipelineFix.convertingToRightPizza
         |> Pipeline.andCallThem "parenthetical application of a semantically-infix function"
 
-because `aSemanticallyInfixFunction` covers `atLeast`/`atMost`/... which can be used here: `Parser.atLeast 3 Char.letter`
+because `aSemanticallyInfixFunction` covers `atLeast`/`atMost`/... which can be used here: `ConversionStep.atLeast 3 Char.letter`
+
+    Pipeline.rightCompositionPipelines
+        |> Pipeline.forbid
+        |> Pipeline.andReportCustomError
+            ">> pipeline"
+            [ "Forbidding `g >> f` for reasons of simplicity, consistency:"
+            , [ "Establish a subject: `List.map (\\user -> user |> User.badgeAdd ... |> User.levelIncrease)`"
+                , " for easier readability and scalability (maybe even creating a separate function)"
+                , " when chaining multiple operations"
+                ]
+                |> String.concat
+            ]
+
+because they can improve food scoping
 
   - [`truqu/elm-review-nobooleancase`](https://dark.elm.dmy.fr/packages/truqu/elm-review-nobooleancase/latest/)
     preferably, I'd completely remove `Bool`s and with it `if ... then ... else ...`
@@ -140,17 +154,6 @@ config =
                 "<< pipeline"
                 [ "Forbidding `g << f` for reasons of simplicity, readability, consistency:"
                 , "  - Keep the order data comes from before and gets piped through functions after: `... |> opF |> opG`"
-                , [ "Establish a subject: `List.map (\\user -> user |> User.badgeAdd ... |> User.levelIncrease)`"
-                  , " for easier readability and scalability (maybe even creating a separate function)"
-                  , " when chaining multiple operations"
-                  ]
-                    |> String.concat
-                ]
-        , Pipeline.rightCompositionPipelines
-            |> Pipeline.forbid
-            |> Pipeline.andReportCustomError
-                ">> pipeline"
-                [ "Forbidding `g >> f` for reasons of simplicity, consistency:"
                 , [ "Establish a subject: `List.map (\\user -> user |> User.badgeAdd ... |> User.levelIncrease)`"
                   , " for easier readability and scalability (maybe even creating a separate function)"
                   , " when chaining multiple operations"
