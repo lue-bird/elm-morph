@@ -1,13 +1,13 @@
 module Text.ConversionStep exposing
-    ( narrowWith
+    ( narrowWith, build
     , text, caseAny
     , integer, floatingPoint
     , line, lineEnd
     )
 
-{-| Parsing text
+{-| [`ConversionStep`](ConversionStep) on text
 
-@docs narrowWith
+@docs narrowWith, build
 
 
 ## match
@@ -70,6 +70,12 @@ narrowWith :
 narrowWith parser =
     \input ->
         input |> String.toList |> ConversionStep.narrowWith parser
+
+
+build : ConversionStep Char narrow -> (narrow -> String)
+build parser =
+    \narrow ->
+        narrow |> ConversionStep.build parser |> String.fromList
 
 
 {-| Matches a specific text string.
