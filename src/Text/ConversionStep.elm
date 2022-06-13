@@ -35,9 +35,9 @@ Feeling motivated? implement & PR
 
 -}
 
-import Char.Conversion exposing (n0To9ToInt)
+import Char.Conversion exposing (N0To9, n0To9ToInt)
 import Char.ConversionStep as Char
-import Conversion exposing (broaden, stringToList, transfer)
+import Conversion exposing (broaden, narrow, stringToList, transfer, unmap)
 import ConversionStep exposing (ConversionStep, atLeast, atom, drop, expect, fail, map, maybe, possibility, sequence, succeed, take, until)
 
 
@@ -271,12 +271,15 @@ line onLineConversionStep =
             )
 
 
-digitsToInteger : List Int -> Int
+digitsToInteger : List N0To9 -> Int
 digitsToInteger =
     \integerDigits ->
         integerDigits
             |> List.reverse
-            |> List.indexedMap (\decimal digit -> digit * 10 ^ decimal)
+            |> List.indexedMap
+                (\decimal digit ->
+                    (digit |> broaden n0To9ToInt) * 10 ^ decimal
+                )
             |> List.sum
 
 
@@ -335,8 +338,10 @@ integer =
                         |> List.reverse
                         |> List.map
                             (\decimal ->
-                                intAbsolute // (10 ^ (decimal |> broaden n0To9ToInt))
+                                intAbsolute // (10 ^ decimal)
                             )
+                        |> List.filterMap
+                            (narrow Char.Conversion.n0To9ToInt >> Result.toMaybe)
                 }
             )
         )
@@ -396,7 +401,8 @@ floatingPoint =
                             |> List.reverse
                             |> List.indexedMap
                                 (\decimal digit ->
-                                    (digit |> toFloat) * 10 ^ -(1 + (decimal |> toFloat))
+                                    (digit |> broaden n0To9ToInt |> toFloat)
+                                        * (10 ^ -(1 + (decimal |> toFloat)))
                                 )
                             |> List.sum
                 in
