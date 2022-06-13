@@ -34,25 +34,31 @@ Define the data type you want to parse into, then build a parser for that data t
     import ConversionStep.Error
 
     type alias Point =
-        { x : Float
-        , y : Float
-        }
+        -- makes `Point` function unavailable:
+        -- https://dark.elm.dmy.fr/packages/lue-bird/elm-no-record-type-alias-constructor-function/latest/
+        RecordWithoutConstructorFunction
+            { x : Float
+            , y : Float
+            }
 
     -- a successful parse looks like
     "(2.71, 3.14)" |> Text.narrowWith point --> Ok { x = 2.71, y = 3.14 }
+
+    -- build always works
+    { x = 2.71, y = 3.14 } |> Text.narrowWith point --> "( 2.71, 3.14 )"
 
     point : ConversionStep Point
     point =
         into "Point"
             (succeed (\x y -> { x = x, y = y })
                 |> drop (atom '(')
-                |> drop (atLeast 0 Char.blank)
+                |> drop (atLeast 0 Char.blank |> buildFrom [ () ])
                 |> take number
                 |> drop (atLeast 0 Char.blank)
                 |> drop (atom ',')
-                |> drop (atLeast 0 Char.blank)
+                |> drop (atLeast 0 Char.blank |> buildFrom [ () ])
                 |> take number
-                |> drop (atLeast 0 Char.blank)
+                |> drop (atLeast 0 Char.blank |> buildFrom [ () ])
                 |> drop (atom ')')
             )
 
