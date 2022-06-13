@@ -4,10 +4,10 @@
     "Util",
     "Conversion",
     "Json",
-    "Parser",
-    "Char.Parser",
-    "Text.Parser",
-    "Parser.Error",
+    "ConversionStep",
+    "Char.ConversionStep",
+    "Text.ConversionStep",
+    "ConversionStep.Error",
     "./README.md"
   ]
 }
