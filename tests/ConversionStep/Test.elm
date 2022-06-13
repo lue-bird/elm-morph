@@ -16,65 +16,75 @@ tests : Test
 tests =
     Test.describe
         "Conversion step"
+        [ emailTest
+        ]
+
+
+
+-- email
+-- format as described in https://en.wikipedia.org/wiki/Email_address
+
+
+emailTest : Test
+emailTest =
+    Test.describe
+        "email"
         [ Test.describe
-            "email"
-            [ Test.describe
-                "valid"
-                ([ """simple@example.com"""
-                 , """very.common@example.com"""
-                 , """other.email-with-hyphen@example.com"""
-                 , """fully-qualified-domain@example.com"""
-                 , -- one-letter local-part
-                   """x@example.com"""
-                 , """example-indeed@strange-example.com"""
-                 , -- slashes are an allowed printable character
-                   """test/test@test.com"""
-                 , -- local domain name with no TLD, although ICANN highly discourages dotless email addresses
-                   """admin@mailserver1"""
-                 , """example@s.example"""
-                 , """user-@example.org"""
-                 ]
-                    |> List.map
-                        (\exampleEmail ->
-                            test
-                                exampleEmail
-                                (\() ->
-                                    case exampleEmail |> Text.ConversionStep.narrowWith email of
-                                        Ok emailParsed ->
-                                            emailParsed
-                                                |> Text.ConversionStep.build email
-                                                |> Expect.equal exampleEmail
+            "valid"
+            ([ """simple@example.com"""
+             , """very.common@example.com"""
+             , """other.email-with-hyphen@example.com"""
+             , """fully-qualified-domain@example.com"""
+             , -- one-letter local-part
+               """x@example.com"""
+             , """example-indeed@strange-example.com"""
+             , -- slashes are an allowed printable character
+               """test/test@test.com"""
+             , -- local domain name with no TLD, although ICANN highly discourages dotless email addresses
+               """admin@mailserver1"""
+             , """example@s.example"""
+             , """user-@example.org"""
+             ]
+                |> List.map
+                    (\exampleEmail ->
+                        test
+                            exampleEmail
+                            (\() ->
+                                case exampleEmail |> Text.ConversionStep.narrowWith email of
+                                    Ok emailParsed ->
+                                        emailParsed
+                                            |> Text.ConversionStep.build email
+                                            |> Expect.equal exampleEmail
 
-                                        Err _ ->
-                                            Expect.pass
-                                )
-                        )
-                )
-            , Test.describe
-                "invalid"
-                ([ -- no @ character
-                   """Abc.example.com"""
-                 , -- only one @ is allowed
-                   """A@b@c@example.com"""
-                 , -- Underscore is not allowed in domain part
-                   """i_like_underscore@but_its_not_allowed_in_this_part.example.com"""
-                 , """QA[icon]CHOCOLATE[icon]@test.com"""
-                 ]
-                    |> List.map
-                        (\exampleEmail ->
-                            test
-                                exampleEmail
-                                (\() ->
-                                    case exampleEmail |> Text.ConversionStep.narrowWith email of
-                                        Ok _ ->
-                                            Expect.fail exampleEmail
+                                    Err _ ->
+                                        Expect.pass
+                            )
+                    )
+            )
+        , Test.describe
+            "invalid"
+            ([ -- no @ character
+               """Abc.example.com"""
+             , -- only one @ is allowed
+               """A@b@c@example.com"""
+             , -- Underscore is not allowed in domain part
+               """i_like_underscore@but_its_not_allowed_in_this_part.example.com"""
+             , """QA[icon]CHOCOLATE[icon]@test.com"""
+             ]
+                |> List.map
+                    (\exampleEmail ->
+                        test
+                            exampleEmail
+                            (\() ->
+                                case exampleEmail |> Text.ConversionStep.narrowWith email of
+                                    Ok _ ->
+                                        Expect.fail exampleEmail
 
-                                        Err _ ->
-                                            Expect.pass
-                                )
-                        )
-                )
-            ]
+                                    Err _ ->
+                                        Expect.pass
+                            )
+                    )
+            )
         ]
 
 
@@ -127,7 +137,7 @@ local =
 type LocalSymbol
     = LocalSymbolPrintable LocalSymbolPrintable
     | LocalSymbolAToZ Char.AToZ
-    | LocalSymbol0To9
+    | LocalSymbol0To9 N0To9
 
 
 type LocalSymbolPrintable
@@ -148,17 +158,34 @@ type LocalSymbolPrintable
     | RightCurlyBracket
 
 
-{-| TODO
-
-    lowerAToZ
-
-    digit
-
--}
+localSymbol : ConversionStep Char LocalSymbol
 localSymbol =
-    Debug.todo "local symbol"
+    choice
+        (\printableVariant aToZVariant n0To9Variant localSymbolUnion ->
+            case localSymbolUnion of
+                LocalSymbolPrintable printableValue ->
+                    printableVariant printableValue
+
+                LocalSymbolAToZ aToZValue ->
+                    aToZVariant aToZValue
+
+                LocalSymbol0To9 n0To9Value ->
+                    n0To9Variant n0To9Value
+        )
+        (possibility LocalSymbolPrintable localSymbolPrintable
+            >> possibility LocalSymbolAToZ
+                (Char.aToZ
+                    |> map
+                        (transfer
+                            .letter
+                            (\letter -> { letter = letter, case_ = Char.CaseLower })
+                        )
+                )
+            >> possibility LocalSymbol0To9 Char.n0To9
+        )
 
 
+localSymbolPrintable : ConversionStep Char LocalSymbolPrintable
 localSymbolPrintable =
     choice
         (\exclamationMark numberSign dollarSign percentSign ampersand asterisk lowLine hyphenMinus tilde verticalLine plusSign equalsSign graveAccent leftCurlyBracket rightCurlyBracket printable ->
