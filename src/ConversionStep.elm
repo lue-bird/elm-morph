@@ -45,7 +45,7 @@ Define the data type you want to parse into, then build a parser for that data t
     "(2.71, 3.14)" |> Text.narrowWith point --> Ok { x = 2.71, y = 3.14 }
 
     -- build always works
-    { x = 2.71, y = 3.14 } |> Text.narrowWith point --> "( 2.71, 3.14 )"
+    { x = 2.71, y = 3.14 } |> Text.build point --> "( 2.71, 3.14 )"
 
     point : ConversionStep Point
     point =
