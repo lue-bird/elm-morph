@@ -136,7 +136,6 @@ Note before we start:
 
 import Conversion exposing (Transfer, transfer)
 import Hand exposing (Empty, Hand, filled)
-import Possibly exposing (Possibly)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Stack exposing (StackTopBelow(..), Stacked, topDown)
 
