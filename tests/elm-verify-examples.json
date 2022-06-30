@@ -1,13 +1,23 @@
 {
   "root": "../src",
   "tests": [
-    "Util",
-    "Conversion",
+    "Morph",
+    "Morph.Char",
+    "Morph.Text",
+    "Sign.Morph",
+    "Digit.Morph",
+    "Morph.Char",
+    "Integer.Morph",
+    "Number.Morph",
+    "List.Morph",
+    "Stack.Morph",
+    "Array.Morph",
+    "Dict.Morph",
+    "MorphRow",
+    "MorphRow.Error",
+    "Value",
     "Json",
-    "ConversionStep",
-    "Char.ConversionStep",
-    "Text.ConversionStep",
-    "ConversionStep.Error",
+    "Util",
     "./README.md"
   ]
 }

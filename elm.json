@@ -1,11 +1,24 @@
 {
     "type": "package",
-    "name": "lue-bird/elm-conversion",
-    "summary": "build conversions to values you can `case` on",
+    "name": "lue-bird/elm-morph",
+    "summary": "build conversions between narrow ⇄ broad types at once",
     "license": "MIT",
     "version": "1.0.0",
     "exposed-modules": [
-        "Conversion",
+        "Morph",
+        "Morph.Char",
+        "Morph.Text",
+        "Sign.Morph",
+        "Digit.Morph",
+        "Morph.Char",
+        "Integer.Morph",
+        "Number.Morph",
+        "List.Morph",
+        "Stack.Morph",
+        "Array.Morph",
+        "Dict.Morph",
+        "MorphRow",
+        "MorphRow.Error",
         "Value",
         "Json"
     ],
@@ -14,8 +27,9 @@
         "elm/core": "1.0.5 <= v < 2.0.0",
         "elm/json": "1.1.3 <= v < 2.0.0",
         "elm/time": "1.0.0 <= v < 2.0.0",
-        "lue-bird/elm-emptiness-typed": "5.1.0 <= v < 6.0.0",
-        "lue-bird/elm-no-record-type-alias-constructor-function": "1.0.3 <= v < 2.0.0"
+        "lue-bird/elm-allowable-state": "1.0.0 <= v < 2.0.0",
+        "lue-bird/elm-emptiness-typed": "5.2.0 <= v < 6.0.0",
+        "lue-bird/elm-no-record-type-alias-constructor-function": "1.0.0 <= v < 2.0.0"
     },
     "test-dependencies": {
         "elm-explorations/test": "1.2.2 <= v < 2.0.0"
