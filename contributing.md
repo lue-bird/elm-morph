@@ -1,7 +1,7 @@
 ## contributing 💙
 
 - share your thoughts
-- add more conversions
+- add more morphs
 - suggest smaller changes through a pull request
 - discuss bigger changes in an issue or in a github Discussion 
 

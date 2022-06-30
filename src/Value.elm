@@ -6,15 +6,49 @@ module Value exposing
     , unit, char, int, float, posix
     , tuple2, tuple3
     , bool, maybe, result, list, string, array, set, dict
-    , intersection, unionIn
+    , group, part, groupFinish, GroupMorph
+    , choice, variant, choiceIn, ChoiceMorphInProgress
     , Error, expectationCustomMap
     , DefaultOrCustom(..)
     , Expectation, ExpectationIn(..)
     , LiteralKind
-    , StructureExpectation, Tuple2Expectation, Tuple3Expectation, KindOrInsideExpectation, StructureLinearInsideExpectation, RecordInsideExpectation, VariantTagExpectation(..), VariantInsideExpectation
+    , StructureExpectation, Tuple2Expectation, Tuple3Expectation, KindOrInsideExpectation, StructureLinearInsideExpectation, RecordInsideExpectation, PartExpectation, VariantTagExpectation(..), VariantInsideExpectation
     )
 
-{-| elm values as a `case`-able union.
+{-| `case`-able elm values.
+
+json encoders/decoders are too low-level for serialization,
+explicitly describing how to serialize individual data types that all have the same shape.
+
+Plus it makes it harder to switch to a different format.
+
+
+### prior art
+
+  - [`bundsol/`: `Boxed`](https://package.elm-lang.org/packages/bundsol/boxed/2.0.0/Boxed)
+      - 👎 no box-unbox morph pairs
+  - [`tricycle/elm-storage`: `Storage.Value`](https://dark.elm.dmy.fr/packages/tricycle/elm-storage/latest/Storage-Value)
+      - 👎 doesn't expose the `Value` variants
+  - [`andre-dietrich/elm-generic`](https://dark.elm.dmy.fr/packages/andre-dietrich/elm-generic/latest/Generic)
+      - 👍 multiple broad results: json, xml, yaml
+      - 👎 no encode-decode morph pairs
+  - [`the-sett/decode-generic`](https://dark.elm.dmy.fr/packages/the-sett/decode-generic/latest/Json-Decode-Generic)
+      - 👎 no encode (so also no encode-decode morph pairs)
+  - [`miniBill/elm-codec`](https://dark.elm.dmy.fr/packages/miniBill/elm-codec/latest/Codec)
+      - 👎 no custom errors
+  - [`MartinSStewart/elm-serialize`](https://dark.elm.dmy.fr/packages/MartinSStewart/elm-serialize/latest/)
+      - 👍 multiple broad results: json, string (url safe), `Bytes`
+      - 👍 custom errors
+      - doesn't encode field & variant names
+          - 👎 hard to debug
+          - 👎 easy to corrupt
+          - 👍 little space
+  - [`fujiy/elm-json-convert`](https://dark.elm.dmy.fr/packages/fujiy/elm-json-convert/latest/Json-Convert)
+      - 👎 no custom errors
+      - 👎 no variant converters
+  - [`prozacchiwawa/elm-json-codec`](https://dark.elm.dmy.fr/packages/prozacchiwawa/elm-json-codec/latest/JsonCodec)
+      - 👎 no custom errors
+      - 👎 no variant converters
 
 @docs ValueAny, LiteralAny, StructureAny, RecordOfValueAny
 @docs Valuey, Literaly, Structurey
@@ -26,26 +60,27 @@ module Value exposing
 @docs repositoryElmCoreOrigin
 
 
-## conversion
+## morph
 
 @docs unit, char, int, float, posix
 @docs tuple2, tuple3
 @docs bool, maybe, result, list, string, array, set, dict
-@docs intersection, unionIn
+@docs group, part, groupFinish, GroupMorph
+@docs choice, variant, choiceIn, ChoiceMorphInProgress
 
 
-### conversions on common formats
+### morphs on common formats
 
   - [`Json`](Json)
 
 If you feel especially motivated, throw a PR adding
 
-  - `Conversion ValueAny Json.Encode.Value ...`
-  - `Conversion ValueAny String ...`
-  - `Conversion ValueAny Bytes ...`
-  - `Conversion ValueAny Yaml ...`
-  - `Conversion ValueAny Xml ...`
-  - `Conversion ValueAny Csv ...`
+  - `Morph ValueAny Json.Encode.Value ...`
+  - `Morph ValueAny String ...`
+  - `Morph ValueAny Bytes ...`
+  - `Morph ValueAny Yaml ...`
+  - `Morph ValueAny Xml ...`
+  - `Morph ValueAny Csv ...`
   - ...
 
 
@@ -55,13 +90,13 @@ If you feel especially motivated, throw a PR adding
 @docs DefaultOrCustom
 @docs Expectation, ExpectationIn
 @docs LiteralKind
-@docs StructureExpectation, Tuple2Expectation, Tuple3Expectation, KindOrInsideExpectation, StructureLinearInsideExpectation, RecordInsideExpectation, VariantTagExpectation, VariantInsideExpectation
+@docs StructureExpectation, Tuple2Expectation, Tuple3Expectation, KindOrInsideExpectation, StructureLinearInsideExpectation, RecordInsideExpectation, PartExpectation, VariantTagExpectation, VariantInsideExpectation
 
 -}
 
 import Array exposing (Array)
-import Conversion exposing (Conversion, TagOrValue(..), Tagged(..), UnionConversionStep, broaden, narrow)
 import Dict exposing (Dict)
+import Morph exposing (GroupMorphInProgress, Morph, TagOrValue(..), Tagged(..), broaden, narrow)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Set exposing (Set)
 import Time exposing (Posix)
@@ -101,9 +136,12 @@ type Valuey literaly structurey
     | Structurey structurey
 
 
-{-| TODO:
+{-| Any value representable in elm.
 
-  - readd `custom` to preserve functions, opaque data, etc.
+Is there a structure you'd like to add that can't be converted in a small amount of time? Add it through a PR!
+
+TODO:
+
   - maybe add `Possible`/`Never` options for each case
 
 -}
@@ -134,17 +172,17 @@ type StructureAny
 {-| The structure of a record that can hold [any](#ValueAny) field value.
 -}
 type alias RecordOfValueAny =
-    Dict String ValueAny
+    List (Tagged String ValueAny)
 
 
 
--- conversion
+-- morph
 
 
 {-| Information on what went wrong while `narrow`ing from a [`ValueAny`](#ValueAny).
 -}
 type alias Error expectationCustom =
-    Conversion.Expected (Expectation expectationCustom)
+    Morph.Expected (Expectation expectationCustom)
 
 
 {-| A failed expectation of a different structure kind or an inner part.
@@ -165,26 +203,26 @@ type alias Expectation expectationCustom =
         expectationCustom
 
 
-{-| Wraps failed part expectations nested inside a [structure](#StructureExpectation).
+{-| Wraps failed expectations nested inside a [structure](#StructureExpectation).
 -}
 type ExpectationIn expectationCustom
     = ExpectationIn (Expectation expectationCustom)
 
 
-{-| TODO: `Default` is a pretty meh name. Considered alternatives: structural?, basic, (usual)
+{-| Either a basic library expectation or a custom defined expectation
 -}
 type DefaultOrCustom default custom
     = Default default
     | Custom custom
 
 
-{-| A supported elm literal kind (that don't contain other [values](#ValueAny))
+{-| A supported elm literal kind (that doesn't contain other [values](#ValueAny))
 -}
 type alias LiteralKind =
     Literaly () () () () () ()
 
 
-{-| Failed expectation for the expected [structure](#StructureAny)
+{-| Failed expectation for the Morph.Expected [structure](#StructureAny)
 – [kind or inside](#KindOrInsideExpectation).
 -}
 type alias StructureExpectation expectation =
@@ -199,9 +237,9 @@ type alias StructureExpectation expectation =
 
 {-| For each part: Was it `Ok ()` or was there an `Err ...`?
 
-If all 2 parts are `Ok ()`, a 2-tuple was expected but something else was found!
+If all 2 parts are `Ok ()`, a 2-tuple was Morph.Expected but something else was found!
 
-This expectation could be represented as a union.
+This expectation could be represented as a choice.
 However, a tuple is a lot easier to work with;
 you don't lose type information either way :)
 
@@ -214,9 +252,9 @@ type alias Tuple2Expectation expectationAtPart =
 
 {-| For each part: Was it `Ok ()` or was there an `Err ...`?
 
-If all 3 parts are `Ok ()`, a 3-tuple was expected but something else was found!
+If all 3 parts are `Ok ()`, a 3-tuple was Morph.Expected but something else was found!
 
-This expectation could be represented as a union.
+This expectation could be represented as a choice.
 However, a tuple is a lot easier to work with;
 you don't lose type information either way :)
 
@@ -228,33 +266,32 @@ type alias Tuple3Expectation expectationAtPart =
     )
 
 
-{-| Failed expectation for the expected elements at specific indexes.
+{-| Failed expectation for the Morph.Expected elements at specific indexes.
 -}
 type alias StructureLinearInsideExpectation atElement =
     RecordWithoutConstructorFunction
         { elementsAtIndexes : Dict Int atElement }
 
 
-{-| Failed expectation for the expected record field tags or values.
+{-| Failed expectation for the Morph.Expected record field tags or values.
 -}
-type alias RecordInsideExpectation atPart =
-    RecordWithoutConstructorFunction
-        { fieldValues : Dict String atPart
-        , fieldsAdditional : Set String
-        }
+type alias RecordInsideExpectation partValueExpectation =
+    List (Tagged String (PartExpectation partValueExpectation))
 
 
-{-| Failed expectation for the expected variant tag or value.
+{-| Failed expectation for the Morph.Expected variant tag or value.
 -}
-type alias VariantInsideExpectation atValueExpectation =
-    TagOrValue VariantTagExpectation atValueExpectation
+type alias VariantInsideExpectation valueExpectation =
+    TagOrValue
+        VariantTagExpectation
+        (Tagged String valueExpectation)
 
 
-{-| Failed expectation for the expected variant tag.
+{-| Failed expectation for the Morph.Expected variant tag.
 -}
 type VariantTagExpectation
     = VariantTagFromModule ModuleOrigin
-    | VariantTagOneOf (Set String)
+    | VariantTagOneIn (List String)
 
 
 {-| Change the `Custom` [`Expectation`](#Expectation).
@@ -344,24 +381,32 @@ expectationCustomMap customChange =
             -> RecordInsideExpectation (ExpectationIn expectationCustomMapped)
         recordInsideExpectationMap =
             \recordExpectation ->
-                { fieldValues =
-                    recordExpectation.fieldValues
-                        |> Dict.map (\_ -> step)
-                , fieldsAdditional =
-                    recordExpectation.fieldsAdditional
-                }
+                recordExpectation
+                    |> List.map
+                        (\(Tagged tag partExpectation) ->
+                            (case partExpectation of
+                                PartExisting ->
+                                    PartExisting
+
+                                PartValue value ->
+                                    (value |> step) |> PartValue
+                            )
+                                |> Tagged tag
+                        )
 
         expectationVariantInsideMap :
-            TagOrValue VariantTagExpectation (ExpectationIn expectationCustom)
-            -> TagOrValue VariantTagExpectation (ExpectationIn expectationCustomMapped)
+            VariantInsideExpectation (ExpectationIn expectationCustom)
+            -> VariantInsideExpectation (ExpectationIn expectationCustomMapped)
         expectationVariantInsideMap =
-            \variantExpectation ->
-                case variantExpectation of
-                    Tag tagExpectation ->
-                        Tag tagExpectation
+            \variantInsideExpectation ->
+                case variantInsideExpectation of
+                    Tag tag ->
+                        Tag tag
 
-                    Value variantValue ->
-                        Value (variantValue |> step)
+                    Value (Tagged tag possibilityValueExpectation) ->
+                        (possibilityValueExpectation |> step)
+                            |> Tagged tag
+                            |> Value
     in
     \expectation ->
         case expectation of
@@ -388,7 +433,7 @@ type Origin
     = Origin ModuleOrigin String
 
 
-{-| `ModuleOrigin (RepositoryOrigin userName repositoryName)`
+{-| `ModuleOrigin (RepositoryOrigin "userName" "repository-name") "Module.Name"`
 -}
 type ModuleOrigin
     = ModuleOrigin RepositoryOrigin String
@@ -416,14 +461,14 @@ repositoryElmCoreOrigin =
 
 literal :
     { kind : () -> LiteralKind
-    , conversion : Conversion literalSpecific LiteralAny ()
+    , morph : Morph literalSpecific LiteralAny ()
     }
-    -> Conversion literalSpecific ValueAny (Error expectationCustom_)
-literal { kind, conversion } =
+    -> Morph literalSpecific ValueAny (Error expectationCustom_)
+literal { kind, morph } =
     { broaden =
         \literalSpecific ->
             literalSpecific
-                |> (conversion |> broaden)
+                |> (morph |> broaden)
                 |> Literaly
     , narrow =
         \valueAny ->
@@ -432,7 +477,7 @@ literal { kind, conversion } =
                     case valueAny of
                         Literaly literalAny ->
                             literalAny
-                                |> (conversion |> narrow)
+                                |> (morph |> narrow)
 
                         Structurey _ ->
                             Err ()
@@ -440,19 +485,19 @@ literal { kind, conversion } =
             narrowLiteral
                 |> Result.mapError
                     (\() ->
-                        Conversion.Expected
+                        Morph.Expected
                             (Literaly (kind ()) |> Default)
                     )
     }
 
 
-{-| `()` [`Conversion`](Conversion#Conversion).
+{-| `()` [`Morph`](Morph#Morph).
 -}
-unit : Conversion () ValueAny (Error expectationCustom_)
+unit : Morph () ValueAny (Error expectationCustom_)
 unit =
     literal
         { kind = Unity
-        , conversion =
+        , morph =
             { broaden = Unity
             , narrow =
                 \valueAny ->
@@ -466,13 +511,13 @@ unit =
         }
 
 
-{-| `Char` [`Conversion`](Conversion#Conversion).
+{-| `Char` [`Morph`](Morph#Morph).
 -}
-char : Conversion Char ValueAny (Error expectationCustom_)
+char : Morph Char ValueAny (Error expectationCustom_)
 char =
     literal
         { kind = Chary
-        , conversion =
+        , morph =
             { broaden = Chary
             , narrow =
                 \valueAny ->
@@ -486,13 +531,13 @@ char =
         }
 
 
-{-| `Int` [`Conversion`](Conversion#Conversion).
+{-| `Int` [`Morph`](Morph#Morph).
 -}
-int : Conversion Int ValueAny (Error expectationCustom_)
+int : Morph Int ValueAny (Error expectationCustom_)
 int =
     literal
         { kind = Inty
-        , conversion =
+        , morph =
             { broaden = Inty
             , narrow =
                 \valueAny ->
@@ -506,13 +551,13 @@ int =
         }
 
 
-{-| `Float` [`Conversion`](Conversion#Conversion).
+{-| `Float` [`Morph`](Morph#Morph).
 -}
-float : Conversion Float ValueAny (Error expectationCustom_)
+float : Morph Float ValueAny (Error expectationCustom_)
 float =
     literal
         { kind = Floaty
-        , conversion =
+        , morph =
             { broaden = Floaty
             , narrow =
                 \valueAny ->
@@ -526,13 +571,13 @@ float =
         }
 
 
-{-| `String` [`Conversion`](Conversion#Conversion).
+{-| `String` [`Morph`](Morph#Morph).
 -}
-string : Conversion String ValueAny (Error expectationCustom_)
+string : Morph String ValueAny (Error expectationCustom_)
 string =
     literal
         { kind = Stringy
-        , conversion =
+        , morph =
             { broaden = Stringy
             , narrow =
                 \valueAny ->
@@ -546,13 +591,13 @@ string =
         }
 
 
-{-| `Posix` [`Conversion`](Conversion#Conversion).
+{-| `Posix` [`Morph`](Morph#Morph).
 -}
-posix : Conversion Posix ValueAny (Error expectationCustom_)
+posix : Morph Posix ValueAny (Error expectationCustom_)
 posix =
     literal
         { kind = Posixy
-        , conversion =
+        , morph =
             { broaden = Posixy
             , narrow =
                 \valueAny ->
@@ -578,27 +623,27 @@ partNarrowExpectation =
         partNarrow
             |> Result.map (\_ -> ())
             |> Result.mapError
-                (\(Conversion.Expected expectation) ->
+                (\(Morph.Expected expectation) ->
                     expectation |> ExpectationIn
                 )
 
 
-{-| `( ..., ... )` [`Conversion`](Conversion#Conversion).
+{-| `( ..., ... )` [`Morph`](Morph#Morph).
 -}
 tuple2 :
-    ( Conversion part0 ValueAny (Error expectationCustom)
-    , Conversion part1 ValueAny (Error expectationCustom)
+    ( Morph part0 ValueAny (Error expectationCustom)
+    , Morph part1 ValueAny (Error expectationCustom)
     )
-    -> Conversion ( part0, part1 ) ValueAny (Error expectationCustom)
-tuple2 partConversions =
+    -> Morph ( part0, part1 ) ValueAny (Error expectationCustom)
+tuple2 partMorphs =
     let
-        ( part0Conversion, part1Conversion ) =
-            partConversions
+        ( part0Morph, part1Morph ) =
+            partMorphs
     in
     { broaden =
         \( part0, part1 ) ->
-            ( part0 |> (part0Conversion |> broaden)
-            , part1 |> (part1Conversion |> broaden)
+            ( part0 |> (part0Morph |> broaden)
+            , part1 |> (part1Morph |> broaden)
             )
                 |> Tuple2y
                 |> StructureAnyIn
@@ -608,15 +653,15 @@ tuple2 partConversions =
             case valueAny of
                 Structurey (StructureAnyIn (Tuple2y ( part0, part1 ))) ->
                     case
-                        ( part0 |> (part0Conversion |> narrow)
-                        , part1 |> (part1Conversion |> narrow)
+                        ( part0 |> (part0Morph |> narrow)
+                        , part1 |> (part1Morph |> narrow)
                         )
                     of
                         ( Ok part0Ok, Ok part1Ok ) ->
                             ( part0Ok, part1Ok ) |> Ok
 
                         ( part0Narrow, part1Narrow ) ->
-                            Conversion.Expected
+                            Morph.Expected
                                 (( part0Narrow |> partNarrowExpectation
                                  , part1Narrow |> partNarrowExpectation
                                  )
@@ -627,34 +672,34 @@ tuple2 partConversions =
                                 |> Err
 
                 _ ->
-                    Conversion.Expected
+                    Morph.Expected
                         (Structurey (Tuple2y ( Ok (), Ok () )) |> Default)
                         |> Err
     }
 
 
-{-| `( ..., ..., ... )` [`Conversion`](Conversion#Conversion).
+{-| `( ..., ..., ... )` [`Morph`](Morph#Morph).
 -}
 tuple3 :
-    ( Conversion part0 ValueAny (Error expectationCustom)
-    , Conversion part1 ValueAny (Error expectationCustom)
-    , Conversion part2 ValueAny (Error expectationCustom)
+    ( Morph part0 ValueAny (Error expectationCustom)
+    , Morph part1 ValueAny (Error expectationCustom)
+    , Morph part2 ValueAny (Error expectationCustom)
     )
     ->
-        Conversion
+        Morph
             ( part0, part1, part2 )
             ValueAny
             (Error expectationCustom)
-tuple3 partConversions =
+tuple3 partMorphs =
     let
-        ( part0Conversion, part1Conversion, part2Conversion ) =
-            partConversions
+        ( part0Morph, part1Morph, part2Morph ) =
+            partMorphs
     in
     { broaden =
         \( part0, part1, part2 ) ->
-            ( part0 |> (part0Conversion |> broaden)
-            , part1 |> (part1Conversion |> broaden)
-            , part2 |> (part2Conversion |> broaden)
+            ( part0 |> (part0Morph |> broaden)
+            , part1 |> (part1Morph |> broaden)
+            , part2 |> (part2Morph |> broaden)
             )
                 |> Tuple3y
                 |> StructureAnyIn
@@ -664,16 +709,16 @@ tuple3 partConversions =
             case valueAny of
                 Structurey (StructureAnyIn (Tuple3y ( part0, part1, part2 ))) ->
                     case
-                        ( part0 |> (part0Conversion |> narrow)
-                        , part1 |> (part1Conversion |> narrow)
-                        , part2 |> (part2Conversion |> narrow)
+                        ( part0 |> (part0Morph |> narrow)
+                        , part1 |> (part1Morph |> narrow)
+                        , part2 |> (part2Morph |> narrow)
                         )
                     of
                         ( Ok part0Ok, Ok part1Ok, Ok part2Ok ) ->
                             ( part0Ok, part1Ok, part2Ok ) |> Ok
 
                         ( part0Narrow, part1Narrow, part2Narrow ) ->
-                            Conversion.Expected
+                            Morph.Expected
                                 (( part0Narrow |> partNarrowExpectation
                                  , part1Narrow |> partNarrowExpectation
                                  , part2Narrow |> partNarrowExpectation
@@ -685,28 +730,28 @@ tuple3 partConversions =
                                 |> Err
 
                 _ ->
-                    Conversion.Expected
+                    Morph.Expected
                         (Structurey (Tuple3y ( Ok (), Ok (), Ok () )) |> Default)
                         |> Err
     }
 
 
-{-| `List` [`Conversion`](Conversion#Conversion).
+{-| `List` [`Morph`](Morph#Morph).
 -}
 list :
-    Conversion element ValueAny (Error expectationCustom)
-    -> Conversion (List element) ValueAny (Error expectationCustom)
-list elementConversion =
+    Morph element ValueAny (Error expectationCustom)
+    -> Morph (List element) ValueAny (Error expectationCustom)
+list elementMorph =
     { narrow =
         \broad ->
             case broad of
                 Structurey (StructureAnyIn (Listy listOfElementsAny)) ->
                     listOfElementsAny
-                        |> List.map (elementConversion |> narrow)
+                        |> List.map (elementMorph |> narrow)
                         |> listResultsToValuesOrErrors
                         |> Result.mapError
                             (\listInsideExpectation ->
-                                Conversion.Expected
+                                Morph.Expected
                                     ({ elementsAtIndexes =
                                         listInsideExpectation.elementsAtIndexes
                                             |> Dict.map (\_ -> ExpectationIn)
@@ -719,37 +764,37 @@ list elementConversion =
                             )
 
                 _ ->
-                    Conversion.Expected
+                    Morph.Expected
                         (Structurey (Listy Kind) |> Default)
                         |> Err
     , broaden =
         \listNarrow ->
             listNarrow
-                |> List.map (elementConversion |> broaden)
+                |> List.map (elementMorph |> broaden)
                 |> Listy
                 |> StructureAnyIn
                 |> Structurey
     }
 
 
-{-| `Array` [`Conversion`](Conversion#Conversion).
+{-| `Array` [`Morph`](Morph#Morph).
 -}
 array :
-    Conversion element ValueAny (Error expectationCustom)
-    -> Conversion (Array element) ValueAny (Error expectationCustom)
-array elementConversion =
+    Morph element ValueAny (Error expectationCustom)
+    -> Morph (Array element) ValueAny (Error expectationCustom)
+array elementMorph =
     { narrow =
         \broad ->
             case broad of
                 Structurey (StructureAnyIn (Arrayy arrayOfElementsAny)) ->
                     arrayOfElementsAny
                         |> Array.toList
-                        |> List.map (elementConversion |> narrow)
+                        |> List.map (elementMorph |> narrow)
                         |> listResultsToValuesOrErrors
                         |> Result.map Array.fromList
                         |> Result.mapError
                             (\arrayInsideExpectation ->
-                                Conversion.Expected
+                                Morph.Expected
                                     ({ elementsAtIndexes =
                                         arrayInsideExpectation.elementsAtIndexes
                                             |> Dict.map (\_ -> ExpectationIn)
@@ -762,13 +807,13 @@ array elementConversion =
                             )
 
                 _ ->
-                    Conversion.Expected
+                    Morph.Expected
                         (Structurey (Arrayy Kind) |> Default)
                         |> Err
     , broaden =
         \arrayNarrow ->
             arrayNarrow
-                |> Array.map (elementConversion |> broaden)
+                |> Array.map (elementMorph |> broaden)
                 |> Arrayy
                 |> StructureAnyIn
                 |> Structurey
@@ -779,48 +824,189 @@ array elementConversion =
 --
 
 
-{-| Introduce a [`Conversion.union`](Conversion#variantUnion) |> [`Conversion.eatVariant`](Conversion#variantEat) chain.
+{-| Incomplete variant union [`Morph`](Morph#Morph) to [`ValueAny`](#ValueAny)
+
+  - starting from [`choice`](#choice)
+  - over [`variant`](#variant)
+  - and completed with [`choiceIn`](#choiceIn)
+
 -}
-unionIn :
+type alias ChoiceMorphInProgress choiceNarrow choiceBroadenFurther variantValueExpectationCustom =
+    RecordWithoutConstructorFunction
+        { narrow :
+            Tagged String ValueAny
+            ->
+                Result
+                    (Morph.Expected
+                        (TagOrValue
+                            { oneIn : List String }
+                            (Tagged String (ExpectationIn variantValueExpectationCustom))
+                        )
+                    )
+                    choiceNarrow
+        , broaden : choiceBroadenFurther
+        }
+
+
+{-| Discriminate into [variants](#variant).
+-}
+choice :
+    choiceBroadenByVariant
+    ->
+        ChoiceMorphInProgress
+            choiceNarrow_
+            choiceBroadenByVariant
+            variantValueExpectationCustom_
+choice choiceBroadenDiscriminatedByPossibility =
+    { narrow =
+        \_ ->
+            Morph.Expected (Tag { oneIn = [] }) |> Err
+    , broaden = choiceBroadenDiscriminatedByPossibility
+    }
+
+
+{-| Describe another variant value [`Morph`](Morph#Morph) to [`ValueAny`](#ValueAny)
+-}
+variant :
+    ( possibilityNarrow -> choiceNarrow
+    , String
+    )
+    -> Morph possibilityNarrow ValueAny (Error variantValueExpectationCustom)
+    ->
+        (ChoiceMorphInProgress
+            choiceNarrow
+            ((possibilityNarrow -> Tagged String ValueAny)
+             -> choiceBroadenFurther
+            )
+            variantValueExpectationCustom
+         ->
+            ChoiceMorphInProgress
+                choiceNarrow
+                choiceBroadenFurther
+                variantValueExpectationCustom
+        )
+variant ( possibilityToChoice, possibilityTag ) possibilityMorph =
+    \choiceMorphSoFar ->
+        { narrow =
+            variantStepNarrow
+                ( possibilityToChoice, possibilityTag, possibilityMorph.narrow )
+                choiceMorphSoFar.narrow
+        , broaden =
+            choiceMorphSoFar.broaden
+                (broaden possibilityMorph
+                    >> Tagged possibilityTag
+                )
+        }
+
+
+variantStepNarrow :
+    ( possibilityNarrow -> narrowChoice
+    , String
+    , possibilityBroad
+      -> Result (Error variantValueExpectationCustom) possibilityNarrow
+    )
+    ->
+        (Tagged String possibilityBroad
+         ->
+            Result
+                (Morph.Expected
+                    (TagOrValue
+                        { oneIn : List String }
+                        (Tagged String (ExpectationIn variantValueExpectationCustom))
+                    )
+                )
+                narrowChoice
+        )
+    ->
+        (Tagged String possibilityBroad
+         ->
+            Result
+                (Morph.Expected
+                    (TagOrValue
+                        { oneIn : List String }
+                        (Tagged String (ExpectationIn variantValueExpectationCustom))
+                    )
+                )
+                narrowChoice
+        )
+variantStepNarrow ( possibilityToChoice, variantTag, possibilityNarrow ) =
+    \choiceNarrowSoFar ->
+        \variantBroad ->
+            case variantBroad |> choiceNarrowSoFar of
+                Ok variantNarrow ->
+                    variantNarrow |> Ok
+
+                Err (Morph.Expected earlierStepsExpectation) ->
+                    let
+                        (Tagged tag valueBroad) =
+                            variantBroad
+                    in
+                    if tag == variantTag then
+                        case valueBroad |> possibilityNarrow of
+                            Ok ok ->
+                                ok |> possibilityToChoice |> Ok
+
+                            Err (Morph.Expected valueExpectation) ->
+                                Morph.Expected
+                                    (Value
+                                        (Tagged variantTag (valueExpectation |> ExpectationIn))
+                                    )
+                                    |> Err
+
+                    else
+                        let
+                            tagsTriedSoFar =
+                                case earlierStepsExpectation of
+                                    Value _ ->
+                                        []
+
+                                    Tag tagExpectation ->
+                                        tagExpectation.oneIn
+                        in
+                        Morph.Expected
+                            (Tag { oneIn = tagsTriedSoFar |> (::) variantTag })
+                            |> Err
+
+
+{-| Conclude a [`Morph.choice`](Morph#choice) |> [`Morph.possibility`](Morph#possibility) chain.
+-}
+choiceIn :
     ModuleOrigin
     ->
-        UnionConversionStep
-            narrowUnion
-            String
-            ValueAny
-            (narrowUnion -> Tagged String ValueAny)
-            (Expectation expectationCustom)
-    ->
-        Conversion
-            narrowUnion
-            ValueAny
-            (Error expectationCustom)
-unionIn moduleOrigin =
-    \conversionStepped ->
+        (ChoiceMorphInProgress
+            choiceNarrow
+            (choiceNarrow -> Tagged String ValueAny)
+            variantValueExpectationCustom
+         ->
+            Morph
+                choiceNarrow
+                ValueAny
+                (Error variantValueExpectationCustom)
+        )
+choiceIn moduleOrigin =
+    \choiceMorphComplete ->
         { narrow =
             \value ->
                 case value of
-                    Structurey (StructureAnyIn (Varianty (Tagged origin variantValueAny))) ->
+                    Structurey (StructureAnyIn (Varianty (Tagged origin possibilityAny))) ->
                         let
                             (Origin variantModuleOrigin variantTag) =
                                 origin
                         in
                         if variantModuleOrigin == moduleOrigin then
-                            Tagged variantTag variantValueAny
-                                |> (conversionStepped |> narrow)
+                            Tagged variantTag possibilityAny
+                                |> narrow choiceMorphComplete
                                 |> Result.mapError
-                                    (Conversion.errorExpectationMap
+                                    (Morph.errorExpectationMap
                                         (\expectation ->
-                                            let
-                                                variantInsideExpectation =
-                                                    case expectation of
-                                                        Tag { possibilities } ->
-                                                            VariantTagOneOf (possibilities |> Set.fromList) |> Tag
+                                            (case expectation of
+                                                Tag tagExpectation ->
+                                                    VariantTagOneIn tagExpectation.oneIn
+                                                        |> Tag
 
-                                                        Value valueExpectation ->
-                                                            valueExpectation |> ExpectationIn |> Value
-                                            in
-                                            variantInsideExpectation
+                                                Value valueExpectation ->
+                                                    valueExpectation |> Value
+                                            )
                                                 |> Inside
                                                 |> Varianty
                                                 |> Structurey
@@ -829,7 +1015,7 @@ unionIn moduleOrigin =
                                     )
 
                         else
-                            Conversion.Expected
+                            Morph.Expected
                                 (VariantTagFromModule moduleOrigin
                                     |> Tag
                                     |> Inside
@@ -840,78 +1026,207 @@ unionIn moduleOrigin =
                                 |> Err
 
                     _ ->
-                        Conversion.Expected
+                        Morph.Expected
                             (Structurey (Varianty Kind) |> Default)
                             |> Err
         , broaden =
-            \narrowUnion ->
+            \narrowChoice ->
                 let
-                    (Tagged tag value) =
-                        narrowUnion |> (conversionStepped |> broaden)
+                    (Tagged tag valueBroad) =
+                        narrowChoice |> broaden choiceMorphComplete
                 in
-                Structurey
-                    (Varianty
-                        (Tagged (Origin moduleOrigin tag) value)
-                        |> StructureAnyIn
-                    )
-        }
-
-
-{-| Finish the [`Conversion.intersection`](Conversion#intersection) |> [`Conversion.partEat`](Conversion#partEat) chain.
--}
-intersection :
-    Conversion.IntersectionConversionStep
-        intersection
-        String
-        intersection
-        RecordOfValueAny
-        (Expectation expectationCustom)
-    -> Conversion intersection ValueAny (Error expectationCustom)
-intersection =
-    \conversionStepped ->
-        { narrow =
-            \broad ->
-                case broad of
-                    Structurey (StructureAnyIn (Recordy fields)) ->
-                        fields
-                            |> conversionStepped.narrow
-                            |> Result.mapError
-                                (Conversion.errorExpectationMap
-                                    (\recordInside ->
-                                        { fieldsAdditional =
-                                            recordInside.fieldsAdditional
-                                                |> Set.fromList
-                                        , fieldValues =
-                                            recordInside.fieldValues
-                                                |> List.map
-                                                    (\(Tagged tag value) ->
-                                                        ( tag, value |> ExpectationIn )
-                                                    )
-                                                |> Dict.fromList
-                                        }
-                                            |> Inside
-                                            |> Recordy
-                                            |> Structurey
-                                            |> Default
-                                    )
-                                )
-
-                    _ ->
-                        Conversion.Expected
-                            (Structurey (Recordy Kind) |> Default)
-                            |> Err
-        , broaden =
-            \narrow ->
-                narrow
-                    |> conversionStepped.broaden
-                    |> Recordy
+                valueBroad
+                    |> Tagged (Origin moduleOrigin tag)
+                    |> Varianty
                     |> StructureAnyIn
                     |> Structurey
         }
 
 
+{-| Start a group assembly [`Morph`](Morph#Morph) to [`ValueAny`](#ValueAny).
+
+  - continue with [`part`](#part)
+  - finish with [`groupFinish`](#groupFinish)
+
+-}
+group :
+    groupNarrowAssemble
+    ->
+        GroupMorphInProgress
+            (groupNarrow_ -> RecordOfValueAny)
+            groupNarrowAssemble
+            RecordOfValueAny
+            (Morph.Expected
+                (RecordInsideExpectation (ExpectationIn partExpectationCustom_))
+            )
+group groupNarrowAssemble =
+    Morph.group groupNarrowAssemble []
+
+
+{-| group part failed expectation
+-}
+type PartExpectation partExpectation
+    = PartExisting
+    | PartValue partExpectation
+
+
+{-| possibly incomplete [`Morph`] step from and to a group.
+-}
+type alias GroupMorph group groupNarrowFurther partExpectationCustom =
+    GroupMorphInProgress
+        (group -> RecordOfValueAny)
+        groupNarrowFurther
+        RecordOfValueAny
+        (Morph.Expected
+            (RecordInsideExpectation (ExpectationIn partExpectationCustom))
+        )
+
+
+{-| Continue a group assembly [`Morph`](Morph#Morph) to [`ValueAny`](#ValueAny).
+
+  - finish with [`groupFinish`](#groupFinish)
+
+-}
+part :
+    ( group -> partNarrow, String )
+    -> Morph partNarrow ValueAny (Error partExpectationCustom)
+    ->
+        (GroupMorph
+            group
+            (partNarrow -> groupNarrowFurther)
+            partExpectationCustom
+         ->
+            GroupMorph
+                group
+                groupNarrowFurther
+                partExpectationCustom
+        )
+part ( accessPart, partTag ) partMorph =
+    \groupMorphSoFar ->
+        { narrow =
+            \groupBroad ->
+                let
+                    wholeAssemblyResult =
+                        groupBroad |> groupMorphSoFar.narrow
+
+                    expectationsSoFar =
+                        case wholeAssemblyResult of
+                            Ok _ ->
+                                []
+
+                            Err (Morph.Expected expectations) ->
+                                expectations
+                in
+                case groupBroad |> List.filter (\(Tagged tag _) -> tag == partTag) |> List.head of
+                    Just (Tagged _ partBroad) ->
+                        case partBroad |> narrow partMorph of
+                            Ok partNarrow ->
+                                wholeAssemblyResult
+                                    |> Result.map
+                                        (\eat -> eat partNarrow)
+
+                            Err (Morph.Expected innerExpectation) ->
+                                Morph.Expected
+                                    (expectationsSoFar
+                                        |> (::)
+                                            (Tagged partTag
+                                                (PartValue (innerExpectation |> ExpectationIn))
+                                            )
+                                    )
+                                    |> Err
+
+                    Nothing ->
+                        Morph.Expected
+                            (expectationsSoFar
+                                |> (::) (Tagged partTag PartExisting)
+                            )
+                            |> Err
+        , broaden =
+            \wholeNarrow ->
+                let
+                    partBroad =
+                        wholeNarrow
+                            |> accessPart
+                            |> broaden partMorph
+                in
+                wholeNarrow
+                    |> groupMorphSoFar.broaden
+                    |> (::) (Tagged partTag partBroad)
+        }
+
+
+{-| Finish the [`group`](#group) |> [`part`](#part) chain.
+-}
+groupFinish :
+    GroupMorph group group expectationCustom
+    -> Morph group ValueAny (Error expectationCustom)
+groupFinish =
+    \groupMorphComplete ->
+        { narrow =
+            groupNarrowFinish groupMorphComplete.narrow
+        , broaden =
+            groupMorphComplete.broaden
+                >> Recordy
+                >> StructureAnyIn
+                >> Structurey
+        }
+
+
+groupNarrowFinish :
+    (RecordOfValueAny
+     ->
+        Result
+            (Morph.Expected
+                (RecordInsideExpectation (ExpectationIn expectationCustom))
+            )
+            value
+    )
+    ->
+        (ValueAny
+         -> Result (Error expectationCustom) value
+        )
+groupNarrowFinish groupNarrowComplete =
+    \broad ->
+        case broad of
+            Structurey (StructureAnyIn (Recordy fields)) ->
+                fields
+                    |> groupNarrowComplete
+                    |> Result.mapError
+                        (Morph.errorExpectationMap
+                            (\recordExpectation ->
+                                recordExpectation
+                                    |> Inside
+                                    |> Recordy
+                                    |> Structurey
+                                    |> Default
+                            )
+                        )
+
+            _ ->
+                Morph.Expected
+                    (Kind |> Recordy |> Structurey |> Default)
+                    |> Err
+
+
 
 --
+
+
+{-| `Bool` [`Morph`](Morph#Morph).
+-}
+bool : Morph Bool ValueAny (Error expectationCustom_)
+bool =
+    choice
+        (\true false boolVariantChoiceIsTrue ->
+            if boolVariantChoiceIsTrue then
+                true ()
+
+            else
+                false ()
+        )
+        |> variant ( \() -> True, "True" ) unit
+        |> variant ( \() -> False, "False" ) unit
+        |> choiceIn moduleBasicsOrigin
 
 
 {-| `Basics` [`ModuleOrigin`](#ModuleOrigin)
@@ -921,21 +1236,24 @@ moduleBasicsOrigin =
     ModuleOrigin repositoryElmCoreOrigin "Basics"
 
 
-{-| `Bool` [`Conversion`](Conversion#Conversion).
+{-| `Maybe` [`Morph`](Morph#Morph).
 -}
-bool : Conversion Bool ValueAny (Error expectationCustom_)
-bool =
-    Conversion.variantUnion
-        (\true false boolVariantUnionIsTrue ->
-            if boolVariantUnionIsTrue then
-                true ()
+maybe :
+    Morph element ValueAny (Error expectationCustom)
+    -> Morph (Maybe element) ValueAny (Error expectationCustom)
+maybe contentMorph =
+    choice
+        (\just nothing narrowMaybe ->
+            case narrowMaybe of
+                Nothing ->
+                    nothing ()
 
-            else
-                false ()
+                Just content ->
+                    content |> just
         )
-        |> Conversion.variantEat ( ( \() -> True, "True" ), unit )
-        |> Conversion.variantEat ( ( \() -> False, "False" ), unit )
-        |> unionIn moduleBasicsOrigin
+        |> variant ( Just, "Just" ) contentMorph
+        |> variant ( \() -> Nothing, "Nothing" ) unit
+        |> choiceIn moduleMaybeOrigin
 
 
 {-| `Maybe` [`ModuleOrigin`](#ModuleOrigin)
@@ -945,24 +1263,26 @@ moduleMaybeOrigin =
     ModuleOrigin repositoryElmCoreOrigin "Maybe"
 
 
-{-| `Maybe` [`Conversion`](Conversion#Conversion).
+{-| `Result` [`Morph`](Morph#Morph).
 -}
-maybe :
-    Conversion element ValueAny (Error expectationCustom)
-    -> Conversion (Maybe element) ValueAny (Error expectationCustom)
-maybe contentConversion =
-    Conversion.variantUnion
-        (\just nothing narrowMaybe ->
-            case narrowMaybe of
-                Nothing ->
-                    nothing ()
+result :
+    { ok : Morph okValue ValueAny (Error expectationCustom)
+    , err : Morph error ValueAny (Error expectationCustom)
+    }
+    -> Morph (Result error okValue) ValueAny (Error expectationCustom)
+result caseMorphs =
+    choice
+        (\ok err narrowResult ->
+            case narrowResult of
+                Ok value ->
+                    value |> ok
 
-                Just content ->
-                    content |> just
+                Err error ->
+                    error |> err
         )
-        |> Conversion.variantEat ( ( Just, "Just" ), contentConversion )
-        |> Conversion.variantEat ( ( \() -> Nothing, "Nothing" ), unit )
-        |> unionIn moduleMaybeOrigin
+        |> variant ( Ok, "Ok" ) caseMorphs.ok
+        |> variant ( Err, "Err" ) caseMorphs.err
+        |> choiceIn moduleResultOrigin
 
 
 {-| `Result` [`ModuleOrigin`](#ModuleOrigin)
@@ -972,26 +1292,22 @@ moduleResultOrigin =
     ModuleOrigin repositoryElmCoreOrigin "Result"
 
 
-{-| `Result` [`Conversion`](Conversion#Conversion).
+{-| `Set` [`Morph`](Morph#Morph).
 -}
-result :
-    { ok : Conversion okValue ValueAny (Error expectationCustom)
-    , err : Conversion error ValueAny (Error expectationCustom)
-    }
-    -> Conversion (Result error okValue) ValueAny (Error expectationCustom)
-result caseConversions =
-    Conversion.variantUnion
-        (\ok err narrowResult ->
-            case narrowResult of
-                Ok value ->
-                    value |> ok
-
-                Err error ->
-                    error |> err
-        )
-        |> Conversion.variantEat ( ( Ok, "Ok" ), caseConversions.ok )
-        |> Conversion.variantEat ( ( Err, "Err" ), caseConversions.err )
-        |> unionIn moduleResultOrigin
+set :
+    Morph comparableElement ValueAny (Error expectationCustom)
+    -> Morph (Set comparableElement) ValueAny (Error expectationCustom)
+set elementMorph =
+    let
+        setListMorph =
+            Morph.translate Set.toList Set.fromList
+                |> Morph.over
+                    (list elementMorph)
+    in
+    choice
+        (\setVariant setNarrow -> setVariant setNarrow)
+        |> variant ( identity, "Set" ) setListMorph
+        |> choiceIn moduleSetOrigin
 
 
 {-| `Set` [`ModuleOrigin`](#ModuleOrigin)
@@ -1001,23 +1317,28 @@ moduleSetOrigin =
     ModuleOrigin repositoryElmCoreOrigin "Set"
 
 
-{-| `Set` [`Conversion`](Conversion#Conversion).
+{-| `Dict` [`Morph`](Morph#Morph).
 -}
-set :
-    Conversion comparableElement ValueAny (Error expectationCustom)
-    -> Conversion (Set comparableElement) ValueAny (Error expectationCustom)
-set elementConversion =
+dict :
+    { key : Morph comparableKey ValueAny (Error expectationCustom)
+    , value : Morph value ValueAny (Error expectationCustom)
+    }
+    -> Morph (Dict comparableKey value) ValueAny (Error expectationCustom)
+dict nodeMorph =
     let
-        setListConversion =
-            Conversion.transfer Set.toList Set.fromList
-                |> Conversion.over
-                    (list elementConversion)
+        dictListMorph =
+            Morph.translate Dict.toList Dict.fromList
+                |> Morph.over
+                    (list
+                        (( nodeMorph.key, nodeMorph.value )
+                            |> tuple2
+                        )
+                    )
     in
-    Conversion.variantUnion
-        (\setVariant setNarrow -> setVariant setNarrow)
-        |> Conversion.variantEat
-            ( ( identity, "Set" ), setListConversion )
-        |> unionIn moduleSetOrigin
+    choice
+        (\dictVariant dictNarrow -> dictVariant dictNarrow)
+        |> variant ( identity, "Dict" ) dictListMorph
+        |> choiceIn moduleDictOrigin
 
 
 {-| `Dict` [`ModuleOrigin`](#ModuleOrigin)
@@ -1025,28 +1346,3 @@ set elementConversion =
 moduleDictOrigin : ModuleOrigin
 moduleDictOrigin =
     ModuleOrigin repositoryElmCoreOrigin "Dict"
-
-
-{-| `Dict` [`Conversion`](Conversion#Conversion).
--}
-dict :
-    { key : Conversion comparableKey ValueAny (Error expectationCustom)
-    , value : Conversion value ValueAny (Error expectationCustom)
-    }
-    -> Conversion (Dict comparableKey value) ValueAny (Error expectationCustom)
-dict nodeConversion =
-    let
-        dictListConversion =
-            Conversion.transfer Dict.toList Dict.fromList
-                |> Conversion.over
-                    (list
-                        (( nodeConversion.key, nodeConversion.value )
-                            |> tuple2
-                        )
-                    )
-    in
-    Conversion.variantUnion
-        (\dictVariant dictNarrow -> dictVariant dictNarrow)
-        |> Conversion.variantEat
-            ( ( identity, "Dict" ), dictListConversion )
-        |> unionIn moduleDictOrigin

@@ -11,7 +11,7 @@ module Json exposing
 @docs JsonAny, JsonAnyIn, JsonLiteralAny, JsonLiteraly, JsonStructureAny, JsonStructurey
 
 
-## conversion
+## morph
 
 @docs jsValueMagic, decoder
 @docs value
@@ -19,10 +19,10 @@ module Json exposing
 -}
 
 import Array
-import Conversion exposing (Conversion, Transfer)
 import Dict exposing (Dict)
 import Json.Decode
 import Json.Encode
+import Morph exposing (Morph, Translate, translate)
 import Value exposing (ValueAny, Valuey(..))
 
 
@@ -87,13 +87,13 @@ type alias JsonStructureAny =
     JsonStructurey (Array.Array JsonAnyIn) (Dict String JsonAnyIn)
 
 
-{-| Conversion between valid [`JsonAny`](#JsonAny) format and [`JsValueMagic`](#JsValueMagic)
+{-| Morph between valid [`JsonAny`](#JsonAny) format and [`JsValueMagic`](#JsValueMagic)
 -}
 jsValueMagic :
-    Conversion
+    Morph
         JsonAny
         JsValueMagic
-        (Conversion.Expected { validJsonFormat : String })
+        (Morph.Expected { validJsonFormat : String })
 jsValueMagic =
     { narrow =
         \jsonMagicBroad ->
@@ -101,7 +101,7 @@ jsValueMagic =
                 |> Json.Decode.decodeValue decoder
                 |> Result.mapError
                     (\errorWhenJsonFormatInvalid ->
-                        Conversion.Expected
+                        Morph.Expected
                             { validJsonFormat =
                                 errorWhenJsonFormatInvalid
                                     |> Json.Decode.errorToString
@@ -201,7 +201,7 @@ Converting between a valid [`JsonAny`](#JsonAny) value and your preferred elm re
 
 Like with `encode`-`decode` pairs, there are a few things to consider:
 
-These are the default conversions:
+These are the default morphs:
 
   - `Nully ()` <-> `Unity ()`
   - `Objecty ([ ( "tag", "elm/time:Time.Posix" ), ( "value", Floaty ) ] |> Dict.fromList)`
@@ -211,7 +211,7 @@ These are the default conversions:
   - `Objecty ([ ( "tag", "elm/core:Basics.Char" ), ( "value", Stringy ) ] |> Dict.fromList)`
     <-> `Chary`
 
-TODO: add options (Maybe as customizable `Conversion Origin Json.Encode.Value ...`):
+TODO: add options (Maybe as customizable `Morph Origin Json.Encode.Value ...`):
 
   - `user/repository/Module.Variant` tag
   - `Module.Variant` tag
@@ -219,8 +219,8 @@ TODO: add options (Maybe as customizable `Conversion Origin Json.Encode.Value ..
   - `aIndex` variant (/field) tag
 
 -}
-value : Transfer JsonAny ValueAny
+value : Translate JsonAny ValueAny
 value =
-    Conversion.transfer
+    translate
         (Debug.todo "")
         (Debug.todo "")

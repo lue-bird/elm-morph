@@ -1,15 +1,15 @@
-module Util exposing (listResultsToValuesOrErrors)
+module Util exposing (listResultsToValuesOrErrors, restoreTry)
 
 {-| Helpers.
 
 Putting them in a separate `module` helps with testing as well as preventing import cycles.
 
-@docs listResultsToValuesOrErrors
+@docs listResultsToValuesOrErrors, restoreTry
 
 -}
 
-import Conversion
 import Dict exposing (Dict)
+import Morph
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 
 
@@ -22,19 +22,19 @@ type alias StructureLinearInsideExpectation atElement =
 else `Err` with information on at what indexes elements were `Err`.
 
     import Dict
-    import Conversion
+    import Morph
 
     [ Ok 3, Ok 4, Ok 5 ]
         |> listResultsToValuesOrErrors
     --> Ok [ 3, 4, 5 ]
 
-    [ Ok 3, Ok 4, Err (Conversion.Expected ()), Ok 6 ]
+    [ Ok 3, Ok 4, Err (Morph.Expected ()), Ok 6 ]
         |> listResultsToValuesOrErrors
     --> Err { elementsAtIndexes = Dict.singleton 2 () }
 
 -}
 listResultsToValuesOrErrors :
-    List (Result (Conversion.Expected expectation) value)
+    List (Result (Morph.Expected expectation) value)
     -> Result (StructureLinearInsideExpectation expectation) (List value)
 listResultsToValuesOrErrors =
     \results ->
@@ -46,7 +46,7 @@ listResultsToValuesOrErrors =
                             Ok elementValue ->
                                 collected |> Result.map ((::) elementValue)
 
-                            Err (Conversion.Expected elementError) ->
+                            Err (Morph.Expected elementError) ->
                                 { elementsAtIndexes =
                                     case collected of
                                         Ok _ ->
@@ -66,54 +66,19 @@ listResultsToValuesOrErrors =
             |> .collected
 
 
-
--- zombie
-{- `Ok` if all values in sequence are `Ok`,
-   else `Err` with information on at what indexes elements were `Err`.
-
-       import Dict
-       import Array
-       import Conversion
-
-       Array.fromList [ Ok 3, Ok 4, Ok 5 ]
-           |> arrayResultsToValuesOrErrors
-       --> Ok (Array.fromList [ 3, 4, 5 ])
-
-       Array.fromList
-           [ Ok 3, Ok 4, Err (Conversion.Expected ()), Ok 6 ]
-           |> arrayResultsToValuesOrErrors
-       --> Err { elementsAtIndexes = Dict.singleton 2 () }
-
-
-   arrayResultsToValuesOrErrors :
-       Array (Result (Conversion.Error expectation) value)
-       -> Result (StructureLinearInsideExpectation expectation) (Array value)
-   arrayResultsToValuesOrErrors =
-       \results ->
-           results
-               |> Array.foldl
-                   (\elementResult { index, collected } ->
-                       { collected =
-                           case elementResult of
-                               Ok elementValue ->
-                                   collected |> Result.map (Array.push elementValue)
-
-                               Err (Conversion.Expected elementError) ->
-                                   { elementsAtIndexes =
-                                       case collected of
-                                           Ok _ ->
-                                               Dict.singleton index elementError
-
-                                           Err { elementsAtIndexes } ->
-                                               elementsAtIndexes
-                                                   |> Dict.insert index elementError
-                                   }
-                                       |> Err
-                       , index = index + 1
-                       }
-                   )
-                   { collected = Array.empty |> Ok
-                   , index = 0
-                   }
-               |> .collected
+{-| Like `Result.andThen` but on `Err` from the attached error.
 -}
+restoreTry :
+    (error -> Result errorMapped okValue)
+    ->
+        (Result error okValue
+         -> Result errorMapped okValue
+        )
+restoreTry errorMapToResult =
+    \result ->
+        case result of
+            Ok ok ->
+                ok |> Ok
+
+            Err error ->
+                error |> errorMapToResult
