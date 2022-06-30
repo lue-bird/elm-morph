@@ -1,37 +1,121 @@
-# elm-conversion
+# elm-morph
 
-> build conversions to values you can `case` on
+> build conversions between narrow ⇄ broad types at once
 
-json encoders/decoders are too low-level for serialization,
-explicitly describing how to serialize individual data types that all have the same shape.
+There's lots shiny applications of such "`Morph`"s that go both ways.
 
-Plus it makes it harder to switch to a different format.
+Below are some appetizers; click the headers for more examples and documentation.
 
-### prior art
+related: [📻 elm-radio episode on the topic "Codecs"](https://elm-radio.com/episode/codecs/)
 
-There's also an [elm-radio episode on the topic "Codecs"](https://elm-radio.com/episode/codecs/)
+## [`Value`](Value)
 
-  - [`bundsol/`: `Boxed`](https://package.elm-lang.org/packages/bundsol/boxed/2.0.0/Boxed)
-      - 👎 no box-unbox conversion pairs
-  - [`tricycle/elm-storage`: `Storage.Value`](https://dark.elm.dmy.fr/packages/tricycle/elm-storage/latest/Storage-Value)
-      - 👎 doesn't expose the `Value` variants
-  - [`andre-dietrich/elm-generic`](https://dark.elm.dmy.fr/packages/andre-dietrich/elm-generic/latest/Generic)
-      - 👍 multiple broad results: json, xml, yaml
-      - 👎 no encode-decode conversion pairs
-  - [`the-sett/decode-generic`](https://dark.elm.dmy.fr/packages/the-sett/decode-generic/latest/Json-Decode-Generic)
-      - 👎 no encode (so also no encode-decode conversion pairs)
-  - [`miniBill/elm-codec`](https://dark.elm.dmy.fr/packages/miniBill/elm-codec/latest/Codec)
-      - 👎 no custom errors
-  - [`MartinSStewart/elm-serialize`](https://dark.elm.dmy.fr/packages/MartinSStewart/elm-serialize/latest/)
-      - 👍 multiple broad results: json, string (url safe), `Bytes`
-      - 👍 custom errors
-      - doesn't encode field & variant names
-          - 👎 hard to debug
-          - 👎 easy to corrupt
-          - 👍 little space
-  - [`fujiy/elm-json-convert`](https://dark.elm.dmy.fr/packages/fujiy/elm-json-convert/latest/Json-Convert)
-      - 👎 no custom errors
-      - 👎 no variant converters
-  - [`prozacchiwawa/elm-json-codec`](https://dark.elm.dmy.fr/packages/prozacchiwawa/elm-json-codec/latest/JsonCodec)
-      - 👎 no custom errors
-      - 👎 no variant converters
+Serialize from and to elm values the easy way.
+Independent of output format.
+
+Here's a 1:1 port of [an example from `elm/json`](https://dark.elm.dmy.fr/packages/elm/json/latest/)
+
+```elm
+module Cause exposing (Cause, value)
+
+import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
+import Morph
+import Value
+
+type alias Cause =
+    RecordWithoutConstructorFunction
+        { name : String
+        , percent : Float
+        , per100k : Float
+        }
+
+
+value : Morph Cause Value (Value.Error expectationCustom_)
+value =
+    Value.group
+        |> Value.part ( .name, "name" ) Value.string
+        |> Value.part ( "percent", .percent ) Value.float
+        |> Value.part ( "per100k", .per100k ) Value.float
+        |> Value.groupFinish
+```
+That was surprisingly easy!
+
+## [`MorphRow`](MorphRow)
+
+Know `Parser`s? `MorphRow` simply always creates a builder alongside. Think
+
+  - `Email/Id/Time.fromString` – `Email/Id/Time.toString`
+  - concrete syntax tree parser – pretty formatter
+  - ...
+
+As with all [`Morph`](Morph#Morph)s, [`MorphRow`](MorphRow) makes the process simpler and more reliable.
+
+Here a 1:1 port of [an example from `elm/parser`](https://dark.elm.dmy.fr/packages/elm/parser/latest/Parser#lazy):
+```elm
+import Morph exposing (Morph, broadenFrom)
+import MorphRow (atLeast, grab, skip, atom)
+import Morph.Char
+
+type Boolean
+    = BooleanTrue
+    | BooleanFalse
+    | BooleanOr ( Boolean, Boolean )
+
+"((true || false) || false)"
+    |> narrow
+        (boolean
+            |> Morph.over Morph.Text.fromList
+        )
+--> Ok (BooleanOr ( BooleanOr ( BooleanTrue, BooleanFalse ), BooleanFalse ))
+
+boolean : MorphRow Char Boolean expectationCustom_
+boolean =
+    Morph.choice
+        (\true false or booleanNarrow ->
+            case booleanNarrow of
+                BooleanTrue ->
+                    true ()
+
+                BooleanFalse ->
+                    false ()
+
+                BooleanOr arguments ->
+                    or arguments
+        )
+        |> MorphRow.possibility MyTrue (Morph.Text.specific "true")
+        |> MorphRow.possibility MyFalse (Morph.Text.specific "false")
+        |> MorphRow.possibility MyOr
+            (MorphRow.succeed Tuple.pair
+                |> skip (Morph.Text.specific "(")
+                |> skip
+                    (broadenFrom []
+                        |> MorphRow.over
+                            (atLeast 0 (Morph.Char.blank |> atom))
+                    )
+                |> grab (Morph.lazy (\_ -> boolean))
+                |> skip
+                    (broadenFrom [ Morph.Char.Space ]
+                        |> MorphRow.over
+                            (atLeast 0 (Morph.Char.blank |> atom))
+                    )
+                |> grab (Morph.Text.specific "||")
+                |> skip
+                    (broadenFrom [ Morph.Char.Space ]
+                        |> MorphRow.over
+                            (atLeast 0 (Morph.Char.blank |> atom))
+                    )
+                |> grab (Morph.lazy (\_ -> boolean))
+                |> skip
+                    (broadenFrom []
+                        |> MorphRow.over
+                            (atLeast 0 (Morph.Char.blank |> atom))
+                    )
+                |> skip (Morph.Text.specific ")")
+            )
+```
+What's different from writing a parser?
+
+  - `broadenFrom ...` provides defaults for generated broad values
+  - `choice (\... -> case ... of ...)` exhaustively matches possibilities with according broad values
+
+Confused? Hyped? Hit @lue up on anything on slack!
