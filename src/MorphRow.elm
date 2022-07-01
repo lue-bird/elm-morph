@@ -49,15 +49,27 @@ Heavily inspired by
     point =
         into "Point"
             (succeed (\x y -> { x = x, y = y })
-                |> skip (atom '(')
-                |> skip (atLeast 0 Char.blank |> broadenFrom [ Char.Space ])
+                |> skip (Morph.Text.specific "(")
+                |> skip
+                    (broadenFrom [ Char.Space ]
+                        |> MorphRow.over (atLeast 0 (Char.blank |> atom))
+                    )
                 |> grab number
-                |> skip (atLeast 0 Char.blank)
-                |> skip (atom ',')
-                |> skip (atLeast 0 Char.blank |> broadenFrom [ Char.Space ])
-                |> grab number
-                |> skip (atLeast 0 Char.blank |> broadenFrom [ Char.Space ])
-                |> skip (atom ')')
+                |> skip
+                    (broadenFrom []
+                        |> MorphRow.over (atLeast 0 (Char.blank |> atom))
+                    )
+                |> skip (Morph.Text.specific ",")
+                |> skip
+                    (broadenFrom [ Char.Space ]
+                        |> MorphRow.over (atLeast 0 (Char.blank |> atom))
+                    )
+                |> grab .x Number.Morph.text
+                |> skip
+                    (broadenFrom [ Char.Space ]
+                        |> MorphRow.over (atLeast 0 (Char.blank |> atom))
+                    )
+                |> skip (Morph.Text.specific ")")
             )
 
     -- we can get a nice error message if it fails
@@ -347,7 +359,7 @@ expect contextDescription morphRow =
                             |> narrowStep (after.narrow |> succeed)
                     )
                 |> onRemainingErr
-    , broaden = \_ -> Hand.empty
+    , broaden = broaden morphRow
     }
 
 
@@ -391,11 +403,11 @@ grab partAccess grabbedNextMorphRow =
         , broaden =
             \groupNarrow ->
                 groupNarrow
-                    |> groupMorphRowSoFar.broaden
+                    |> partAccess
+                    |> grabbedNextMorphRow.broaden
                     |> Stack.onTopStack
                         (groupNarrow
-                            |> partAccess
-                            |> grabbedNextMorphRow.broaden
+                            |> groupMorphRowSoFar.broaden
                         )
         }
 
@@ -455,9 +467,9 @@ skip ignoredNext =
                     |> onRemainingErr
         , broaden =
             \groupNarrow ->
-                (groupNarrow |> groupMorphRowSoFar.broaden)
+                (() |> ignoredNext.broaden)
                     |> Stack.onTopStack
-                        (() |> ignoredNext.broaden)
+                        (groupNarrow |> groupMorphRowSoFar.broaden)
         }
 
 
@@ -514,7 +526,7 @@ expectDefault expected morphRow =
                             |> narrowStep (after.narrow |> succeed)
                     )
                 |> onRemainingErr
-    , broaden = \_ -> Hand.empty
+    , broaden = broaden morphRow
     }
 
 
@@ -535,26 +547,26 @@ expectDefault expected morphRow =
 
 -}
 specific : List atom -> MorphRow atom () expectedCustom_
-specific expectedInput =
+specific expectedConstantInput =
     broadenFrom
-        (List.repeat (expectedInput |> List.length) ())
+        (List.repeat (expectedConstantInput |> List.length) ())
         |> over
-            (sequence
-                (List.map
-                    (Morph.specific >> atom)
-                    expectedInput
-                )
+            (expectedConstantInput
+                |> List.map (Morph.specific >> atom)
+                |> sequence
             )
 
 
 {-| [`MorphRow`](#MorphRow) from and to a single broad input = atom.
+
+Short for [`MorphRow.over`](#over) [`atomAny`](#atomAny)
+
 -}
 atom :
     Morph narrow atom (Morph.Error atom expectCustom)
     -> MorphRow atom narrow expectCustom
-atom morphToAtom =
-    morphToAtom
-        |> over atomAny
+atom =
+    over atomAny
 
 
 {-| Always succeed with the given value.
@@ -644,6 +656,8 @@ succeed narrowConstant =
             )
         |> Result.mapError MorphRow.Error.textMessage
     --> Err "1:0: I was expecting nothing, this always fails. I reached the end of the broad."
+
+TODO: avoidable?
 
 -}
 fail : MorphRow atom_ narrow_ expectedCustom_
@@ -938,19 +952,17 @@ next :
         (MorphRow atom narrow expectedCustom
          -> MorphRow atom narrowNarrow expectedCustom
         )
-next narrowNarrowToNarrow parserNarrowNarrow =
+next narrowNarrowToNarrow morphNarrowNarrow =
     \morphRowBefore ->
         { narrow =
-            \broad ->
-                broad
-                    |> narrowStep morphRowBefore
-                    |> Result.andThen
-                        (\result ->
-                            result.broad
-                                |> narrowStep
-                                    (parserNarrowNarrow result.narrow)
-                        )
-                    |> onRemainingErr
+            narrowStep morphRowBefore
+                >> Result.andThen
+                    (\result ->
+                        result.broad
+                            |> narrowStep
+                                (morphNarrowNarrow result.narrow)
+                    )
+                >> onRemainingErr
         , broaden =
             \narrowNarrow ->
                 let
@@ -960,7 +972,7 @@ next narrowNarrowToNarrow parserNarrowNarrow =
                 (narrowed |> broaden morphRowBefore)
                     |> Stack.onTopStack
                         (narrowNarrow
-                            |> broaden (parserNarrowNarrow narrowed)
+                            |> broaden (morphNarrowNarrow narrowed)
                         )
         }
 
@@ -982,14 +994,14 @@ errorFromMorph location =
         }
 
 
-{-| Transform the narrow result value.
+{-| Describe how to reach an even broader type.
 
     import Morph exposing (listToString)
     import MorphRow exposing (map, atLeast)
     import Morph.CharRow as Char
     import Morph.TextRow as Text
 
-    -- Get some letters, and make them lowercase.
+    -- get some letters, make them lowercase
     "ABC"
         |> Text.narrowWith
             (atLeast 1 Char.letter
@@ -1005,12 +1017,12 @@ over :
         (Morph narrowNarrow narrow (Morph.Error atom expectedCustom)
          -> MorphRow atom narrowNarrow expectedCustom
         )
-over unmappedMorphRow =
+over morphRowBeforeMorph =
     \narrowMorph ->
         { narrow =
             \broad ->
                 broad
-                    |> narrowStep unmappedMorphRow
+                    |> narrowStep morphRowBeforeMorph
                     |> Result.andThen
                         (\narrowed ->
                             narrowed.narrow
@@ -1026,7 +1038,8 @@ over unmappedMorphRow =
                         )
                     >> onRemainingErr
         , broaden =
-            broaden narrowMorph >> broaden unmappedMorphRow
+            broaden narrowMorph
+                >> broaden morphRowBeforeMorph
         }
 
 
@@ -1119,9 +1132,7 @@ sequence morphRowsInSequence =
     , broaden =
         \narrowSequence ->
             List.map2
-                (\parserInSequence narrowInSequence ->
-                    narrowInSequence |> broaden parserInSequence
-                )
+                (\morphInSequence -> broaden morphInSequence)
                 morphRowsInSequence
                 narrowSequence
                 |> List.concatMap Stack.toList
@@ -1255,18 +1266,18 @@ atLeast :
     Int
     -> MorphRow atom narrow expectedCustom
     -> MorphRow atom (List narrow) expectedCustom
-atLeast minimum stepParser =
+atLeast minimum stepMorphRow =
     succeed (\minimumList overMinimum -> minimumList ++ overMinimum)
         |> grab (List.take minimum)
-            (exactly minimum stepParser)
+            (exactly minimum stepMorphRow)
         |> grab (List.drop minimum)
-            (asManyAsPossible stepParser)
+            (untilFailure stepMorphRow)
 
 
-asManyAsPossible :
+untilFailure :
     MorphRow atom narrow expectedCustom
     -> MorphRow atom (List narrow) expectedCustom
-asManyAsPossible stepParser =
+untilFailure stepMorphRow =
     loop
         { initial = []
         , step =
@@ -1284,11 +1295,27 @@ asManyAsPossible stepParser =
                         (translate
                             Stack.top
                             (\stepped -> Stack.topDown stepped soFar)
-                            |> over stepParser
+                            |> over stepMorphRow
                         )
                     |> possibility Commit
                         ((soFar |> List.reverse) |> succeed)
         , goOnBroaden = Stack.toList
+        , goOnBack =
+            \stack ->
+                case stack |> Stack.topRemove of
+                    Hand.Empty _ ->
+                        Nothing
+
+                    Hand.Filled downStacked ->
+                        downStacked |> filled |> Just
+        , commitBack =
+            \list ->
+                case list |> Stack.fromList of
+                    Hand.Empty _ ->
+                        Nothing
+
+                    Hand.Filled stacked ->
+                        stacked |> filled |> Stack.reverse |> Just
         }
 
 
@@ -1418,6 +1445,22 @@ atMost maximum =
                             )
                         |> possibility Commit
                             (soFar |> List.reverse |> succeed)
+            , goOnBack =
+                \stack ->
+                    case stack |> Stack.topRemove of
+                        Hand.Empty _ ->
+                            Nothing
+
+                        Hand.Filled downStacked ->
+                            downStacked |> filled |> Just
+            , commitBack =
+                \list ->
+                    case list of
+                        [] ->
+                            Nothing
+
+                        last :: before ->
+                            Stack.topDown last before |> Stack.reverse |> Just
             }
 
 
@@ -1431,6 +1474,9 @@ type LoopStep partial complete
 
 {-| A powerful way to recurse over [`MorphRow`](#MorphRow)s.
 
+Double-check that `goOnBack` can give `Nothing` in actual situations.
+Otherwise, [`broaden`](Morph#broaden) runs infinitely.
+
 
 ### example: fold
 
@@ -1443,7 +1489,6 @@ type LoopStep partial complete
     sumWhileLessThan max =
         loop
             { initial = 0
-            , goOnBroaden = identity
             , step =
                 \soFarTotal ->
                     choice
@@ -1471,6 +1516,7 @@ type LoopStep partial complete
                             )
                         |> possibility MorphRow.Commit
                             (soFarTotal |> succeed)
+            , goOnBroaden = identity
             }
 
     -- stops before we reach a maximum of 6 in the sum
@@ -1482,10 +1528,11 @@ type LoopStep partial complete
             )
     --> Ok 5
 
+TODO: fix example
+
 -}
 loop :
     { initial : beforeStep
-    , goOnBroaden : goOnValue -> beforeStep
     , step :
         beforeStep
         ->
@@ -1496,27 +1543,99 @@ loop :
                  -> Hand (Stacked atom) Possibly Empty
                 )
                 expectedCustom
+    , goOnBroaden : goOnValue -> beforeStep
+    , goOnBack : goOnValue -> Maybe goOnValue
+    , commitBack : commitValue -> Maybe goOnValue
     }
     -> MorphRow atom commitValue expectedCustom
 loop loop_ =
-    -- ✨ isn't this beautiful ✨
+    -- ↓ This  is what hell looks like FYI
     let
-        step : () -> beforeStep -> MorphRow atom commitValue expectedCustom
-        step () =
-            \beforeStep ->
-                loop_.step beforeStep
-                    |> choiceFinish
-                    |> next Commit
-                        (\parsed ->
-                            case parsed of
-                                Commit committed ->
-                                    committed |> succeed
-
-                                GoOn goingOn ->
-                                    goingOn |> loop_.goOnBroaden |> step ()
-                        )
+        loopStep =
+            \before ->
+                before |> loop_.step |> choiceFinish
     in
-    loop_.initial |> step ()
+    { broaden =
+        let
+            goOnBack : Maybe goOnValue -> beforeStep
+            goOnBack =
+                \steppedBack ->
+                    case steppedBack of
+                        Nothing ->
+                            loop_.initial
+
+                        Just goOnBefore ->
+                            goOnBefore |> loop_.goOnBroaden
+
+            broadenStepBack : () -> (Maybe goOnValue -> Hand (Stacked atom) Possibly Empty)
+            broadenStepBack () =
+                \narrowGoOnValue ->
+                    case narrowGoOnValue of
+                        Nothing ->
+                            Hand.empty
+
+                        Just goOnValue ->
+                            let
+                                steppedBack =
+                                    goOnValue |> loop_.goOnBack
+                            in
+                            (goOnValue |> GoOn)
+                                |> broaden (steppedBack |> goOnBack |> loopStep)
+                                |> Stack.onTopStack
+                                    (steppedBack |> broadenStepBack ())
+        in
+        \commitValueNarrow ->
+            let
+                committedBack =
+                    commitValueNarrow
+                        |> loop_.commitBack
+            in
+            (committedBack |> broadenStepBack ())
+                |> Stack.onTopStack
+                    ((commitValueNarrow |> Commit)
+                        |> broaden (committedBack |> goOnBack |> loopStep)
+                    )
+    , narrow =
+        let
+            loopNarrowStep :
+                ()
+                ->
+                    (beforeStep
+                     ->
+                        (Hand (Stacked atom) Possibly Empty
+                         ->
+                            Result
+                                (SuccessExpectation atom expectedCustom)
+                                { narrow : commitValue
+                                , broad : Hand (Stacked atom) Possibly Empty
+                                }
+                        )
+                    )
+            loopNarrowStep () =
+                \before ->
+                    narrowStep (before |> loopStep)
+                        >> Result.andThen
+                            (\stepped ->
+                                case stepped.narrow of
+                                    Commit committed ->
+                                        { broad = stepped.broad
+                                        , narrow = committed
+                                        }
+                                            |> Ok
+
+                                    GoOn goOnValue ->
+                                        stepped.broad
+                                            |> (goOnValue
+                                                    |> loop_.goOnBroaden
+                                                    |> loopNarrowStep ()
+                                               )
+                            )
+        in
+        \broad ->
+            broad
+                |> (loop_.initial |> loopNarrowStep ())
+                |> onRemainingErr
+    }
 
 
 {-| [convert](#MorphRow) parts and interspersed separators into a `Stack`.
