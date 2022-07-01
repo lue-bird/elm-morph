@@ -35,17 +35,19 @@ intAbsoluteTo0To9s =
         in
         Stack.onTopLay
             (case smallestDecimal |> Morph.narrow Digit.Morph.n0To9ToInt of
-                Err _ ->
-                    -- remainderBy 10 is never >= 10
-                    Digit.Morph.N0
-
                 Ok decimal0To9 ->
                     decimal0To9
+
+                -- remainderBy 10 is never >= 10
+                Err _ ->
+                    Digit.Morph.N0
             )
             (case withoutDecimal of
                 0 ->
                     Hand.empty
 
                 otherDecimalInt ->
-                    otherDecimalInt |> intAbsoluteTo0To9s |> Hand.emptyAdapt (\_ -> Possible)
+                    otherDecimalInt
+                        |> intAbsoluteTo0To9s
+                        |> Hand.emptyAdapt (\_ -> Possible)
             )
