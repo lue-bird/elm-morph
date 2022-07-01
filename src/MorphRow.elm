@@ -1421,7 +1421,6 @@ atMost maximum =
     \step ->
         loop
             { initial = []
-            , goOnBroaden = Stack.toList
             , step =
                 \soFar ->
                     choice
@@ -1445,6 +1444,7 @@ atMost maximum =
                             )
                         |> possibility Commit
                             (soFar |> List.reverse |> succeed)
+            , goOnBroaden = Stack.toList
             , goOnBack =
                 \stack ->
                     case stack |> Stack.topRemove of

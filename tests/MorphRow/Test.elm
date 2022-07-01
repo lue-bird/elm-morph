@@ -299,7 +299,6 @@ domain =
         |> MorphRow.grab .secondUp
             (loop
                 { initial = []
-                , goOnBroaden = Stack.toList
                 , step =
                     \hostLabels ->
                         choice
@@ -326,6 +325,7 @@ domain =
                                     )
                                     |> MorphRow.over domainTopLevel
                                 )
+                , goOnBroaden = Stack.toList
                 , commitBack =
                     \commitValue ->
                         case commitValue.hostLabels |> Stack.fromList of
