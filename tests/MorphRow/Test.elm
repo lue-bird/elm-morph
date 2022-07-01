@@ -2,7 +2,7 @@ module MorphRow.Test exposing (tests)
 
 import Digit.Morph
 import Expect
-import Hand exposing (Empty, Hand)
+import Hand exposing (Empty, Hand, filled)
 import Morph exposing (Morph, broaden, broadenFrom, choice, narrow, translate)
 import Morph.Char as Char
 import Morph.Text
@@ -29,8 +29,7 @@ tests =
 
 pointTest : Test
 pointTest =
-    Test.describe
-        "point"
+    Test.describe "point"
         [ test "narrow"
             (\() ->
                 "(3,  -9999.124)"
@@ -44,6 +43,20 @@ pointTest =
                             |> Morph.over Stack.Morph.toText
                         )
                     |> Expect.equal (Ok { x = 3.0, y = -9999.124 })
+            )
+        , test "broaden"
+            (\() ->
+                { x = 3.0, y = -9999.124 }
+                    |> broaden
+                        (Morph.group
+                            (\x y -> { x = x, y = y })
+                            (\x y -> { x = x, y = y })
+                            |> Morph.part ( .x, .x >> Ok ) Number.Morph.fromFloat
+                            |> Morph.part ( .y, .y >> Ok ) Number.Morph.fromFloat
+                            |> MorphRow.over point
+                            |> Morph.over Stack.Morph.toText
+                        )
+                    |> Expect.equal "( 3, -9999.124 )"
             )
         ]
 
@@ -72,16 +85,6 @@ point =
                 |> MorphRow.over (atLeast 0 (Char.blank |> atom))
             )
         |> skip (Morph.Text.specific ")")
-
-
-type alias Point =
-    RecordWithoutConstructorFunction
-        { x : Number, y : Number }
-
-
-
--- email
--- format as described in https://en.wikipedia.org/wiki/Email_address
 
 
 emailTest : Test
@@ -151,6 +154,11 @@ emailTest =
         ]
 
 
+
+-- email
+-- format as described in https://en.wikipedia.org/wiki/Email_address
+
+
 email : MorphRow Char Email expectedCustom_
 email =
     succeed
@@ -181,10 +189,6 @@ local =
             )
 
 
-
--- local
-
-
 localSymbol : Morph LocalSymbol Char (Morph.Error Char variantExpectation_)
 localSymbol =
     choice
@@ -208,6 +212,10 @@ localSymbol =
             )
         |> Morph.possibility LocalSymbol0To9 Digit.Morph.n0To9
         |> Morph.choiceFinish
+
+
+
+-- local
 
 
 localSymbolPrintable :
@@ -318,6 +326,22 @@ domain =
                                     )
                                     |> MorphRow.over domainTopLevel
                                 )
+                , commitBack =
+                    \commitValue ->
+                        case commitValue.hostLabels |> Stack.fromList of
+                            Hand.Empty _ ->
+                                Nothing
+
+                            Hand.Filled stacked ->
+                                stacked |> filled |> Stack.reverse |> Just
+                , goOnBack =
+                    \stack ->
+                        case stack |> Stack.topRemove of
+                            Hand.Empty _ ->
+                                Nothing
+
+                            Hand.Filled downStacked ->
+                                downStacked |> filled |> Just
                 }
             )
 
@@ -376,10 +400,6 @@ hostLabelSymbol =
         |> Morph.choiceFinish
 
 
-
--- domain
-
-
 domainTopLevel : MorphRow Char DomainTopLevel expectedCustom_
 domainTopLevel =
     succeed
@@ -396,6 +416,10 @@ domainTopLevel =
             (Char.aToZ |> atom)
         |> grab .afterFirstAToZ
             (atLeast 0 (domainTopLevelAfterFirstAToZSymbol |> atom))
+
+
+
+-- domain
 
 
 domainTopLevelAfterFirstAToZSymbol :
@@ -416,6 +440,11 @@ domainTopLevelAfterFirstAToZSymbol =
         |> Morph.possibility DomainTopLevelSymbolAToZ Char.aToZ
         |> Morph.possibility DomainTopLevelSymbol0To9 Digit.Morph.n0To9
         |> Morph.choiceFinish
+
+
+type alias Point =
+    RecordWithoutConstructorFunction
+        { x : Number, y : Number }
 
 
 type alias Email =
