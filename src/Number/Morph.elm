@@ -42,10 +42,17 @@ type Number
         }
 
 
-{-| [`Translate`](Morph#Translate) between a `Float` and a [decimal representation](#Number).
+{-| [`Translate`](Morph#Translate) between a `Float` and [decimal representation](#Number).
 
 Keep in mind that `Number -> Float` can be lossy
 since `Float` is fixed in bit size while [`Number`](#Number) is not.
+
+    -9999.124
+        |> broaden
+            (Number.Morph.toFloat
+                |> MorphRow.over Number.Morph.text
+            )
+    --> "-999.1239999999997962731868028640747070312"
 
 -}
 fromFloat : Morph Float Number error_
@@ -99,14 +106,14 @@ toFloat =
 
                 Just signed ->
                     let
-                        whole =
-                            floatValue |> floor
+                        wholeAbsolute =
+                            signed.absolute |> truncate
                     in
                     { sign = signed.sign
                     , whole =
-                        whole |> abs |> intAbsoluteTo0To9s
+                        wholeAbsolute |> intAbsoluteTo0To9s
                     , fraction =
-                        (signed.absolute - (whole |> Basics.toFloat))
+                        (signed.absolute - (wholeAbsolute |> Basics.toFloat))
                             |> abs
                             |> floatFraction
                     }
