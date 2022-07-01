@@ -34,8 +34,8 @@ value : Morph Cause Value (Value.Error expectationCustom_)
 value =
     Value.group
         |> Value.part ( .name, "name" ) Value.string
-        |> Value.part ( "percent", .percent ) Value.float
-        |> Value.part ( "per100k", .per100k ) Value.float
+        |> Value.part ( .percent, "percent" ) Value.float
+        |> Value.part ( .per100k, "per100k" ) Value.float
         |> Value.groupFinish
 ```
 That was surprisingly easy!
