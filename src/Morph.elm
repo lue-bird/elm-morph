@@ -6,7 +6,7 @@ module Morph exposing
     , validate, specific
     , broaden, narrow
     , Translate
-    , translate, broadenFrom, remain
+    , translate, broadenFrom, toggle, remain
     , map, unmap
     , lazy, over
     , reverse
@@ -45,7 +45,7 @@ module Morph exposing
 
 ### [`Translate`](Morph#Translate) create
 
-@docs translate, broadenFrom, remain
+@docs translate, broadenFrom, toggle, remain
 
 
 ### [`Translate`](Morph#Translate) scan
@@ -330,18 +330,33 @@ type alias Translate unmapped mapped =
     Morph unmapped mapped Never
 
 
+{-| Switch between 2 opposite representations.
+
+    toggle List.reverse
+
+    toggle Linear.opposite
+
+    toggle not
+
+-}
+toggle : (value -> value) -> Morph value value error_
+toggle changeToOpposite =
+    translate changeToOpposite changeToOpposite
+
+
 {-| A [`Morph`](#Morph) that doesn't transform anything.
 
 Same as writing:
 
+  - [`toggle`](#toggle) `identity`
   - [`translate`](#translate) `identity identity`
   - [`validate`](#validate) `Ok`
-  - `{ narrow = Ok, broaden = identity }`
+  - `{ broaden = identity, narrow = Ok }`
 
 -}
 remain : Morph value value error_
 remain =
-    translate identity identity
+    toggle identity
 
 
 {-| Mutual `Morph` = [`Translate`](#Translate)
