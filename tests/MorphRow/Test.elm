@@ -2,11 +2,11 @@ module MorphRow.Test exposing (tests)
 
 import Digit.Morph
 import Expect
-import Hand exposing (Empty, Hand, filled)
+import Hand exposing (Empty, Hand)
 import Morph exposing (Morph, broaden, broadenFrom, choice, narrow, translate)
 import Morph.Char as Char
 import Morph.Text
-import MorphRow exposing (LoopStep(..), MorphRow, atLeast, atom, grab, loop, skip, split, succeed)
+import MorphRow exposing (MorphRow, atLeast, atom, grab, skip, split, succeed)
 import Number.Morph exposing (Number)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Stack exposing (Stacked)
@@ -24,7 +24,7 @@ tests =
 
 
 
---point
+-- point
 
 
 pointTest : Test
@@ -293,57 +293,19 @@ localSymbolPrintable =
 domain : MorphRow Char Domain expectedCustom_
 domain =
     succeed
-        (\first secondUp -> { first = first, secondUp = secondUp })
+        (\first hostLabels topLevel ->
+            { first = first, hostLabels = hostLabels, topLevel = topLevel }
+        )
         |> MorphRow.grab .first hostLabel
         |> MorphRow.skip (Morph.Text.specific ".")
-        |> MorphRow.grab .secondUp
-            (loop
-                { initial = []
-                , step =
-                    \hostLabels ->
-                        choice
-                            (\goOn commit loopStep ->
-                                case loopStep of
-                                    MorphRow.GoOn goOnValue ->
-                                        goOn goOnValue
-
-                                    MorphRow.Commit commitValue ->
-                                        commit commitValue
-                            )
-                            |> MorphRow.possibility GoOn
-                                (succeed (\label -> Stack.topDown label hostLabels)
-                                    |> MorphRow.grab Stack.top hostLabel
-                                    |> MorphRow.skip (Morph.Text.specific ".")
-                                )
-                            |> MorphRow.possibility Commit
-                                (translate
-                                    .topLevel
-                                    (\topLevelNarrow ->
-                                        { topLevel = topLevelNarrow
-                                        , hostLabels = hostLabels |> List.reverse
-                                        }
-                                    )
-                                    |> MorphRow.over domainTopLevel
-                                )
-                , goOnBroaden = Stack.toList
-                , commitBack =
-                    \commitValue ->
-                        case commitValue.hostLabels |> Stack.fromList of
-                            Hand.Empty _ ->
-                                Nothing
-
-                            Hand.Filled stacked ->
-                                stacked |> filled |> Stack.reverse |> Just
-                , goOnBack =
-                    \stack ->
-                        case stack |> Stack.topRemove of
-                            Hand.Empty _ ->
-                                Nothing
-
-                            Hand.Filled downStacked ->
-                                downStacked |> filled |> Just
-                }
+        |> MorphRow.grab .hostLabels
+            (atLeast 0
+                (succeed (\label -> label)
+                    |> MorphRow.grab (\label -> label) hostLabel
+                    |> MorphRow.skip (Morph.Text.specific ".")
+                )
             )
+        |> MorphRow.grab .topLevel domainTopLevel
 
 
 hostLabel : MorphRow Char HostLabel expectedCustom_
@@ -488,10 +450,8 @@ type LocalSymbolPrintable
 type alias Domain =
     RecordWithoutConstructorFunction
         { first : HostLabel
-        , secondUp :
-            { hostLabels : List HostLabel
-            , topLevel : DomainTopLevel
-            }
+        , hostLabels : List HostLabel
+        , topLevel : DomainTopLevel
         }
 
 
