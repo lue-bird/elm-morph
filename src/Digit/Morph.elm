@@ -122,7 +122,7 @@ n1To9ToInt =
 
     import MorphRow exposing (map)
     import MorphRow.Error
-    import Morph.CharRow as Char
+    import Morph.Char as Char
     import Morph.TextRow as Text
 
     "123abc" |> Text.narrowWith (atLeast 1 Digit.Morph.n0To9) --> Ok "123"
