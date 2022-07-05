@@ -1,5 +1,5 @@
 module Number.Morph exposing
-    ( Number(..), text
+    ( Number, text
     , toFloat, fromFloat
     )
 
@@ -16,10 +16,10 @@ import Hand exposing (Empty, Hand, filled)
 import Integer.Morph.Internal exposing (intAbsoluteTo0To9s, n0To9sToInt)
 import Morph exposing (Morph, translate)
 import Morph.Text
-import MorphRow exposing (MorphRow, atLeast, atom, grab, maybe, skip, succeed)
+import MorphRow exposing (MorphRow, atLeast, grab, maybe, one, skip, succeed)
 import Possibly exposing (Possibly)
 import Sign
-import Sign.Morph exposing (Sign)
+import Sign.Morph exposing (Sign, Signable(..))
 import Stack exposing (Stacked)
 
 
@@ -33,11 +33,9 @@ Don't shy away from spinning your own version of this if needed, like
         | Decimal Number
 
 -}
-type Number
-    = N0
-    | Signed
-        { sign : Sign
-        , whole : Hand (Stacked Digit.Morph.N0To9) Never Empty
+type alias Number =
+    Signable
+        { whole : Hand (Stacked Digit.Morph.N0To9) Never Empty
         , fraction : Hand (Stacked Digit.Morph.N0To9) Possibly Empty
         }
 
@@ -199,9 +197,9 @@ text =
                     |> grab .whole
                         (succeed Stack.topDown
                             |> grab Stack.top
-                                (Digit.Morph.n0To9 |> atom)
+                                (Digit.Morph.n0To9 |> one)
                             |> grab (Stack.topRemove >> Stack.toList)
-                                (atLeast 0 (Digit.Morph.n0To9 |> atom))
+                                (atLeast 0 (Digit.Morph.n0To9 |> one))
                         )
                     |> grab .fraction
                         (translate
@@ -226,7 +224,7 @@ text =
                                     (succeed (\fractionDigits -> fractionDigits)
                                         |> skip (Morph.Text.specific ".")
                                         |> grab (\fractionDigits -> fractionDigits)
-                                            (atLeast 1 (Digit.Morph.n0To9 |> atom))
+                                            (atLeast 1 (Digit.Morph.n0To9 |> one))
                                     )
                                 )
                         )

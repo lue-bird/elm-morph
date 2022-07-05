@@ -1,8 +1,12 @@
-module Sign.Morph exposing (Sign(..), plusOrMinus, maybeMinus)
+module Sign.Morph exposing
+    ( Sign(..), plusOrMinus, maybeMinus
+    , Signable(..)
+    )
 
 {-|
 
 @docs Sign, plusOrMinus, maybeMinus
+@docs Signable
 
 -}
 
@@ -16,6 +20,13 @@ import MorphRow exposing (MorphRow, maybe)
 type Sign
     = Positive
     | Negative
+
+
+{-| `0` or a signed number.
+-}
+type Signable signedNumber
+    = N0
+    | Signed { signedNumber | sign : Sign }
 
 
 {-| `'+'` or `'-'`.

@@ -1,4 +1,4 @@
-module Integer.Morph exposing (Integer(..), text, toInt, fromInt)
+module Integer.Morph exposing (Integer, text, toInt, fromInt)
 
 {-| [`Morph`](Morph#Morph) to and from whole decimal numbers
 
@@ -11,19 +11,17 @@ import Hand exposing (Empty, Hand, fill)
 import Integer.Morph.Internal exposing (intAbsoluteTo0To9s, n0To9sToInt)
 import Morph exposing (Morph, choice)
 import Morph.Text
-import MorphRow exposing (MorphRow, atLeast, atom, grab, succeed)
+import MorphRow exposing (MorphRow, atLeast, grab, one, succeed)
 import Sign
-import Sign.Morph exposing (Sign)
+import Sign.Morph exposing (Sign, Signable(..))
 import Stack exposing (StackTopBelow)
 
 
 {-| A whole decimal number
 -}
-type Integer
-    = N0
-    | Signed
-        { sign : Sign
-        , absolute :
+type alias Integer =
+    Signable
+        { absolute :
             Hand
                 (StackTopBelow Digit.Morph.N1To9 Digit.Morph.N0To9)
                 Never
@@ -132,9 +130,9 @@ text =
                     |> grab .sign Sign.Morph.maybeMinus
                     |> grab .absolute
                         (succeed Stack.topDown
-                            |> grab Stack.top (Digit.Morph.n1To9 |> atom)
+                            |> grab Stack.top (Digit.Morph.n1To9 |> one)
                             |> grab (Stack.topRemove >> Stack.toList)
-                                (atLeast 0 (Digit.Morph.n0To9 |> atom))
+                                (atLeast 0 (Digit.Morph.n0To9 |> one))
                         )
                 )
             |> MorphRow.choiceFinish
