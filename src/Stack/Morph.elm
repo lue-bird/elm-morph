@@ -17,7 +17,9 @@ module Stack.Morph exposing
 @docs toText, fromText
 
 
-## each
+## transform
+
+Also available: [`toggle`](Morph#toggle) `Stack.reverse`
 
 @docs belowTopEach
 

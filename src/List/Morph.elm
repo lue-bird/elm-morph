@@ -2,6 +2,11 @@ module List.Morph exposing (elementEach)
 
 {-| [`Morph`](Morph#Morph) to and from a `List`
 
+
+## transform
+
+Also available: [`toggle`](Morph#toggle) `List.reverse`
+
 @docs elementEach
 
 -}

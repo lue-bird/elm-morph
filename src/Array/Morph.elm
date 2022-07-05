@@ -11,7 +11,9 @@ module Array.Morph exposing
 @docs fromList, toList
 
 
-## each
+## transform
+
+Also available: [`toggle`](Morph#toggle) [`Array.Extra.reverse`](https://dark.elm.dmy.fr/packages/elm-community/array-extra/latest/Array-Extra#reverse)
 
 @docs elementEach
 
