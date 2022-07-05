@@ -2,7 +2,7 @@
 
 > build conversions between narrow ⇄ broad types at once
 
-There's lots shiny applications of such "`Morph`"s that go both ways.
+There's a lot of shiny applications of "morph"s that go both ways.
 
 Below are some appetizers; click the headers for more examples and documentation.
 
@@ -44,8 +44,9 @@ That was surprisingly easy!
 
 Know `Parser`s? `MorphRow` simply always creates a builder alongside. Think
 
-  - `Email/Id/Time.fromString` – `Email/Id/Time.toString`
-  - concrete syntax tree parser – pretty formatter
+  - `Email/Id/Time.fromString` ⇄ `Email/Id/Time.toString`
+  - concrete syntax tree parser ⇄ pretty formatter
+  - language tree ⇄ simplified, partially evaluated language tree
   - ...
 
 As with all [`Morph`](Morph#Morph)s, [`MorphRow`](MorphRow) makes the process simpler and more reliable.
@@ -53,7 +54,7 @@ As with all [`Morph`](Morph#Morph)s, [`MorphRow`](MorphRow) makes the process si
 Here a 1:1 port of [an example from `elm/parser`](https://dark.elm.dmy.fr/packages/elm/parser/latest/Parser#lazy):
 ```elm
 import Morph exposing (Morph, broadenFrom)
-import MorphRow (atLeast, grab, skip, atom)
+import MorphRow (succeed, atLeast, grab, skip, one)
 import Morph.Char
 
 type Boolean
@@ -85,30 +86,30 @@ boolean =
         |> MorphRow.possibility MyTrue (Morph.Text.specific "true")
         |> MorphRow.possibility MyFalse (Morph.Text.specific "false")
         |> MorphRow.possibility MyOr
-            (MorphRow.succeed Tuple.pair
+            (succeed Tuple.pair
                 |> skip (Morph.Text.specific "(")
                 |> skip
                     (broadenFrom []
                         |> MorphRow.over
-                            (atLeast 0 (Morph.Char.blank |> atom))
+                            (atLeast 0 (Morph.Char.blank |> one))
                     )
                 |> grab (Morph.lazy (\_ -> boolean))
                 |> skip
                     (broadenFrom [ Morph.Char.Space ]
                         |> MorphRow.over
-                            (atLeast 0 (Morph.Char.blank |> atom))
+                            (atLeast 0 (Morph.Char.blank |> one))
                     )
                 |> grab (Morph.Text.specific "||")
                 |> skip
                     (broadenFrom [ Morph.Char.Space ]
                         |> MorphRow.over
-                            (atLeast 0 (Morph.Char.blank |> atom))
+                            (atLeast 0 (Morph.Char.blank |> one))
                     )
                 |> grab (Morph.lazy (\_ -> boolean))
                 |> skip
                     (broadenFrom []
                         |> MorphRow.over
-                            (atLeast 0 (Morph.Char.blank |> atom))
+                            (atLeast 0 (Morph.Char.blank |> one))
                     )
                 |> skip (Morph.Text.specific ")")
             )
