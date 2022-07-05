@@ -26,14 +26,14 @@ Plus it makes it harder to switch to a different format.
 ### prior art
 
   - [`bundsol/`: `Boxed`](https://package.elm-lang.org/packages/bundsol/boxed/2.0.0/Boxed)
-      - 👎 no box-unbox morph pairs
+      - 👎 no box-unbox conversion pairs
   - [`tricycle/elm-storage`: `Storage.Value`](https://dark.elm.dmy.fr/packages/tricycle/elm-storage/latest/Storage-Value)
       - 👎 doesn't expose the `Value` variants
   - [`andre-dietrich/elm-generic`](https://dark.elm.dmy.fr/packages/andre-dietrich/elm-generic/latest/Generic)
       - 👍 multiple broad results: json, xml, yaml
-      - 👎 no encode-decode morph pairs
+      - 👎 no encode-decode conversion pairs
   - [`the-sett/decode-generic`](https://dark.elm.dmy.fr/packages/the-sett/decode-generic/latest/Json-Decode-Generic)
-      - 👎 no encode (so also no encode-decode morph pairs)
+      - 👎 no encode (so no encode-decode conversion pairs as well)
   - [`miniBill/elm-codec`](https://dark.elm.dmy.fr/packages/miniBill/elm-codec/latest/Codec)
       - 👎 no custom errors
   - [`MartinSStewart/elm-serialize`](https://dark.elm.dmy.fr/packages/MartinSStewart/elm-serialize/latest/)
@@ -78,7 +78,7 @@ If you feel especially motivated, throw a PR adding
   - `Morph ValueAny Json.Encode.Value ...`
   - `Morph ValueAny String ...`
   - `Morph ValueAny Bytes ...`
-  - `Morph ValueAny Yaml ...`
+  - `Morph ValueAny Yaml ...` after [`MaybeJustJames/yaml`](https://github.com/MaybeJustJames/yaml/blob/2.1.1/src/Yaml/Parser.elm)
   - `Morph ValueAny Xml ...`
   - `Morph ValueAny Csv ...`
   - ...
@@ -138,11 +138,7 @@ type Valuey literaly structurey
 
 {-| Any value representable in elm.
 
-Is there a structure you'd like to add that can't be converted in a small amount of time? Add it through a PR!
-
-TODO:
-
-  - maybe add `Possible`/`Never` options for each case
+Is there a structure you'd like to add that can't be converted in a small amount of time? PR!
 
 -}
 type alias ValueAny =
