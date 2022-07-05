@@ -2,15 +2,15 @@ module MorphRow exposing
     ( MorphRow
     , SuccessExpectation, Error, InputEndOrSuccess(..)
     , succeed, expect, fail
-    , atomAny, atom
+    , end, oneAny, one
     , specific
     , skip, grab, GroupMorphRowInProgress
     , over, next
     , possibility, ChoiceMorphRowInProgress, choiceFinish
     , sequence
     , atLeast, between, exactly, maybe
-    , split
-    , loop, LoopStep(..)
+    , separatedBy
+    , before, until, while
     )
 
 {-| A simple, easy to use, general-purpose parser-builder with good error messages.
@@ -24,8 +24,8 @@ Heavily inspired by
 
 ## example: 2D point
 
-    import MorphRow exposing (MorphRow, atLeast, drop, into, succeed, take, atom)
-    import Morph.CharRow as Char
+    import MorphRow exposing (MorphRow, atLeast, drop, into, succeed, take, one)
+    import Morph.Char as Char
     import Morph.TextRow as Text exposing (number)
     import MorphRow.Error
 
@@ -52,22 +52,22 @@ Heavily inspired by
                 |> skip (Morph.Text.specific "(")
                 |> skip
                     (broadenFrom [ Char.Space ]
-                        |> MorphRow.over (atLeast 0 (Char.blank |> atom))
+                        |> MorphRow.over (atLeast 0 (Char.blank |> one))
                     )
                 |> grab number
                 |> skip
                     (broadenFrom []
-                        |> MorphRow.over (atLeast 0 (Char.blank |> atom))
+                        |> MorphRow.over (atLeast 0 (Char.blank |> one))
                     )
                 |> skip (Morph.Text.specific ",")
                 |> skip
                     (broadenFrom [ Char.Space ]
-                        |> MorphRow.over (atLeast 0 (Char.blank |> atom))
+                        |> MorphRow.over (atLeast 0 (Char.blank |> one))
                     )
                 |> grab .x Number.Morph.text
                 |> skip
                     (broadenFrom [ Char.Space ]
-                        |> MorphRow.over (atLeast 0 (Char.blank |> atom))
+                        |> MorphRow.over (atLeast 0 (Char.blank |> one))
                     )
                 |> skip (Morph.Text.specific ")")
             )
@@ -115,7 +115,7 @@ Simply use [`Morph.narrow`](Morph#narrow), [`Morph.broaden`](Morph#broaden)
 ## create
 
 @docs succeed, expect, fail
-@docs atomAny, atom
+@docs end, oneAny, one
 @docs specific
 
 
@@ -125,7 +125,7 @@ Simply use [`Morph.narrow`](Morph#narrow), [`Morph.broaden`](Morph#broaden)
 @docs over, next
 
 
-### choices
+### choice
 
 @docs possibility, ChoiceMorphRowInProgress, choiceFinish
 
@@ -134,17 +134,24 @@ Simply use [`Morph.narrow`](Morph#narrow), [`Morph.broaden`](Morph#broaden)
 
 @docs sequence
 @docs atLeast, between, exactly, maybe
-@docs split
+@docs separatedBy
 
 
-### looping
+### loop
 
-@docs loop, LoopStep
+[`while`](#while), [`until`](#until) are powerful ways to recurse over [`MorphRow`](#MorphRow)s:
+
+situation: One [`possibility`](#possibility) matches, [`next`](#next) the new argument is taken to call the whole [`MorphRow`](#MorphRow) recursively.
+
+This grows the stack, so you cannot do it indefinitely.
+[`while`](#while), [`until`](#until) enable tail-call elimination so you can have as many repeats you want.
+
+@docs before, until, while
 
 -}
 
 import Hand exposing (Empty, Hand, filled)
-import Morph exposing (Expected(..), GroupMorphInProgress, Morph, broaden, broadenFrom, choice, narrow, translate)
+import Morph exposing (Expected(..), GroupMorphInProgress, Morph, broaden, broadenFrom, choice, narrow, translate, validate)
 import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Stack exposing (StackTopBelow, Stacked, topDown)
@@ -291,7 +298,7 @@ onRemainingErr state =
 {-| Describe the context to improve error messages.
 
     import MorphRow.Error
-    import Morph.CharRow as Char
+    import Morph.Char as Char
     import Morph.TextRow as Text
 
     -- we can redefine an error message if something goes wrong
@@ -304,7 +311,7 @@ onRemainingErr state =
     --> Err "1:1: I was expecting a name consisting of letters. I got stuck when I got '1'."
 
 
-    import MorphRow exposing (take, drop, succeed, expect, atom)
+    import MorphRow exposing (take, drop, succeed, expect, one)
     import Morph.TextRow as Text
 
     type alias Point =
@@ -320,11 +327,11 @@ onRemainingErr state =
     point =
         expect "point"
             (succeed (\x y -> { x = x, y = y })
-                |> skip (atom '(')
+                |> skip (one '(')
                 |> grab .x Text.number
-                |> skip (atom ',')
+                |> skip (one ',')
                 |> grab .y Text.number
-                |> skip (atom ')')
+                |> skip (one ')')
             )
 
     "(12,34)" |> narrow (map Text.fromList point)
@@ -426,7 +433,7 @@ grab partAccess grabbedNextMorphRow =
         |> Text.narrowWith
             (succeed (\userName -> { username = userName })
                 |> grab .username (atLeast 1 aToZ)
-                |> skip (atom '@')
+                |> skip (one '@')
                 |> skip
                     (Text.fromList
                         |> MorphRow.over (atLeast 1 aToZ)
@@ -477,56 +484,39 @@ skip ignoredNext =
 
 > ℹ️ Equivalent regular expression: `.`
 
-    import MorphRow exposing (atomAny)
+    import MorphRow exposing (oneAny)
     import MorphRow.Error
     import Morph.TextRow as Text
 
     -- can match any character
-    "abc" |> Text.narrowWith atomAny --> Ok 'a'
-    "#hashtag" |> Text.narrowWith atomAny --> Ok '#'
+    "abc" |> Text.narrowWith oneAny --> Ok 'a'
+    "#hashtag" |> Text.narrowWith oneAny --> Ok '#'
 
     -- only fails if we run out of inputs
     ""
-        |> Text.narrowWith atomAny
+        |> Text.narrowWith oneAny
         |> Result.mapError MorphRow.Error.textMessage
     --> Err "1:0: I was expecting a character. I reached the end of the input."
 
 -}
-atomAny : MorphRow atom atom expectedCustom_
-atomAny =
-    expectDefault Morph.MoreInput
-        { narrow =
-            \broad ->
-                case broad of
-                    Hand.Empty _ ->
-                        Hand.empty |> narrow fail
-
-                    Hand.Filled (Stack.TopDown nextAtom tail) ->
-                        narrow (nextAtom |> succeed) (Stack.fromList tail)
-        , broaden = Stack.only
-        }
-
-
-{-| [Expect](Morph#Expectation) something basic. Use [`expect`](#expect) for custom failure states.
--}
-expectDefault :
-    Morph.ExpectationWith { startingAtDown : Int } atom expectedCustom
-    -> MorphRow atom narrow expectedCustom
-    -> MorphRow atom narrow expectedCustom
-expectDefault expected morphRow =
+oneAny : MorphRow atom atom expectedCustom_
+oneAny =
     { narrow =
-        \beforeInput ->
-            beforeInput
-                |> narrowStep morphRow
-                |> Result.mapError
-                    (\error -> { error | expected = expected })
-                |> Result.andThen
-                    (\after ->
-                        after.broad
-                            |> narrowStep (after.narrow |> succeed)
-                    )
-                |> onRemainingErr
-    , broaden = broaden morphRow
+        \broad ->
+            case broad of
+                Hand.Empty _ ->
+                    Morph.Expected
+                        (Success
+                            { expected = Morph.MoreInput
+                            , startingAtDown = 0
+                            , description = Hand.empty
+                            }
+                        )
+                        |> Err
+
+                Hand.Filled (Stack.TopDown nextAtom tail) ->
+                    tail |> Stack.fromList |> narrow (nextAtom |> succeed)
+    , broaden = Stack.only
     }
 
 
@@ -552,21 +542,21 @@ specific expectedConstantInput =
         (List.repeat (expectedConstantInput |> List.length) ())
         |> over
             (expectedConstantInput
-                |> List.map (Morph.specific >> atom)
+                |> List.map (Morph.specific >> one)
                 |> sequence
             )
 
 
-{-| [`MorphRow`](#MorphRow) from and to a single broad input = atom.
+{-| [`MorphRow`](#MorphRow) from and to a single broad input.
 
-Short for [`MorphRow.over`](#over) [`atomAny`](#atomAny)
+Short for [`MorphRow.over`](#over) [`oneAny`](#oneAny)
 
 -}
-atom :
-    Morph narrow atom (Morph.Error atom expectCustom)
-    -> MorphRow atom narrow expectCustom
-atom =
-    over atomAny
+one :
+    Morph narrow element (Morph.Error element expectCustom)
+    -> MorphRow element narrow expectCustom
+one =
+    over oneAny
 
 
 {-| Always succeed with the given value.
@@ -585,7 +575,7 @@ For anything composed of multiple parts,
 first declaratively describing what you expect to get in the end,
 then [taking](#grab) and [dropping](#skip) what you need to parse.
 
-    import MorphRow exposing (succeed, atom)
+    import MorphRow exposing (succeed, one)
     import Morph.TextRow exposing (integer)
 
     type alias Point =
@@ -600,7 +590,7 @@ then [taking](#grab) and [dropping](#skip) what you need to parse.
     point =
         succeed (\x y -> { x = x, y = y })
             |> grab .x integer
-            |> skip (atom ',')
+            |> skip (one ',')
             |> grab .y integer
 
     "12,34" |> Text.narrowWith point
@@ -657,7 +647,9 @@ succeed narrowConstant =
         |> Result.mapError MorphRow.Error.textMessage
     --> Err "1:0: I was expecting nothing, this always fails. I reached the end of the broad."
 
-TODO: avoidable?
+This is often used in combination with [`next`](#next).
+
+TODO: remove?
 
 -}
 fail : MorphRow atom_ narrow_ expectedCustom_
@@ -695,7 +687,7 @@ try this [`MorphRow`](#MorphRow).
 > ℹ️ Equivalent regular expression: `|`
 
     import MorphRow exposing (atom)
-    import Morph.CharRow as Char
+    import Morph.Char as Char
     import MorphRow.Error
 
     type UnderscoreOrLetter
@@ -729,7 +721,7 @@ try this [`MorphRow`](#MorphRow).
 
     -- if none work, we get the error from all possible steps
     "1"
-        |> Text.narrowWith (onFailDown [ atom '_', Char.letter ])
+        |> Text.narrowWith (onFailDown [ one '_', Char.letter ])
         |> Result.mapError MorphRow.Error.textMessage
     --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '1'."
 
@@ -737,7 +729,7 @@ try this [`MorphRow`](#MorphRow).
 ### example: fallback step if the previous step fails
 
     import Morph
-    import Morph.CharRow as Char
+    import Morph.Char as Char
     import MorphRow.Error
 
     type AlphaNum
@@ -864,93 +856,30 @@ choiceFinish =
 {-| After [converting](#MorphRow) the previous section,
 form another [morph](#MorphRow) with the value we got.
 
-This can be used to narrow the previous value further,
-or to use the last value for the next [morph](#MorphRow) like a backreference.
+It allows using the last value for the next [`MorphRow`](#MorphRow) like a backreference.
 
-    integerWithLeading0s : MorphRow Char Int
-    integerWithLeading0s =
-        next
-            identity
-            (\int ->
-                case int of
-                    0 ->
-                        Text.integer
+But!
 
-                    intSigned ->
-                        intSigned |> succeed
-            )
-            Text.integer
+  - try to keep [`next`](#next) filters/validations to a minimum to get
+      - a better error description out of the box
+      - a more descriptive and correct type
+      - building invalid values becomes impossible
+  - [loop](#loop) instead of recursively recursively [`next`](#next)
+  - try to know what to morph by tracking context,
+    independent of what narrow result the last morph gave
+      - for example don't use [`next`](#next) for versioning etc.
+        Use [`choice`](Morph#choice) where each [`possibility`](#possibility) expects a specific number
 
-Try to keep `next` filters to a minimum. Instead of
-
-    printable : MorphRow Char Char
-    printable =
-        next identity
-            (\char ->
-                if List.member char [ '!', '#', '$', '%', '&', '*', '_', '-' ] then
-                    char |> succeed
-
-                else
-                    fail
-            )
-            atomAny
-
-do
-
-    printable : MorphRow Char LocalSymbolPrintable
-    printable =
-        choice
-            (\exclamationMark numberSign dollarSign percentSign ampersand asterisk lowLine hyphenMinus printable ->
-                case printable of
-                    ExclamationMark ->
-                        exclamationMark ()
-
-                    NumberSign ->
-                        numberSign ()
-
-                    DollarSign ->
-                        dollarSign ()
-
-                    PercentSign ->
-                        percentSign ()
-
-                    Ampersand ->
-                        ampersand ()
-
-                    Asterisk ->
-                        asterisk ()
-
-                    LowLine ->
-                        lowLine ()
-
-                    HyphenMinus ->
-                        hyphenMinus ()
-            )
-            (possibility (\() -> ExclamationMark) (atom '!')
-                >> possibility (\() -> NumberSign) (atom '#')
-                >> possibility (\() -> DollarSign) (atom '$')
-                >> possibility (\() -> PercentSign) (atom '%')
-                >> possibility (\() -> Ampersand) (atom '&')
-                >> possibility (\() -> Asterisk) (atom '*')
-                >> possibility (\() -> LowLine) (atom '_')
-                >> possibility (\() -> HyphenMinus) (atom '-')
-            )
-
-This gives you
-
-  - a better error description out of the box
-  - a more descriptive and correct type
-  - building invalid values is impossible!
-
-If you're using `next` recursively, see if you can [`loop`](#loop) instead.
+TODO: add example
+TODO: remove?
 
 -}
 next :
-    (narrowNarrow -> narrow)
-    -> (narrow -> MorphRow atom narrowNarrow expectedCustom)
+    (narrow -> broad)
+    -> (broad -> MorphRow atom narrow expectedCustom)
     ->
-        (MorphRow atom narrow expectedCustom
-         -> MorphRow atom narrowNarrow expectedCustom
+        (MorphRow atom broad expectedCustom
+         -> MorphRow atom narrow expectedCustom
         )
 next narrowNarrowToNarrow morphNarrowNarrow =
     \morphRowBefore ->
@@ -998,7 +927,7 @@ errorFromMorph location =
 
     import Morph exposing (listToString)
     import MorphRow exposing (map, atLeast)
-    import Morph.CharRow as Char
+    import Morph.Char as Char
     import Morph.TextRow as Text
 
     -- get some letters, make them lowercase
@@ -1045,8 +974,8 @@ over morphRowBeforeMorph =
 
 expectationFromMorph :
     { startingAtDown : Int }
-    -> Morph.Expectation atom description
-    -> Morph.ExpectationWith { startingAtDown : Int } atom description
+    -> Morph.Expectation specific description
+    -> Morph.ExpectationWith { startingAtDown : Int } specific description
 expectationFromMorph location =
     \morphExpectation ->
         case morphExpectation of
@@ -1075,8 +1004,8 @@ expectationFromMorph location =
 
 {-| Match a sequence of parsers in order, and gets the result as a `List`.
 
-    import MorphRow exposing (map, atom)
-    import Morph.CharRow as Char
+    import MorphRow exposing (map, one)
+    import Morph.Char as Char
     import Morph.TextRow as Text
 
     -- all parsers must be of the same type
@@ -1144,7 +1073,7 @@ sequence morphRowsInSequence =
 
 > ℹ️ Equivalent regular expression: `?`
 
-    import Morph.CharRow exposing (letter)
+    import Morph.Char exposing (letter)
     import Morph.TextRow as Text
 
     -- maybe we get `Just` a letter
@@ -1179,7 +1108,7 @@ maybe contentMorphRow =
 > ℹ️ Equivalent regular expression: `{n}`
 
     import MorphRow.Error
-    import Morph.CharRow as Char
+    import Morph.Char as Char
     import Morph.TextRow as Text
 
     -- we want `exactly 3` letters
@@ -1201,12 +1130,95 @@ exactly howOften repeatedMorphRow =
     sequence (List.repeat howOften repeatedMorphRow)
 
 
+loopWhile :
+    (List goOnElement
+     -> MorphRow atom goOnElement expectedCustom
+    )
+    -> MorphRow atom (List goOnElement) expectedCustom
+loopWhile whileStep =
+    let
+        loopStep =
+            \before_ ->
+                choice
+                    (\goOn commit loopStepNarrow ->
+                        case loopStepNarrow of
+                            GoOn goOnELement ->
+                                goOn goOnELement
+
+                            Commit commitElement ->
+                                commit commitElement
+                    )
+                    |> possibility GoOn (before_ |> whileStep)
+                    |> possibility Commit (succeed ())
+                    |> choiceFinish
+    in
+    { broaden =
+        let
+            broadenStepBack :
+                ()
+                ->
+                    (List goOnElement
+                     -> Hand (Stacked atom) Possibly Empty
+                    )
+            broadenStepBack () =
+                \toStep ->
+                    case toStep of
+                        [] ->
+                            Hand.empty
+
+                        top :: tail ->
+                            (top |> GoOn)
+                                |> broaden (tail |> loopStep)
+                                |> Stack.onTopStack (tail |> broadenStepBack ())
+        in
+        \commitResultNarrow ->
+            commitResultNarrow
+                |> List.reverse
+                |> broadenStepBack ()
+    , narrow =
+        let
+            loopNarrowStep :
+                ()
+                ->
+                    (List goOnElement
+                     ->
+                        (Hand (Stacked atom) Possibly Empty
+                         ->
+                            Result
+                                (SuccessExpectation atom expectedCustom)
+                                { narrow : List goOnElement
+                                , broad : Hand (Stacked atom) Possibly Empty
+                                }
+                        )
+                    )
+            loopNarrowStep () =
+                \before_ ->
+                    narrowStep (before_ |> loopStep)
+                        >> Result.andThen
+                            (\stepped ->
+                                case stepped.narrow of
+                                    Commit () ->
+                                        { broad = stepped.broad
+                                        , narrow = before_ |> List.reverse
+                                        }
+                                            |> Ok
+
+                                    GoOn goOnElement ->
+                                        stepped.broad
+                                            |> (before_ |> (::) goOnElement |> loopNarrowStep ())
+                            )
+        in
+        ([] |> loopNarrowStep ())
+            >> onRemainingErr
+    }
+
+
 {-| Match a value at least a number of times and returns them as a `List`.
 
 > ℹ️ Equivalent regular expression: `{min,}`
 
     import MorphRow.Error
-    import Morph.CharRow as Char
+    import Morph.Char as Char
     import Morph.TextRow as Text
 
     -- we want at least three letters, we are okay with more than three
@@ -1225,7 +1237,7 @@ exactly howOften repeatedMorphRow =
 
 > ℹ️ Equivalent regular expression: `*`
 
-    import Morph.CharRow as Char
+    import Morph.Char as Char
     import Morph.TextRow as Text
 
     -- We want as many letters as there are.
@@ -1245,7 +1257,7 @@ exactly howOften repeatedMorphRow =
 > ℹ️ Equivalent regular expression: `+`
 
     import MorphRow.Error
-    import Morph.CharRow as Char
+    import Morph.Char as Char
     import Morph.TextRow as Text
 
     -- we want as many letters as there are
@@ -1266,57 +1278,251 @@ atLeast :
     Int
     -> MorphRow atom narrow expectedCustom
     -> MorphRow atom (List narrow) expectedCustom
-atLeast minimum stepMorphRow =
+atLeast minimum elementStepMorphRow =
     succeed (\minimumList overMinimum -> minimumList ++ overMinimum)
         |> grab (List.take minimum)
-            (exactly minimum stepMorphRow)
+            (exactly minimum elementStepMorphRow)
         |> grab (List.drop minimum)
-            (untilFailure stepMorphRow)
+            (loopWhile (\_ -> elementStepMorphRow))
 
 
-untilFailure :
-    MorphRow atom narrow expectedCustom
-    -> MorphRow atom (List narrow) expectedCustom
-untilFailure stepMorphRow =
-    loop
-        { initial = []
-        , step =
-            \soFar ->
-                choice
-                    (\goOn commit stepNarrow ->
-                        case stepNarrow of
-                            GoOn goOnValue ->
-                                goOn goOnValue
+{-| How are [`atLeast`](#atLeast), ... defined?
+The [section loop](#loop) explains why using [`next`](#next) recursively is a bad idea.
 
-                            Commit commitValue ->
-                                commit commitValue
+    import Morph exposing (choice, validate)
+    import MorphRow exposing (MorphRow, one, succeed, atLeast, take, drop, while)
+    import Morph.Char
+    import Morph.Text
+    import Number.Morph
+
+    sumWhileLessThan : Float -> MorphRow Char (List Number)
+    sumWhileLessThan max =
+        while
+            (\stepped ->
+                let
+                    floats =
+                        stepped |> Stack.map (\_ -> Morph.map Number.Morph.toFloat)
+                in
+                if (floats |> Stack.sum) < max then
+                    Ok ()
+                else
+                    Err ()
+            )
+            (succeed (\n -> n)
+                |> grab (\n -> n) Number.Morph.text
+                |> skip (atLeast 0 (Morph.Char.blank |> one))
+            )
+
+    -- stops before we reach a maximum of 6 in the sum
+    "2 3 4"
+        |> narrow
+            (Morph.Text.fromList
+                |> MorphRow.over
+                    (succeed (\numbers -> numbers)
+                        |> grab (\numbers -> numbers) (sumWhileLessThan 6)
+                        |> skip (Text.Morph.specific "4")
                     )
-                    |> possibility GoOn
-                        (translate
-                            Stack.top
-                            (\stepped -> Stack.topDown stepped soFar)
-                            |> over stepMorphRow
-                        )
-                    |> possibility Commit
-                        ((soFar |> List.reverse) |> succeed)
-        , goOnBroaden = Stack.toList
-        , goOnBack =
-            \stack ->
-                case stack |> Stack.topRemove of
-                    Hand.Empty _ ->
-                        Nothing
+            )
+    --> Ok 5
 
-                    Hand.Filled downStacked ->
-                        downStacked |> filled |> Just
-        , commitBack =
-            \list ->
-                case list |> Stack.fromList of
-                    Hand.Empty _ ->
-                        Nothing
+-}
+while :
+    (Hand (Stacked element) Never Empty -> Result () ())
+    -> MorphRow atom element possibilityExpectationCustom
+    -> MorphRow atom (List element) possibilityExpectationCustom
+while elementValidate elementStepMorphRowInLoopToGoOn =
+    loopWhile
+        (\soFar ->
+            validate
+                (\element ->
+                    case soFar |> Stack.topDown element |> elementValidate of
+                        Ok () ->
+                            element |> Ok
 
-                    Hand.Filled stacked ->
-                        stacked |> filled |> Stack.reverse |> Just
+                        Err () ->
+                            Morph.failure
+                )
+                |> over elementStepMorphRowInLoopToGoOn
+        )
+
+
+{-| [Morph](#MorphRow) multiple elements from now to when `end` matches.
+
+    decoderNameSubject : MorphRow String Char expectationCustom_
+    decoderNameSubject =
+        Text.fromList
+            |> MorphRow.over
+                (MorphRow.before
+                    { end =
+                        MorphRow.succeed ()
+                            |> skip (Morph.Text.specific "Decoder")
+                            |> skip MorphRow.end
+                    , goOn = MorphRow.oneAny
+                    }
+                )
+
+You might think: Why not use
+
+    decoderNameSubject : MorphRow String Char expectationCustom_
+    decoderNameSubject =
+        MorphRow.succeed (\subject -> subject)
+            |> grab (\subject -> subject) (atLeast 0 MorphRow.oneAny)
+            |> skip (Morph.Text.specific "Decoder")
+            |> skip MorphRow.end
+
+Problem is: This will never succeed.
+`atLeast 0 MorphRow.oneAny` always goes on.
+We never reach the necessary [`skip`](#skip)ped things.
+
+-}
+before :
+    { end : MorphRow atom () expectedCustom
+    , goOn : MorphRow atom goOnElement expectedCustom
+    }
+    -> MorphRow atom (List goOnElement) expectedCustom
+before untilStep =
+    until
+        { commit =
+            translate
+                (\before_ -> { before = before_, end = () })
+                .before
+        , end = untilStep.end
+        , goOn = untilStep.goOn
         }
+
+
+{-| How are [`between`](#between), ... defined?
+The [section loop](#loop) explains why using [`next`](#next) recursively is a bad idea.
+
+    decoderNameSubject : MorphRow String Char expectationCustom_
+    decoderNameSubject =
+        Text.fromList
+            |> MorphRow.over
+                (MorphRow.until
+                    { commit =
+                        translate
+                            (\before -> { before = before, end = () })
+                            .before
+                    , end =
+                        MorphRow.succeed ()
+                            |> skip (Morph.Text.specific "Decoder")
+                            |> skip MorphRow.end
+                    , goOn = MorphRow.oneAny
+                    }
+                )
+
+↑ can be simplified with [`before`](#before)
+
+Any kind of structure validation that if it fails should proceed to `goOn`
+must be in `commit`
+
+-}
+until :
+    { commit :
+        Morph
+            commitResult
+            { end : endElement
+            , before : List goOnElement
+            }
+            (Morph.Error atom expectedCustom)
+    , end : MorphRow atom endElement expectedCustom
+    , goOn : MorphRow atom goOnElement expectedCustom
+    }
+    -> MorphRow atom commitResult expectedCustom
+until untilStep =
+    let
+        loopStep =
+            choice
+                (\commit goOn loopStepNarrow ->
+                    case loopStepNarrow of
+                        Commit commitElement ->
+                            commit commitElement
+
+                        GoOn goOnELement ->
+                            goOn goOnELement
+                )
+                |> possibility Commit untilStep.end
+                |> possibility GoOn untilStep.goOn
+                |> choiceFinish
+    in
+    { broaden =
+        let
+            broadenStepBack :
+                ()
+                ->
+                    (List goOnElement
+                     -> Hand (Stacked atom) Possibly Empty
+                    )
+            broadenStepBack () =
+                \toStep ->
+                    case toStep of
+                        [] ->
+                            Hand.empty
+
+                        top :: tail ->
+                            (top |> GoOn)
+                                |> broaden loopStep
+                                |> Stack.onTopStack
+                                    (tail |> broadenStepBack ())
+        in
+        \commitResultNarrow ->
+            let
+                committedBack =
+                    commitResultNarrow
+                        |> broaden untilStep.commit
+            in
+            (committedBack.before
+                |> List.reverse
+                |> broadenStepBack ()
+            )
+                |> Stack.onTopStack
+                    ((committedBack.end |> Commit)
+                        |> broaden loopStep
+                    )
+    , narrow =
+        let
+            loopNarrowStep :
+                ()
+                ->
+                    (List goOnElement
+                     ->
+                        (Hand (Stacked atom) Possibly Empty
+                         ->
+                            Result
+                                (SuccessExpectation atom expectedCustom)
+                                { narrow : commitResult
+                                , broad : Hand (Stacked atom) Possibly Empty
+                                }
+                        )
+                    )
+            loopNarrowStep () =
+                \before_ ->
+                    narrowStep loopStep
+                        >> Result.andThen
+                            (\stepped ->
+                                case stepped.narrow of
+                                    Commit committed ->
+                                        case { before = before_, end = committed } |> narrow untilStep.commit of
+                                            Err error ->
+                                                error
+                                                    |> errorFromMorph
+                                                        { startingAtDown = stepped.broad |> Stack.length }
+                                                    |> Err
+
+                                            Ok commitResult ->
+                                                { broad = stepped.broad
+                                                , narrow = commitResult
+                                                }
+                                                    |> Ok
+
+                                    GoOn goOnElement ->
+                                        stepped.broad
+                                            |> (before_ |> (::) goOnElement |> loopNarrowStep ())
+                            )
+        in
+        ([] |> loopNarrowStep ())
+            >> onRemainingErr
+    }
 
 
 {-| Match a value between a range of times and returns them as a `List`.
@@ -1324,7 +1530,7 @@ untilFailure stepMorphRow =
 > ℹ️ Equivalent regular expression: `{min,max}`
 
     import MorphRow.Error
-    import Morph.CharRow as Char
+    import Morph.Char as Char
     import Morph.TextRow as Text
 
     -- we want between two and four letters
@@ -1351,7 +1557,7 @@ Alternative to [`maybe`](#maybe) which instead returns a `List`.
 
 > ℹ️ Equivalent regular expression: `?`
 
-    import Morph.CharRow as Char
+    import Morph.Char as Char
     import Morph.TextRow as Text
 
     -- we want one letter, optionally
@@ -1368,7 +1574,7 @@ Alternative to [`maybe`](#maybe) which instead returns a `List`.
 > ℹ️ Equivalent regular expression: `{0,max}`
 
     import MorphRow exposing (atom)
-    import Morph.CharRow as Char
+    import Morph.Char as Char
     import Morph.TextRow as Text
 
     -- we want a maximum of three letters
@@ -1388,7 +1594,7 @@ Alternative to [`maybe`](#maybe) which instead returns a `List`.
         |> Text.narrowWith
             (succeed (\letters -> letters)
                 |> grab (between 0 3 Char.letter)
-                |> skip (atom 'd')
+                |> skip (one 'd')
             )
     --> Ok [ 'a', 'b', 'c' ]
 
@@ -1417,54 +1623,28 @@ atMost :
     Int
     -> MorphRow atom narrow expectedCustom
     -> MorphRow atom (List narrow) expectedCustom
-atMost maximum =
-    \step ->
-        loop
-            { initial = []
-            , step =
-                \soFar ->
-                    choice
-                        (\goOn commit loopStep ->
-                            case loopStep of
-                                GoOn goOnValue ->
-                                    goOn goOnValue
+atMost maximum elementStepMorphRow =
+    until
+        { commit =
+            validate
+                (\soFar ->
+                    if (soFar |> List.length) >= maximum then
+                        soFar |> Ok
 
-                                Commit commitValue ->
-                                    commit commitValue
-                        )
-                        |> possibility GoOn
-                            (if (soFar |> List.length) >= maximum then
-                                fail
-
-                             else
-                                translate
-                                    Stack.top
-                                    (\top -> topDown top soFar)
-                                    |> over step
-                            )
-                        |> possibility Commit
-                            (soFar |> List.reverse |> succeed)
-            , goOnBroaden = Stack.toList
-            , goOnBack =
-                \stack ->
-                    case stack |> Stack.topRemove of
-                        Hand.Empty _ ->
-                            Nothing
-
-                        Hand.Filled downStacked ->
-                            downStacked |> filled |> Just
-            , commitBack =
-                \list ->
-                    case list of
-                        [] ->
-                            Nothing
-
-                        last :: before ->
-                            Stack.topDown last before |> Stack.reverse |> Just
-            }
+                    else
+                        Morph.failure
+                )
+                |> Morph.over
+                    (translate
+                        (\before_ -> { end = (), before = before_ })
+                        .before
+                    )
+        , end = succeed ()
+        , goOn = elementStepMorphRow
+        }
 
 
-{-| How to continue this [`loop`](#loop).
+{-| How to continue this `loop`.
 Either continue with a partial result or return with a complete value.
 -}
 type LoopStep partial complete
@@ -1472,184 +1652,22 @@ type LoopStep partial complete
     | Commit complete
 
 
-{-| A powerful way to recurse over [`MorphRow`](#MorphRow)s.
+{-| [Morph](#MorphRow) parts and interspersed separators into a `Stack`.
 
-Double-check that `goOnBack` can give `Nothing` in actual situations.
-Otherwise, [`broaden`](Morph#broaden) runs infinitely.
-
-
-### example: fold
-
-    import MorphRow exposing (MorphRow, atom, succeed, onFailDown, fail, atLeast, take, drop, loop)
-    import Morph.CharRow as Char
-    import Morph.TextRow as Text
-    import Morph.TextRow exposing (number)
-
-    sumWhileLessThan : Float -> MorphRow Char Float
-    sumWhileLessThan max =
-        loop
-            { initial = 0
-            , step =
-                \soFarTotal ->
-                    choice
-                        (\goOn commit loopStep ->
-                            case loopStep of
-                                MorphRow.GoOn goOnValue ->
-                                    goOn goOnValue
-
-                                MorphRow.Commit commitValue ->
-                                    commit commitValue
-                        )
-                        |> possibility MorphRow.GoOn
-                            (validate
-                                (\n ->
-                                    if soFarTotal + n >= max then
-                                        () |> Err
-                                    else
-                                        (soFarTotal + n) |> Ok
-                                )
-                                |> MorphRow.over
-                                    (succeed (\n -> n)
-                                        |> grab (\n -> n) number
-                                        |> skip (atLeast 0 Char.blank)
-                                    )
-                            )
-                        |> possibility MorphRow.Commit
-                            (soFarTotal |> succeed)
-            , goOnBroaden = identity
-            }
-
-    -- stops before we reach a maximum of 6 in the sum
-    "2 3 4"
-        |> Text.narrowWith
-            (succeed (\sum -> sum)
-                |> grab (sumWhileLessThan 6)
-                |> skip (atom '4')
-            )
-    --> Ok 5
-
-TODO: fix example
-
--}
-loop :
-    { initial : beforeStep
-    , step :
-        beforeStep
-        ->
-            ChoiceMorphRowInProgress
-                atom
-                (LoopStep goOnValue commitValue)
-                (LoopStep goOnValue commitValue
-                 -> Hand (Stacked atom) Possibly Empty
-                )
-                expectedCustom
-    , goOnBroaden : goOnValue -> beforeStep
-    , goOnBack : goOnValue -> Maybe goOnValue
-    , commitBack : commitValue -> Maybe goOnValue
-    }
-    -> MorphRow atom commitValue expectedCustom
-loop loop_ =
-    -- ↓ This  is what hell looks like FYI
-    let
-        loopStep =
-            \before ->
-                before |> loop_.step |> choiceFinish
-    in
-    { broaden =
-        let
-            goOnBack : Maybe goOnValue -> beforeStep
-            goOnBack =
-                \steppedBack ->
-                    case steppedBack of
-                        Nothing ->
-                            loop_.initial
-
-                        Just goOnBefore ->
-                            goOnBefore |> loop_.goOnBroaden
-
-            broadenStepBack : () -> (Maybe goOnValue -> Hand (Stacked atom) Possibly Empty)
-            broadenStepBack () =
-                \narrowGoOnValue ->
-                    case narrowGoOnValue of
-                        Nothing ->
-                            Hand.empty
-
-                        Just goOnValue ->
-                            let
-                                steppedBack =
-                                    goOnValue |> loop_.goOnBack
-                            in
-                            (goOnValue |> GoOn)
-                                |> broaden (steppedBack |> goOnBack |> loopStep)
-                                |> Stack.onTopStack
-                                    (steppedBack |> broadenStepBack ())
-        in
-        \commitValueNarrow ->
-            let
-                committedBack =
-                    commitValueNarrow
-                        |> loop_.commitBack
-            in
-            (committedBack |> broadenStepBack ())
-                |> Stack.onTopStack
-                    ((commitValueNarrow |> Commit)
-                        |> broaden (committedBack |> goOnBack |> loopStep)
-                    )
-    , narrow =
-        let
-            loopNarrowStep :
-                ()
-                ->
-                    (beforeStep
-                     ->
-                        (Hand (Stacked atom) Possibly Empty
-                         ->
-                            Result
-                                (SuccessExpectation atom expectedCustom)
-                                { narrow : commitValue
-                                , broad : Hand (Stacked atom) Possibly Empty
-                                }
-                        )
-                    )
-            loopNarrowStep () =
-                \before ->
-                    narrowStep (before |> loopStep)
-                        >> Result.andThen
-                            (\stepped ->
-                                case stepped.narrow of
-                                    Commit committed ->
-                                        { broad = stepped.broad
-                                        , narrow = committed
-                                        }
-                                            |> Ok
-
-                                    GoOn goOnValue ->
-                                        stepped.broad
-                                            |> (goOnValue
-                                                    |> loop_.goOnBroaden
-                                                    |> loopNarrowStep ()
-                                               )
-                            )
-        in
-        \broad ->
-            broad
-                |> (loop_.initial |> loopNarrowStep ())
-                |> onRemainingErr
-    }
-
-
-{-| [convert](#MorphRow) parts and interspersed separators into a `Stack`.
-
-    import MorphRow exposing (map, split)
+    import Stack
+    import MorphRow exposing (separatedBy, atLeast, one)
     import Morph.TextRow as Text exposing (text)
-    import Morph.CharRow as Char
+    import Morph.Char as Char
 
     -- note that both values and separators must be of the same type
     "a,bc,def"
         |> Text.narrowWith
-            (split ( atLeast 0, text "," ) (atLeast 0 Char.aToZLower))
+            (separatedBy
+                ( atLeast 0, Morph.Text.specific "," )
+                (atLeast 0 (Morph.Char.aToZLower |> one))
+            )
     --> Ok
-    -->     (topDown
+    -->     (Stack.topDown
     -->         [ 'a' ]
     -->         [ { separator = (), part = [ 'b', 'c' ] }
     -->         , { separator = (), part = [ 'd', 'e', 'f' ] }
@@ -1659,9 +1677,12 @@ loop loop_ =
     -- leading/trailing separators are valid and give empty parts
     ",a,,"
         |> Text.narrowWith
-            (split ( atLeast 0, text "," ) (atLeast 0 Char.aToZLower))
+            (separatedBy
+                ( atLeast 0, Morph.Text.specific "," )
+                (atLeast 0 (Morph.Char.aToZLower |> one))
+            )
     --> Ok
-    -->     (topDown
+    -->     (Stack.topDown
     -->         []
     -->         [ { separator = (), part = [ 'a' ] }
     -->         , { separator = (), part = [] }
@@ -1672,19 +1693,24 @@ loop loop_ =
     -- an empty input text gives a single element from an empty string
     ""
         |> Text.narrowWith
-            (split ( atLeast 0, text "," ) (atLeast 0 Char.aToZLower))
+            (separatedBy
+                ( atLeast 0, Morph.Text.specific "," )
+                (atLeast 0 (Morph.Char.aToZLower |> one))
+            )
     --> Ok (topDown [] [])
 
 Attention on separated part [`MorphRow`](#MorphRow)s:
 
-    split ( atLeast 0, text "," ) (atLeast 0 atomAny)
+    separatedBy
+        ( atLeast 0, Morph.Text.specific "," )
+        (atLeast 0 oneAny)
 
 would only parse 1 part until the end
-because `atLeast 0 atomAny` always [`succeed`](#succeed)s.
+because `atLeast 0 oneAny` always [`succeed`](#succeed)s.
 No separator would ever be parsed.
 
 -}
-split :
+separatedBy :
     ( MorphRow atom { separator : separator, part : part } expectedCustom
       -> MorphRow atom (List { separator : separator, part : part }) expectedCustom
     , MorphRow atom separator expectedCustom
@@ -1702,11 +1728,11 @@ split :
                 Empty
             )
             expectedCustom
-split ( splitSequence, separatorMorphRow ) partMorphRow =
+separatedBy ( separatorsToSequence, separatorMorphRow ) partMorphRow =
     succeed topDown
         |> grab Stack.top partMorphRow
         |> grab (Stack.topRemove >> Stack.toList)
-            (splitSequence
+            (separatorsToSequence
                 (succeed
                     (\separator part ->
                         { separator = separator, part = part }
@@ -1715,3 +1741,49 @@ split ( splitSequence, separatorMorphRow ) partMorphRow =
                     |> grab .part partMorphRow
                 )
             )
+
+
+{-| Only matches when there's no further broad input afterwards.
+
+This is not required for [`narrow`](Morph#narrow)ing to succeed.
+
+It can, however simplify checking for specific endings:
+
+    decoderNameSubject : MorphRow String Char expectationCustom_
+    decoderNameSubject =
+        Text.fromList
+            |> MorphRow.over
+                (MorphRow.until
+                    { commit =
+                        translate
+                            (\before -> { before = before, end = () })
+                            .before
+                    , end =
+                        MorphRow.succeed ()
+                            |> skip (Morph.Text.specific "Decoder")
+                            |> skip MorphRow.end
+                    , goOn = MorphRow.oneAny
+                    }
+                )
+
+-}
+end : MorphRow atom_ () expectationCustom_
+end =
+    { narrow =
+        \broad ->
+            case broad of
+                Hand.Empty _ ->
+                    Hand.empty |> narrow (succeed ())
+
+                Hand.Filled stacked ->
+                    Morph.Expected
+                        (Success
+                            { expected = Morph.NoMoreInput
+                            , startingAtDown = stacked |> filled |> Stack.length
+                            , description = Hand.empty
+                            }
+                        )
+                        |> Err
+    , broaden =
+        \() -> Hand.empty
+    }
