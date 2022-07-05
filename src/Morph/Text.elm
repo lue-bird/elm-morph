@@ -13,7 +13,9 @@ module Morph.Text exposing
 @docs toList, fromList
 
 
-## each
+## transform
+
+Also available: [`toggle`](Morph#toggle) `String.reverse`
 
 @docs elementEach
 
@@ -21,7 +23,7 @@ Use [`Morph.narrow`](Morph#narrow), [`Morph.broaden`](Morph#broaden)
 with [`Text.fromList`](#fromList) `|> over ...`
 
     import Morph exposing (narrow)
-    import Morph.CharRow as Char
+    import Morph.Char as Char
     import Morph.TextRow as Text
     import MorphRow.Error
 
@@ -60,11 +62,9 @@ Feeling motivated? implement & PR
 
 -}
 
-import Hand exposing (filled)
-import Morph exposing (Morph, Translate, broadenFrom, narrow, translate)
+import Morph exposing (Morph, Translate, broadenFrom, translate)
 import Morph.Char
-import MorphRow exposing (MorphRow, atom, succeed)
-import Stack
+import MorphRow exposing (MorphRow, one)
 
 
 {-| [`Translate`](Morph#Translate) from a `String` to a `List Char`.
@@ -132,7 +132,7 @@ caseAny expectedText =
         |> MorphRow.over
             (MorphRow.sequence
                 (List.map
-                    (\expectedChar -> Morph.Char.caseAny expectedChar |> atom)
+                    (\expectedChar -> Morph.Char.caseAny expectedChar |> one)
                     (expectedText |> Morph.map toList)
                 )
             )
@@ -152,7 +152,7 @@ no more remaining characters in the input text.
 > ℹ️ Equivalent regular expression: `$`
 
     import MorphRow exposing (map, followedBy, atLeast)
-    import Morph.CharRow as Char
+    import Morph.Char as Char
     import Morph.TextRow exposing (line)
     import MorphRow.Error
 
@@ -245,32 +245,10 @@ lineEnd =
                     inputEndVariant ()
         )
         |> MorphRow.possibility Return
-            (Morph.Char.return |> atom)
+            (Morph.Char.return |> one)
         |> MorphRow.possibility (\() -> InputEnd)
-            inputEnd
+            MorphRow.end
         |> MorphRow.choiceFinish
-
-
-inputEnd : MorphRow atom_ () expectationCustom_
-inputEnd =
-    { narrow =
-        \broad ->
-            case broad of
-                Hand.Empty _ ->
-                    Hand.empty |> narrow (succeed ())
-
-                Hand.Filled stacked ->
-                    Morph.Expected
-                        (MorphRow.Success
-                            { expected = Morph.NoMoreInput
-                            , startingAtDown = stacked |> filled |> Stack.length
-                            , description = Hand.empty
-                            }
-                        )
-                        |> Err
-    , broaden =
-        \() -> Hand.empty
-    }
 
 
 
