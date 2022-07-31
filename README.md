@@ -4,9 +4,9 @@
 
 There's a lot of shiny applications of "morph"s that go both ways.
 
-Below are some appetizers; click the headers for more examples and documentation.
+↓ are some appetizers; click headers for more examples and documentation
 
-related: [📻 elm-radio episode on the topic "Codecs"](https://elm-radio.com/episode/codecs/)
+related: [📻 elm-radio episode "Codecs"](https://elm-radio.com/episode/codecs/)
 
 ## [`Value`](Value)
 
