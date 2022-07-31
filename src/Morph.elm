@@ -591,12 +591,14 @@ part :
         (MorphInProgress
             { narrow :
                 groupBroad
-                -> (partNarrow -> groupNarrowFurther)
+                -> Result partError (partNarrow -> groupNarrowFurther)
             , broaden : groupNarrow -> (partBroad -> groupBroadenFurther)
             }
          ->
             MorphInProgress
-                { narrow : groupBroad -> groupNarrowFurther
+                { narrow :
+                    groupBroad
+                    -> Result partError groupNarrowFurther
                 , broaden : groupNarrow -> groupBroadenFurther
                 }
         )
@@ -604,10 +606,10 @@ part ( narrowPartAccess, broadPartAccess ) partMorph =
     \groupMorphSoFar ->
         { narrow =
             groupMorphSoFar.narrow
-                |> narrowPart broadPartAccess (narrow partMorph)
+                |> narrowPart broadPartAccess (.narrow partMorph)
         , broaden =
             groupMorphSoFar.broaden
-                |> broadenPart narrowPartAccess (broaden partMorph)
+                |> broadenPart narrowPartAccess (.broaden partMorph)
         }
 
 
@@ -630,25 +632,33 @@ broadenPart narrowPartAccess broadenPartMorph =
 
 narrowPart :
     (groupBroad -> partBroad)
-    -> (partBroad -> partNarrow)
+    -> (partBroad -> Result partError partNarrow)
     ->
-        ((groupBroad -> (partNarrow -> groupNarrowFurther))
-         -> (groupBroad -> groupNarrowFurther)
+        ((groupBroad
+          -> Result partError (partNarrow -> groupNarrowFurther)
+         )
+         ->
+            (groupBroad
+             -> Result partError groupNarrowFurther
+            )
         )
 narrowPart broadPartAccess narrowPartMorph =
     \groupMorphSoFarNarrow ->
         \groupBroad ->
             let
-                narrowPartOrError : partNarrow
+                narrowPartOrError : Result partError partNarrow
                 narrowPartOrError =
                     groupBroad
                         |> broadPartAccess
                         |> narrowPartMorph
             in
-            narrowPartOrError
-                |> (groupBroad
-                        |> groupMorphSoFarNarrow
-                   )
+            groupBroad
+                |> groupMorphSoFarNarrow
+                |> Result.andThen
+                    (\groupMorphSoFarEat ->
+                        narrowPartOrError
+                            |> Result.map groupMorphSoFarEat
+                    )
 
 
 {-| Possibly incomplete [`Morph`](#Morph) to and from a choice.
