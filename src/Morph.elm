@@ -561,31 +561,42 @@ type Tagged tag value
     ( "4", "5" )
         |> narrow
             (group
-                (\x y -> { x = x, y = y })
-                (\x y -> ( x, y ))
-                |> partOnOk ( .x, Tuple.first >> Ok )
-                    (Integer.Morph.toInt |> MorphRow.over Integer.Morph.fromText)
-                |> partOnOk ( .y, Tuple.second >> Ok )
-                    (Integer.Morph.toInt |> MorphRow.over Integer.Morph.fromText)
+                ( \x y -> { x = x, y = y }
+                , \x y -> ( x, y )
+                )
+                |> partOnOk ( .x, Tuple.first )
+                    (Integer.Morph.toInt
+                        |> MorphRow.over
+                            (Integer.Morph.fromText
+                                |> MorphRow.finish
+                            )
+                    )
+                |> partOnOk ( .y, Tuple.second )
+                    (Integer.Morph.toInt
+                        |> MorphRow.over
+                            (Integer.Morph.fromText
+                                |> MorphRow.finish
+                            )
+                    )
             )
     --> Ok { x = 4, y = 5 }
 
 -}
 part :
     ( groupNarrow -> partNarrow
-    , groupBroad -> Result partError partBroad
+    , groupBroad -> partBroad
     )
     -> Morph partNarrow partBroad partError
     ->
         (MorphInProgress
             { narrow :
                 groupBroad
-                -> Result partError (partNarrow -> groupNarrowFurther)
+                -> (partNarrow -> groupNarrowFurther)
             , broaden : groupNarrow -> (partBroad -> groupBroadenFurther)
             }
          ->
             MorphInProgress
-                { narrow : groupBroad -> Result partError groupNarrowFurther
+                { narrow : groupBroad -> groupNarrowFurther
                 , broaden : groupNarrow -> groupBroadenFurther
                 }
         )
@@ -618,29 +629,26 @@ broadenPart narrowPartAccess broadenPartMorph =
 
 
 narrowPart :
-    (groupBroad -> Result partError partBroad)
-    -> (partBroad -> Result partError partNarrow)
+    (groupBroad -> partBroad)
+    -> (partBroad -> partNarrow)
     ->
-        ((groupBroad -> Result partError (partNarrow -> groupNarrowFurther))
-         -> (groupBroad -> Result partError groupNarrowFurther)
+        ((groupBroad -> (partNarrow -> groupNarrowFurther))
+         -> (groupBroad -> groupNarrowFurther)
         )
 narrowPart broadPartAccess narrowPartMorph =
     \groupMorphSoFarNarrow ->
         \groupBroad ->
-            groupBroad
-                |> groupMorphSoFarNarrow
-                |> Result.andThen
-                    (\partNarrowEat ->
-                        let
-                            narrowPartOrError : Result partError partNarrow
-                            narrowPartOrError =
-                                groupBroad
-                                    |> broadPartAccess
-                                    |> Result.andThen narrowPartMorph
-                        in
-                        narrowPartOrError
-                            |> Result.map partNarrowEat
-                    )
+            let
+                narrowPartOrError : partNarrow
+                narrowPartOrError =
+                    groupBroad
+                        |> broadPartAccess
+                        |> narrowPartMorph
+            in
+            narrowPartOrError
+                |> (groupBroad
+                        |> groupMorphSoFarNarrow
+                   )
 
 
 {-| Possibly incomplete [`Morph`](#Morph) to and from a choice.
