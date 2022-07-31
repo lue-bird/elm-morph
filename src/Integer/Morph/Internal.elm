@@ -1,14 +1,14 @@
 module Integer.Morph.Internal exposing (intAbsoluteTo0To9s, n0To9sToInt)
 
 import Digit.Morph
-import Hand exposing (Empty, Hand)
+import Emptiable exposing (Emptiable)
 import Morph
 import Possibly exposing (Possibly(..))
 import Stack exposing (Stacked)
 
 
 n0To9sToInt :
-    Hand (Stacked Digit.Morph.N0To9) Never Empty
+    Emptiable (Stacked Digit.Morph.N0To9) Never
     -> Int
 n0To9sToInt =
     \integerDigits ->
@@ -23,7 +23,7 @@ n0To9sToInt =
             |> Stack.sum
 
 
-intAbsoluteTo0To9s : Int -> Hand (Stacked Digit.Morph.N0To9) never_ Empty
+intAbsoluteTo0To9s : Int -> Emptiable (Stacked Digit.Morph.N0To9) never_
 intAbsoluteTo0To9s =
     \intAbsolute ->
         let
@@ -44,10 +44,10 @@ intAbsoluteTo0To9s =
             )
             (case withoutDecimal of
                 0 ->
-                    Hand.empty
+                    Emptiable.empty
 
                 otherDecimalInt ->
                     otherDecimalInt
                         |> intAbsoluteTo0To9s
-                        |> Hand.emptyAdapt (\_ -> Possible)
+                        |> Emptiable.emptyAdapt (\_ -> Possible)
             )

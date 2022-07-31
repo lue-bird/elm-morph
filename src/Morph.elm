@@ -1,8 +1,6 @@
 module Morph exposing
-    ( Morph
-    , Expected(..), expectation, errorExpectationMap
-    , expectationMap
-    , Expectation, ExpectationWith(..), Error, ErrorWith, expect
+    ( Morph, MorphInProgress
+    , Expectation, ExpectationWith(..), Error, ErrorWith, failure, expect
     , validate, specific
     , broaden, narrow
     , Translate
@@ -11,21 +9,21 @@ module Morph exposing
     , lazy, over
     , reverse
     , Tagged(..), TagOrValue(..)
-    , group, part, GroupMorphInProgress
+    , group, part
     , ChoiceMorphInProgress
     , choice, possibility, choiceFinish
     )
 
 {-| Call it Codec, Conversion, PrismReversible,
 
-@docs Morph
+@docs Morph, MorphInProgress
 
 
 ## fallible
 
 @docs Expected, expectation, errorExpectationMap
 @docs expectationMap
-@docs Expectation, ExpectationWith, Error, ErrorWith, expect
+@docs Expectation, ExpectationWith, Error, ErrorWith, failure, expect
 
 
 ### fallible create
@@ -70,7 +68,7 @@ module Morph exposing
 
 ### groups
 
-@docs group, part, GroupMorphInProgress
+@docs group, part
 
 
 ### choices
@@ -80,13 +78,13 @@ module Morph exposing
 
 -}
 
-import Hand exposing (Empty, Hand)
+import Emptiable exposing (Emptiable)
 import Possibly exposing (Possibly)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Stack exposing (Stacked)
 
 
-{-| Morph functions to a more general format and back.
+{-| Conversion functions to a more general format and back.
 
 👀 type `Morph narrow broad error`:
 
@@ -110,124 +108,29 @@ Composition, group, choice steps etc. can be defined just as well.
 
 -}
 type alias Morph narrow broad error =
-    GroupMorphInProgress (narrow -> broad) narrow broad error
-
-
-
---
-
-
-{-| An expectation that hasn't been met.
--}
-type Expected expectation
-    = Expected expectation
-
-
-{-| The expectation that hasn't been met.
-
-    Morph.Expected 3
-        |> Morph.errorExpectation
-    --> 3
-
--}
-expectation : Expected expectation -> expectation
-expectation =
-    \(Expected expectation_) -> expectation_
-
-
-{-| Change the expectation that hasn't been met.
--}
-errorExpectationMap :
-    (expectation -> expectationMapped)
-    -> Expected expectation
-    -> Expected expectationMapped
-errorExpectationMap expectationChange =
-    \(Expected expectation_) ->
-        Expected (expectation_ |> expectationChange)
-
-
-{-| Take what the `narrow` function [`Expected`](#Expected) and adapt it.
--}
-expectationMap :
-    (expectation -> expectationMapped)
-    -> Morph specific general (Expected expectation)
-    -> Morph specific general (Expected expectationMapped)
-expectationMap expectationChange =
-    \morph ->
-        { broaden = morph |> broaden
-        , narrow =
-            \general ->
-                general
-                    |> (morph |> narrow)
-                    |> Result.mapError
-                        (errorExpectationMap expectationChange)
+    MorphInProgress
+        { narrow : broad -> Result error narrow
+        , broaden : narrow -> broad
         }
 
 
+{-| Sometimes, you'll see the most general version of [`Morph`](#Morph):
 
---
+    : MorphInProgress
+    :     { narrow : narrow
+    :     , broaden : broaden
+    :     }
 
+where
 
-{-| The function that turns `narrow` into `broad`.
--}
-broaden :
-    Morph narrow broad error_
-    -> (narrow -> broad)
-broaden =
-    \morph -> morph.broaden
+  - [`narrow`](#narrow)ed value types can't necessarily be [`broaden`](#broaden)ed
+  - [`broaden`](#broaden)ed value types can't necessarily be [`narrow`](#narrow)ed
 
-
-{-| The function that turns `broad` into `narrow` or an `error`.
--}
-narrow :
-    Morph specific general error
-    -> (general -> Result error specific)
-narrow =
-    \morph -> morph.narrow
-
-
-{-| Convert values of the arbitrarily chosen types `unmapped -> mapped`.
-
-    "3456" |> map stringToList --> [ '3', '4', '5', '6' ]
+This general form is helpful to describe a step in building an incomplete [`Morph`](#Morph).
 
 -}
-map : Translate unmapped mapped -> (unmapped -> mapped)
-map translate_ =
-    \unmapped ->
-        unmapped |> broaden translate_
-
-
-{-| [`reverse`](#reverse) `|> map` is equivalent.
--}
-unmap : Translate unmapped mapped -> (mapped -> unmapped)
-unmap translate_ =
-    \mapped ->
-        case mapped |> narrow translate_ of
-            Ok mappedNarrow ->
-                mappedNarrow
-
-            Err error ->
-                error |> never
-
-
-
---
-
-
-{-| Filter specific values.
-
-In general, try to narrow down the type when limiting values:
-["Parse, don't validate"](https://elm-radio.com/episode/parse-dont-validate/).
-That's a core idea in elm. You'll find lots of legendary resources surrounding this topic.
-
--}
-validate :
-    (value -> Result error value)
-    -> Morph value value error
-validate narrowConvert =
-    { narrow = narrowConvert
-    , broaden = identity
-    }
+type alias MorphInProgress narrowAndBroaden =
+    narrowAndBroaden
 
 
 
@@ -236,34 +139,110 @@ validate narrowConvert =
 
 {-| What went wrong.
 -}
-type alias Expectation atom description =
-    ExpectationWith {} atom description
+type alias Expectation specific =
+    ExpectationWith () specific
 
 
 {-| Generic version of [`Expectation`](#Expectation) where each inner [error](#ErrorWith) has extra fields.
 -}
-type ExpectationWith location atom description
+type ExpectationWith location specific
     = NoFail
+    | OneOf (Emptiable (Stacked (ErrorWith location specific)) Possibly)
+    | Specific specific
+      -- | LocatedAt location
+      -- row-specific
     | MoreInput
     | NoMoreInput
-    | Specific atom
-    | OneIn (Hand (Stacked (ErrorWith location atom description)) Possibly Empty)
 
 
-{-| [What went wrong](#Expectation), where it went wrong and maybe a custom description.
+{-| [What went wrong](#Expectation), where it went wrong and maybe custom descriptions.
 -}
-type alias Error atom description =
-    ErrorWith {} atom description
+type alias Error specific =
+    ErrorWith () specific
 
 
 {-| Generic version of [`Error`](#Error) which can have extra fields.
 -}
-type alias ErrorWith location atom description =
+type alias ErrorWith location specific =
     RecordWithoutConstructorFunction
-        { location
-            | expected : ExpectationWith location atom description
-            , description : Hand (Stacked description) Possibly Empty
+        { expected : ExpectationWith location specific
+        , description : Emptiable (Stacked String) Possibly
+        , location : location
         }
+
+
+specificMap :
+    (specific -> specificMapped)
+    ->
+        (Morph narrow broad (ErrorWith location specific)
+         -> Morph narrow broad (ErrorWith location specificMapped)
+        )
+specificMap specificChange =
+    \morph ->
+        { narrow =
+            .narrow morph
+                >> Result.mapError
+                    (errorSpecificMap specificChange)
+        , broaden = .broaden morph
+        }
+
+
+errorSpecificMap :
+    (specific -> specificMapped)
+    ->
+        (ErrorWith location specific
+         -> ErrorWith location specificMapped
+        )
+errorSpecificMap specificChange =
+    \error ->
+        { expected =
+            error.expected
+                |> expectationSpecificMap specificChange
+        , description = error.description
+        , location = error.location
+        }
+
+
+expectationSpecificMap :
+    (specific -> specificMapped)
+    ->
+        (ExpectationWith location specific
+         -> ExpectationWith location specificMapped
+        )
+expectationSpecificMap specificChange =
+    \expectation_ ->
+        case expectation_ of
+            NoFail ->
+                NoFail
+
+            OneOf possibilities ->
+                possibilities
+                    |> Stack.map
+                        (\_ -> errorSpecificMap specificChange)
+                    |> OneOf
+
+            Specific specific_ ->
+                Specific (specific_ |> specificChange)
+
+            MoreInput ->
+                MoreInput
+
+            NoMoreInput ->
+                NoMoreInput
+
+
+{-| Always `Err`. Make sure to [`expect`](#expect) something.
+
+TODO: remove? add description?
+
+-}
+failure : Result (Error specific_) narrow_
+failure =
+    { expected = NoFail
+    , description = Emptiable.empty
+    , location = ()
+    }
+        |> Err
 
 
 {-| Describe the context to improve error messages.
@@ -272,10 +251,10 @@ TODO example
 
 -}
 expect :
-    description
+    String
     ->
-        (Morph narrow broad (ErrorWith location atom description)
-         -> Morph narrow broad (ErrorWith location atom description)
+        (Morph narrow broad (ErrorWith location specific)
+         -> Morph narrow broad (ErrorWith location specific)
         )
 expect expectationCustomDescription morphToDescribe =
     { morphToDescribe
@@ -297,6 +276,129 @@ expect expectationCustomDescription morphToDescribe =
 --
 
 
+{-| The function that turns `narrow` into `broad`.
+-}
+broaden :
+    MorphInProgress { narrow : narrow, broaden : broaden }
+    -> broaden
+broaden =
+    .broaden
+
+
+{-| The function that turns `broad` into `narrow` or an `error`.
+-}
+narrow :
+    MorphInProgress { narrow : narrow, broaden : broaden_ }
+    -> narrow
+narrow =
+    .narrow
+
+
+{-| Convert values of the arbitrarily chosen types `unmapped -> mapped`.
+
+    "3456" |> (Morph.Text.toList |> Morph.map)
+    --> [ '3', '4', '5', '6' ]
+
+-}
+map :
+    MorphInProgress
+        { narrow : unmapped -> Result Never mapped
+        , broaden : broaden_
+        }
+    -> (unmapped -> mapped)
+map translate_ =
+    \unmapped ->
+        case unmapped |> narrow translate_ of
+            Ok mappedNarrow ->
+                mappedNarrow
+
+            Err error ->
+                error |> never
+
+
+{-| Equivalent to [`Morph.reverse`](#reverse) `|> Morph.map`
+-}
+unmap :
+    MorphInProgress
+        { narrow : narrow_
+        , broaden : unmap
+        }
+    -> unmap
+unmap translate_ =
+    broaden translate_
+
+
+
+--
+
+
+{-| Filter specific values.
+
+In general, try to narrow down the type when limiting values:
+["Parse, don't validate"](https://elm-radio.com/episode/parse-dont-validate/).
+That's a core idea in elm. You'll find lots of legendary resources on this topic.
+
+Narrowing gives you
+
+  - a better error description out of the box
+  - a more descriptive and correct type
+  - building invalid values becomes impossible
+
+```
+printable : Morph LocalSymbolPrintable Char (Morph.Error Char expectationCustom_)
+printable =
+    choice
+        (\exclamationMark numberSign dollarSign percentSign ampersand asterisk lowLine hyphenMinus backSlash printable ->
+            case printable of
+                ExclamationMark ->
+                    exclamationMark ()
+
+                NumberSign ->
+                    numberSign ()
+
+                DollarSign ->
+                    dollarSign ()
+
+                PercentSign ->
+                    percentSign ()
+
+                Ampersand ->
+                    ampersand ()
+
+                Asterisk ->
+                    asterisk ()
+
+                LowLine ->
+                    lowLine ()
+
+                HyphenMinus ->
+                    hyphenMinus ()
+        )
+        |> Morph.possibility (\() -> ExclamationMark) (Morph.specific '!')
+        |> Morph.possibility (\() -> NumberSign) (Morph.specific '#')
+        |> Morph.possibility (\() -> DollarSign) (Morph.specific '$')
+        |> Morph.possibility (\() -> PercentSign) (Morph.specific '%')
+        |> Morph.possibility (\() -> Ampersand) (Morph.specific '&')
+        |> Morph.possibility (\() -> Asterisk) (Morph.specific '*')
+        |> Morph.possibility (\() -> LowLine) (Morph.specific '_')
+        |> Morph.possibility (\() -> HyphenMinus) (Morph.specific '-')
+        |> Morph.choiceFinish
+```
+
+-}
+validate :
+    (narrow -> Result error narrow)
+    ->
+        MorphInProgress
+            { narrow : narrow -> Result error narrow
+            , broaden : broad -> broad
+            }
+validate narrowConvert =
+    { narrow = narrowConvert
+    , broaden = identity
+    }
+
+
 {-| [`map`](#map) & .
 Limits consumed arguments to [`Morph`](#Morph)s that can `Never` fail to [`unmap`](#unmap), for example
 
@@ -316,27 +418,27 @@ That's the reason it's a good idea to always expose 2 versions: `aToB` & `bToA`.
 
 **!** Information can get lost on the way:
 
-    dictToListMorph :
-        Translate
-            (Dict comparableKey value)
-            (List ( comparableKey, value ))
-    dictToListMorph =
-        Morph.translate Dict.toList Dict.fromList
+    dictFromListMorph =
+        Morph.translate Dict.fromList Dict.toList
 
 Still, there's no parsing to translate one state to the other.
 
 -}
-type alias Translate unmapped mapped =
-    Morph unmapped mapped Never
+type alias Translate mapped unmapped =
+    Morph mapped unmapped Never
 
 
-{-| Switch between 2 opposite representations.
+{-| Switch between 2 opposite representations. Examples:
 
     toggle List.reverse
 
-    toggle Linear.opposite
-
     toggle not
+
+    toggle negate
+
+    toggle (\n -> n ^ -1)
+
+    toggle Linear.opposite
 
 -}
 toggle : (value -> value) -> Morph value value error_
@@ -348,15 +450,19 @@ toggle changeToOpposite =
 
 Same as writing:
 
-  - [`toggle`](#toggle) `identity`
-  - [`translate`](#translate) `identity identity`
   - [`validate`](#validate) `Ok`
+  - [`translate`](#translate) `identity identity`
   - `{ broaden = identity, narrow = Ok }`
+  - [`toggle`](#toggle) `identity` when broad and narrow types match
 
 -}
-remain : Morph value value error_
+remain :
+    MorphInProgress
+        { narrow : narrow -> Result error_ narrow
+        , broaden : broad -> broad
+        }
 remain =
-    toggle identity
+    translate identity identity
 
 
 {-| Mutual `Morph` = [`Translate`](#Translate)
@@ -370,17 +476,23 @@ and can be mapped 1:1 into each other.
 
 Examples:
 
-  - [`Morph.Text.toList`](Morph-Text#toList), [`Morph.Text.fromList`](Morph-Text#fromList)
+  - [`Text.Morph.toList`](Text-Morph#toList), [`Text.Morph.fromList`](Text-Morph#fromList)
   - [`Array.Morph.toList`](Array-Morph#toList), [`Array.Morph.fromList`](Array-Morph#fromList)
+  - [`Stack.Morph.toList`](Stack-Morph#toList), [`Stack.Morph.fromList`](Stack-Morph#fromList)
+  - [`Stack.Morph.toText`](Stack-Morph#toText), [`Stack.Morph.fromText`](Stack-Morph#fromText)
 
 -}
 translate :
-    (unmapped -> mapped)
-    -> (mapped -> unmapped)
-    -> Morph unmapped mapped error_
+    (beforeMap -> mapped)
+    -> (beforeUnmapped -> unmapped)
+    ->
+        MorphInProgress
+            { narrow : beforeMap -> Result error_ mapped
+            , broaden : beforeUnmapped -> unmapped
+            }
 translate mapTo unmapFrom =
-    { broaden = mapTo
-    , narrow = \mapped -> mapped |> unmapFrom |> Ok
+    { narrow = mapTo >> Ok
+    , broaden = unmapFrom
     }
 
 
@@ -391,14 +503,14 @@ For any more complex [`broaden`](#broaden)ing process, use [`translate`](#transl
 -}
 broadenFrom : broadConstant -> Morph () broadConstant error_
 broadenFrom narrowConstant =
-    translate (\() -> narrowConstant) (\_ -> ())
+    translate (\_ -> ()) (\() -> narrowConstant)
 
 
-{-| Match only a specific broad input.
+{-| Match only the specific given broad input
 -}
 specific :
     broadConstant
-    -> Morph () broadConstant (Error broadConstant description_)
+    -> Morph () broadConstant (Error broadConstant)
 specific broadConstant =
     { narrow =
         \broad ->
@@ -407,7 +519,8 @@ specific broadConstant =
 
             else
                 { expected = Specific broadConstant
-                , description = Hand.empty
+                , description = Emptiable.empty
+                , location = ()
                 }
                     |> Err
     , broaden =
@@ -430,21 +543,6 @@ type TagOrValue tagExpectation valueExpectation
 -}
 type Tagged tag value
     = Tagged tag value
-
-
-{-| The most general version of [`Morph`](#Morph) where
-
-  - [`narrow`](#narrow)ed value types can't necessarily be [`broaden`](#broaden)ed
-  - [`broaden`](#broaden)ed value types can't necessarily be [`narrow`](#narrow)ed
-
-This general form is helpful to describe a step in building an incomplete [`Morph`](#Morph).
-
--}
-type alias GroupMorphInProgress broadenFromNarrow narrowFromBroad broad error =
-    RecordWithoutConstructorFunction
-        { narrow : broad -> Result error narrowFromBroad
-        , broaden : broadenFromNarrow
-        }
 
 
 {-| Describe the [`Morph`](#Morph) of the next part in a [`group`](#group).
@@ -481,17 +579,17 @@ part :
     )
     -> Morph partNarrow partBroad partError
     ->
-        (GroupMorphInProgress
-            (groupNarrow -> (partBroad -> groupBroadenFurther))
-            (partNarrow -> groupNarrowFurther)
-            groupBroad
-            partError
-         ->
-            GroupMorphInProgress
-                (groupNarrow -> groupBroadenFurther)
-                groupNarrowFurther
+        (MorphInProgress
+            { narrow :
                 groupBroad
-                partError
+                -> Result partError (partNarrow -> groupNarrowFurther)
+            , broaden : groupNarrow -> (partBroad -> groupBroadenFurther)
+            }
+         ->
+            MorphInProgress
+                { narrow : groupBroad -> Result partError groupNarrowFurther
+                , broaden : groupNarrow -> groupBroadenFurther
+                }
         )
 part ( narrowPartAccess, broadPartAccess ) partMorph =
     \groupMorphSoFar ->
@@ -555,11 +653,9 @@ type alias ChoiceMorphInProgress choiceNarrow choiceBroad choiceBroaden possibil
         choiceBroad
         ->
             Result
-                (Expected
-                    { possibilities :
-                        Hand (Stacked possibilityExpectation) Possibly Empty
-                    }
-                )
+                { possibilities :
+                    Emptiable (Stacked possibilityExpectation) Possibly
+                }
                 choiceNarrow
     , broaden : choiceBroaden
     }
@@ -571,7 +667,7 @@ try this [`Morph`](#Morph).
 > ℹ️ Equivalent regular expression: `|`
 
     import MorphRow exposing (atom)
-    import Morph.CharRow as Char
+    import Morph.Char as Char
     import MorphRow.Error
 
     type UnderscoreOrLetter
@@ -589,7 +685,7 @@ try this [`Morph`](#Morph).
                     Letter char ->
                         letter char
             )
-            |> possibility (\() -> Underscore) (atom '_')
+            |> possibility (\() -> Underscore) (one '_')
             |> possibility Letter Char.letter
             |> choiceFinish
 
@@ -605,7 +701,7 @@ try this [`Morph`](#Morph).
 
     -- if none work, we get the error from all possible steps
     "1"
-        |> Text.narrowWith (onFailDown [ atom '_', Char.letter ])
+        |> Text.narrowWith (onFailDown [ one '_', Char.letter ])
         |> Result.mapError MorphRow.Error.textMessage
     --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '1'."
 
@@ -638,7 +734,7 @@ possibility possibilityToChoice possibilityMorph =
                     Ok possibilityNarrowed ->
                         possibilityNarrowed |> Ok
 
-                    Err (Expected soFarExpectation) ->
+                    Err soFarExpectation ->
                         case broad |> narrow possibilityMorph of
                             Ok possibilityNarrow ->
                                 possibilityNarrow
@@ -646,11 +742,10 @@ possibility possibilityToChoice possibilityMorph =
                                     |> Ok
 
                             Err possibilityExpectation ->
-                                Expected
-                                    { possibilities =
-                                        soFarExpectation.possibilities
-                                            |> Stack.onTopLay possibilityExpectation
-                                    }
+                                { possibilities =
+                                    soFarExpectation.possibilities
+                                        |> Stack.onTopLay possibilityExpectation
+                                }
                                     |> Err
         , broaden =
             choiceMorphSoFar.broaden
@@ -658,17 +753,16 @@ possibility possibilityToChoice possibilityMorph =
         }
 
 
-{-| Assemble a combined whole from its [parts](#part).
+{-| Assemble a combined whole from its [parts](#part)
 -}
 group :
     narrowAssemble
     -> broadAssemble
     ->
-        GroupMorphInProgress
-            (groupNarrow_ -> broadAssemble)
-            narrowAssemble
-            broad_
-            error_
+        MorphInProgress
+            { narrow : broad_ -> Result error_ narrowAssemble
+            , broaden : groupNarrow_ -> broadAssemble
+            }
 group narrowAssemble broadAssemble =
     { narrow = \_ -> narrowAssemble |> Ok
     , broaden = \_ -> broadAssemble
@@ -688,7 +782,7 @@ choice :
 choice choiceBroadenDiscriminatedByPossibility =
     { narrow =
         \_ ->
-            Expected { possibilities = Hand.empty } |> Err
+            { possibilities = Emptiable.empty } |> Err
     , broaden = choiceBroadenDiscriminatedByPossibility
     }
 
@@ -700,20 +794,21 @@ choiceFinish :
         narrowUnion
         possibilityBroad
         (narrowUnion -> possibilityBroad)
-        (Error atom possibilityExpectationCustom)
+        (Error specific)
     ->
         Morph
             narrowUnion
             possibilityBroad
-            (Error atom possibilityExpectationCustom)
+            (Error specific)
 choiceFinish =
     \choiceMorphComplete ->
         { narrow =
             narrow choiceMorphComplete
                 >> Result.mapError
-                    (\(Expected expectation_) ->
-                        { expected = OneIn expectation_.possibilities
-                        , description = Hand.empty
+                    (\expectation_ ->
+                        { expected = OneOf expectation_.possibilities
+                        , description = Emptiable.empty
+                        , location = ()
                         }
                     )
         , broaden =
@@ -729,7 +824,7 @@ choiceFinish =
 {-| [morphs](#Morph) _lazily_.
 This allows to create self-referential parsers for recursive definitions.
 
-    import MorphRow exposing (grab, skip, atom)
+    import MorphRow exposing (grab, skip, one)
     import Integer.Morph
     import Morph.Text
 
@@ -758,13 +853,13 @@ This allows to create self-referential parsers for recursive definitions.
                     |> skip
                         (broadenFrom [ Morph.Char.Space ]
                             |> MorphRow.over
-                                (atLeast 1 (Morph.Char.blank |> atom))
+                                (atLeast 1 (Morph.Char.blank |> one))
                         )
                     |> skip (Morph.Text.specific "::")
                     |> skip
                         (broadenFrom [ Morph.Char.Space ]
                             |> MorphRow.over
-                                (atLeast 1 (Morph.Char.blank |> atom))
+                                (atLeast 1 (Morph.Char.blank |> one))
                         )
                     |> grab (Morph.lazy (\() -> lazyList))
                 )
@@ -829,13 +924,13 @@ over morphNarrowBroad =
         }
 
 
-{-| Reverse the `Translate a <-> b`
-by swapping the functions [`narrow`](#narrow) <-> [`broaden`](#broaden).
+{-| `Translate a <-> b`
+by swapping the functions [`map`](#map) <-> [`unmap`](#unmap).
 
     [ 'O', 'h', 'a', 'y', 'o' ]
-        |> (Morph.stringToList
-            |> Morph.reverse
-            |> Morph.map
+        |> (Text.Morph.toList
+                |> Morph.reverse
+                |> Morph.map
            )
     --> "Ohayo"
 
@@ -843,12 +938,12 @@ by swapping the functions [`narrow`](#narrow) <-> [`broaden`](#broaden).
 
 -}
 reverse :
-    Translate unmapped mapped
-    -> Morph mapped unmapped error_
+    Translate mapped unmapped
+    -> Morph unmapped mapped error_
 reverse =
     \translate_ ->
         { narrow =
             \unmapped ->
-                unmapped |> map translate_ |> Ok
-        , broaden = unmap translate_
+                unmapped |> unmap translate_ |> Ok
+        , broaden = map translate_
         }

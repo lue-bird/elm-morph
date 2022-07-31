@@ -12,6 +12,7 @@
     "List.Morph",
     "Stack.Morph",
     "Array.Morph",
+    "ArraySized.Morph",
     "Dict.Morph",
     "MorphRow",
     "MorphRow.Error",

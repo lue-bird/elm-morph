@@ -25,7 +25,7 @@ Also available: [`toggle`](Morph#toggle) `Stack.reverse`
 
 -}
 
-import Hand exposing (Empty, Hand)
+import Emptiable exposing (Emptiable)
 import Morph exposing (Morph, Translate, translate)
 import Possibly exposing (Possibly)
 import Stack exposing (StackTopBelow, Stacked)
@@ -42,8 +42,8 @@ import Stack exposing (StackTopBelow, Stacked)
 -}
 toList :
     Morph
-        (Hand (Stacked element) Possibly Empty)
         (List element)
+        (Emptiable (Stacked element) Possibly)
         error_
 toList =
     translate Stack.toList Stack.fromList
@@ -60,8 +60,8 @@ toList =
 -}
 fromList :
     Morph
+        (Emptiable (Stacked element) Possibly)
         (List element)
-        (Hand (Stacked element) Possibly Empty)
         error_
 fromList =
     translate Stack.fromList Stack.toList
@@ -78,11 +78,11 @@ fromList =
 -}
 toText :
     Morph
-        (Hand (Stacked Char) Possibly Empty)
         String
+        (Emptiable (Stacked Char) Possibly)
         error_
 toText =
-    translate Stack.toString Stack.fromString
+    translate Stack.toText Stack.fromText
 
 
 {-| [`Translate`](Morph#Translate) from `String` to a stack of `Char`s.
@@ -95,11 +95,11 @@ toText =
 -}
 fromText :
     Morph
+        (Emptiable (Stacked Char) Possibly)
         String
-        (Hand (Stacked Char) Possibly Empty)
         error_
 fromText =
-    translate Stack.fromString Stack.toString
+    translate Stack.fromText Stack.toText
 
 
 
@@ -112,8 +112,8 @@ belowTopEach :
     Translate elementNarrow elementBroad
     ->
         Morph
-            (Hand (StackTopBelow top elementNarrow) possiblyOrNever Empty)
-            (Hand (StackTopBelow top elementBroad) possiblyOrNever Empty)
+            (Emptiable (StackTopBelow top elementNarrow) possiblyOrNever)
+            (Emptiable (StackTopBelow top elementBroad) possiblyOrNever)
             error_
 belowTopEach elementMorph =
     translate

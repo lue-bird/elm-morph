@@ -1,12 +1,13 @@
 module MorphRow.Test exposing (tests)
 
 import Digit.Morph
+import Emptiable exposing (Emptiable)
 import Expect
-import Hand exposing (Empty, Hand)
 import Morph exposing (Morph, broaden, broadenFrom, choice, narrow, translate)
 import Morph.Char as Char
 import Morph.Text
-import MorphRow exposing (MorphRow, atLeast, atom, grab, skip, split, succeed)
+import MorphRow exposing (MorphRow, atLeast, grab, one, separatedBy, skip, succeed)
+import N exposing (n0, n1)
 import Number.Morph exposing (Number)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Stack exposing (Stacked)
@@ -61,28 +62,28 @@ pointTest =
         ]
 
 
-point : MorphRow Char Point String
+point : MorphRow Char Point
 point =
     succeed (\x y -> { x = x, y = y })
         |> skip (Morph.Text.specific "(")
         |> skip
             (broadenFrom [ Char.Space ]
-                |> MorphRow.over (atLeast 0 (Char.blank |> atom))
+                |> MorphRow.over (atLeast n0 (Char.blank |> one))
             )
         |> grab .x Number.Morph.text
         |> skip
             (broadenFrom []
-                |> MorphRow.over (atLeast 0 (Char.blank |> atom))
+                |> MorphRow.over (atLeast n0 (Char.blank |> one))
             )
         |> skip (Morph.Text.specific ",")
         |> skip
             (broadenFrom [ Char.Space ]
-                |> MorphRow.over (atLeast 0 (Char.blank |> atom))
+                |> MorphRow.over (atLeast n0 (Char.blank |> one))
             )
         |> grab .y Number.Morph.text
         |> skip
             (broadenFrom [ Char.Space ]
-                |> MorphRow.over (atLeast 0 (Char.blank |> atom))
+                |> MorphRow.over (atLeast n0 (Char.blank |> one))
             )
         |> skip (Morph.Text.specific ")")
 
@@ -159,7 +160,7 @@ emailTest =
 -- format as described in https://en.wikipedia.org/wiki/Email_address
 
 
-email : MorphRow Char Email expectedCustom_
+email : MorphRow Char Email
 email =
     succeed
         (\local_ domain_ ->
@@ -172,7 +173,7 @@ email =
         |> grab .domain domain
 
 
-local : MorphRow Char Local expectedCustom_
+local : MorphRow Char Local
 local =
     succeed (\dotSeparated -> { dotSeparated = dotSeparated })
         |> grab .dotSeparated
@@ -182,14 +183,14 @@ local =
                     .part
                 )
                 |> MorphRow.over
-                    (split
-                        ( atLeast 1, Morph.Text.specific "." )
-                        (atLeast 1 (localSymbol |> atom))
+                    (separatedBy
+                        ( atLeast n1, Morph.Text.specific "." )
+                        (atLeast n1 (localSymbol |> one))
                     )
             )
 
 
-localSymbol : Morph LocalSymbol Char (Morph.Error Char variantExpectation_)
+localSymbol : Morph LocalSymbol Char (Morph.Error Char)
 localSymbol =
     choice
         (\printableVariant aToZVariant n0To9Variant localSymbolUnion ->
@@ -222,7 +223,7 @@ localSymbolPrintable :
     Morph
         LocalSymbolPrintable
         Char
-        (Morph.Error Char variantExpectationDescription_)
+        (Morph.Error Char)
 localSymbolPrintable =
     choice
         (\exclamationMark numberSign dollarSign percentSign ampersand asterisk lowLine hyphenMinus tilde verticalLine plusSign equalsSign graveAccent leftCurlyBracket rightCurlyBracket localSymbolPrintableNarrow ->
@@ -290,7 +291,7 @@ localSymbolPrintable =
         |> Morph.choiceFinish
 
 
-domain : MorphRow Char Domain expectedCustom_
+domain : MorphRow Char Domain
 domain =
     succeed
         (\first hostLabels topLevel ->
@@ -299,7 +300,7 @@ domain =
         |> MorphRow.grab .first hostLabel
         |> MorphRow.skip (Morph.Text.specific ".")
         |> MorphRow.grab .hostLabels
-            (atLeast 0
+            (atLeast n0
                 (succeed (\label -> label)
                     |> MorphRow.grab (\label -> label) hostLabel
                     |> MorphRow.skip (Morph.Text.specific ".")
@@ -308,7 +309,7 @@ domain =
         |> MorphRow.grab .topLevel domainTopLevel
 
 
-hostLabel : MorphRow Char HostLabel expectedCustom_
+hostLabel : MorphRow Char HostLabel
 hostLabel =
     succeed
         (\firstSymbol betweenFirstAndLastSymbols lastSymbol ->
@@ -318,14 +319,14 @@ hostLabel =
             }
         )
         |> grab .firstSymbol
-            (hostLabelSideSymbol |> atom)
+            (hostLabelSideSymbol |> one)
         |> grab .betweenFirstAndLastSymbols
-            (atLeast 0 (hostLabelSymbol |> atom))
+            (atLeast n0 (hostLabelSymbol |> one))
         |> grab .lastSymbol
-            (hostLabelSideSymbol |> atom)
+            (hostLabelSideSymbol |> one)
 
 
-hostLabelSideSymbol : Morph HostLabelSideSymbol Char (Morph.Error Char variantExpectation_)
+hostLabelSideSymbol : Morph HostLabelSideSymbol Char (Morph.Error Char)
 hostLabelSideSymbol =
     choice
         (\aToZVariant n0To9Variant sideSymbol ->
@@ -341,7 +342,7 @@ hostLabelSideSymbol =
         |> Morph.choiceFinish
 
 
-hostLabelSymbol : Morph HostLabelSymbol Char (Morph.Error Char variantExpectation_)
+hostLabelSymbol : Morph HostLabelSymbol Char (Morph.Error Char)
 hostLabelSymbol =
     choice
         (\hyphenMinus aToZVariant n0To9Variant symbol ->
@@ -362,7 +363,7 @@ hostLabelSymbol =
         |> Morph.choiceFinish
 
 
-domainTopLevel : MorphRow Char DomainTopLevel expectedCustom_
+domainTopLevel : MorphRow Char DomainTopLevel
 domainTopLevel =
     succeed
         (\startDigits firstAToZ afterFirstAToZ ->
@@ -372,12 +373,12 @@ domainTopLevel =
             }
         )
         |> grab .startDigits
-            (atLeast 0 (Digit.Morph.n0To9 |> atom))
+            (atLeast n0 (Digit.Morph.n0To9 |> one))
         |> -- guarantees it can't be numeric only
            grab .firstAToZ
-            (Char.aToZ |> atom)
+            (Char.aToZ |> one)
         |> grab .afterFirstAToZ
-            (atLeast 0 (domainTopLevelAfterFirstAToZSymbol |> atom))
+            (atLeast n0 (domainTopLevelAfterFirstAToZSymbol |> one))
 
 
 
@@ -388,7 +389,7 @@ domainTopLevelAfterFirstAToZSymbol :
     Morph
         DomainTopLevelAfterFirstAToZSymbol
         Char
-        (Morph.Error Char variantExpectation_)
+        (Morph.Error Char)
 domainTopLevelAfterFirstAToZSymbol =
     choice
         (\aToZVariant n0To9Variant domainTopLevelSymbolUnion ->
@@ -419,7 +420,7 @@ type alias Email =
 type alias Local =
     RecordWithoutConstructorFunction
         { dotSeparated :
-            Hand (Stacked (List LocalSymbol)) Never Empty
+            Emptiable (Stacked (List LocalSymbol)) Never
         }
 
 

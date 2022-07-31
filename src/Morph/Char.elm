@@ -27,12 +27,12 @@ import Morph exposing (Morph, broadenFrom, choice)
 This is case insensitive.
 
     import MorphRow.Error
-    import Morph.CharRow as Char
+    import Morph.Char as Char
     import Morph.TextRow as Text
 
     -- match a specific character, case insensitive
-    "a" |> Text.narrowWith (Morph.Char.caseAny 'a' |> atom) --> Ok 'a'
-    "A" |> Text.narrowWith (Morph.Char.caseAny 'a' |> atom) --> Ok 'A'
+    "a" |> Text.narrowWith (Morph.Char.caseAny 'a' |> one) --> Ok 'a'
+    "A" |> Text.narrowWith (Morph.Char.caseAny 'a' |> one) --> Ok 'A'
 
     "123"
         |> Text.narrowWith (Char.caseAny 'a')
@@ -42,11 +42,7 @@ This is case insensitive.
 -}
 caseAny :
     Char
-    ->
-        Morph
-            ()
-            Char
-            (Morph.Error Char variantExpectation_)
+    -> Morph () Char (Morph.Error Char)
 caseAny expectedChar =
     let
         expectedCase =
@@ -80,7 +76,7 @@ This is case insensitive.
 
 > ℹ️ Equivalent regular expression: `[a-zA-Z]`
 
-    import Morph.CharRow exposing (letter)
+    import Morph.Char exposing (letter)
     import Morph.TextRow as Text
 
     -- match any letter, case insensitive
@@ -133,7 +129,7 @@ aToZ :
     Morph
         { case_ : Case, letter : AToZ }
         Char
-        (Morph.Error Char variantExpectation_)
+        (Morph.Error Char)
 aToZ =
     cased { lower = aToZLower, upper = aToZUpper }
 
@@ -143,18 +139,18 @@ cased :
         Morph
             possibilityNarrow
             broad
-            (Morph.Error atom variantExpectation)
+            (Morph.Error atom)
     , upper :
         Morph
             possibilityNarrow
             broad
-            (Morph.Error atom variantExpectation)
+            (Morph.Error atom)
     }
     ->
         Morph
             { case_ : Case, letter : possibilityNarrow }
             broad
-            (Morph.Error atom variantExpectation)
+            (Morph.Error atom)
 cased casedLetters =
     choice
         (\lower upper caseValue ->
@@ -174,7 +170,7 @@ cased casedLetters =
         |> Morph.choiceFinish
 
 
-aToZInCase : (Char -> Char) -> Morph AToZ Char (Morph.Error Char variantExpectation_)
+aToZInCase : (Char -> Char) -> Morph AToZ Char (Morph.Error Char)
 aToZInCase aToZTransformation =
     choice
         (\a b c d e f g h i j k l m n o p q r s t u v w x y z aToZ_ ->
@@ -304,7 +300,7 @@ This is case sensitive.
     --> Err "1:1: I was expecting a lowercase letter [a-z]. I got stuck when I got the character 'A'."
 
 -}
-aToZLower : Morph AToZ Char (Morph.Error Char variantExpectation_)
+aToZLower : Morph AToZ Char (Morph.Error Char)
 aToZLower =
     aToZInCase Char.toLower
 
@@ -328,7 +324,7 @@ This is case sensitive.
     --> Err "1:1: I was expecting a letter uppercase [A-Z]. I got stuck when I got the character 'a'."
 
 -}
-aToZUpper : Morph AToZ Char (Morph.Error Char variantExpectation_)
+aToZUpper : Morph AToZ Char (Morph.Error Char)
 aToZUpper =
     aToZInCase Char.toUpper
 
@@ -353,7 +349,7 @@ aToZUpper =
     --> Err "1:1: I was expecting a blank space or new line. I got stuck when I got 'a'."
 
 -}
-return : Morph Return Char (Morph.Error Char variantExpectation_)
+return : Morph Return Char (Morph.Error Char)
 return =
     choice
         (\newLineVariant carriageReturnVariant returnNarrow ->
@@ -399,23 +395,29 @@ return =
 
 ### example: token surrounded by spaces
 
-    import MorphRow exposing (succeed, atLeast, drop, take, atom)
+    import MorphRow exposing (succeed, atLeast, drop, take, one)
     import Morph.TextRow as Text
-    import Morph.CharRow as Char
+    import Morph.Char as Char
 
     "1  +  2"
         |> Text.narrowWith
-            (succeed (\x y -> x + y)
-                |> grab Text.int
-                |> skip (atLeast 0 Char.blank |> broadenFrom [ () ])
-                |> skip (atom '+')
-                |> skip (atLeast 0 Char.blank |> broadenFrom [ () ])
-                |> grab Text.int
+            (succeed (\x y -> { left = x, right = y })
+                |> grab .left Text.int
+                |> skip
+                    (broadenFrom [ () ]
+                        |> MorphRow.over (atLeast 0 (Char.blank |> one))
+                    )
+                |> skip (Morph.Text.specific "+")
+                |> skip
+                    (broadenFrom [ () ]
+                        |> MorphRow.over (atLeast 0 (Char.blank |> one))
+                    )
+                |> grab .right Text.int
             )
-    --> Ok 3
+    --> Ok { left = 1, right = 2 }
 
 -}
-blank : Morph Blank Char (Morph.Error Char String)
+blank : Morph Blank Char (Morph.Error Char)
 blank =
     Morph.expect "a blank character"
         (choice

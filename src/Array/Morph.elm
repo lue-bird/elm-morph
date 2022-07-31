@@ -28,11 +28,11 @@ import Morph exposing (Morph, Translate, translate)
     import Array
 
     [ 0, 1, 2, 3 ]
-        |> (Morph.listToArray |> Morph.map)
+        |> (Array.Morph.fromList |> Morph.map)
     --> Array.fromList [ 0, 1, 2, 3 ]
 
 -}
-fromList : Morph (List element) (Array element) error_
+fromList : Morph (Array element) (List element) error_
 fromList =
     translate Array.fromList Array.toList
 
@@ -42,11 +42,11 @@ fromList =
     import Array
 
     Array.fromList [ 0, 1, 2, 3 ]
-        |> (Morph.arrayToList |> Morph.map)
+        |> (Array.Morph.toList |> Morph.map)
     --> [ 0, 1, 2, 3 ]
 
 -}
-toList : Morph (Array element) (List element) error_
+toList : Morph (List element) (Array element) error_
 toList =
     translate Array.toList Array.fromList
 

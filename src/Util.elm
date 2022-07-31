@@ -34,7 +34,7 @@ else `Err` with information on at what indexes elements were `Err`.
 
 -}
 listResultsToValuesOrErrors :
-    List (Result (Morph.Expected expectation) value)
+    List (Result expectation value)
     -> Result (StructureLinearInsideExpectation expectation) (List value)
 listResultsToValuesOrErrors =
     \results ->
@@ -46,7 +46,7 @@ listResultsToValuesOrErrors =
                             Ok elementValue ->
                                 collected |> Result.map ((::) elementValue)
 
-                            Err (Morph.Expected elementError) ->
+                            Err elementError ->
                                 { elementsAtIndexes =
                                     case collected of
                                         Ok _ ->

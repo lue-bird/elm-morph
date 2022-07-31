@@ -11,15 +11,19 @@ Morph.Morph
 
 -}
 
+import ArraySized
+import ArraySized.Morph
 import Digit.Morph
-import Hand exposing (Empty, Hand, filled)
+import Emptiable exposing (Emptiable, filled)
 import Integer.Morph.Internal exposing (intAbsoluteTo0To9s, n0To9sToInt)
+import Linear exposing (DirectionLinear(..))
 import Morph exposing (Morph, translate)
 import Morph.Text
 import MorphRow exposing (MorphRow, atLeast, grab, maybe, one, skip, succeed)
+import N exposing (n0, n1)
 import Possibly exposing (Possibly)
 import Sign
-import Sign.Morph exposing (Sign, Signable(..))
+import Sign.Morph exposing (Signable(..))
 import Stack exposing (Stacked)
 
 
@@ -35,8 +39,8 @@ Don't shy away from spinning your own version of this if needed, like
 -}
 type alias Number =
     Signable
-        { whole : Hand (Stacked Digit.Morph.N0To9) Never Empty
-        , fraction : Hand (Stacked Digit.Morph.N0To9) Possibly Empty
+        { whole : Emptiable (Stacked Digit.Morph.N0To9) Never
+        , fraction : Emptiable (Stacked Digit.Morph.N0To9) Possibly
         }
 
 
@@ -89,10 +93,10 @@ toFloat =
                     Sign.number numberSigned.sign
                         ((numberSigned.whole |> n0To9sToInt |> Basics.toFloat)
                             + (case numberSigned.fraction of
-                                Hand.Empty _ ->
+                                Emptiable.Empty _ ->
                                     0
 
-                                Hand.Filled fraction ->
+                                Emptiable.Filled fraction ->
                                     fraction |> filled |> toFraction
                               )
                         )
@@ -119,11 +123,11 @@ toFloat =
         )
 
 
-floatFraction : Float -> Hand (Stacked Digit.Morph.N0To9) Possibly Empty
+floatFraction : Float -> Emptiable (Stacked Digit.Morph.N0To9) Possibly
 floatFraction =
     \float ->
         if float == 0 then
-            Hand.empty
+            Emptiable.empty
 
         else
             let
@@ -170,9 +174,9 @@ floatFraction =
     --> Err "1:1: I was expecting a digit [0-9]. I got stuck when I got the character 'a'."
 
 -}
-text : MorphRow Char Number String
+text : MorphRow Char Number
 text =
-    MorphRow.expect "a number"
+    MorphRow.expect "number"
         (Morph.choice
             (\n0Variant signedVariant numberNarrow ->
                 case numberNarrow of
@@ -199,32 +203,36 @@ text =
                             |> grab Stack.top
                                 (Digit.Morph.n0To9 |> one)
                             |> grab (Stack.topRemove >> Stack.toList)
-                                (atLeast 0 (Digit.Morph.n0To9 |> one))
+                                (ArraySized.Morph.fromList
+                                    |> MorphRow.over (atLeast n0 (Digit.Morph.n0To9 |> one))
+                                )
                         )
                     |> grab .fraction
                         (translate
-                            (\fractionStack ->
-                                case fractionStack of
-                                    Hand.Empty _ ->
-                                        Nothing
-
-                                    Hand.Filled stacked ->
-                                        stacked |> filled |> Stack.toList |> Just
-                            )
                             (\maybeFraction ->
                                 case maybeFraction of
                                     Nothing ->
-                                        Hand.empty
+                                        Emptiable.empty
 
                                     Just fractionDigits ->
-                                        fractionDigits |> Stack.fromList
+                                        fractionDigits |> ArraySized.toStackFilled
+                            )
+                            (\fractionStack ->
+                                case fractionStack of
+                                    Emptiable.Empty _ ->
+                                        Nothing
+
+                                    Emptiable.Filled (Stack.TopDown top down) ->
+                                        ArraySized.l1 top
+                                            |> ArraySized.minGlue Up (down |> ArraySized.fromList)
+                                            |> Just
                             )
                             |> MorphRow.over
                                 (maybe
                                     (succeed (\fractionDigits -> fractionDigits)
                                         |> skip (Morph.Text.specific ".")
                                         |> grab (\fractionDigits -> fractionDigits)
-                                            (atLeast 1 (Digit.Morph.n0To9 |> one))
+                                            (atLeast n1 (Digit.Morph.n0To9 |> one))
                                     )
                                 )
                         )

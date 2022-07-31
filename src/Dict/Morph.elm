@@ -52,8 +52,8 @@ toListImplementation =
 -}
 fromList :
     Morph
-        (List { key : comparableKey, value : value })
         (Dict comparableKey value)
+        (List { key : comparableKey, value : value })
         error_
 fromList =
     translate fromListImplementation toListImplementation
@@ -70,8 +70,8 @@ fromList =
 -}
 toList :
     Morph
-        (Dict comparableKey value)
         (List { key : comparableKey, value : value })
+        (Dict comparableKey value)
         error_
 toList =
     translate toListImplementation fromListImplementation

@@ -10,6 +10,7 @@ module Sign.Morph exposing
 
 -}
 
+import Emptiable exposing (filled)
 import Morph exposing (Morph, translate)
 import Morph.Text
 import MorphRow exposing (MorphRow, maybe)
@@ -31,7 +32,7 @@ type Signable signedNumber
 
 {-| `'+'` or `'-'`.
 -}
-plusOrMinus : Morph Sign Char (Morph.Error Char description_)
+plusOrMinus : Morph Sign Char (Morph.Error Char)
 plusOrMinus =
     Morph.choice
         (\plus minus signNarrow ->
@@ -49,23 +50,24 @@ plusOrMinus =
 
 {-| A possible negate sign. If none is found, `Positive` is returned.
 -}
-maybeMinus : MorphRow Char Sign expectedCustom_
+maybeMinus : MorphRow Char Sign
 maybeMinus =
     translate
+        (\minusSymbol ->
+            case minusSymbol of
+                Emptiable.Empty _ ->
+                    Positive
+
+                Emptiable.Filled () ->
+                    Negative
+        )
         (\signNarrow ->
             case signNarrow of
                 Positive ->
-                    Nothing
+                    Emptiable.empty
 
                 Negative ->
-                    Just ()
+                    () |> filled
         )
-        (\minusSymbol ->
-            case minusSymbol of
-                Nothing ->
-                    Positive
-
-                Just () ->
-                    Negative
-        )
-        |> MorphRow.over (maybe (Morph.Text.specific "-"))
+        |> MorphRow.over
+            (maybe (Morph.Text.specific "-"))

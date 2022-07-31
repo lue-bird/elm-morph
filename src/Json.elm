@@ -93,7 +93,7 @@ jsValueMagic :
     Morph
         JsonAny
         JsValueMagic
-        (Morph.Expected { validJsonFormat : String })
+        { invalidJsonFormat : String }
 jsValueMagic =
     { narrow =
         \jsonMagicBroad ->
@@ -101,11 +101,10 @@ jsValueMagic =
                 |> Json.Decode.decodeValue decoder
                 |> Result.mapError
                     (\errorWhenJsonFormatInvalid ->
-                        Morph.Expected
-                            { validJsonFormat =
-                                errorWhenJsonFormatInvalid
-                                    |> Json.Decode.errorToString
-                            }
+                        { invalidJsonFormat =
+                            errorWhenJsonFormatInvalid
+                                |> Json.Decode.errorToString
+                        }
                     )
     , broaden =
         let

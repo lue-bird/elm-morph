@@ -36,7 +36,7 @@ type N1To9
 
 {-| [`Morph`](Morph#Morph) [`N0To9`](#N0To9) to `Int`
 -}
-n0To9ToInt : Morph N0To9 Int (Morph.Error Int variantExpectation_)
+n0To9ToInt : Morph N0To9 Int (Morph.Error Int)
 n0To9ToInt =
     Morph.choice
         (\n0Variant n1To9Variant n0To9Narrow ->
@@ -54,7 +54,7 @@ n0To9ToInt =
 
 {-| [`Morph`](Morph#Morph) [`N1To9`](#N1To9) to `Int`
 -}
-n1To9ToInt : Morph N1To9 Int (Morph.Error Int variantExpectation_)
+n1To9ToInt : Morph N1To9 Int (Morph.Error Int)
 n1To9ToInt =
     Morph.choice
         (\n1 n2 n3 n4 n5 n6 n7 n8 n9 n1To9Narrow ->
@@ -136,7 +136,7 @@ n1To9ToInt =
     --> Err "1:1: I was expecting at least 1 digit [0-9]. I got stuck when I got the character 'a'."
 
 -}
-n0To9 : Morph N0To9 Char (Morph.Error Char variantExpectation_)
+n0To9 : Morph N0To9 Char (Morph.Error Char)
 n0To9 =
     Morph.choice
         (\n0Variant n1To9Variant n0To9Narrow ->
@@ -154,7 +154,7 @@ n0To9 =
 
 {-| Match a [1|...|9](#N1To9) digit `Char`.
 -}
-n1To9 : Morph N1To9 Char (Morph.Error Char variantExpectation_)
+n1To9 : Morph N1To9 Char (Morph.Error Char)
 n1To9 =
     Morph.choice
         (\n1 n2 n3 n4 n5 n6 n7 n8 n9 n1To9Narrow ->

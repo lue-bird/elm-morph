@@ -69,24 +69,24 @@ import MorphRow exposing (MorphRow, one)
 
 {-| [`Translate`](Morph#Translate) from a `String` to a `List Char`.
 
-    "0123" |> (Morph.stringToList |> Morph.broaden)
+    "0123" |> (Morph.Text.toList |> Morph.map)
     --> [ '0', '1', '2', '3' ]
 
 -}
-toList : Morph String (List Char) error_
+toList : Morph (List Char) String error_
 toList =
     translate String.toList String.fromList
 
 
 {-| [`Translate`](Morph#Translate) from `List Char` to a `String`.
 
-    "0123" |> (Morph.stringToList |> Morph.broaden)
+    "0123" |> (Morph.Text.fromList |> Morph.map)
     --> [ '0', '1', '2', '3' ]
 
 -}
-fromList : Morph (List Char) String error_
+fromList : Morph String (List Char) error_
 fromList =
-    toList |> Morph.reverse
+    translate String.fromList String.toList
 
 
 {-| Match a specific text string and nothing else.
@@ -107,7 +107,7 @@ This is case sensitive.
     --> MorphRow.specific ("hello" |> String.toList)
 
 -}
-specific : String -> MorphRow Char () expectedCustom_
+specific : String -> MorphRow Char ()
 specific expectedText =
     MorphRow.specific (expectedText |> String.toList)
 
@@ -125,7 +125,7 @@ This is case insensitive.
     --> Err "1:3: I was expecting the text \"abc\" (case insensitive). I got stuck when I got the character '@'."
 
 -}
-caseAny : String -> MorphRow Char () (Morph.Error Char variantExpectation_)
+caseAny : String -> MorphRow Char ()
 caseAny expectedText =
     broadenFrom
         (List.repeat (expectedText |> String.length) ())
@@ -133,7 +133,7 @@ caseAny expectedText =
             (MorphRow.sequence
                 (List.map
                     (\expectedChar -> Morph.Char.caseAny expectedChar |> one)
-                    (expectedText |> Morph.map toList)
+                    (expectedText |> (toList |> Morph.map))
                 )
             )
 
@@ -233,7 +233,7 @@ no more remaining characters in the input text.
     --> Ok [ "hi", "ho", "hu" ]
 
 -}
-lineEnd : MorphRow Char LineEnd expectedCustom_
+lineEnd : MorphRow Char LineEnd
 lineEnd =
     Morph.choice
         (\returnVariant inputEndVariant maybe_ ->

@@ -14,7 +14,7 @@ module MorphRow.Error exposing
 
 -}
 
-import Hand exposing (Empty, Hand)
+import Emptiable exposing (Emptiable)
 import Morph
 import MorphRow
 import Possibly exposing (Possibly)
@@ -33,18 +33,17 @@ type alias LinesLocation =
 
 {-| How far parsing got from the beginning of an input source.
 
-  - 0 for before the first input atom
-  - 1 for the first input atom
-  - input-length for the last input atom
+  - 0 for before the first input element
+  - 1 for the first input element
+  - input-length for the last input element
 
 Use [`downToUpInLine`](#downToUpInLine) for `String` inputs.
 
 -}
-downToUpIn : Hand (Stacked atom_) Possibly Empty -> Int -> Int
+downToUpIn : Emptiable (Stacked atom_) Possibly -> Int -> Int
 downToUpIn inputSource =
     \fromLast ->
-        1
-            + ((inputSource |> Stack.length) - 1)
+        (inputSource |> Stack.length)
             - fromLast
 
 
@@ -84,7 +83,7 @@ Use [`downToUpIn`](#downToUpIn) for any `List` inputs.
 -}
 downToUpInLine : String -> Int -> Int
 downToUpInLine inputSource =
-    downToUpIn (inputSource |> Stack.fromString)
+    downToUpIn (inputSource |> Stack.fromText)
 
 
 {-| Present the `TextLocation` as `"line:column"`, for example
@@ -106,8 +105,10 @@ locationToString =
 
 expectationMissDescribe :
     { source : String }
-    -> MorphRow.SuccessExpectation Char String
-    -> List String
+    ->
+        (MorphRow.Error Char
+         -> List String
+        )
 expectationMissDescribe { source } =
     \expectationMiss ->
         [ case expectationMiss.startingAtDown of
@@ -193,8 +194,8 @@ expectationMissDescribe { source } =
 
 {-| Dumps the error into a human-readable format.
 
-    import MorphRow exposing (MorphRow, take, drop, into, succeed, atLeast, atom, take)
-    import Morph.CharRow as Char
+    import MorphRow exposing (MorphRow, take, drop, into, succeed, atLeast, one, take)
+    import Morph.Char as Char
     import Morph.TextRow as Text
 
     "  abc  "
@@ -221,11 +222,11 @@ expectationMissDescribe { source } =
     point =
         into "Point"
             (succeed Point
-                |> skip (atom '(')
+                |> skip (one '(')
                 |> grab Text.number
-                |> skip (atom ',')
+                |> skip (one ',')
                 |> grab Text.number
-                |> skip (atom ')')
+                |> skip (one ')')
             )
 
     "  (12,)  "
@@ -252,11 +253,11 @@ expectationMissDescribe { source } =
     line =
         into "Line"
             (succeed (\p1 p2 -> { p1 = p1, p2 = p2 })
-                |> skip (atom '[')
+                |> skip (one '[')
                 |> grab point
-                |> skip (atom ',')
+                |> skip (one ',')
                 |> grab point
-                |> skip (atom ']')
+                |> skip (one ']')
             )
 
     "  [(12,34),(56,)]  "
@@ -275,8 +276,8 @@ expectationMissDescribe { source } =
     -->     , "             ~~~~^"
     -->     ]
 
-    import MorphRow exposing (MorphRow, drop, into, succeed, atLeast, take, atom)
-    import Morph.CharRow exposing (blank)
+    import MorphRow exposing (MorphRow, drop, into, succeed, atLeast, take, one)
+    import Morph.Char exposing (blank)
     import Morph.TextRow exposing (number)
 
     type alias Point =
@@ -288,15 +289,15 @@ expectationMissDescribe { source } =
     point =
         into "Point"
             (succeed (\x y -> { x = x, y = y })
-                |> skip (atom '(')
+                |> skip (one '(')
                 |> skip (atLeast 0 blank)
                 |> grab number
                 |> skip (atLeast 0 blank)
-                |> skip (atom ',')
+                |> skip (one ',')
                 |> skip (atLeast 0 blank)
                 |> grab number
                 |> skip (atLeast 0 blank)
-                |> skip (atom ')')
+                |> skip (one ')')
             )
 
     "  (12,)  "
@@ -336,38 +337,14 @@ expectationMissDescribe { source } =
 -}
 describe :
     { source : String }
-    -> MorphRow.Error Char narrow_ String
+    -> MorphRow.Error Char
     -> List String
 describe { source } =
     \error ->
-        case error of
-            Morph.Expected (MorphRow.NoMoreInputRemaining remaining) ->
-                [ [ [ remaining.remainingAtomCount
-                        |> Stack.length
-                        |> downToUpInLines source
-                        |> locationToString
-                    , ": I was done parsing but something's still left:\n"
-                    ]
-                        |> String.concat
-                  ]
-                , ((remaining.remainingAtomCount
-                        |> Stack.toList
-                        |> String.fromList
-                        |> String.left 100
-                   )
-                    ++ "...\""
-                  )
-                    |> String.lines
-                    |> List.map (\line -> "    " ++ line)
-                , [ "Correct or remove that part, then try again" ]
-                ]
-                    |> List.concat
-
-            Morph.Expected (MorphRow.Success expectationMiss) ->
-                [ [ "I was expecting" ]
-                , expectationMiss |> expectationMissDescribe { source = source }
-                ]
-                    |> List.concat
+        [ [ "I was expecting" ]
+        , error |> expectationMissDescribe { source = source }
+        ]
+            |> List.concat
 
 
 {-| Create an [`Error`](MorphRow#Error) message.
@@ -376,7 +353,7 @@ TODO: update examples
 
     import MorphRow
     import Morph.TextRow as Text
-    import Morph.CharRow exposing (letter)
+    import Morph.Char exposing (letter)
 
     -- Getting a digit instead of a letter.
     "123"
@@ -395,7 +372,7 @@ TODO: update examples
 -}
 expectedDescribe :
     { source : String }
-    -> Morph.ExpectationWith { startingAtDown : Int } Char String
+    -> Morph.ExpectationWith { startingAtDown : Int } Char
     -> List String
 expectedDescribe source =
     \expected ->
@@ -412,14 +389,14 @@ expectedDescribe source =
             Morph.Specific atomSpecific ->
                 [ atomSpecific |> String.fromChar ]
 
-            Morph.OneIn possibilities ->
+            Morph.OneOf possibilities ->
                 [ [ "either" ]
                 , possibilities
                     |> Stack.map
                         (\_ possibilityExpectation ->
                             case possibilityExpectation |> expectationMissDescribe source of
                                 [] ->
-                                    Hand.empty
+                                    Emptiable.empty
 
                                 possibilityLine0 :: possibilityLines1Up ->
                                     Stack.topDown

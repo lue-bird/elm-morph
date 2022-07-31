@@ -6,14 +6,16 @@ module Integer.Morph exposing (Integer, text, toInt, fromInt)
 
 -}
 
+import ArraySized.Morph
 import Digit.Morph
-import Hand exposing (Empty, Hand, fill)
+import Emptiable exposing (Emptiable, fill)
 import Integer.Morph.Internal exposing (intAbsoluteTo0To9s, n0To9sToInt)
 import Morph exposing (Morph, choice)
 import Morph.Text
 import MorphRow exposing (MorphRow, atLeast, grab, one, succeed)
+import N exposing (n0)
 import Sign
-import Sign.Morph exposing (Sign, Signable(..))
+import Sign.Morph exposing (Signable(..))
 import Stack exposing (StackTopBelow)
 
 
@@ -22,10 +24,9 @@ import Stack exposing (StackTopBelow)
 type alias Integer =
     Signable
         { absolute :
-            Hand
+            Emptiable
                 (StackTopBelow Digit.Morph.N1To9 Digit.Morph.N0To9)
                 Never
-                Empty
         }
 
 
@@ -108,9 +109,9 @@ toInt =
     --> Err "1:1: I was expecting an integer value. I got stuck when I got the character 'a'."
 
 -}
-text : MorphRow Char Integer String
+text : MorphRow Char Integer
 text =
-    MorphRow.expect "an integer"
+    MorphRow.expect "integer"
         (choice
             (\integer0Variant integerSignedVariant integerNarrow ->
                 case integerNarrow of
@@ -132,7 +133,10 @@ text =
                         (succeed Stack.topDown
                             |> grab Stack.top (Digit.Morph.n1To9 |> one)
                             |> grab (Stack.topRemove >> Stack.toList)
-                                (atLeast 0 (Digit.Morph.n0To9 |> one))
+                                (ArraySized.Morph.fromList
+                                    |> MorphRow.over
+                                        (atLeast n0 (Digit.Morph.n0To9 |> one))
+                                )
                         )
                 )
             |> MorphRow.choiceFinish
