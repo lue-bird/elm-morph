@@ -1,12 +1,11 @@
 ## 2.0.0 plan
 
-  - `atLeast`, `between`, `exactly`, `split` return `typesafe-array`
 
 # change log
 
 ## 1.0.0
 
-Changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/parser/latest/)
+changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/parser/latest/)
 
   - `Parser` → `MorphRow` that can also `build`
   - `Parser.Expression` remove
@@ -21,7 +20,8 @@ Changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
           - in favor of `between 0 max`
       - `concat` remove
       - `fold`, `foldWhile` remove
-          - in favor of `while`
+          - in favor of `whileAccumulate`
+      - `atLeast`, `between`, `exactly`, `split` return `typesafe-array`
       - `until` changed
         ```elm
         until :
