@@ -111,7 +111,7 @@ expectationMissDescribe :
         )
 expectationMissDescribe { source } =
     \expectationMiss ->
-        [ case expectationMiss.startingAtDown of
+        [ case expectationMiss.location.startingAtDown of
             0 ->
                 [ expectationMiss.expected |> expectedDescribe { source = source }
                 , [ "but nothing's left to parse" ]
@@ -130,7 +130,7 @@ expectationMissDescribe { source } =
         , [ expectationMiss.expected |> expectedDescribe { source = source }
           , [ [ "starting at "
               , (source |> String.length)
-                    - expectationMiss.startingAtDown
+                    - expectationMiss.location.startingAtDown
                     |> downToUpInLines source
                     |> locationToString
               ]
@@ -140,13 +140,13 @@ expectationMissDescribe { source } =
             |> List.concat
         , let
             errorOffset =
-                expectationMiss.startingAtDown |> downToUpInLine source
+                expectationMiss.location.startingAtDown |> downToUpInLine source
 
             errorLocation =
                 errorOffset |> downToUpInLines source
 
             rangeStart =
-                (errorOffset - expectationMiss.startingAtDown)
+                (errorOffset - expectationMiss.location.startingAtDown)
                     |> downToUpInLines source
 
             lineNumberWidth =

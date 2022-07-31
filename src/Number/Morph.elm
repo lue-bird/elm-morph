@@ -14,7 +14,7 @@ Morph.Morph
 import ArraySized
 import ArraySized.Morph
 import Digit.Morph
-import Emptiable exposing (Emptiable, filled)
+import Emptiable exposing (Emptiable, fillMap, fillMapFlat, filled)
 import Integer.Morph.Internal exposing (intAbsoluteTo0To9s, n0To9sToInt)
 import Linear exposing (DirectionLinear(..))
 import Morph exposing (Morph, translate)
@@ -71,6 +71,26 @@ since `Float` is fixed in bit size while [`Number`](#Number) is not.
 toFloat : Morph Number Float error_
 toFloat =
     Morph.translate
+        (\floatValue ->
+            case floatValue |> Sign.ofNumber of
+                Nothing ->
+                    N0
+
+                Just signed ->
+                    let
+                        wholeAbsolute =
+                            signed.absolute |> truncate
+                    in
+                    { sign = signed.sign
+                    , whole =
+                        wholeAbsolute |> intAbsoluteTo0To9s
+                    , fraction =
+                        (signed.absolute - (wholeAbsolute |> Basics.toFloat))
+                            |> abs
+                            |> floatFraction
+                    }
+                        |> Signed
+        )
         (\floatNarrow ->
             case floatNarrow of
                 N0 ->
@@ -100,26 +120,6 @@ toFloat =
                                     fraction |> filled |> toFraction
                               )
                         )
-        )
-        (\floatValue ->
-            case floatValue |> Sign.ofNumber of
-                Nothing ->
-                    N0
-
-                Just signed ->
-                    let
-                        wholeAbsolute =
-                            signed.absolute |> truncate
-                    in
-                    { sign = signed.sign
-                    , whole =
-                        wholeAbsolute |> intAbsoluteTo0To9s
-                    , fraction =
-                        (signed.absolute - (wholeAbsolute |> Basics.toFloat))
-                            |> abs
-                            |> floatFraction
-                    }
-                        |> Signed
         )
 
 
@@ -199,33 +199,22 @@ text =
                     |> grab .sign
                         Sign.Morph.maybeMinus
                     |> grab .whole
-                        (succeed Stack.topDown
+                        (succeed Stack.onTopLay
                             |> grab Stack.top
                                 (Digit.Morph.n0To9 |> one)
-                            |> grab (Stack.topRemove >> Stack.toList)
-                                (ArraySized.Morph.fromList
+                            |> grab Stack.topRemove
+                                (ArraySized.Morph.toStackEmptiable
                                     |> MorphRow.over (atLeast n0 (Digit.Morph.n0To9 |> one))
                                 )
                         )
                     |> grab .fraction
                         (translate
-                            (\maybeFraction ->
-                                case maybeFraction of
-                                    Nothing ->
-                                        Emptiable.empty
-
-                                    Just fractionDigits ->
-                                        fractionDigits |> ArraySized.toStackFilled
-                            )
-                            (\fractionStack ->
-                                case fractionStack of
-                                    Emptiable.Empty _ ->
-                                        Nothing
-
-                                    Emptiable.Filled (Stack.TopDown top down) ->
-                                        ArraySized.l1 top
-                                            |> ArraySized.minGlue Up (down |> ArraySized.fromList)
-                                            |> Just
+                            (fillMapFlat ArraySized.toStackFilled)
+                            (fillMap
+                                (\(Stack.TopDown top down) ->
+                                    ArraySized.l1 top
+                                        |> ArraySized.minGlue Up (down |> ArraySized.fromList)
+                                )
                             )
                             |> MorphRow.over
                                 (maybe

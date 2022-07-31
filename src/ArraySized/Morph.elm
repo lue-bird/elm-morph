@@ -25,7 +25,7 @@ Also available: [`toggle`](Morph#toggle) [`Array.Extra.reverse`](https://dark.el
 
 import ArraySized exposing (ArraySized)
 import Emptiable exposing (Emptiable)
-import Morph exposing (Morph, MorphInProgress, Translate, broaden, narrow, translate)
+import Morph exposing (Morph, MorphInProgress, Translate, broaden, narrow, translate, translateOn)
 import N exposing (Fixed, Min, N0, N1)
 import Possibly exposing (Possibly)
 import Stack exposing (Stacked)
@@ -79,7 +79,7 @@ toList =
     import ArraySized
 
     Stack.topDown 0 [ 1, 2, 3, 4 ]
-        |> Morph.map ArraySized.Morph.fromStackEmptiable
+        |> (ArraySized.Morph.fromStackEmptiable |> Morph.map)
     --: ArraySized (Min (Fixed N0)) number_
 
 Have `>= 1` element (`Emptiable (Stacked ...) Never`)? → [`fromStackFilled`](#fromStackFilled)
@@ -87,14 +87,11 @@ Have `>= 1` element (`Emptiable (Stacked ...) Never`)? → [`fromStackFilled`](#
 -}
 fromStackEmptiable :
     Morph
+        (ArraySized (Min (Fixed N0)) element)
         (Emptiable (Stacked element) Possibly)
-        (ArraySized
-            (Min (Fixed N0))
-            element
-        )
         error_
 fromStackEmptiable =
-    translate ArraySized.toStackEmptiable ArraySized.fromStackEmptiable
+    translate ArraySized.fromStackEmptiable ArraySized.toStackEmptiable
 
 
 {-| [`Translate`](Morph#Translate) from `ArraySized` to `Emptiable (Stacked ...) Possibly`
@@ -104,7 +101,7 @@ fromStackEmptiable =
 
     ArraySized.l4 0 1 2 3
         |> ArraySized.minLower n0
-        |> Morph.map ArraySized.Morph.toStackEmptiable
+        |> (ArraySized.Morph.toStackEmptiable |> Morph.map)
     --> Stack.topDown 0 [ 1, 2, 3 ]
     --: Emptiable (Stacked number_) Possibly
 
@@ -113,11 +110,11 @@ Have `>= 1` element (`Emptiable (Stacked ...) Never`)? → [`toStackFilled`](#to
 -}
 toStackEmptiable :
     Morph
-        (ArraySized (Min (Fixed N0)) element)
         (Emptiable (Stacked element) Possibly)
+        (ArraySized (Min (Fixed N0)) element)
         error_
 toStackEmptiable =
-    translate ArraySized.fromStackEmptiable ArraySized.toStackEmptiable
+    translate ArraySized.toStackEmptiable ArraySized.fromStackEmptiable
 
 
 {-| [`Translate`](Morph#Translate) from `Emptiable (Stacked ...) Never` to `ArraySized`
@@ -181,40 +178,5 @@ elementEach :
             (ArraySized lengthRange unmapped)
             error_
 elementEach elementTranslate =
-    translate ArraySized.map ArraySized.map
-        |> onTranslate elementTranslate
-
-
-onTranslate :
-    MorphInProgress
-        { narrow :
-            elementUnmapped -> Result Never elementMapped
-        , broaden :
-            elementMapped -> elementUnmapped
-        }
-    ->
-        (MorphInProgress
-            { narrow :
-                (elementUnmapped -> elementMapped)
-                -> (structureUnmapped -> Result structureError structureMapped)
-            , broaden :
-                (elementMapped -> elementUnmapped)
-                -> (structureMapped -> structureUnmapped)
-            }
-         ->
-            MorphInProgress
-                { narrow :
-                    structureUnmapped -> Result structureError structureMapped
-                , broaden :
-                    structureMapped -> structureUnmapped
-                }
-        )
-onTranslate elementTranslate =
-    \structureMorph ->
-        { narrow =
-            narrow structureMorph
-                (Morph.map elementTranslate)
-        , broaden =
-            broaden structureMorph
-                (Morph.unmap elementTranslate)
-        }
+    ( ArraySized.map, ArraySized.map )
+        |> translateOn elementTranslate

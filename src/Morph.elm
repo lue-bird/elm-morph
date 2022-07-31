@@ -4,7 +4,7 @@ module Morph exposing
     , validate, specific
     , broaden, narrow
     , Translate
-    , translate, broadenFrom, toggle, remain
+    , translate, broadenFrom, toggle, remain, translateOn
     , map, unmap
     , lazy, over
     , reverse
@@ -21,8 +21,6 @@ module Morph exposing
 
 ## fallible
 
-@docs Expected, expectation, errorExpectationMap
-@docs expectationMap
 @docs Expectation, ExpectationWith, Error, ErrorWith, failure, expect
 
 
@@ -43,7 +41,7 @@ module Morph exposing
 
 ### [`Translate`](Morph#Translate) create
 
-@docs translate, broadenFrom, toggle, remain
+@docs translate, broadenFrom, toggle, remain, translateOn
 
 
 ### [`Translate`](Morph#Translate) scan
@@ -279,7 +277,7 @@ expect expectationCustomDescription morphToDescribe =
 {-| The function that turns `narrow` into `broad`.
 -}
 broaden :
-    MorphInProgress { narrow : narrow, broaden : broaden }
+    MorphInProgress { narrow : narrow_, broaden : broaden }
     -> broaden
 broaden =
     .broaden
@@ -484,11 +482,11 @@ Examples:
 -}
 translate :
     (beforeMap -> mapped)
-    -> (beforeUnmapped -> unmapped)
+    -> (beforeUnmap -> unmapped)
     ->
         MorphInProgress
             { narrow : beforeMap -> Result error_ mapped
-            , broaden : beforeUnmapped -> unmapped
+            , broaden : beforeUnmap -> unmapped
             }
 translate mapTo unmapFrom =
     { narrow = mapTo >> Ok
@@ -938,12 +936,57 @@ by swapping the functions [`map`](#map) <-> [`unmap`](#unmap).
 
 -}
 reverse :
-    Translate mapped unmapped
-    -> Morph unmapped mapped error_
+    MorphInProgress
+        { narrow : beforeMap -> Result Never mapped
+        , broaden : beforeUnmap -> unmapped
+        }
+    ->
+        MorphInProgress
+            { narrow : beforeUnmap -> Result error_ unmapped
+            , broaden : beforeMap -> mapped
+            }
 reverse =
     \translate_ ->
         { narrow =
             \unmapped ->
                 unmapped |> unmap translate_ |> Ok
         , broaden = map translate_
+        }
+
+
+{-| Morph the structure's elements
+
+    List.Morph.elementEach elementTranslate =
+        ( List.map, List.map )
+            |> translateOn elementTranslate
+
+-}
+translateOn :
+    MorphInProgress
+        { narrow :
+            elementBeforeMap -> Result Never elementMapped
+        , broaden :
+            elementBeforeUnmap -> elementUnmapped
+        }
+    ->
+        (( (elementBeforeMap -> elementMapped)
+           -> (structureBeforeMap -> structureMapped)
+         , (elementBeforeUnmap -> elementUnmapped)
+           -> (structureBeforeUnmap -> structureUnmapped)
+         )
+         ->
+            MorphInProgress
+                { narrow :
+                    structureBeforeMap -> Result error_ structureMapped
+                , broaden :
+                    structureBeforeUnmap -> structureUnmapped
+                }
+        )
+translateOn elementTranslate =
+    \( structureMap, structureUnmap ) ->
+        { narrow =
+            structureMap (map elementTranslate)
+                >> Ok
+        , broaden =
+            structureUnmap (unmap elementTranslate)
         }

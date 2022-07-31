@@ -1,6 +1,5 @@
 module MorphRow exposing
-    ( MorphRow
-    , Error
+    ( MorphRow, Error
     , succeed, expect, fail
     , end, oneAny, one
     , specific
@@ -12,6 +11,7 @@ module MorphRow exposing
     , separatedBy
     , before, until
     , whileAccumulate
+    , finish
     )
 
 {-| Simple, easy to use, general-purpose parser-builder with good error messages
@@ -119,8 +119,7 @@ Note before we start:
 
   - 👎 performs worse as there's more [possibilities](#possibility) to parse to know it failed
 
-@docs MorphRow
-@docs SuccessExpectation, Error, InputEndOrSuccess
+@docs MorphRow, Error
 
 
 ## scan
@@ -163,6 +162,12 @@ This grows the stack, so you cannot do it indefinitely.
 [`while`](#while), [`until`](#until) enable tail-call elimination so you can have as many repeats you want.
 
 @docs before, until
+@docs whileAccumulate
+
+
+### transform
+
+@docs finish
 
 -}
 
@@ -1756,3 +1761,28 @@ end =
     , broaden =
         \() -> Emptiable.empty
     }
+
+
+
+-- transform
+
+
+{-| Final step before running a [`MorphRow`](#MorphRow),
+transforming it into a [`Morph`](Morph#Morph) on the full stack of input elements.
+
+    point
+        |> MorphRow.finish
+        |> Morph.over Stack.Morph.toText
+
+-}
+finish :
+    MorphRow atom narrow
+    -> Morph narrow (Emptiable (Stacked atom) Possibly) (Error atom)
+finish =
+    \morphRow ->
+        { narrow =
+            narrow (morphRow |> skip end)
+                >> Result.map .narrow
+        , broaden =
+            broaden morphRow
+        }

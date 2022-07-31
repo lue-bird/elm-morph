@@ -10,7 +10,7 @@ module Value exposing
     , Error(..), expectationCustomMap
     , DefaultOrCustom(..)
     , LiteralKind
-    , StructureExpectation, Tuple2Expectation, Tuple3Expectation, KindOrInsideExpectation, StructureLinearInsideExpectation, RecordInsideExpectation, PartExpectation, VariantInsideExpectation
+    , StructureExpectation, Tuple2Expectation, Tuple3Expectation, KindOrInsideExpectation, StructureLinearInsideExpectation, RecordInsideExpectation, PartExpectation, TagExpectation, TaggedInsideExpectation
     )
 
 {-| `case`-able elm values.
@@ -81,9 +81,8 @@ If you feel especially motivated, throw a PR adding
 
 @docs Error, expectationCustomMap
 @docs DefaultOrCustom
-@docs Expectation, Error
 @docs LiteralKind
-@docs StructureExpectation, Tuple2Expectation, Tuple3Expectation, KindOrInsideExpectation, StructureLinearInsideExpectation, RecordInsideExpectation, PartExpectation, VariantTagExpectation, VariantInsideExpectation
+@docs StructureExpectation, Tuple2Expectation, Tuple3Expectation, KindOrInsideExpectation, StructureLinearInsideExpectation, RecordInsideExpectation, PartExpectation, TagExpectation, TaggedInsideExpectation
 
 -}
 
@@ -213,7 +212,7 @@ type alias StructureExpectation expectation =
         (KindOrInsideExpectation (StructureLinearInsideExpectation expectation))
         (KindOrInsideExpectation (StructureLinearInsideExpectation expectation))
         (KindOrInsideExpectation (RecordInsideExpectation expectation))
-        (KindOrInsideExpectation (VariantInsideExpectation expectation))
+        (KindOrInsideExpectation (TaggedInsideExpectation expectation))
 
 
 {-| For each part: Was it `Ok ()` or was there an `Err ...`?
@@ -260,14 +259,16 @@ type alias RecordInsideExpectation partValueExpectation =
     List (Tagged String (PartExpectation partValueExpectation))
 
 
-{-| Failed expectation for the Expected variant tag or value.
+{-| Failed expectation for the Expected tag or value.
 -}
-type alias VariantInsideExpectation valueExpectation =
+type alias TaggedInsideExpectation valueExpectation =
     TagOrValue
         TagExpectation
         (Tagged String valueExpectation)
 
 
+{-| Failed expectation for the Expected [`Tag`](#Tag)
+-}
 type TagExpectation
     = TagNamespace String
     | TagMember { oneOf : List String }
@@ -373,8 +374,8 @@ expectationCustomMap customChange =
                         )
 
         expectationVariantInsideMap :
-            VariantInsideExpectation (Error expectationCustom)
-            -> VariantInsideExpectation (Error expectationCustomMapped)
+            TaggedInsideExpectation (Error expectationCustom)
+            -> TaggedInsideExpectation (Error expectationCustomMapped)
         expectationVariantInsideMap =
             \variantInsideExpectation ->
                 case variantInsideExpectation of
@@ -972,11 +973,11 @@ choiceIn namespace =
         , broaden =
             \narrowChoice ->
                 let
-                    (Tagged tag valueBroad) =
+                    (Tagged memberTag valueBroad) =
                         narrowChoice |> broaden choiceMorphComplete
                 in
                 valueBroad
-                    |> Tagged (Tag { namespace = namespace, tag = tag })
+                    |> Tagged { namespace = namespace, member = memberTag }
                     |> Varianty
                     |> StructureAny
                     |> Structurey
@@ -1069,7 +1070,7 @@ part ( accessPart, partTag ) partMorph =
                                     |> Result.map
                                         (\eat -> eat partNarrow)
 
-                            Err (Expected innerExpectation) ->
+                            Err innerExpectation ->
                                 (expectationsSoFar
                                     |> (::)
                                         (Tagged partTag
@@ -1235,16 +1236,30 @@ dict :
     , value : Morph value ValueAny (Error expectationCustom)
     }
     -> Morph (Dict comparableKey value) ValueAny (Error expectationCustom)
-dict nodeMorph =
+dict entryMorph =
     let
         dictListMorph =
             Dict.Morph.fromList
                 |> Morph.over
-                    (list
-                        (tuple2 ( nodeMorph.key, nodeMorph.value ))
-                    )
+                    (list (entry entryMorph))
     in
     choice
         (\dictVariant dictNarrow -> dictVariant dictNarrow)
         |> variant ( identity, "Dict" ) dictListMorph
         |> choiceIn "Dict"
+
+
+entry :
+    { key : Morph comparableKey ValueAny (Error expectationCustom)
+    , value : Morph value ValueAny (Error expectationCustom)
+    }
+    ->
+        Morph
+            { key : comparableKey, value : value }
+            ValueAny
+            (Error expectationCustom)
+entry entryMorph =
+    group (\key value -> { key = key, value = value })
+        |> part ( .key, "key" ) entryMorph.key
+        |> part ( .value, "value" ) entryMorph.value
+        |> groupFinish

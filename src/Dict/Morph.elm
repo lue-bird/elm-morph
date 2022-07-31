@@ -18,7 +18,7 @@ module Dict.Morph exposing
 -}
 
 import Dict exposing (Dict)
-import Morph exposing (Morph, Translate, translate)
+import Morph exposing (Morph, Translate, translate, translateOn)
 
 
 fromListImplementation :
@@ -87,6 +87,12 @@ valueEach :
     Translate unmappedValue mappedValue
     -> Morph (Dict key unmappedValue) (Dict key mappedValue) error_
 valueEach elementTranslate =
-    translate
-        (Dict.map (\_ -> Morph.map elementTranslate))
-        (Dict.map (\_ -> Morph.unmap elementTranslate))
+    ( valuesMap, valuesMap )
+        |> translateOn elementTranslate
+
+
+valuesMap :
+    (value -> valueMapped)
+    -> (Dict key value -> Dict key valueMapped)
+valuesMap valueMap =
+    Dict.map (\_ -> valueMap)

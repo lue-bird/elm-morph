@@ -41,6 +41,7 @@ pointTest =
                             |> Morph.part ( .x, .x >> Ok ) Number.Morph.fromFloat
                             |> Morph.part ( .y, .y >> Ok ) Number.Morph.fromFloat
                             |> MorphRow.over point
+                            |> MorphRow.finish
                             |> Morph.over Stack.Morph.toText
                         )
                     |> Expect.equal (Ok { x = 3.0, y = -9999.124 })
@@ -55,6 +56,7 @@ pointTest =
                             |> Morph.part ( .x, .x >> Ok ) Number.Morph.fromFloat
                             |> Morph.part ( .y, .y >> Ok ) Number.Morph.fromFloat
                             |> MorphRow.over point
+                            |> MorphRow.finish
                             |> Morph.over Stack.Morph.toText
                         )
                     |> Expect.equal "( 3, -9999.124 )"

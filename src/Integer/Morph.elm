@@ -50,18 +50,6 @@ since `Int` is fixed in bit size while [`Integer`](#Integer) is not.
 toInt : Morph Integer Int error_
 toInt =
     Morph.translate
-        (\integerNarrow ->
-            case integerNarrow of
-                N0 ->
-                    0
-
-                Signed integerSigned ->
-                    Sign.number integerSigned.sign
-                        (integerSigned.absolute
-                            |> Stack.topMap Digit.Morph.N1To9
-                            |> n0To9sToInt
-                        )
-        )
         (\int ->
             case Sign.ofNumber int of
                 Nothing ->
@@ -79,6 +67,18 @@ toInt =
                                 Stack.TopDown (Digit.Morph.N1To9 top) down ->
                                     Stack.topDown top down
                         }
+        )
+        (\integerNarrow ->
+            case integerNarrow of
+                N0 ->
+                    0
+
+                Signed integerSigned ->
+                    Sign.number integerSigned.sign
+                        (integerSigned.absolute
+                            |> Stack.topMap Digit.Morph.N1To9
+                            |> n0To9sToInt
+                        )
         )
 
 
