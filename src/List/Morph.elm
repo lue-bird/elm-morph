@@ -20,5 +20,4 @@ elementEach :
     Translate unmapped mapped
     -> Morph (List unmapped) (List mapped) error_
 elementEach elementTranslate =
-    ( List.map, List.map )
-        |> translateOn elementTranslate
+    translateOn ( List.map, List.map ) elementTranslate

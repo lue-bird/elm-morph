@@ -965,23 +965,22 @@ reverse =
 {-| Morph the structure's elements
 
     List.Morph.elementEach elementTranslate =
-        ( List.map, List.map )
-            |> translateOn elementTranslate
+        translateOn ( List.map, List.map ) elementTranslate
 
 -}
 translateOn :
-    MorphInProgress
-        { narrow :
-            elementBeforeMap -> Result Never elementMapped
-        , broaden :
-            elementBeforeUnmap -> elementUnmapped
-        }
+    ( (elementBeforeMap -> elementMapped)
+      -> (structureBeforeMap -> structureMapped)
+    , (elementBeforeUnmap -> elementUnmapped)
+      -> (structureBeforeUnmap -> structureUnmapped)
+    )
     ->
-        (( (elementBeforeMap -> elementMapped)
-           -> (structureBeforeMap -> structureMapped)
-         , (elementBeforeUnmap -> elementUnmapped)
-           -> (structureBeforeUnmap -> structureUnmapped)
-         )
+        (MorphInProgress
+            { narrow :
+                elementBeforeMap -> Result Never elementMapped
+            , broaden :
+                elementBeforeUnmap -> elementUnmapped
+            }
          ->
             MorphInProgress
                 { narrow :
@@ -990,11 +989,10 @@ translateOn :
                     structureBeforeUnmap -> structureUnmapped
                 }
         )
-translateOn elementTranslate =
-    \( structureMap, structureUnmap ) ->
-        { narrow =
-            structureMap (map elementTranslate)
-                >> Ok
-        , broaden =
-            structureUnmap (unmap elementTranslate)
-        }
+translateOn ( structureMap, structureUnmap ) elementTranslate =
+    { narrow =
+        structureMap (map elementTranslate)
+            >> Ok
+    , broaden =
+        structureUnmap (unmap elementTranslate)
+    }

@@ -178,5 +178,4 @@ elementEach :
             (ArraySized lengthRange unmapped)
             error_
 elementEach elementTranslate =
-    ( ArraySized.map, ArraySized.map )
-        |> translateOn elementTranslate
+    translateOn ( ArraySized.map, ArraySized.map ) elementTranslate
