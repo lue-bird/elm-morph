@@ -26,7 +26,7 @@ Also available: [`toggle`](Morph#toggle) `Stack.reverse`
 -}
 
 import Emptiable exposing (Emptiable)
-import Morph exposing (Morph, Translate, translate)
+import Morph exposing (Morph, Translate, translate, translateOn)
 import Possibly exposing (Possibly)
 import Stack exposing (StackTopBelow, Stacked)
 
@@ -116,6 +116,8 @@ belowTopEach :
             (Emptiable (StackTopBelow top elementBroad) possiblyOrNever)
             error_
 belowTopEach elementMorph =
-    translate
-        (Stack.belowTopMap (\_ -> Morph.map elementMorph))
-        (Stack.belowTopMap (\_ -> Morph.unmap elementMorph))
+    translateOn ( belowTopElementMap, belowTopElementMap ) elementMorph
+
+
+belowTopElementMap elementMap =
+    Stack.belowTopMap (\_ -> elementMap)

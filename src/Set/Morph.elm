@@ -19,7 +19,7 @@ Also available: [`toggle`](Morph#toggle) [`Set.Extra.reverse`](https://dark.elm.
 
 -}
 
-import Morph exposing (Morph, Translate, translate)
+import Morph exposing (Morph, Translate, translate, translateOn)
 import Set exposing (Set)
 
 
@@ -61,6 +61,4 @@ elementEach :
     Translate comparableMapped comparableUnmapped
     -> Morph (Set comparableMapped) (Set comparableUnmapped) error_
 elementEach elementTranslate =
-    translate
-        (Set.map (Morph.map elementTranslate))
-        (Set.map (Morph.unmap elementTranslate))
+    translateOn ( Set.map, Set.map ) elementTranslate

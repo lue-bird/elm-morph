@@ -20,7 +20,7 @@ Also available: [`toggle`](Morph#toggle) [`Array.Extra.reverse`](https://dark.el
 -}
 
 import Array exposing (Array)
-import Morph exposing (Morph, Translate, translate)
+import Morph exposing (Morph, Translate, translate, translateOn)
 
 
 {-| [`Translate`](Morph#Translate) from `List` to `Array`.
@@ -55,12 +55,10 @@ toList =
 --
 
 
-{-| [`Translate`](Morph#Translate) each element in an `Array`.
+{-| [`Translate`](Morph#Translate) each element in an `Array`
 -}
 elementEach :
     Translate unmapped mapped
     -> Morph (Array unmapped) (Array mapped) error_
 elementEach elementTranslate =
-    translate
-        (Array.map (Morph.map elementTranslate))
-        (Array.map (Morph.unmap elementTranslate))
+    translateOn ( Array.map, Array.map ) elementTranslate
