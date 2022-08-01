@@ -6,7 +6,6 @@ module MorphRow exposing
     , skip, grab, GroupMorphRowInProgress
     , over, next
     , possibility, ChoiceMorphRowInProgress, choiceFinish
-    , sequence
     , atLeast, between, exactly, maybe
     , separatedBy
     , before, until
@@ -145,9 +144,8 @@ Simply use [`Morph.narrow`](Morph#narrow), [`Morph.broaden`](Morph#broaden)
 @docs possibility, ChoiceMorphRowInProgress, choiceFinish
 
 
-## sequences
+## sequence
 
-@docs sequence
 @docs atLeast, between, exactly, maybe
 @docs separatedBy
 
@@ -1690,24 +1688,20 @@ No separator would ever be parsed.
 -}
 separatedBy :
     ( MorphRow atom { separator : separator, part : part }
-      -> MorphRow atom (List { separator : separator, part : part })
+      -> MorphRow atom afterFirst
     , MorphRow atom separator
     )
     -> MorphRow atom part
     ->
         MorphRow
             atom
-            (Emptiable
-                (StackTopBelow
-                    part
-                    { separator : separator, part : part }
-                )
-                Never
-            )
+            { first : part
+            , afterFirst : afterFirst
+            }
 separatedBy ( separatorsToSequence, separatorMorphRow ) partMorphRow =
-    succeed topDown
-        |> grab Stack.top partMorphRow
-        |> grab (Stack.topRemove >> Stack.toList)
+    succeed (\first afterFirst -> { first = first, afterFirst = afterFirst })
+        |> grab .first partMorphRow
+        |> grab .afterFirst
             (separatorsToSequence
                 (succeed
                     (\separator part ->
