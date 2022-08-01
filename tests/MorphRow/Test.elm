@@ -1,16 +1,19 @@
 module MorphRow.Test exposing (tests)
 
+import ArraySized exposing (ArraySized)
+import ArraySized.Morph
 import Digit.Morph
-import Emptiable exposing (Emptiable)
+import Emptiable
 import Expect
+import Linear exposing (DirectionLinear(..))
 import Morph exposing (Morph, broaden, broadenFrom, choice, narrow, translate)
 import Morph.Char as Char
 import Morph.Text
 import MorphRow exposing (MorphRow, atLeast, grab, one, separatedBy, skip, succeed)
-import N exposing (n0, n1)
+import N exposing (Fixed, Min, N0, N1, N2, n0, n1)
 import Number.Morph exposing (Number)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
-import Stack exposing (Stacked)
+import Stack
 import Stack.Morph
 import Test exposing (Test, test)
 
@@ -38,11 +41,11 @@ pointTest =
                         (Morph.group
                             (\x y -> { x = x, y = y })
                             (\x y -> { x = x, y = y })
-                            |> Morph.part ( .x, .x >> Ok ) Number.Morph.fromFloat
-                            |> Morph.part ( .y, .y >> Ok ) Number.Morph.fromFloat
+                            |> Morph.part ( .x, .x ) Number.Morph.fromFloat
+                            |> Morph.part ( .y, .y ) Number.Morph.fromFloat
                             |> MorphRow.over point
                             |> MorphRow.finish
-                            |> Morph.over Stack.Morph.toText
+                            |> Morph.over Stack.Morph.fromText
                         )
                     |> Expect.equal (Ok { x = 3.0, y = -9999.124 })
             )
@@ -53,11 +56,11 @@ pointTest =
                         (Morph.group
                             (\x y -> { x = x, y = y })
                             (\x y -> { x = x, y = y })
-                            |> Morph.part ( .x, .x >> Ok ) Number.Morph.fromFloat
-                            |> Morph.part ( .y, .y >> Ok ) Number.Morph.fromFloat
+                            |> Morph.part ( .x, .x ) Number.Morph.fromFloat
+                            |> Morph.part ( .y, .y ) Number.Morph.fromFloat
                             |> MorphRow.over point
                             |> MorphRow.finish
-                            |> Morph.over Stack.Morph.toText
+                            |> Morph.over Stack.Morph.fromText
                         )
                     |> Expect.equal "( 3, -9999.124 )"
             )
@@ -69,22 +72,22 @@ point =
     succeed (\x y -> { x = x, y = y })
         |> skip (Morph.Text.specific "(")
         |> skip
-            (broadenFrom [ Char.Space ]
+            (broadenFrom (ArraySized.l1 Char.Space |> ArraySized.min n0 |> ArraySized.maxNo)
                 |> MorphRow.over (atLeast n0 (Char.blank |> one))
             )
         |> grab .x Number.Morph.text
         |> skip
-            (broadenFrom []
+            (broadenFrom (ArraySized.empty |> ArraySized.maxNo)
                 |> MorphRow.over (atLeast n0 (Char.blank |> one))
             )
         |> skip (Morph.Text.specific ",")
         |> skip
-            (broadenFrom [ Char.Space ]
+            (broadenFrom (ArraySized.l1 Char.Space |> ArraySized.min n0 |> ArraySized.maxNo)
                 |> MorphRow.over (atLeast n0 (Char.blank |> one))
             )
         |> grab .y Number.Morph.text
         |> skip
-            (broadenFrom [ Char.Space ]
+            (broadenFrom (ArraySized.l1 Char.Space |> ArraySized.min n0 |> ArraySized.maxNo)
                 |> MorphRow.over (atLeast n0 (Char.blank |> one))
             )
         |> skip (Morph.Text.specific ")")
@@ -94,7 +97,7 @@ emailTest : Test
 emailTest =
     let
         emailToText =
-            email |> Morph.over Stack.Morph.toText
+            email |> MorphRow.finish |> Morph.over Stack.Morph.fromText
     in
     Test.describe
         "email"
@@ -177,18 +180,37 @@ email =
 
 local : MorphRow Char Local
 local =
-    succeed (\dotSeparated -> { dotSeparated = dotSeparated })
-        |> grab .dotSeparated
-            (Stack.Morph.belowTopEach
-                (translate
-                    (\part -> { separator = (), part = part })
-                    .part
+    translate (\dotSeparated -> { dotSeparated = dotSeparated })
+        .dotSeparated
+        |> Morph.over
+            (translate
+                (\{ first, afterFirst } ->
+                    ArraySized.l1 first
+                        |> ArraySized.minGlue Up
+                            (afterFirst |> ArraySized.min n1)
                 )
-                |> MorphRow.over
-                    (separatedBy
-                        ( atLeast n1, Morph.Text.specific "." )
-                        (atLeast n1 (localSymbol |> one))
+                (\arr ->
+                    { first = arr |> ArraySized.element ( Up, n0 )
+                    , afterFirst = arr |> ArraySized.minElementRemove ( Up, n0 )
+                    }
+                )
+                |> Morph.over
+                    (Morph.group
+                        (\first afterFirst -> { first = first, afterFirst = afterFirst })
+                        (\first afterFirst -> { first = first, afterFirst = afterFirst })
+                        |> Morph.part ( .first, .first ) Morph.remain
+                        |> Morph.part ( .afterFirst, .afterFirst )
+                            (ArraySized.Morph.elementEach
+                                (translate .part
+                                    (\part -> { separator = (), part = part })
+                                )
+                            )
                     )
+            )
+        |> MorphRow.over
+            (separatedBy
+                ( atLeast n1, Morph.Text.specific "." )
+                (atLeast n1 (localSymbol |> one))
             )
 
 
@@ -208,9 +230,8 @@ localSymbol =
         )
         |> Morph.possibility LocalSymbolPrintable localSymbolPrintable
         |> Morph.possibility LocalSymbolAToZ
-            (translate
+            (translate .letter
                 (\letter -> { letter = letter, case_ = Char.CaseLower })
-                .letter
                 |> Morph.over Char.aToZ
             )
         |> Morph.possibility LocalSymbol0To9 Digit.Morph.n0To9
@@ -422,7 +443,9 @@ type alias Email =
 type alias Local =
     RecordWithoutConstructorFunction
         { dotSeparated :
-            Emptiable (Stacked (List LocalSymbol)) Never
+            ArraySized
+                (Min (Fixed N2))
+                (ArraySized (Min (Fixed N1)) LocalSymbol)
         }
 
 
@@ -453,7 +476,7 @@ type LocalSymbolPrintable
 type alias Domain =
     RecordWithoutConstructorFunction
         { first : HostLabel
-        , hostLabels : List HostLabel
+        , hostLabels : ArraySized (Min (Fixed N0)) HostLabel
         , topLevel : DomainTopLevel
         }
 
@@ -461,7 +484,7 @@ type alias Domain =
 type alias HostLabel =
     RecordWithoutConstructorFunction
         { firstSymbol : HostLabelSideSymbol
-        , betweenFirstAndLastSymbols : List HostLabelSymbol
+        , betweenFirstAndLastSymbols : ArraySized (Min (Fixed N0)) HostLabelSymbol
         , lastSymbol : HostLabelSideSymbol
         }
 
@@ -479,9 +502,9 @@ type HostLabelSymbol
 
 type alias DomainTopLevel =
     RecordWithoutConstructorFunction
-        { startDigits : List Digit.Morph.N0To9
+        { startDigits : ArraySized (Min (Fixed N0)) Digit.Morph.N0To9
         , firstAToZ : { case_ : Char.Case, letter : Char.AToZ }
-        , afterFirstAToZ : List DomainTopLevelAfterFirstAToZSymbol
+        , afterFirstAToZ : ArraySized (Min (Fixed N0)) DomainTopLevelAfterFirstAToZSymbol
         }
 
 
