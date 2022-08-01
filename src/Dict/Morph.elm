@@ -87,8 +87,7 @@ valueEach :
     Translate unmappedValue mappedValue
     -> Morph (Dict key unmappedValue) (Dict key mappedValue) error_
 valueEach elementTranslate =
-    ( valuesMap, valuesMap )
-        |> translateOn elementTranslate
+    translateOn ( valuesMap, valuesMap ) elementTranslate
 
 
 valuesMap :
