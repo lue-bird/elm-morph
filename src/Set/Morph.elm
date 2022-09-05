@@ -1,25 +1,23 @@
 module Set.Morph exposing
-    ( fromList, toList
-    , elementEach
+    ( elementTranslate
+    , list, toList
     )
 
 {-| [`Morph`](Morph) a `Set`
 
 
-## `List`
+## alter
 
-@docs fromList, toList
+@docs elementTranslate
 
 
 ## transform
 
-Also available: [`toggle`](Morph#toggle) [`Set.Extra.reverse`](https://dark.elm.dmy.fr/packages/elm-community/array-extra/latest/Set-Extra#reverse)
-
-@docs elementEach
+@docs list, toList
 
 -}
 
-import Morph exposing (Morph, Translate, translate, translateOn)
+import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, Translate, translate, translateOn)
 import Set exposing (Set)
 
 
@@ -32,8 +30,11 @@ import Set exposing (Set)
     --> Set.fromList [ 0, 1, 2, 3 ]
 
 -}
-fromList : Morph (Set comparableElement) (List comparableElement) error_
-fromList =
+list :
+    MorphIndependently
+        (List comparableNarrowElement -> Result error_ (Set comparableNarrowElement))
+        (Set broadElement -> List broadElement)
+list =
     translate Set.fromList Set.toList
 
 
@@ -46,7 +47,10 @@ fromList =
     --> [ 0, 1, 2, 3 ]
 
 -}
-toList : Morph (List comparableElement) (Set comparableElement) error_
+toList :
+    MorphIndependently
+        (Set narrowElement -> Result error_ (List narrowElement))
+        (List comparableBroadElement -> Set comparableBroadElement)
 toList =
     translate Set.toList Set.fromList
 
@@ -55,10 +59,21 @@ toList =
 --
 
 
-{-| [`Translate`](Morph#Translate) each element in a `Set`.
+{-| [`Translate`](Morph#Translate) each element in a `Set`
 -}
-elementEach :
-    Translate comparableMapped comparableUnmapped
-    -> Morph (Set comparableMapped) (Set comparableUnmapped) error_
-elementEach elementTranslate =
-    translateOn ( Set.map, Set.map ) elementTranslate
+elementTranslate :
+    MorphIndependently
+        (comparableBeforeMapElement
+         -> Result (ErrorWithDeadEnd Never) comparableMappedElement
+        )
+        (comparableBeforeUnmapElement -> comparableUnmappedElement)
+    ->
+        MorphIndependently
+            (Set comparableBeforeMapElement
+             -> Result error_ (Set comparableMappedElement)
+            )
+            (Set comparableBeforeUnmapElement
+             -> Set comparableUnmappedElement
+            )
+elementTranslate elementTranslate_ =
+    translateOn ( Set.map, Set.map ) elementTranslate_

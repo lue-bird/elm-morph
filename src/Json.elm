@@ -1,8 +1,9 @@
 module Json exposing
     ( JsValueMagic
-    , JsonAny, JsonAnyIn(..), JsonLiteralAny, JsonLiteraly(..), JsonStructureAny, JsonStructurey(..)
-    , jsValueMagic, decoder
+    , JsonStructurey(..)
+    , jsValueMagic, anyDecoder
     , value
+    , Any, LiteralAny, Literaly(..), StructureAny(..)
     )
 
 {-| JSON
@@ -13,17 +14,22 @@ module Json exposing
 
 ## morph
 
-@docs jsValueMagic, decoder
+@docs jsValueMagic, anyDecoder
 @docs value
 
 -}
 
 import Array
 import Dict exposing (Dict)
+import Emptiable
 import Json.Decode
 import Json.Encode
 import Morph exposing (Morph, Translate, translate)
-import Value exposing (ValueAny, Valuey(..))
+import Morph.Error
+import Number exposing (Rational)
+import Possibly exposing (Possibly(..))
+import Stack
+import Value exposing (DescriptiveAny, LiteralOrStructure(..), Tagged(..))
 
 
 {-| A value from the javascript side:
@@ -46,152 +52,232 @@ type alias JsValueMagic =
 
 
 {-| A valid JSON value. `case`able. Elm doesn't crash on `==`.
-Can't contain any [spooky impure stuff](#JsValueMagic).
+Can't contain any [spooky impure stuff](#JsValueMagic)
 -}
-type alias JsonAny =
-    Valuey JsonLiteralAny JsonStructureAny
+type alias Any =
+    LiteralOrStructure LiteralAny StructureAny
 
 
-{-| `type alias`es can't be recursive in elm
-→ structure's inner json parts are wrapped with `Json.AnyIn`.
+{-| json literal. null, bool, number, string are supported
+
+Just ignore the `aNumber`. It's prevents introducing a type constraint.
+
 -}
-type JsonAnyIn
-    = AnyIn JsonAny
-
-
-{-| json literal. null or bool or number or string are supported
--}
-type JsonLiteraly nully booly floaty stringy
-    = Nully nully
-    | Booly booly
-    | Floaty floaty
-    | Stringy stringy
+type Literaly null bool aNumber string
+    = Null null
+    | Bool bool
+    | Number aNumber
+    | String string
 
 
 {-| Any json literal. null or bool or number or string are supported
 -}
-type alias JsonLiteralAny =
-    JsonLiteraly () Bool Float String
+type alias LiteralAny =
+    Literaly
+        ()
+        Bool
+        -- json numbers aren't strictly necessary to adhere `Float` range,
+        -- but elm `Decoder`s/`Encoder`s can only handle `Float`s
+        Float
+        String
 
 
-{-| json structure. record/dict or array are supported
+{-| json structure. record/object/dict or array are supported
 -}
-type JsonStructurey arrayy objecty
-    = Arrayy arrayy
-    | Objecty objecty
+type JsonStructurey array dict
+    = Array array
+    | Dict dict
 
 
 {-| Any json structure. record/dict or array are supported
+
+`type alias`es can't be recursive in elm
+→ structures are wrapped with `StructureAny`
+
 -}
-type alias JsonStructureAny =
-    JsonStructurey (Array.Array JsonAnyIn) (Dict String JsonAnyIn)
+type StructureAny
+    = StructureAny
+        (JsonStructurey
+            (Array.Array Any)
+            (List (Value.Tagged String Any))
+        )
 
 
-{-| Morph between valid [`JsonAny`](#JsonAny) format and [`JsValueMagic`](#JsValueMagic)
+{-| [Morph](#Morph) to valid [`Json.Any` value](#Any) format from [`JsValueMagic`](#JsValueMagic)
 -}
-jsValueMagic :
-    Morph
-        JsonAny
-        JsValueMagic
-        { invalidJsonFormat : String }
+jsValueMagic : Morph Any JsValueMagic
 jsValueMagic =
-    { narrow =
-        \jsonMagicBroad ->
-            jsonMagicBroad
-                |> Json.Decode.decodeValue decoder
-                |> Result.mapError
-                    (\errorWhenJsonFormatInvalid ->
-                        { invalidJsonFormat =
-                            errorWhenJsonFormatInvalid
-                                |> Json.Decode.errorToString
-                        }
-                    )
-    , broaden =
-        let
-            jsonAnyEncode : () -> JsonAny -> JsValueMagic
-            jsonAnyEncode () =
-                \jsonAny ->
-                    case jsonAny of
-                        Literaly literalAny ->
-                            literalAny |> literalAnyEncode
+    Morph.to "json"
+        { narrow =
+            Json.Decode.decodeValue anyDecoder
+                >> Result.mapError decodeErrorToMorph
+        , broaden = anyEncode ()
+        }
 
-                        Structurey structureAny ->
-                            structureAny |> structureAnyEncode ()
 
-            step : () -> JsonAnyIn -> JsValueMagic
-            step () =
-                \(AnyIn jsonAny) ->
-                    jsonAny |> jsonAnyEncode ()
+{-| Should be redundant if `anyDecoder` catches all cases
+-}
+decodeErrorToMorph : Json.Decode.Error -> Morph.Error
+decodeErrorToMorph =
+    \decodeError ->
+        case decodeError of
+            Json.Decode.Field fieldName error ->
+                [ "field `"
+                , fieldName
+                , "`: "
+                , error |> decodeErrorToMorph |> Morph.Error.toString
+                , "\n\n"
+                , "`Morph` can't turn this into a more structured error"
+                , " because it refers to field errors by their location in the dict/record/object."
+                , "\n"
+                , "When decoding elm-internal json however, the error only preserves names."
+                ]
+                    |> String.concat
+                    |> Morph.DeadEnd
 
-            literalAnyEncode : JsonLiteralAny -> Json.Encode.Value
-            literalAnyEncode =
-                \literalAny ->
-                    case literalAny of
-                        Nully () ->
-                            Json.Encode.null
+            Json.Decode.Index arrayIndex error ->
+                { location = arrayIndex
+                , error = error |> decodeErrorToMorph
+                }
+                    |> Stack.only
+                    |> Morph.Parts
 
-                        Booly boolLiteral ->
-                            boolLiteral |> Json.Encode.bool
+            Json.Decode.OneOf possibilities ->
+                case possibilities |> Stack.fromList of
+                    Emptiable.Empty Possible ->
+                        "no expected possibilities in Json.Decode.oneOf"
+                            |> Morph.DeadEnd
 
-                        Floaty floatLiteral ->
-                            floatLiteral |> Json.Encode.float
+                    Emptiable.Filled stacked ->
+                        stacked
+                            |> Emptiable.filled
+                            |> Stack.map (\_ -> decodeErrorToMorph)
+                            |> Morph.Possibilities
 
-                        Stringy stringLiteral ->
-                            stringLiteral |> Json.Encode.string
+            Json.Decode.Failure custom jsValue ->
+                [ custom
+                , "\n\n"
+                , "    "
+                , jsValue
+                    |> Json.Encode.encode 4
+                    |> String.lines
+                    |> String.join "    "
+                ]
+                    |> String.concat
+                    |> Morph.DeadEnd
 
-            structureAnyEncode : () -> JsonStructureAny -> JsValueMagic
-            structureAnyEncode () =
-                \structureAny ->
-                    case structureAny of
-                        Arrayy arrayAny ->
-                            arrayAny
-                                |> Json.Encode.array (step ())
 
-                        Objecty objectAny ->
-                            objectAny
-                                |> Dict.map (\_ -> step ())
-                                |> Dict.toList
-                                |> Json.Encode.object
-        in
-        jsonAnyEncode ()
-    }
+{-| [Morph](#Morph) to valid [`Json.Any` value](#Any) format from a `String`
+
+[Broadens](Morph#broadenWith) to a compact `String`.
+To adjust format readability → [`stringBroadWith`](#stringBroadWith)
+
+-}
+string : Morph Any String
+string =
+    stringBroadWith { indentation = 0 }
+
+
+{-| [`Json.string`](#string) [Morph](#Morph) with adjustable readability configuration
+-}
+stringBroadWith : { indentation : Int } -> Morph Any String
+stringBroadWith { indentation } =
+    Morph.to "json"
+        { narrow =
+            Json.Decode.decodeValue anyDecoder
+                >> Result.mapError decodeErrorToMorph
+        , broaden =
+            anyEncode ()
+                >> Json.Encode.encode indentation
+        }
+
+
+anyEncode : () -> Any -> JsValueMagic
+anyEncode () =
+    \jsonAny ->
+        case jsonAny of
+            Literal literalAny ->
+                literalAny |> literalAnyEncode
+
+            Structure structureAny ->
+                structureAny |> structureAnyEncode ()
+
+
+literalAnyEncode : LiteralAny -> Json.Encode.Value
+literalAnyEncode =
+    \literalAny ->
+        case literalAny of
+            Null () ->
+                Json.Encode.null
+
+            Bool boolLiteral ->
+                boolLiteral |> Json.Encode.bool
+
+            Number floatLiteral ->
+                floatLiteral |> Json.Encode.float
+
+            String stringLiteral ->
+                stringLiteral |> Json.Encode.string
+
+
+structureAnyEncode : () -> StructureAny -> JsValueMagic
+structureAnyEncode () =
+    \(StructureAny structureAny) ->
+        case structureAny of
+            Array arrayAny ->
+                arrayAny
+                    |> Json.Encode.array (anyEncode ())
+
+            Dict objectAny ->
+                objectAny
+                    |> List.map
+                        (\(Tagged tag fieldValue) ->
+                            ( tag, fieldValue |> anyEncode () )
+                        )
+                    |> Json.Encode.object
 
 
 {-| Some elm functions, [for example html events](https://dark.elm.dmy.fr/packages/elm/html/latest/Html-Events#on), require a `Json.Decode.Decoder`,
 which is an opaque type and can't be constructed (for example by supplying a `Json.Decode.Value -> Result Json.Error elm`).
 
-In general, try to use [`Json.jsValueMagic`](#jsValueMagic) wherever possible instead.
+In general, try to use [`Json.jsValueMagic`](#jsValueMagic) instead wherever possible.
 
 -}
-decoder : Json.Decode.Decoder JsonAny
-decoder =
+anyDecoder : Json.Decode.Decoder Any
+anyDecoder =
     let
-        jsonLiteralDecoder : Json.Decode.Decoder JsonLiteralAny
+        jsonLiteralDecoder : Json.Decode.Decoder LiteralAny
         jsonLiteralDecoder =
             Json.Decode.oneOf
-                [ Nully () |> Json.Decode.null
-                , Json.Decode.map Booly Json.Decode.bool
-                , Json.Decode.map Floaty Json.Decode.float
-                , Json.Decode.map Stringy Json.Decode.string
+                [ Null () |> Json.Decode.null
+                , Json.Decode.map Bool Json.Decode.bool
+                , Json.Decode.map
+                    (Morph.broadenWith Number.fromFloat >> Number)
+                    Json.Decode.float
+                , Json.Decode.map String Json.Decode.string
                 ]
 
-        jsonStructureDecoder : Json.Decode.Decoder JsonStructureAny
+        jsonStructureDecoder : Json.Decode.Decoder StructureAny
         jsonStructureDecoder =
-            Json.Decode.oneOf
-                [ Json.Decode.map Arrayy
-                    (Json.Decode.array inDecoder)
-                , Json.Decode.map Objecty
-                    (Json.Decode.dict inDecoder)
-                ]
-
-        inDecoder : Json.Decode.Decoder JsonAnyIn
-        inDecoder =
-            (\() -> decoder |> Json.Decode.map AnyIn)
-                |> Json.Decode.lazy
+            Json.Decode.map StructureAny
+                (Json.Decode.oneOf
+                    [ Json.Decode.map Array
+                        (Json.Decode.array
+                            (Json.Decode.lazy (\() -> anyDecoder))
+                        )
+                    , Json.Decode.map
+                        (List.map (\( tag, v ) -> Value.Tagged tag v)
+                            >> Dict
+                        )
+                        (Json.Decode.keyValuePairs
+                            (Json.Decode.lazy (\() -> anyDecoder))
+                        )
+                    ]
+                )
     in
     Json.Decode.oneOf
-        [ Json.Decode.map Literaly jsonLiteralDecoder
-        , Json.Decode.map Structurey jsonStructureDecoder
+        [ Json.Decode.map Literal jsonLiteralDecoder
+        , Json.Decode.map Structure jsonStructureDecoder
         ]
 
 
@@ -203,23 +289,60 @@ Like with `encode`-`decode` pairs, there are a few things to consider:
 These are the default morphs:
 
   - `Nully ()` <-> `Unity ()`
-  - `Objecty ([ ( "tag", "elm/time:Time.Posix" ), ( "value", Floaty ) ] |> Dict.fromList)`
+  - `Objecty ([ ( "Posix", Floaty ) ] |> Dict.fromList)`
     <-> `Posixy` (considering dat iso format js uses)
-  - `Objecty ([ ( "tag", "elm/core:Basics.Int" ), ( "value", Floaty ) ] |> Dict.fromList)`
+  - `Objecty ([ ( "Int", Floaty ) ] |> Dict.fromList)`
     <-> `Inty`
-  - `Objecty ([ ( "tag", "elm/core:Basics.Char" ), ( "value", Stringy ) ] |> Dict.fromList)`
+  - `Objecty ([ ( "Char", Stringy ) ] |> Dict.fromList)`
     <-> `Chary`
 
-TODO: add options (Maybe as customizable `Morph Origin Json.Encode.Value ...`):
-
-  - `user/repository/Module.Variant` tag
-  - `Module.Variant` tag
-  - `Variant` tag
-  - `aIndex` variant (/field) tag
-
 -}
-value : Translate JsonAny ValueAny
+value : Translate DescriptiveAny Any
 value =
     translate
-        (Debug.todo "")
-        (Debug.todo "")
+        jsonAnyToValueAny
+        valueAnyToJsonAny
+
+
+valueAnyToJsonAny : DescriptiveAny -> Any
+valueAnyToJsonAny =
+    \valueAny ->
+        case valueAny of
+            Literal literalAny ->
+                case literalAny of
+                    Value.Unit () ->
+                        Null () |> Literal
+
+                    Value.Char char ->
+                        (char |> String.fromChar)
+                            |> String
+                            |> Literal
+                            |> Tagged "char"
+                            |> List.singleton
+                            |> Dict
+                            |> StructureAny
+                            |> Structure
+
+                    Value.Int int ->
+                        (int |> toFloat |> Number.fromFloat)
+                            |> Number
+                            |> Literal
+                            |> Tagged "int"
+                            |> List.singleton
+                            |> Dict
+                            |> StructureAny
+                            |> Structure
+
+                    _ ->
+                        Debug.todo ""
+
+            Structure (Value.StructureAny structureAny) ->
+                case structureAny of
+                    _ ->
+                        Debug.todo ""
+
+
+jsonAnyToValueAny : Any -> DescriptiveAny
+jsonAnyToValueAny =
+    \jsonAny ->
+        Debug.todo ""

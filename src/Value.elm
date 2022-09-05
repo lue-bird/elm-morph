@@ -1,19 +1,16 @@
 module Value exposing
-    ( ValueAny, LiteralAny, StructureAny, RecordOfValueAny
-    , Valuey(..), Literaly(..), Structurey(..)
-    , Tag
+    ( LiteralOrStructure(..), Literal(..), Tagged(..), LiteralAny
+    , DescriptiveAny, StructureDescriptiveAny(..), RecordAny
+    , StructureCompactAny(..), CompactAny
     , unit, char, int, float, posix
     , tuple2, tuple3
     , bool, maybe, result, list, string, array, set, dict
-    , group, part, groupFinish, GroupMorph
-    , choice, variant, choiceIn, ChoiceMorphInProgress
-    , Error(..), expectationCustomMap
-    , DefaultOrCustom(..)
-    , LiteralKind
-    , StructureExpectation, Tuple2Expectation, Tuple3Expectation, KindOrInsideExpectation, StructureLinearInsideExpectation, RecordInsideExpectation, PartExpectation, TagExpectation, TaggedInsideExpectation
+    , record, field, recordFinish, RecordMorph
+    , choice, variant, choiceFinish, ChoiceMorph
+    , CompactOrDescriptive(..), Morph
     )
 
-{-| `case`-able elm values.
+{-| generic, `case`-able elm value
 
 json encoders/decoders are too low-level for serialization,
 explicitly describing how to serialize individual data types that all have the same shape.
@@ -33,7 +30,6 @@ Plus it makes it harder to switch to a different format.
   - [`the-sett/decode-generic`](https://dark.elm.dmy.fr/packages/the-sett/decode-generic/latest/Json-Decode-Generic)
       - 👎 no encode (so no encode-decode conversion pairs as well)
   - [`miniBill/elm-codec`](https://dark.elm.dmy.fr/packages/miniBill/elm-codec/latest/Codec)
-      - 👎 no custom errors
   - [`MartinSStewart/elm-serialize`](https://dark.elm.dmy.fr/packages/MartinSStewart/elm-serialize/latest/)
       - 👍 multiple broad results: json, string (url safe), `Bytes`
       - 👍 custom errors
@@ -42,15 +38,39 @@ Plus it makes it harder to switch to a different format.
           - 👎 easy to corrupt
           - 👍 little space
   - [`fujiy/elm-json-convert`](https://dark.elm.dmy.fr/packages/fujiy/elm-json-convert/latest/Json-Convert)
-      - 👎 no custom errors
       - 👎 no variant converters
   - [`prozacchiwawa/elm-json-codec`](https://dark.elm.dmy.fr/packages/prozacchiwawa/elm-json-codec/latest/JsonCodec)
-      - 👎 no custom errors
       - 👎 no variant converters
 
-@docs ValueAny, LiteralAny, StructureAny, RecordOfValueAny
-@docs Valuey, Literaly, Structurey
-@docs Tag
+@docs CompactOrDescriptivey
+
+@docs LiteralOrStructure, Literal, Morph.Parts, Tagged, LiteralAny
+
+
+## descriptive
+
+@docs DescriptiveAny, StructureDescriptiveAny, RecordAny
+
+
+## compact
+
+@docs StructureCompactAny, CompactAny
+
+TODO: add options (Maybe as customizable `Morph (tagged String Value) Json.Encode.Value ...`):
+
+  - tag
+  - descriptive
+      - field tag = name
+      - variant tag = name
+      - →
+          - readable by humans
+          - readable by other tools
+          - debuggable
+          - shuffling fields [`Morph`](#Morph) order → no change
+          - renaming fields → breaking change
+  - compact
+      - field tag = [field `Morph`](Value#field) index
+      - variant tag = [variant `Morph`](Value#variant) index
 
 
 ## morph
@@ -58,8 +78,8 @@ Plus it makes it harder to switch to a different format.
 @docs unit, char, int, float, posix
 @docs tuple2, tuple3
 @docs bool, maybe, result, list, string, array, set, dict
-@docs group, part, groupFinish, GroupMorph
-@docs choice, variant, choiceIn, ChoiceMorphInProgress
+@docs record, field, recordFinish, RecordMorph
+@docs choice, variant, choiceFinish, ChoiceMorph
 
 
 ### morphs on common formats
@@ -79,44 +99,46 @@ If you feel especially motivated, throw a PR adding
 
 ## expectations
 
-@docs Error, expectationCustomMap
+@docs Error
 @docs DefaultOrCustom
 @docs LiteralKind
-@docs StructureExpectation, Tuple2Expectation, Tuple3Expectation, KindOrInsideExpectation, StructureLinearInsideExpectation, RecordInsideExpectation, PartExpectation, TagExpectation, TaggedInsideExpectation
+@docs StructureExpectation, Tuple2Expectation, Tuple3Expectation, KindOrInsideExpectation, StructureLinearInsideExpectation, RecordInsideExpectation, TagOrValue, PartExpectation, TagExpectation, TaggedInsideExpectation
 
 -}
 
 import Array exposing (Array)
 import Dict exposing (Dict)
 import Dict.Morph
-import Morph exposing (Morph, MorphInProgress, TagOrValue(..), Tagged(..), broaden, narrow)
+import Emptiable exposing (Emptiable)
+import Morph exposing (Morph, MorphIndependently, MorphOrError, NoTry, broadenWith, in_, narrowWith, to)
+import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Set exposing (Set)
 import Set.Morph
+import Stack exposing (Stacked)
 import Time exposing (Posix)
-import Util exposing (listResultsToValuesOrErrors)
 
 
-{-| elm structure that can itself contain values.
+{-| elm structure that can itself contain values
 -}
-type Structurey tuple2y tuple3y listy arrayy recordy varianty
-    = Tuple2y tuple2y
-    | Tuple3y tuple3y
-    | Listy listy
-    | Arrayy arrayy
-    | Recordy recordy
-    | Varianty varianty
+type Structure tuple2 tuple3 list array record variant
+    = Tuple2 tuple2
+    | Tuple3 tuple3
+    | List list
+    | Array array
+    | Record record
+    | Variant variant
 
 
-{-| elm literal that don't itself contain values.
+{-| elm literal that don't itself contain values
 -}
-type Literaly unity chary inty floaty stringy posixy
-    = Unity unity
-    | Chary chary
-    | Inty inty
-    | Floaty floaty
-    | Stringy stringy
-    | Posixy posixy
+type Literal unit char int float string posix
+    = Unit unit
+    | Char char
+    | Int int
+    | Float float
+    | String string
+    | Posix posix
 
 
 {-| elm value. Either
@@ -125,9 +147,15 @@ type Literaly unity chary inty floaty stringy posixy
   - a structure that can itself contain values
 
 -}
-type Valuey literaly structurey
-    = Literaly literaly
-    | Structurey structurey
+type LiteralOrStructure literal structure
+    = Literal literal
+    | Structure structure
+
+
+{-| tag-value pair like a field or a variant
+-}
+type Tagged tag value
+    = Tagged tag value
 
 
 {-| Any value representable in elm.
@@ -135,736 +163,632 @@ type Valuey literaly structurey
 Is there a structure you'd like to add that can't be converted in a small amount of time? PR!
 
 -}
-type alias ValueAny =
-    Valuey LiteralAny StructureAny
+type alias DescriptiveAny =
+    LiteralOrStructure LiteralAny StructureDescriptiveAny
 
 
 {-| A supported elm literal (that don't contain other [values](#ValueAny))
 -}
 type alias LiteralAny =
-    Literaly () Char Int Float String Posix
+    Literal () Char Int Float String Posix
 
 
-{-| A structure that can itself contain further values.
+{-| A structure that can itself contain further values
 -}
-type StructureAny
+type StructureDescriptiveAny
     = StructureAny
-        (Structurey
-            ( ValueAny, ValueAny )
-            ( ValueAny, ValueAny, ValueAny )
-            (List ValueAny)
-            (Array ValueAny)
-            RecordOfValueAny
-            (Tagged Tag ValueAny)
+        (Structure
+            ( DescriptiveAny, DescriptiveAny )
+            ( DescriptiveAny, DescriptiveAny, DescriptiveAny )
+            (List DescriptiveAny)
+            (Array DescriptiveAny)
+            RecordAny
+            (Tagged String DescriptiveAny)
         )
 
 
-{-| The structure of a record that can hold [any](#ValueAny) field value.
+{-| The structure of a record that can hold [any](#ValueAny) field value
 -}
-type alias RecordOfValueAny =
-    List (Tagged String ValueAny)
+type alias RecordAny =
+    List (Tagged String DescriptiveAny)
+
+
+type CompactOrDescriptive compacty descriptivey
+    = Compacty compacty
+    | Descriptivey descriptivey
+
+
+type alias CompactAny =
+    LiteralOrStructure LiteralAny StructureCompactAny
+
+
+{-| A structure that can itself contain further values
+-}
+type StructureCompactAny
+    = StructureIndexedAny
+        (Structure
+            ( DescriptiveAny, DescriptiveAny )
+            ( DescriptiveAny, DescriptiveAny, DescriptiveAny )
+            (List DescriptiveAny)
+            (Array DescriptiveAny)
+            Never
+            (Tagged Int DescriptiveAny)
+        )
 
 
 
 -- morph
 
 
-{-| A failed expectation of a different structure kind or an inner part.
+{-| [`Morph`](Morph#Morph) between a given narrow value
+and a generic value [`CompactOrDescriptive`](#CompactOrDescriptive)[`CompactAny`](#DescriptiveAny)[`DescriptiveAny`](#DescriptiveAny)
 -}
-type KindOrInsideExpectation insideExpectation
-    = Kind
-    | Inside insideExpectation
-
-
-{-| Information on what went wrong while `narrow`ing from a [`ValueAny`](#ValueAny).
--}
-type Error expectationCustom
-    = Expected
-        (DefaultOrCustom
-            (Valuey
-                LiteralKind
-                (StructureExpectation (Error expectationCustom))
-            )
-            expectationCustom
+type alias Morph narrow =
+    Morph.MorphIndependently
+        (LiteralOrStructure
+            LiteralAny
+            (CompactOrDescriptive StructureCompactAny StructureDescriptiveAny)
+         -> Result Morph.Error narrow
         )
+        (narrow -> DescriptiveAny)
 
 
-{-| Either a basic library expectation or a custom defined expectation
+
+-- literal
+
+
+literal : Morph LiteralAny
+literal =
+    Morph.value "Literal"
+        { broaden = Literal
+        , narrow =
+            \valueAny ->
+                case valueAny of
+                    Literal literalAny ->
+                        literalAny |> Ok
+
+                    Structure _ ->
+                        "Structure" |> Err
+        }
+
+
+literalKindToString : Literal unit_ char_ int_ float_ string_ posix_ -> String
+literalKindToString =
+    \literal_ ->
+        case literal_ of
+            Unit _ ->
+                "Unit"
+
+            Char _ ->
+                "Char"
+
+            Int _ ->
+                "Int"
+
+            Float _ ->
+                "Float"
+
+            String _ ->
+                "String"
+
+            Posix _ ->
+                "Posix"
+
+
+{-| `()` [`Morph`](#Morph)
 -}
-type DefaultOrCustom default custom
-    = Default default
-    | Custom custom
-
-
-{-| A supported elm literal kind (that doesn't contain other [values](#ValueAny))
--}
-type alias LiteralKind =
-    Literaly () () () () () ()
-
-
-{-| Failed expectation for the Expected [structure](#StructureAny)
-– [kind or inside](#KindOrInsideExpectation).
--}
-type alias StructureExpectation expectation =
-    Structurey
-        (Tuple2Expectation expectation)
-        (Tuple3Expectation expectation)
-        (KindOrInsideExpectation (StructureLinearInsideExpectation expectation))
-        (KindOrInsideExpectation (StructureLinearInsideExpectation expectation))
-        (KindOrInsideExpectation (RecordInsideExpectation expectation))
-        (KindOrInsideExpectation (TaggedInsideExpectation expectation))
-
-
-{-| For each part: Was it `Ok ()` or was there an `Err ...`?
-
-If all 2 parts are `Ok ()`, a 2-tuple was Expected but something else was found!
-
-This expectation could be represented as a choice.
-However, a tuple is a lot easier to work with;
-you don't lose type information either way :)
-
--}
-type alias Tuple2Expectation expectationAtPart =
-    ( Result expectationAtPart ()
-    , Result expectationAtPart ()
-    )
-
-
-{-| For each part: Was it `Ok ()` or was there an `Err ...`?
-
-If all 3 parts are `Ok ()`, a 3-tuple was Expected but something else was found!
-
-This expectation could be represented as a choice.
-However, a tuple is a lot easier to work with;
-you don't lose type information either way :)
-
--}
-type alias Tuple3Expectation expectationAtPart =
-    ( Result expectationAtPart ()
-    , Result expectationAtPart ()
-    , Result expectationAtPart ()
-    )
-
-
-{-| Failed expectation for the Expected elements at specific indexes.
--}
-type alias StructureLinearInsideExpectation atElement =
-    RecordWithoutConstructorFunction
-        { elementsAtIndexes : Dict Int atElement }
-
-
-{-| Failed expectation for the Expected record field tags or values.
--}
-type alias RecordInsideExpectation partValueExpectation =
-    List (Tagged String (PartExpectation partValueExpectation))
-
-
-{-| Failed expectation for the Expected tag or value.
--}
-type alias TaggedInsideExpectation valueExpectation =
-    TagOrValue
-        TagExpectation
-        (Tagged String valueExpectation)
-
-
-{-| Failed expectation for the Expected [`Tag`](#Tag)
--}
-type TagExpectation
-    = TagNamespace String
-    | TagMember { oneOf : List String }
-
-
-{-| Change the `Custom` [`Expectation`](#Expectation).
--}
-expectationCustomMap :
-    (expectationCustom -> expectationCustomMapped)
-    ->
-        (Error expectationCustom
-         -> Error expectationCustomMapped
-        )
-expectationCustomMap customChange =
-    let
-        step :
-            Error expectationCustom
-            -> Error expectationCustomMapped
-        step =
-            expectationCustomMap customChange
-
-        insideStructureMap :
-            StructureExpectation (Error expectationCustom)
-            -> StructureExpectation (Error expectationCustomMapped)
-        insideStructureMap =
-            \structureInside ->
-                case structureInside of
-                    Tuple2y ( part0Expectation, part1Expectation ) ->
-                        ( part0Expectation |> Result.mapError step
-                        , part1Expectation |> Result.mapError step
-                        )
-                            |> Tuple2y
-
-                    Tuple3y ( part0Expectation, part1Expectation, part2Expectation ) ->
-                        ( part0Expectation |> Result.mapError step
-                        , part1Expectation |> Result.mapError step
-                        , part2Expectation |> Result.mapError step
-                        )
-                            |> Tuple3y
-
-                    Listy (Inside listInside) ->
-                        listInside
-                            |> arrayInsideMap
-                            |> Inside
-                            |> Listy
-
-                    Arrayy (Inside arrayInside) ->
-                        arrayInside
-                            |> arrayInsideMap
-                            |> Inside
-                            |> Arrayy
-
-                    Recordy (Inside recordExpectation) ->
-                        recordExpectation
-                            |> recordInsideExpectationMap
-                            |> Inside
-                            |> Recordy
-
-                    Varianty (Inside variantExpectation) ->
-                        variantExpectation
-                            |> expectationVariantInsideMap
-                            |> Inside
-                            |> Varianty
-
-                    Listy Kind ->
-                        Listy Kind
-
-                    Arrayy Kind ->
-                        Arrayy Kind
-
-                    Recordy Kind ->
-                        Recordy Kind
-
-                    Varianty Kind ->
-                        Varianty Kind
-
-        arrayInsideMap :
-            StructureLinearInsideExpectation (Error expectationCustom)
-            -> StructureLinearInsideExpectation (Error expectationCustomMapped)
-        arrayInsideMap =
-            \arrayInside ->
-                { elementsAtIndexes =
-                    arrayInside.elementsAtIndexes
-                        |> Dict.map (\_ -> step)
-                }
-
-        recordInsideExpectationMap :
-            RecordInsideExpectation (Error expectationCustom)
-            -> RecordInsideExpectation (Error expectationCustomMapped)
-        recordInsideExpectationMap =
-            \recordExpectation ->
-                recordExpectation
-                    |> List.map
-                        (\(Tagged tag partExpectation) ->
-                            (case partExpectation of
-                                PartExisting ->
-                                    PartExisting
-
-                                PartValue value ->
-                                    (value |> step) |> PartValue
-                            )
-                                |> Tagged tag
-                        )
-
-        expectationVariantInsideMap :
-            TaggedInsideExpectation (Error expectationCustom)
-            -> TaggedInsideExpectation (Error expectationCustomMapped)
-        expectationVariantInsideMap =
-            \variantInsideExpectation ->
-                case variantInsideExpectation of
-                    Tag tag ->
-                        Tag tag
-
-                    Value (Tagged tag possibilityValueExpectation) ->
-                        (possibilityValueExpectation |> step)
-                            |> Tagged tag
-                            |> Value
-    in
-    \(Expected expectation_) ->
-        (case expectation_ of
-            Custom custom ->
-                custom |> customChange |> Custom
-
-            Default default ->
-                (case default of
-                    Literaly literalKind ->
-                        literalKind |> Literaly
-
-                    Structurey structureInside ->
-                        structureInside
-                            |> insideStructureMap
-                            |> Structurey
-                )
-                    |> Default
-        )
-            |> Expected
-
-
-
---
-
-
-{-| Unique origin of a namespace's member:
-
-  - namespace could be `"Basics"`, `"ArraySized"`, `"fruits company Ui"`, `"backend Email"`
-  - member could be `True`, `Add1`, `NotAsked`, `sign-in`
-
--}
-type alias Tag =
-    RecordWithoutConstructorFunction
-        { namespace : String, member : String }
-
-
-
---
-
-
-literal :
-    { kind : () -> LiteralKind
-    , morph : Morph literalSpecific LiteralAny ()
-    }
-    -> Morph literalSpecific ValueAny (Error expectationCustom_)
-literal { kind, morph } =
-    { broaden =
-        \literalSpecific ->
-            literalSpecific
-                |> (morph |> broaden)
-                |> Literaly
-    , narrow =
-        \valueAny ->
-            let
-                narrowLiteral =
-                    case valueAny of
-                        Literaly literalAny ->
-                            literalAny
-                                |> (morph |> narrow)
-
-                        Structurey _ ->
-                            Err ()
-            in
-            narrowLiteral
-                |> Result.mapError
-                    (\() ->
-                        Expected
-                            (Literaly (kind ()) |> Default)
-                    )
-    }
-
-
-{-| `()` [`Morph`](Morph#Morph).
--}
-unit : Morph () ValueAny (Error expectationCustom_)
+unit : Morph ()
 unit =
-    literal
-        { kind = Unity
-        , morph =
-            { broaden = Unity
-            , narrow =
-                \valueAny ->
-                    case valueAny of
-                        Unity unitValue ->
-                            unitValue |> Ok
+    Morph.value "Unit"
+        { broaden = Unit
+        , narrow =
+            \valueAny ->
+                case valueAny of
+                    Unit unitValue ->
+                        unitValue |> Ok
 
-                        _ ->
-                            Err ()
-            }
+                    literalExceptUnit ->
+                        literalExceptUnit |> literalKindToString |> Err
         }
+        |> Morph.over literal
 
 
-{-| `Char` [`Morph`](Morph#Morph).
+{-| `Char` [`Morph`](#Morph)
 -}
-char : Morph Char ValueAny (Error expectationCustom_)
+char : Morph Char
 char =
-    literal
-        { kind = Chary
-        , morph =
-            { broaden = Chary
-            , narrow =
-                \valueAny ->
-                    case valueAny of
-                        Chary charValue ->
-                            charValue |> Ok
+    Morph.value "Char"
+        { broaden = Char
+        , narrow =
+            \valueAny ->
+                case valueAny of
+                    Char charValue ->
+                        charValue |> Ok
 
-                        _ ->
-                            Err ()
-            }
+                    literalExceptChar ->
+                        literalExceptChar |> literalKindToString |> Err
         }
+        |> Morph.over literal
 
 
-{-| `Int` [`Morph`](Morph#Morph).
+{-| `Int` [`Morph`](#Morph)
 -}
-int : Morph Int ValueAny (Error expectationCustom_)
+int : Morph Int
 int =
-    literal
-        { kind = Inty
-        , morph =
-            { broaden = Inty
-            , narrow =
-                \valueAny ->
-                    case valueAny of
-                        Inty intValue ->
-                            intValue |> Ok
+    Morph.value "Int"
+        { broaden = Int
+        , narrow =
+            \valueAny ->
+                case valueAny of
+                    Int intValue ->
+                        intValue |> Ok
 
-                        _ ->
-                            Err ()
-            }
+                    literalExceptInt ->
+                        literalExceptInt |> literalKindToString |> Err
         }
+        |> Morph.over literal
 
 
-{-| `Float` [`Morph`](Morph#Morph).
+{-| `Float` [`Morph`](#Morph)
 -}
-float : Morph Float ValueAny (Error expectationCustom_)
+float : Morph Float
 float =
-    literal
-        { kind = Floaty
-        , morph =
-            { broaden = Floaty
-            , narrow =
-                \valueAny ->
-                    case valueAny of
-                        Floaty floatValue ->
-                            floatValue |> Ok
+    Morph.value "Float"
+        { broaden = Float
+        , narrow =
+            \valueAny ->
+                case valueAny of
+                    Float floatValue ->
+                        floatValue |> Ok
 
-                        _ ->
-                            Err ()
-            }
+                    literalExceptFloat ->
+                        literalExceptFloat |> literalKindToString |> Err
         }
+        |> Morph.over literal
 
 
-{-| `String` [`Morph`](Morph#Morph).
+{-| `String` [`Morph`](#Morph)
 -}
-string : Morph String ValueAny (Error expectationCustom_)
+string : Morph String
 string =
-    literal
-        { kind = Stringy
-        , morph =
-            { broaden = Stringy
-            , narrow =
-                \valueAny ->
-                    case valueAny of
-                        Stringy stringNarrow ->
-                            stringNarrow |> Ok
+    Morph.value "String"
+        { broaden = String
+        , narrow =
+            \valueAny ->
+                case valueAny of
+                    String stringNarrow ->
+                        stringNarrow |> Ok
 
-                        _ ->
-                            Err ()
-            }
+                    literalExceptString ->
+                        literalExceptString |> literalKindToString |> Err
         }
+        |> Morph.over literal
 
 
-{-| `Posix` [`Morph`](Morph#Morph).
+{-| `Posix` [`Morph`](#Morph)
 -}
-posix : Morph Posix ValueAny (Error expectationCustom_)
+posix : Morph Posix
 posix =
-    literal
-        { kind = Posixy
-        , morph =
-            { broaden = Posixy
-            , narrow =
-                \valueAny ->
-                    case valueAny of
-                        Posixy posixNarrow ->
-                            posixNarrow |> Ok
+    Morph.value "Posix"
+        { broaden = Posix
+        , narrow =
+            \valueAny ->
+                case valueAny of
+                    Posix posixNarrow ->
+                        posixNarrow |> Ok
 
-                        _ ->
-                            Err ()
-            }
+                    literalExceptUnit ->
+                        literalExceptUnit |> literalKindToString |> Err
+        }
+        |> Morph.over literal
+
+
+
+-- structure
+
+
+structure :
+    MorphIndependently
+        (LiteralOrStructure narrowLiteral_ narrowStructure
+         -> Result Morph.Error narrowStructure
+        )
+        (broadStructure
+         -> LiteralOrStructure broadLiteral_ broadStructure
+        )
+structure =
+    Morph.value "Structure"
+        { broaden = Structure
+        , narrow =
+            \valueAny ->
+                case valueAny of
+                    Structure structure_ ->
+                        structure_ |> Ok
+
+                    Literal _ ->
+                        "Literal" |> Err
         }
 
 
+structureKindToString :
+    Structure tuple2_ tuple3_ list_ array_ record_ variant_
+    -> String
+structureKindToString =
+    \structure_ ->
+        case structure_ of
+            Tuple2 _ ->
+                "Tuple2"
 
---
+            Tuple3 _ ->
+                "Tuple3"
+
+            List _ ->
+                "List"
+
+            Array _ ->
+                "Array"
+
+            Record _ ->
+                "Record"
+
+            Variant _ ->
+                "Variant"
 
 
-partNarrowExpectation :
-    Result (Error expectation) value_
-    -> Result (Error expectation) ()
-partNarrowExpectation =
-    Result.map (\_ -> ())
-
-
-{-| `( ..., ... )` [`Morph`](Morph#Morph).
+{-| `( ..., ... )` [`Morph`](#Morph)
 -}
 tuple2 :
-    ( Morph part0 ValueAny (Error expectationCustom)
-    , Morph part1 ValueAny (Error expectationCustom)
+    ( Morph part0
+    , Morph part1
     )
-    -> Morph ( part0, part1 ) ValueAny (Error expectationCustom)
+    -> Morph ( part0, part1 )
 tuple2 partMorphs =
     let
         ( part0Morph, part1Morph ) =
             partMorphs
     in
-    { broaden =
-        \( part0, part1 ) ->
-            ( part0 |> (part0Morph |> broaden)
-            , part1 |> (part1Morph |> broaden)
-            )
-                |> Tuple2y
-                |> StructureAny
-                |> Structurey
-    , narrow =
-        \valueAny ->
-            case valueAny of
-                Structurey (StructureAny (Tuple2y ( part0, part1 ))) ->
-                    case
-                        ( part0 |> (part0Morph |> narrow)
-                        , part1 |> (part1Morph |> narrow)
-                        )
-                    of
-                        ( Ok part0Ok, Ok part1Ok ) ->
-                            ( part0Ok, part1Ok ) |> Ok
+    Morph.value "Tuple2"
+        { broaden =
+            \( part0, part1 ) ->
+                ( part0 |> broadenWith part0Morph
+                , part1 |> broadenWith part1Morph
+                )
+                    |> Tuple2
+        , narrow =
+            \valueAny ->
+                case valueAny of
+                    Tuple2 ( part0, part1 ) ->
+                        case
+                            ( part0 |> narrowWith part0Morph
+                            , part1 |> narrowWith part1Morph
+                            )
+                        of
+                            ( Ok part0Ok, Ok part1Ok ) ->
+                                ( part0Ok, part1Ok ) |> Ok
 
-                        ( part0Narrow, part1Narrow ) ->
-                            Expected
-                                (( part0Narrow |> partNarrowExpectation
-                                 , part1Narrow |> partNarrowExpectation
-                                 )
-                                    |> Tuple2y
-                                    |> Structurey
-                                    |> Default
-                                )
-                                |> Err
+                            ( Err part0Error, part1Narrow ) ->
+                                Stack.only
+                                    { location = 0
+                                    , error = part0Error
+                                    }
+                                    |> (case part1Narrow of
+                                            Ok _ ->
+                                                identity
 
-                _ ->
-                    Expected
-                        (Structurey (Tuple2y ( Ok (), Ok () )) |> Default)
-                        |> Err
-    }
+                                            Err part1Error ->
+                                                Stack.onTopLay
+                                                    { location = 1
+                                                    , error = part1Error
+                                                    }
+                                       )
+                                    |> Morph.Parts
+                                    |> Err
+
+                            ( Ok _, Err part1Error ) ->
+                                Stack.only
+                                    { location = 1
+                                    , error = part1Error
+                                    }
+                                    |> Morph.Parts
+                                    |> Err
+
+                    structureExceptTuple2 ->
+                        structureExceptTuple2 |> structureKindToString
+        }
+        |> Morph.over structure
 
 
-{-| `( ..., ..., ... )` [`Morph`](Morph#Morph).
+{-| `( ..., ..., ... )` [`Morph`](#Morph)
 -}
 tuple3 :
-    ( Morph part0 ValueAny (Error expectationCustom)
-    , Morph part1 ValueAny (Error expectationCustom)
-    , Morph part2 ValueAny (Error expectationCustom)
+    ( Morph part0
+    , Morph part1
+    , Morph part2
     )
-    ->
-        Morph
-            ( part0, part1, part2 )
-            ValueAny
-            (Error expectationCustom)
+    -> Morph ( part0, part1, part2 )
 tuple3 partMorphs =
     let
         ( part0Morph, part1Morph, part2Morph ) =
             partMorphs
     in
-    { broaden =
-        \( part0, part1, part2 ) ->
-            ( part0 |> (part0Morph |> broaden)
-            , part1 |> (part1Morph |> broaden)
-            , part2 |> (part2Morph |> broaden)
-            )
-                |> Tuple3y
-                |> StructureAny
-                |> Structurey
-    , narrow =
-        \valueAny ->
-            case valueAny of
-                Structurey (StructureAny (Tuple3y ( part0, part1, part2 ))) ->
-                    case
-                        ( part0 |> (part0Morph |> narrow)
-                        , part1 |> (part1Morph |> narrow)
-                        , part2 |> (part2Morph |> narrow)
-                        )
-                    of
-                        ( Ok part0Ok, Ok part1Ok, Ok part2Ok ) ->
-                            ( part0Ok, part1Ok, part2Ok ) |> Ok
+    Morph.value "Tuple3"
+        { broaden =
+            \( part0, part1, part2 ) ->
+                ( part0 |> (part0Morph |> broadenWith)
+                , part1 |> (part1Morph |> broadenWith)
+                , part2 |> (part2Morph |> broadenWith)
+                )
+                    |> Tuple3
+        , narrow =
+            \valueAny ->
+                case valueAny of
+                    Tuple3 ( part0, part1, part2 ) ->
+                        case
+                            ( part0 |> narrowWith part0Morph
+                            , part1 |> narrowWith part1Morph
+                            , part2 |> narrowWith part2Morph
+                            )
+                        of
+                            ( Ok part0Ok, Ok part1Ok, Ok part2Ok ) ->
+                                ( part0Ok, part1Ok, part2Ok ) |> Ok
 
-                        ( part0Narrow, part1Narrow, part2Narrow ) ->
-                            Expected
-                                (( part0Narrow |> partNarrowExpectation
-                                 , part1Narrow |> partNarrowExpectation
-                                 , part2Narrow |> partNarrowExpectation
-                                 )
-                                    |> Tuple3y
-                                    |> Structurey
-                                    |> Default
-                                )
-                                |> Err
+                            ( Err part0Error, part1Narrow, part2Narrow ) ->
+                                Stack.only
+                                    { location = 0
+                                    , error = part0Error
+                                    }
+                                    |> (case part1Narrow of
+                                            Ok _ ->
+                                                identity
 
-                _ ->
-                    Expected
-                        (Structurey (Tuple3y ( Ok (), Ok (), Ok () )) |> Default)
-                        |> Err
-    }
+                                            Err part1Error ->
+                                                Stack.onTopLay
+                                                    { location = 1
+                                                    , error = part1Error
+                                                    }
+                                       )
+                                    |> (case part2Narrow of
+                                            Ok _ ->
+                                                identity
+
+                                            Err part2Error ->
+                                                Stack.onTopLay
+                                                    { location = 2
+                                                    , error = part2Error
+                                                    }
+                                       )
+                                    |> Morph.Parts
+                                    |> Err
+
+                            ( Ok _, Err part1Error, part2Narrow ) ->
+                                Stack.only
+                                    { location = 1
+                                    , error = part1Error
+                                    }
+                                    |> (case part2Narrow of
+                                            Ok _ ->
+                                                identity
+
+                                            Err part2Error ->
+                                                Stack.onTopLay
+                                                    { location = 2
+                                                    , error = part2Error
+                                                    }
+                                       )
+                                    |> Morph.Parts
+                                    |> Err
+
+                            ( Ok _, Ok _, Err part2Error ) ->
+                                Stack.only
+                                    { location = 2
+                                    , error = part2Error
+                                    }
+                                    |> Morph.Parts
+                                    |> Err
+
+                    structureExceptTODO ->
+                        structureExceptTODO |> structureKindToString |> Morph.DeadEnd |> Err
+        }
+        |> Morph.over structure
 
 
-{-| `List` [`Morph`](Morph#Morph).
+{-| `List` [`Morph`](#Morph)
 -}
-list :
-    Morph element ValueAny (Error expectationCustom)
-    -> Morph (List element) ValueAny (Error expectationCustom)
+list : Morph element -> Morph (List element)
 list elementMorph =
-    { narrow =
-        \broad ->
-            case broad of
-                Structurey (StructureAny (Listy listOfElementsAny)) ->
-                    listOfElementsAny
-                        |> List.map (elementMorph |> narrow)
-                        |> listResultsToValuesOrErrors
-                        |> Result.mapError
-                            (\listInsideExpectation ->
-                                Expected
-                                    (listInsideExpectation
-                                        |> Inside
-                                        |> Listy
-                                        |> Structurey
-                                        |> Default
-                                    )
-                            )
+    structure "List"
+        { narrow =
+            \broad ->
+                case broad of
+                    List listOfElementsAny ->
+                        listOfElementsAny
+                            |> List.map (narrowWith elementMorph)
+                            |> listResultsToValuesOrErrors
+                            |> Result.mapError Morph.Parts
 
-                _ ->
-                    Expected
-                        (Structurey (Listy Kind) |> Default)
-                        |> Err
-    , broaden =
-        \listNarrow ->
-            listNarrow
-                |> List.map (elementMorph |> broaden)
-                |> Listy
-                |> StructureAny
-                |> Structurey
-    }
+                    structureExceptTODO ->
+                        structureExceptTODO |> structureKindToString |> Morph.DeadEnd |> Err
+        , broaden =
+            \listNarrow ->
+                listNarrow
+                    |> List.map (elementMorph |> broadenWith)
+                    |> List
+        }
 
 
-{-| `Array` [`Morph`](Morph#Morph).
+{-| `Ok` if all values in sequence are `Ok`,
+else `Err` with information on at what indexes elements were `Err`
 -}
-array :
-    Morph element ValueAny (Error expectationCustom)
-    -> Morph (Array element) ValueAny (Error expectationCustom)
-array elementMorph =
-    { narrow =
-        \broad ->
-            case broad of
-                Structurey (StructureAny (Arrayy arrayOfElementsAny)) ->
-                    arrayOfElementsAny
-                        |> Array.toList
-                        |> List.map (elementMorph |> narrow)
-                        |> listResultsToValuesOrErrors
-                        |> Result.map Array.fromList
-                        |> Result.mapError
-                            (\arrayInsideExpectation ->
-                                Expected
-                                    (arrayInsideExpectation
-                                        |> Inside
-                                        |> Arrayy
-                                        |> Structurey
-                                        |> Default
-                                    )
-                            )
+listResultsToValuesOrErrors :
+    List (Result error value)
+    ->
+        Result
+            (Emptiable
+                (Stacked { location : Int, error : error })
+                Never
+            )
+            (List value)
+listResultsToValuesOrErrors =
+    \results ->
+        results
+            |> List.foldr
+                (\elementResult { index, collected } ->
+                    { collected =
+                        case elementResult of
+                            Ok elementValue ->
+                                collected |> Result.map ((::) elementValue)
 
-                _ ->
-                    Expected
-                        (Structurey (Arrayy Kind) |> Default)
-                        |> Err
-    , broaden =
-        \arrayNarrow ->
-            arrayNarrow
-                |> Array.map (elementMorph |> broaden)
-                |> Arrayy
-                |> StructureAny
-                |> Structurey
-    }
+                            Err elementError ->
+                                (case collected of
+                                    Ok _ ->
+                                        Emptiable.empty
+
+                                    Err elementsAtIndexes ->
+                                        elementsAtIndexes |> Emptiable.emptyAdapt (\_ -> Possible)
+                                )
+                                    |> Stack.onTopLay
+                                        { location = index
+                                        , error = elementError
+                                        }
+                                    |> Err
+                    , index = index - 1
+                    }
+                )
+                { collected = [] |> Ok
+                , index = (results |> List.length) - 1
+                }
+            |> .collected
+
+
+{-| `Array` [`Morph`](#Morph)
+-}
+array : Morph element -> Morph (Array element)
+array elementMorph =
+    structure "Array"
+        { narrow =
+            \broad ->
+                case broad of
+                    Array arrayOfElementsAny ->
+                        case
+                            arrayOfElementsAny
+                                |> Array.toList
+                                |> List.map (elementMorph |> narrowWith)
+                                |> listResultsToValuesOrErrors
+                        of
+                            Ok list_ ->
+                                list_ |> Array.fromList |> Ok
+
+                            Err arrayInsideExpectation ->
+                                arrayInsideExpectation
+                                    |> Morph.Parts
+                                    |> Err
+
+                    structureExceptTODO ->
+                        structureExceptTODO |> structureKindToString |> Morph.DeadEnd |> Err
+        , broaden =
+            \arrayNarrow ->
+                arrayNarrow
+                    |> Array.map (elementMorph |> broadenWith)
+                    |> Array
+        }
 
 
 
 --
 
 
-{-| Incomplete variant union [`Morph`](Morph#Morph) to [`ValueAny`](#ValueAny)
+{-| Incomplete variant union [`Morph`](#Morph) to [`ValueAny`](#ValueAny)
 
   - starting from [`choice`](#choice)
   - over [`variant`](#variant)
-  - and completed with [`choiceIn`](#choiceIn)
+  - and completed with [`choiceFinish`](#choiceFinish)
 
 -}
-type alias ChoiceMorphInProgress choiceNarrow choiceBroadenFurther variantValueExpectationCustom =
-    RecordWithoutConstructorFunction
-        { narrow :
-            Tagged String ValueAny
-            ->
+type ChoiceMorph choiceNarrow choiceBroadenFurther noStepTag_ noTryPossiblyOrNever
+    = ChoiceMorphInProgress
+        (MorphIndependently
+            (Tagged String DescriptiveAny
+             ->
                 Result
-                    (TagOrValue
-                        { oneOf : List String }
-                        (Tagged String (Error variantValueExpectationCustom))
-                    )
+                    { possibilities :
+                        Emptiable
+                            (Stacked (Tagged String (TagOrValue () Morph.Error)))
+                            noTryPossiblyOrNever
+                    }
                     choiceNarrow
-        , broaden : choiceBroadenFurther
-        }
+            )
+            choiceBroadenFurther
+        )
 
 
-{-| Discriminate into [variants](#variant).
+type TagOrValue tag value
+    = Tag tag
+    | Value value
+
+
+{-| Discriminate into [variants](#variant)
 -}
 choice :
     choiceBroadenByVariant
-    ->
-        ChoiceMorphInProgress
-            choiceNarrow_
-            choiceBroadenByVariant
-            variantValueExpectationCustom_
+    -> ChoiceMorph choiceNarrow_ choiceBroadenByVariant NoTry Possibly
 choice choiceBroadenDiscriminatedByPossibility =
     { narrow =
         \_ ->
-            Tag { oneOf = [] } |> Err
+            { possibilities = Emptiable.empty } |> Err
     , broaden = choiceBroadenDiscriminatedByPossibility
     }
+        |> ChoiceMorphInProgress
 
 
-{-| Describe another variant value [`Morph`](Morph#Morph) to [`ValueAny`](#ValueAny)
+{-| Describe another variant value [`Morph`](#Morph) to [`ValueAny`](#ValueAny)
 -}
 variant :
     ( possibilityNarrow -> choiceNarrow
     , String
     )
-    -> Morph possibilityNarrow ValueAny (Error variantValueExpectationCustom)
+    -> Morph possibilityNarrow
     ->
-        (ChoiceMorphInProgress
+        (ChoiceMorph
             choiceNarrow
-            ((possibilityNarrow -> Tagged String ValueAny)
+            ((possibilityNarrow -> Tagged String DescriptiveAny)
              -> choiceBroadenFurther
             )
-            variantValueExpectationCustom
+            NoTry
+            noTryPossiblyOrNever_
          ->
-            ChoiceMorphInProgress
+            ChoiceMorph
                 choiceNarrow
                 choiceBroadenFurther
-                variantValueExpectationCustom
+                NoTry
+                noTryNever_
         )
 variant ( possibilityToChoice, possibilityTag ) possibilityMorph =
-    \choiceMorphSoFar ->
+    \(ChoiceMorphInProgress choiceMorphSoFar) ->
         { narrow =
             variantStepNarrow
-                ( possibilityToChoice, possibilityTag, possibilityMorph.narrow )
-                choiceMorphSoFar.narrow
+                ( possibilityToChoice, possibilityTag, narrowWith possibilityMorph )
+                (narrowWith choiceMorphSoFar)
         , broaden =
-            choiceMorphSoFar.broaden
-                (broaden possibilityMorph
-                    >> Tagged possibilityTag
-                )
+            (broadenWith possibilityMorph
+                >> Tagged possibilityTag
+            )
+                |> broadenWith choiceMorphSoFar
         }
+            |> ChoiceMorphInProgress
 
 
 variantStepNarrow :
     ( possibilityNarrow -> narrowChoice
     , String
     , possibilityBroad
-      -> Result (Error variantValueExpectationCustom) possibilityNarrow
+      -> Result Morph.Error possibilityNarrow
     )
     ->
         (Tagged String possibilityBroad
          ->
             Result
                 (TagOrValue
-                    { oneOf : List String }
-                    (Tagged String (Error variantValueExpectationCustom))
+                    { possibilities : List String }
+                    (Tagged String Morph.Error)
                 )
                 narrowChoice
         )
@@ -873,8 +797,8 @@ variantStepNarrow :
          ->
             Result
                 (TagOrValue
-                    { oneOf : List String }
-                    (Tagged String (Error variantValueExpectationCustom))
+                    { possibilities : List String }
+                    (Tagged String Morph.Error)
                 )
                 narrowChoice
         )
@@ -896,8 +820,9 @@ variantStepNarrow ( possibilityToChoice, variantTag, possibilityNarrow ) =
                                 ok |> possibilityToChoice |> Ok
 
                             Err valueExpectation ->
-                                Value
-                                    (Tagged variantTag valueExpectation)
+                                valueExpectation
+                                    |> Tagged variantTag
+                                    |> Value
                                     |> Err
 
                     else
@@ -908,145 +833,115 @@ variantStepNarrow ( possibilityToChoice, variantTag, possibilityNarrow ) =
                                         []
 
                                     Tag tagExpectation ->
-                                        tagExpectation.oneOf
+                                        tagExpectation.possibilities
                         in
-                        Tag { oneOf = tagsTriedSoFar |> (::) variantTag }
+                        Tag { possibilities = tagsTriedSoFar |> (::) variantTag }
                             |> Err
 
 
-{-| Conclude a [`Morph.choice`](Morph#choice) |> [`Morph.possibility`](Morph#possibility) chain.
+{-| Conclude a [`Morph.choice`](Morph#choice) |> [`Morph.try`](Morph#try) chain
 -}
-choiceIn :
-    String
-    ->
-        (ChoiceMorphInProgress
-            choiceNarrow
-            (choiceNarrow -> Tagged String ValueAny)
-            variantValueExpectationCustom
-         ->
-            Morph
-                choiceNarrow
-                ValueAny
-                (Error variantValueExpectationCustom)
-        )
-choiceIn namespace =
+choiceFinish :
+    ChoiceMorph
+        choiceNarrow
+        (choiceNarrow -> Tagged String DescriptiveAny)
+        NoTry
+        Never
+    -> Morph choiceNarrow
+choiceFinish =
     \choiceMorphComplete ->
-        { narrow =
-            \value ->
-                case value of
-                    Structurey (StructureAny (Varianty (Tagged tag possibilityAny))) ->
-                        if tag.namespace == namespace then
-                            Tagged tag.member possibilityAny
-                                |> narrow choiceMorphComplete
+        Morph.to "variant"
+            { narrow =
+                \value ->
+                    case value of
+                        Structure (StructureAny (Variant variant_)) ->
+                            variant_
+                                |> narrowWith choiceMorphComplete
                                 |> Result.mapError
                                     (\error ->
-                                        Expected
-                                            ((case error of
-                                                Value valueError ->
-                                                    valueError |> Value
-
-                                                Tag tagError ->
-                                                    tagError |> TagMember |> Tag
-                                             )
-                                                |> Inside
-                                                |> Varianty
-                                                |> Structurey
-                                                |> Default
-                                            )
+                                        error
+                                            |> Morph.Parts
                                     )
 
-                        else
-                            Expected
-                                (TagNamespace namespace
-                                    |> Tag
-                                    |> Inside
-                                    |> Varianty
-                                    |> Structurey
-                                    |> Default
-                                )
+                        _ ->
+                            ("kind" |> Morph.DeadEnd)
                                 |> Err
-
-                    _ ->
-                        Expected
-                            (Structurey (Varianty Kind) |> Default)
-                            |> Err
-        , broaden =
-            \narrowChoice ->
-                let
-                    (Tagged memberTag valueBroad) =
-                        narrowChoice |> broaden choiceMorphComplete
-                in
-                valueBroad
-                    |> Tagged { namespace = namespace, member = memberTag }
-                    |> Varianty
-                    |> StructureAny
-                    |> Structurey
-        }
+            , broaden =
+                \narrowChoice ->
+                    let
+                        (Tagged tag valueBroad) =
+                            narrowChoice |> broadenWith choiceMorphComplete
+                    in
+                    valueBroad
+                        |> Tagged tag
+                        |> Variant
+                        |> StructureAny
+                        |> Structure
+            }
 
 
-{-| Start a group assembly [`Morph`](Morph#Morph) to [`ValueAny`](#ValueAny).
+{-| Start a group assembly [`Morph`](#Morph) to [`ValueAny`](#ValueAny).
 
   - continue with [`part`](#part)
   - finish with [`groupFinish`](#groupFinish)
 
 -}
-group :
+record :
     groupNarrowAssemble
     ->
-        MorphInProgress
-            { narrow :
-                RecordOfValueAny
-                ->
-                    Result
-                        (RecordInsideExpectation (Error partExpectationCustom_))
-                        groupNarrowAssemble
-            , broaden : groupNarrow_ -> RecordOfValueAny
-            }
-group groupNarrowAssemble =
-    Morph.group groupNarrowAssemble []
-
-
-{-| group part failed expectation
--}
-type PartExpectation partExpectation
-    = PartExisting
-    | PartValue partExpectation
-
-
-{-| possibly incomplete [`Morph`] step from and to a group.
--}
-type alias GroupMorph group groupNarrowFurther partExpectationCustom =
-    MorphInProgress
-        { narrow :
-            RecordOfValueAny
-            ->
+        MorphIndependently
+            (RecordAny
+             ->
                 Result
-                    (RecordInsideExpectation (Error partExpectationCustom))
-                    groupNarrowFurther
-        , broaden : group -> RecordOfValueAny
-        }
+                    (Emptiable
+                        (Tagged String (TagOrValue () Morph.Error))
+                        Never
+                    )
+                    groupNarrowAssemble
+            )
+            (groupNarrow_ -> RecordAny)
+record groupNarrowAssemble =
+    Morph.group ( groupNarrowAssemble, [] )
 
 
-{-| Continue a group assembly [`Morph`](Morph#Morph) to [`ValueAny`](#ValueAny).
+{-| possibly incomplete [`Morph`] step from and to a group
+-}
+type alias RecordMorph groupNarrow groupNarrowFurther =
+    MorphIndependently
+        (RecordAny
+         ->
+            Result
+                { expected :
+                    Emptiable
+                        (Stacked
+                            { location : String
+                            , error : Morph.Error
+                            }
+                        )
+                        Never
+                }
+                groupNarrowFurther
+        )
+        (groupNarrow -> RecordAny)
+
+
+{-| Continue a group assembly [`Morph`](#Morph) to [`ValueAny`](#ValueAny).
 
   - finish with [`groupFinish`](#groupFinish)
 
 -}
-part :
-    ( group -> partNarrow, String )
-    -> Morph partNarrow ValueAny (Error partExpectationCustom)
+field :
+    ( group -> partNarrow
+    , String
+    )
+    -> Morph partNarrow
     ->
-        (GroupMorph
+        (RecordMorph
             group
             (partNarrow -> groupNarrowFurther)
-            partExpectationCustom
-         ->
-            GroupMorph
-                group
-                groupNarrowFurther
-                partExpectationCustom
+         -> RecordMorph group groupNarrowFurther
         )
-part ( accessPart, partTag ) partMorph =
+field ( accessPart, partTag ) partMorph =
     \groupMorphSoFar ->
         { narrow =
             \groupBroad ->
@@ -1064,7 +959,7 @@ part ( accessPart, partTag ) partMorph =
                 in
                 case groupBroad |> List.filter (\(Tagged tag _) -> tag == partTag) |> List.head of
                     Just (Tagged _ partBroad) ->
-                        case partBroad |> narrow partMorph of
+                        case partBroad |> narrowWith partMorph of
                             Ok partNarrow ->
                                 wholeAssemblyResult
                                     |> Result.map
@@ -1074,14 +969,14 @@ part ( accessPart, partTag ) partMorph =
                                 (expectationsSoFar
                                     |> (::)
                                         (Tagged partTag
-                                            (PartValue innerExpectation)
+                                            (Value innerExpectation)
                                         )
                                 )
                                     |> Err
 
                     Nothing ->
                         (expectationsSoFar
-                            |> (::) (Tagged partTag PartExisting)
+                            |> (::) (Tagged partTag (Tag ()))
                         )
                             |> Err
         , broaden =
@@ -1090,7 +985,7 @@ part ( accessPart, partTag ) partMorph =
                     partBroad =
                         wholeNarrow
                             |> accessPart
-                            |> broaden partMorph
+                            |> broadenWith partMorph
                 in
                 wholeNarrow
                     |> groupMorphSoFar.broaden
@@ -1098,54 +993,52 @@ part ( accessPart, partTag ) partMorph =
         }
 
 
-{-| Finish the [`group`](#group) |> [`part`](#part) chain.
+{-| Finish the [`group`](#group) |> [`part`](#part) chain
 -}
-groupFinish :
-    GroupMorph group group expectationCustom
-    -> Morph group ValueAny (Error expectationCustom)
-groupFinish =
+recordFinish :
+    RecordMorph group group
+    -> Morph group
+recordFinish =
     \groupMorphComplete ->
         { narrow =
-            groupNarrowFinish groupMorphComplete.narrow
+            recordNarrowFinish groupMorphComplete.narrow
         , broaden =
             groupMorphComplete.broaden
-                >> Recordy
+                >> Record
                 >> StructureAny
-                >> Structurey
+                >> Structure
         }
 
 
-groupNarrowFinish :
-    (RecordOfValueAny
+recordNarrowFinish :
+    (RecordAny
      ->
         Result
-            (RecordInsideExpectation (Error expectationCustom))
+            { expected :
+                Emptiable
+                    (Stacked { location : Int, error : Morph.Error })
+                    Never
+            }
             value
     )
     ->
-        (ValueAny
-         -> Result (Error expectationCustom) value
+        (DescriptiveAny
+         -> Result value Morph.Error
         )
-groupNarrowFinish groupNarrowComplete =
+recordNarrowFinish groupNarrowComplete =
     \broad ->
         case broad of
-            Structurey (StructureAny (Recordy fields)) ->
+            Structure (StructureAny (Record fields)) ->
                 fields
                     |> groupNarrowComplete
                     |> Result.mapError
                         (\recordExpectation ->
-                            Expected
-                                (recordExpectation
-                                    |> Inside
-                                    |> Recordy
-                                    |> Structurey
-                                    |> Default
-                                )
+                            recordExpectation.expected
+                                |> Morph.Parts
                         )
 
             _ ->
-                Expected
-                    (Kind |> Recordy |> Structurey |> Default)
+                ("kind" |> Morph.DeadEnd)
                     |> Err
 
 
@@ -1153,9 +1046,9 @@ groupNarrowFinish groupNarrowComplete =
 --
 
 
-{-| `Bool` [`Morph`](Morph#Morph).
+{-| `Bool` [`Morph`](#Morph)
 -}
-bool : Morph Bool ValueAny (Error expectationCustom_)
+bool : Morph Bool
 bool =
     choice
         (\true false boolVariantChoiceIsTrue ->
@@ -1167,14 +1060,12 @@ bool =
         )
         |> variant ( \() -> True, "True" ) unit
         |> variant ( \() -> False, "False" ) unit
-        |> choiceIn "Basics"
+        |> choiceFinish
 
 
-{-| `Maybe` [`Morph`](Morph#Morph).
+{-| `Maybe` [`Morph`](#Morph)
 -}
-maybe :
-    Morph element ValueAny (Error expectationCustom)
-    -> Morph (Maybe element) ValueAny (Error expectationCustom)
+maybe : Morph element -> Morph (Maybe element)
 maybe contentMorph =
     choice
         (\just nothing narrowMaybe ->
@@ -1187,16 +1078,16 @@ maybe contentMorph =
         )
         |> variant ( Just, "Just" ) contentMorph
         |> variant ( \() -> Nothing, "Nothing" ) unit
-        |> choiceIn "Maybe"
+        |> choiceFinish
 
 
-{-| `Result` [`Morph`](Morph#Morph).
+{-| `Result` [`Morph`](#Morph)
 -}
 result :
-    { ok : Morph okValue ValueAny (Error expectationCustom)
-    , err : Morph error ValueAny (Error expectationCustom)
+    { ok : Morph okValue
+    , err : Morph error
     }
-    -> Morph (Result error okValue) ValueAny (Error expectationCustom)
+    -> Morph (Result error okValue)
 result caseMorphs =
     choice
         (\ok err narrowResult ->
@@ -1209,57 +1100,50 @@ result caseMorphs =
         )
         |> variant ( Ok, "Ok" ) caseMorphs.ok
         |> variant ( Err, "Err" ) caseMorphs.err
-        |> choiceIn "Result"
+        |> choiceFinish
 
 
-{-| `Set` [`Morph`](Morph#Morph).
+{-| `Set` [`Morph`](#Morph)
 -}
 set :
-    Morph comparableElement ValueAny (Error expectationCustom)
-    -> Morph (Set comparableElement) ValueAny (Error expectationCustom)
+    Morph comparableElement
+    -> Morph (Set comparableElement)
 set elementMorph =
     let
         setListMorph =
-            Set.Morph.fromList
+            Set.Morph.list
                 |> Morph.over (list elementMorph)
     in
     choice
         (\setVariant setNarrow -> setVariant setNarrow)
         |> variant ( identity, "Set" ) setListMorph
-        |> choiceIn "Set"
+        |> choiceFinish
 
 
-{-| `Dict` [`Morph`](Morph#Morph).
+{-| `Dict` [`Morph`](#Morph)
 -}
 dict :
-    { key : Morph comparableKey ValueAny (Error expectationCustom)
-    , value : Morph value ValueAny (Error expectationCustom)
+    { key : Morph comparableKey
+    , value : Morph value
     }
-    -> Morph (Dict comparableKey value) ValueAny (Error expectationCustom)
+    -> Morph (Dict comparableKey value)
 dict entryMorph =
-    let
-        dictListMorph =
-            Dict.Morph.fromList
-                |> Morph.over
-                    (list (entry entryMorph))
-    in
     choice
         (\dictVariant dictNarrow -> dictVariant dictNarrow)
-        |> variant ( identity, "Dict" ) dictListMorph
-        |> choiceIn "Dict"
+        |> variant ( identity, "Dict" )
+            (Dict.Morph.list
+                |> Morph.over (list (keyValue entryMorph))
+            )
+        |> choiceFinish
 
 
-entry :
-    { key : Morph comparableKey ValueAny (Error expectationCustom)
-    , value : Morph value ValueAny (Error expectationCustom)
+keyValue :
+    { key : Morph comparableKey
+    , value : Morph value
     }
-    ->
-        Morph
-            { key : comparableKey, value : value }
-            ValueAny
-            (Error expectationCustom)
-entry entryMorph =
-    group (\key value -> { key = key, value = value })
-        |> part ( .key, "key" ) entryMorph.key
-        |> part ( .value, "value" ) entryMorph.value
-        |> groupFinish
+    -> Morph { key : comparableKey, value : value }
+keyValue entryMorph =
+    record (\key value -> { key = key, value = value })
+        |> field ( .key, "key" ) entryMorph.key
+        |> field ( .value, "value" ) entryMorph.value
+        |> recordFinish

@@ -1,24 +1,24 @@
 module Dict.Morph exposing
-    ( fromList, toList
-    , valueEach
+    ( valueTranslate
+    , list, toList
     )
 
 {-| [`Morph`](Morph#Morph) to and from a `Dict`
 
 
+## alter
+
+@docs valueTranslate
+
+
 ## `List`
 
-@docs fromList, toList
-
-
-## each
-
-@docs valueEach
+@docs list, toList
 
 -}
 
 import Dict exposing (Dict)
-import Morph exposing (Morph, Translate, translate, translateOn)
+import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, Translate, translate, translateOn)
 
 
 fromListImplementation :
@@ -45,17 +45,22 @@ toListImplementation =
 
     import Array
 
-    [ 0, 1, 2, 3 ]
-        |> (Morph.listToArray |> Morph.map)
-    --> Array.fromList [ 0, 1, 2, 3 ]
+    [ { key = "hi", value = "there" }
+    , { key = "git", value = "gud" }
+    ]
+        |> Morph.mapWith Dict.Morph.list
+    --> Dict.fromList [ ( "Hi", "there" ), ( "git", "gud" ) ]
 
 -}
-fromList :
-    Morph
-        (Dict comparableKey value)
-        (List { key : comparableKey, value : value })
-        error_
-fromList =
+list :
+    MorphIndependently
+        (List { key : comparableNarrowKey, value : narrowValue }
+         -> Result error_ (Dict comparableNarrowKey narrowValue)
+        )
+        (Dict broadKey broadValue
+         -> List { key : broadKey, value : broadValue }
+        )
+list =
     translate fromListImplementation toListImplementation
 
 
@@ -69,10 +74,13 @@ fromList =
 
 -}
 toList :
-    Morph
-        (List { key : comparableKey, value : value })
-        (Dict comparableKey value)
-        error_
+    MorphIndependently
+        (Dict broadKey broadValue
+         -> Result error_ (List { key : broadKey, value : broadValue })
+        )
+        (List { key : comparableNarrowKey, value : narrowValue }
+         -> Dict comparableNarrowKey narrowValue
+        )
 toList =
     translate toListImplementation fromListImplementation
 
@@ -81,13 +89,22 @@ toList =
 --
 
 
-{-| [`Translate`](Morph#Translate) each key in a `Dict`.
+{-| [`Translate`](Morph#Translate) each key in a `Dict`
 -}
-valueEach :
-    Translate unmappedValue mappedValue
-    -> Morph (Dict key unmappedValue) (Dict key mappedValue) error_
-valueEach elementTranslate =
-    translateOn ( valuesMap, valuesMap ) elementTranslate
+valueTranslate :
+    MorphIndependently
+        (beforeMapValue -> Result (ErrorWithDeadEnd Never) mappedValue)
+        (beforeUnmapValue -> unmappedValue)
+    ->
+        MorphIndependently
+            (Dict narrowKey beforeMapValue
+             -> Result error_ (Dict narrowKey mappedValue)
+            )
+            (Dict broadKey beforeUnmapValue
+             -> Dict broadKey unmappedValue
+            )
+valueTranslate entryValueTranslate =
+    translateOn ( valuesMap, valuesMap ) entryValueTranslate
 
 
 valuesMap :

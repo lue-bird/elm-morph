@@ -1,6 +1,6 @@
-module MorphRow.Error exposing
-    ( describe
-    , LinesLocation, downToUpIn, downToUpInLine, downToUpInLines
+module Morph.Error exposing
+    ( LinesLocation, downToUpIn, downToUpInLine, downToUpInLines
+    , toString
     )
 
 {-| Error reporting
@@ -16,13 +16,12 @@ module MorphRow.Error exposing
 
 import Emptiable exposing (Emptiable)
 import Morph
-import MorphRow
 import Possibly exposing (Possibly)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Stack exposing (Stacked)
 
 
-{-| Position withing multiple lines.
+{-| Position withing multiple lines
 -}
 type alias LinesLocation =
     RecordWithoutConstructorFunction
@@ -40,14 +39,14 @@ type alias LinesLocation =
 Use [`downToUpInLine`](#downToUpInLine) for `String` inputs.
 
 -}
-downToUpIn : Emptiable (Stacked atom_) Possibly -> Int -> Int
+downToUpIn : Emptiable (Stacked broadElement_) Possibly -> Int -> Int
 downToUpIn inputSource =
     \fromLast ->
         (inputSource |> Stack.length)
             - fromLast
 
 
-{-| How far parsing got from the beginning of input source lines.
+{-| How far parsing got from the beginning of input source lines
 -}
 downToUpInLines : String -> Int -> LinesLocation
 downToUpInLines source =
@@ -86,32 +85,15 @@ downToUpInLine inputSource =
     downToUpIn (inputSource |> Stack.fromText)
 
 
-{-| Present the `TextLocation` as `"line:column"`, for example
-
-    { line = 3, column = 10 } |> locationToString
-    --> "line 3)10"
-
--}
-locationToString : LinesLocation -> String
-locationToString =
-    \location ->
-        [ "line "
-        , location.line |> String.fromInt
-        , ")"
-        , location.column |> String.fromInt
-        ]
-            |> String.concat
-
-
-expectationMissDescribe :
+errorToString :
     { source : String }
     ->
-        (MorphRow.Error Char
+        (MorphRow.RowError Char
          -> List String
         )
-expectationMissDescribe { source } =
+errorToString { source } =
     \expectationMiss ->
-        [ case expectationMiss.location.startingAtDown of
+        [ case expectationMiss.location.startDown of
             0 ->
                 [ expectationMiss.expected |> expectedDescribe { source = source }
                 , [ "but nothing's left to parse" ]
@@ -130,7 +112,7 @@ expectationMissDescribe { source } =
         , [ expectationMiss.expected |> expectedDescribe { source = source }
           , [ [ "starting at "
               , (source |> String.length)
-                    - expectationMiss.location.startingAtDown
+                    - expectationMiss.location.startDown
                     |> downToUpInLines source
                     |> locationToString
               ]
@@ -140,13 +122,13 @@ expectationMissDescribe { source } =
             |> List.concat
         , let
             errorOffset =
-                expectationMiss.location.startingAtDown |> downToUpInLine source
+                expectationMiss.location.startDown |> downToUpInLine source
 
             errorLocation =
                 errorOffset |> downToUpInLines source
 
             rangeStart =
-                (errorOffset - expectationMiss.location.startingAtDown)
+                (errorOffset - expectationMiss.location.startDown)
                     |> downToUpInLines source
 
             lineNumberWidth =
@@ -192,16 +174,33 @@ expectationMissDescribe { source } =
             |> List.concat
 
 
+{-| Present the `TextLocation` as `"line:column"`, for example
+
+    { line = 3, column = 10 } |> locationToString
+    --> "line 3)10"
+
+-}
+locationToString : LinesLocation -> String
+locationToString =
+    \location ->
+        [ "line "
+        , location.line |> String.fromInt
+        , ")"
+        , location.column |> String.fromInt
+        ]
+            |> String.concat
+
+
 {-| Dumps the error into a human-readable format.
 
-    import MorphRow exposing (MorphRow, take, drop, into, succeed, atLeast, one, take)
-    import Morph.Char as Char
-    import Morph.TextRow as Text
+    import Morph exposing (MorphRow, take, drop, into, succeed, atLeast, one, take)
+    import Char.Morph as Char
+    import String.Morph as Text
 
     "  abc  "
         |> Text.narrowWith
             (succeed (\number -> number)
-                |> grab (atLeast 0 Char.blank)
+                |> grab (atLeast n0 Char.Morph.only ' ')
                 |> skip Text.number
             )
         |> Result.mapError (dump "filename.txt")
@@ -232,7 +231,7 @@ expectationMissDescribe { source } =
     "  (12,)  "
         |> Text.narrowWith
             (succeed (\point -> point)
-                |> skip (atLeast 0 Char.blank)
+                |> skip (atLeast n0 Char.Morph.only ' ')
                 |> grab point
             )
         |> Result.mapError (dump "filename.txt")
@@ -263,7 +262,7 @@ expectationMissDescribe { source } =
     "  [(12,34),(56,)]  "
         |> Text.narrowWith
             (succeed (\line -> line)
-                |> skip (atLeast 0 Char.blank)
+                |> skip (atLeast n0 Char.Morph.only ' ')
                 |> grab line
             )
         |> Result.mapError (dump { source = "  [(12,34),(56,)]  " })
@@ -276,9 +275,9 @@ expectationMissDescribe { source } =
     -->     , "             ~~~~^"
     -->     ]
 
-    import MorphRow exposing (MorphRow, drop, into, succeed, atLeast, take, one)
-    import Morph.Char exposing (blank)
-    import Morph.TextRow exposing (number)
+    import Morph exposing (MorphRow, drop, into, succeed, atLeast, take, one)
+    import Char.Morph exposing (blank)
+    import String.Morph exposing (number)
 
     type alias Point =
         { x : Float
@@ -290,20 +289,20 @@ expectationMissDescribe { source } =
         into "Point"
             (succeed (\x y -> { x = x, y = y })
                 |> skip (one '(')
-                |> skip (atLeast 0 blank)
+                |> skip (atLeast n0 blank)
                 |> grab number
-                |> skip (atLeast 0 blank)
+                |> skip (atLeast n0 blank)
                 |> skip (one ',')
-                |> skip (atLeast 0 blank)
+                |> skip (atLeast n0 blank)
                 |> grab number
-                |> skip (atLeast 0 blank)
+                |> skip (atLeast n0 blank)
                 |> skip (one ')')
             )
 
     "  (12,)  "
         |> Text.narrowWith
             (succeed (\point -> point)
-                |> skip (atLeast 0 Char.blank)
+                |> skip (atLeast n0 Char.Morph.only ' ')
                 |> grab point
             )
         |> Result.mapError dumpCodeSnippet
@@ -322,7 +321,7 @@ expectationMissDescribe { source } =
         ]
         |> Text.narrowWith
             (succeed (\point -> point)
-                |> skip (atLeast 0 Char.blank)
+                |> skip (atLeast n0 Char.Morph.only ' ')
                 |> grab point
             )
         |> Result.mapError dumpCodeSnippet
@@ -335,14 +334,11 @@ expectationMissDescribe { source } =
     -->     ]
 
 -}
-describe :
-    { source : String }
-    -> MorphRow.Error Char
-    -> List String
-describe { source } =
+toString : Morph.Error -> String
+toString =
     \error ->
         [ [ "I was expecting" ]
-        , error |> expectationMissDescribe { source = source }
+        , error |> errorToString
         ]
             |> List.concat
 
@@ -351,9 +347,9 @@ describe { source } =
 
 TODO: update examples
 
-    import MorphRow
-    import Morph.TextRow as Text
-    import Morph.Char exposing (letter)
+    import Morph
+    import String.Morph as Text
+    import Char.Morph exposing (letter)
 
     -- Getting a digit instead of a letter.
     "123"
@@ -372,29 +368,24 @@ TODO: update examples
 -}
 expectedDescribe :
     { source : String }
-    -> Morph.ExpectationWith { startingAtDown : Int } Char
+    -> Morph.Error { startDown : Int } Char
     -> List String
 expectedDescribe source =
     \expected ->
         case expected of
-            Morph.NoFail ->
-                []
+            Morph.DeadEnd unexpectedDescription ->
+                [ "not " ++ unexpectedDescription ]
 
-            Morph.MoreInput ->
-                [ "more input" ]
+            Morph.Only specific ->
+                [ specific |> String.fromChar ]
 
-            Morph.NoMoreInput ->
-                [ "no more input" ]
-
-            Morph.Specific atomSpecific ->
-                [ atomSpecific |> String.fromChar ]
-
-            Morph.OneOf possibilities ->
+            Morph.Possibilities possibilities ->
                 [ [ "either" ]
                 , possibilities
+                    |> Emptiable.emptyAdapt never
                     |> Stack.map
                         (\_ possibilityExpectation ->
-                            case possibilityExpectation |> expectationMissDescribe source of
+                            case possibilityExpectation |> errorToString source of
                                 [] ->
                                     Emptiable.empty
 

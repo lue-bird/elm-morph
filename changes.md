@@ -1,19 +1,17 @@
-## 2.0.0 plan
-
-
 # change log
 
 ## 1.0.0
 
 changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/parser/latest/)
+(definitely incomplete)
 
-  - `Parser` → `MorphRow` that can also `build`
+  - `Parser` → `MorphRow` that can also build
   - `Parser.Expression` remove
   - `Parser.Sequence` merge → `MorphRow`
       - `zeroOrMore` remove
-          - in favor of `atLeast 0`
+          - in favor of `atLeast n0`
       - `oneOrMore` remove
-          - in favor of `atLeast 1`
+          - in favor of `atLeast n1`
       - `zeroOrOne` remove
           - in favor of `maybe`
       - `atMost max` remove
@@ -31,10 +29,10 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
         to
         ```elm
         before :
-            { end : MorphRow atom () expectedCustom
-            , goOn : MorphRow atom goOnElement expectedCustom
+            { end : MorphRow broadElement () expectedCustom
+            , goOn : MorphRow broadElement goOnElement expectedCustom
             }
-            -> MorphRow atom (List goOnElement) expectedCustom
+            -> MorphRow broadElement (List goOnElement) expectedCustom
         ```
         and
         ```elm
@@ -45,77 +43,69 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
                     { end : endElement
                     , before : List goOnElement
                     }
-                    (Morph.Error atom expectedCustom)
-            , end : MorphRow atom endElement expectedCustom
-            , goOn : MorphRow atom goOnElement expectedCustom
+                    (Morph.Error broadElement expectedCustom)
+            , end : MorphRow broadElement endElement expectedCustom
+            , goOn : MorphRow broadElement goOnElement expectedCustom
             }
-            -> MorphRow atom commitResult expectedCustom
+            -> MorphRow broadElement commitResult expectedCustom
         ```
-      - `split`, `splitIncluding`
-        replace with
-        ```elm
-        separatedBy :
-            ( MorphRow atom { separator : separator, part : part } expectedCustom
-              -> MorphRow atom (List { separator : separator, part : part }) expectedCustom
-            , MorphRow atom separator expectedCustom
-            )
-            -> MorphRow atom part expectedCustom
-            ->
-                MorphRow
-                    atom
-                    (Emptiable
-                        (StackTopBelow
-                            part
-                            { separator : separator, part : part }
+      - `split`, `splitIncluding` remove
+          - in favor of
+            ```elm
+            succeed
+                |> grab element
+                |> grab
+                    (atLeast n0
+                        (succeed
+                            |> grab separator
+                            |> grab element
                         )
-                        Never
-                        Empty
                     )
-                    expectedCustom
-        ```
-  - `Parser.Common` merge → `Morph.TextRow`
+            ```
+  - `Parser.Common` merge → `String.Morph`
       - `digits` remove
-          - in favor of `atLeast 0 (Digit.Morph.n0To9 |> one)` explicitly
+          - in favor of `atLeast n0 (Digit.n0To9 |> one)` explicitly
       - `letters` remove
-          - in favor of `atLeast 0 (Morph.Char.aToZ |> one)` explicitly
+          - in favor of `atLeast n0 (Morph.AToZ.caseAny |> one)` explicitly
       - `spaces` remove
-          - in favor of `atLeast 0 (Morph.Char.blank |> one)` explicitly
+          - in favor of `atLeast n0 (blankChar |> one)` explicitly
+            where `blankChar` is a custom definition or just `Char.Morph.only ' '`
       - `token` token
           - in favor of
             ```elm
-            import Morph.Char as Char
+            import Char.Morph as Char
             succeed (\... -> ...)
-                |> skip (atLeast 0 (Morph.Char.blank |> one))
+                |> skip (atLeast n0 (Char.Morph.only ' ' |> one))
                 |> grab ...
-                |> skip (atLeast 0 (Morph.Char.blank |> one))
+                |> skip (atLeast n0 (Char.Morph.only ' ' |> one))
             ```
             explicitly
       - `textNoCase` name → `caseAny`
       - `line` remove
-        in favor of `... |> skip Morph.Text.lineEnd`
+        in favor of `... |> skip String.Morph.lineEnd`
   - `Parser.Check` remove
       - `end` move → `MorphRow`
       - lookahead/-before remove
       - no `end` in favor of `narrowWith : ... -> Result (ExpectationMiss ... | InputRemaining ...)`
       - only `endOfLine` kept → consuming `lineEnd`
-  - name `Parser.Char` → `Morph.Char`
+  - name `Parser.Char` → `Char.Morph`
       - `anyChar` remove
-          - in favor of `MorphRow.oneAny`
+          - in favor of `Morph.oneAny`
       - `char` remove
-          - in favor of `Morph.Text.specific`
+          - in favor of `String.Morph.only`
       - `charNoCase` name → `caseAny`
       - `lowercase` name → `caseLower`
       - `uppercase` name → `caseUpper`
       - `alphaNum` remove
-          - in favor of `Morph.choice ... |> MorphRow.possibility |> MorphRow.choiceFinish`
+          - in favor of `Morph.choice ... |> Morph.rowTry |> MorphRow.choiceFinish`
       - `space` name → `blank`
           - to emphasize it can be any whitespace
       - `except` remove
-          - in favor of `Morph.choice ... |> MorphRow.possibility |> MorphRow.choiceFinish`
+          - in favor of `Morph.choice ... |> Morph.rowTry |> MorphRow.choiceFinish`
   - `MorphRow`
       - `parse : String -> MorphRow narrow -> Result Error narrow` remove
           - in favor of
-            `Morph.narrow (... |> Morph.over Stack.Morph.toText)`
+            `narrowWith (... |> Morph.over Stack.Morph.toText)`
       - `first |> orElse second` remove
           - in favor of `onFailDown [ first, second ]`
       - can parse any input list (not only `String`)
@@ -125,13 +115,13 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
           - in favor of `grab`, `skip`
       - `andThen2` remove
       - `textOf` remove
-          - in favor of `Morph.Text.fromList |> MorphRow.over ...`
+          - in favor of `String.Morph.fromList |> Morph.rowOver ...`
       - `oneAny` add
       - `one` add
       - `before` add
       - `until` add
       - `while` add
       - `oneOf` remove
-          - in favor of `Morph.choice ... |> MorphRow.possibility |> MorphRow.choiceFinish`
+          - in favor of `Morph.choice ... |> Morph.rowTry |> MorphRow.choiceFinish`
       - `possibility` add
       - `choiceFinish` add
