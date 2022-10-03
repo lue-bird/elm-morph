@@ -1,19 +1,36 @@
 module Char.Morph exposing (only, string, value)
 
+{-|
+
+@docs only, string, value
+
+-}
+
 import Morph exposing (Morph)
 import Value exposing (MorphValue)
 import Value.Unexposed
 
 
-{-| `Char` [`Morph`](#Morph)
+{-| `Char` [`MorphValue`](Value#MorphValue)
+
+Be aware, that [special-cased characters as the result of `Char.toUpper`](https://github.com/elm/core/issues/1001)
+are [encoded](Morph#broadenWith) as 2 `Char`s in a `String`
+and therefore can't be [decoded](Morph#narrowWith) again
+
 -}
 value : MorphValue Char
 value =
     string
         |> Morph.over Value.Unexposed.string
-        |> Morph.over Value.literal
 
 
+{-| [`Morph`] a `String` of length 1 to a `Char`
+
+Be aware, that [special-cased characters as the result of `Char.toUpper`](https://github.com/elm/core/issues/1001)
+are [encoded](Morph#broadenWith) as 2 `Char`s in a `String`
+and therefore can't be [decoded](Morph#narrowWith) again
+
+-}
 string : Morph Char String
 string =
     Morph.value "Char"
