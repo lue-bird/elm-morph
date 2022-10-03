@@ -75,8 +75,17 @@ type alias Json tag =
 
 {-| json literal. null, bool, number, string
 
-Note: json numbers aren't strictly necessary to adhere `Float` range,
-but elm `Decoder`s/`Encoder`s can only handle `Float`s
+  - json numbers don't strictly adhere to a `Float`
+    as defined in the [IEEE 754 standard][ieee]
+    which is hardcoded into almost all CPUs.
+    This standard allows `Infinity` and `NaN`
+  - elm `Decoder`s/`Encoder`s can only handle `Float`s
+  - [The JSON spec][json] does not include these values, so we encode them
+    [`elm/json` silently encodes both as `null`](https://github.com/elm/json/blob/0206c00884af953f2cba8823fee111ee71a0330e/src/Json/Encode.elm#L106)
+    matching `JSON.stringify` behavior in plain JS
+
+[ieee]: https://en.wikipedia.org/wiki/IEEE_754
+[json]: https://www.json.org/
 
 -}
 type Literal
@@ -235,8 +244,10 @@ structureJsValueMagicEncode () =
                     |> Json.Encode.object
 
 
-{-| Some elm functions, [for example html events](https://dark.elm.dmy.fr/packages/elm/html/latest/Html-Events#on), require a `Json.Decode.Decoder`,
-which is an opaque type and can't be constructed (for example by supplying a `Json.Decode.Value -> Result Json.Error elm`).
+{-| Some elm functions,
+[for example html events](https://dark.elm.dmy.fr/packages/elm/html/latest/Html-Events#on)
+require a `Json.Decode.Decoder`,
+which is an opaque type and can't be constructed (for example by from `Json.Decode.Value -> Result Json.Error elm`)
 
 In general, try to use [`Json.jsValueMagic`](#jsValueMagic) instead wherever possible
 
