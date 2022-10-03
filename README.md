@@ -11,7 +11,7 @@ There's a lot of shiny applications of these ["morph"](Morph)s
 
 ↓ some appetizers. Click headers for documentation
 
-## [`ValueAny`](ValueAny)
+## [`Value`](Value)
 
 Serialize from and to elm values the easy way.
 Independent of output format
@@ -19,10 +19,10 @@ Independent of output format
 1:1 port of [an `elm/json` example](https://dark.elm.dmy.fr/packages/elm/json/latest/) ↓
 
 ```elm
-module Cause exposing (Cause, valueAny)
+module Cause exposing (Cause, value)
 
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
-import ValueAny exposing (MorphValueAny)
+import Value exposing (MorphValue)
 import Float.Morph
 import String.Morph
 
@@ -34,26 +34,27 @@ type alias Cause =
         }
 
 
-valueAny : MorphValueAny Cause
-valueAny =
-    ValueAny.record
+value : MorphValue Cause
+value =
+    Value.record
         (\name percent per100k ->
             { name = name, percent = percent, per100k = per100k }
         )
-        |> ValueAny.field ( .name, "name" ) String.Morph.valueAny
-        |> ValueAny.field ( .percent, "percent" ) Float.Morph.valueAny
-        |> ValueAny.field ( .per100k, "per100k" ) Float.Morph.valueAny
-        |> ValueAny.recordFinish
+        |> Value.field ( .name, "name" ) String.Morph.value
+        |> Value.field ( .percent, "percent" ) Float.Morph.value
+        |> Value.field ( .per100k, "per100k" ) Float.Morph.value
+        |> Value.recordFinish
 ```
 surprisingly easy!
 
 Another example with a `type` adapted from [elm guide on custom types](https://guide.elm-lang.org/types/custom_types.html)
 ```elm
-module User exposing (valueAny)
+module User exposing (value)
 
 import Unit
-import ValueAny exposing (MorphValueAny)
+import Value exposing (MorphValue)
 import Morph
+import String.Morph
 
 type User
     = Anonymous
@@ -63,8 +64,8 @@ type alias SignedIn =
     RecordWithoutConstructorFunction
         { name : String, status : String }
 
-valueAny : MorphValueAny User
-valueAny =
+value : MorphValue User
+value =
     Morph.choice
         (\variantAnonymous variantSignedIn user ->
             case user of
@@ -74,18 +75,19 @@ valueAny =
                 SignedIn signedIn ->
                     variantSignedIn signedIn
         )
-        |> ValueAny.variant ( \() -> Anonymous, "Anonymous" ) Unit.valueAny
-        |> ValueAny.variant ( SignedIn, "SignedIn" ) signedInValueAny
+        |> Value.variant ( \() -> Anonymous, "Anonymous" ) Unit.value
+        |> Value.variant ( SignedIn, "SignedIn" ) signedInValue
+        |> Value.choiceFinish
 
-signedInValueAny : MorphValueAny SignedIn
-signedInValueAny =
-    ValueAny.record
+signedInValue : MorphValue SignedIn
+signedInValue =
+    Value.record
         (\name status ->
             { name = name, status = status }
         )
-        |> ValueAny.field ( .name, "name" ) String.Morph.valueAny
-        |> ValueAny.field ( .statue, "status" ) String.Morph.valueAny
-        |> ValueAny.recordFinish
+        |> Value.field ( .name, "name" ) String.Morph.value
+        |> Value.field ( .statue, "status" ) String.Morph.value
+        |> Value.recordFinish
 ```
 clean
 

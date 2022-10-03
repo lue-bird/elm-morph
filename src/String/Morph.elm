@@ -1,7 +1,7 @@
 module String.Morph exposing
     ( elementTranslate
     , only
-    , toList, fromList
+    , toList, list, value
     , for, forBroad
     )
 
@@ -20,7 +20,7 @@ Also available: [`toggle`](Morph#toggle) `String.reverse`
 
 ### transform
 
-@docs toList, fromList
+@docs toList, list, value
 
 
 ## sequence
@@ -32,6 +32,7 @@ Also available: [`toggle`](Morph#toggle) `String.reverse`
 import Char.Morph
 import List.Morph
 import Morph exposing (Morph, MorphOrError, MorphRow, Translate, broad, one, translate, translateOn)
+import Value exposing (MorphValue)
 
 
 {-| [`Translate`](Morph#Translate) from a `String` to a `List Char`.
@@ -55,8 +56,8 @@ Use [`narrowWith`](Morph#narrow), [`broadenWith`](Morph#broaden)
 with [`Morph.rowFinish`](MorphRow#finish) `|> over` [`Text.fromList`](#fromList)
 
 -}
-fromList : MorphOrError String (List Char) error_
-fromList =
+list : MorphOrError String (List Char) error_
+list =
     translate String.fromList String.toList
 
 
@@ -69,8 +70,8 @@ fromList =
 elementTranslate :
     Translate Char Char
     -> MorphOrError String String error_
-elementTranslate elementTranslate =
-    translateOn ( String.map, String.map ) elementTranslate
+elementTranslate elementCharTranslate =
+    translateOn ( String.map, String.map ) elementCharTranslate
 
 
 
@@ -111,9 +112,9 @@ See [`Morph.forBroad`](Morph#forBroad)
 
 -}
 forBroad :
-    (Char -> MorphRow broadElement narrow)
+    (Char -> MorphRow broadElement ())
     -> String
-    -> MorphRow broadElement narrow
+    -> MorphRow broadElement ()
 forBroad charMorphRow expectedText =
     List.Morph.forBroad charMorphRow
         (expectedText |> String.toList)
@@ -128,3 +129,25 @@ for :
 for charMorphRow expectedText =
     List.Morph.for charMorphRow
         (expectedText |> String.toList)
+
+
+
+--
+
+
+{-| `String` [`MorphValue`](Value#MorphValue)
+-}
+value : MorphValue String
+value =
+    Morph.value "String"
+        { broaden = String
+        , narrow =
+            \value ->
+                case value of
+                    String stringNarrow ->
+                        stringNarrow |> Ok
+
+                    literalExceptString ->
+                        literalExceptString |> literalKindToString |> Err
+        }
+        |> Morph.over Value.literal

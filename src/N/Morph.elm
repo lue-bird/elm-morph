@@ -59,6 +59,8 @@ rangeDescription =
             |> String.concat
 
 
+{-| TODO: How do we set 9 as max?
+-}
 charIn :
     ( N (In min (Up lowerLimitMaxToUpperLimitMin_ To minMax))
     , N (In (Fixed minMax) (Up upperLimitMaxX To upperLimitMaxPlusX))

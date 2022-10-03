@@ -1,15 +1,17 @@
 module Morph.Test exposing (tests)
 
 import AToZ exposing (AToZ)
+import Array
 import ArraySized exposing (ArraySized)
 import ArraySized.Morph
-import Blank
-import Digit
+import Char.Morph
+import Decimal exposing (Decimal)
 import Expect
-import Linear exposing (DirectionLinear(..))
+import Fuzz
+import Linear exposing (Direction(..))
 import Morph exposing (Morph, MorphRow, MorphRowIndependently, atLeast, broad, broadenWith, choice, grab, narrowWith, one, skip, succeed, translate)
-import N exposing (Fixed, In, Min, N0, N1, N2, n0, n1)
-import Number exposing (Rational)
+import N exposing (Fixed, In, InFixed, Min, N, N0, N1, N2, N9, n0, n1, n9)
+import N.Morph
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Stack.Morph
 import String.Morph
@@ -37,10 +39,11 @@ pointTest =
                 "(3,  -9999.124)"
                     |> narrowWith
                         (Morph.group
-                            (\x y -> { x = x, y = y })
-                            (\x y -> { x = x, y = y })
-                            |> Morph.part ( .x, .x ) Number.fromFloat
-                            |> Morph.part ( .y, .y ) Number.fromFloat
+                            ( \x y -> { x = x, y = y }
+                            , \x y -> { x = x, y = y }
+                            )
+                            |> Morph.part ( .x, .x ) Decimal.float
+                            |> Morph.part ( .y, .y ) Decimal.float
                             |> Morph.overRow point
                             |> Morph.rowFinish
                             |> Morph.over Stack.Morph.string
@@ -52,10 +55,11 @@ pointTest =
                 { x = 3.0, y = -9999.124 }
                     |> broadenWith
                         (Morph.group
-                            (\x y -> { x = x, y = y })
-                            (\x y -> { x = x, y = y })
-                            |> Morph.part ( .x, .x ) Number.fromFloat
-                            |> Morph.part ( .y, .y ) Number.fromFloat
+                            ( \x y -> { x = x, y = y }
+                            , \x y -> { x = x, y = y }
+                            )
+                            |> Morph.part ( .x, .x ) Decimal.float
+                            |> Morph.part ( .y, .y ) Decimal.float
                             |> Morph.overRow point
                             |> Morph.rowFinish
                             |> Morph.over Stack.Morph.string
@@ -70,23 +74,23 @@ point =
     succeed (\x y -> { x = x, y = y })
         |> skip (String.Morph.only "(")
         |> skip
-            (broad (ArraySized.l1 Blank.Space)
-                |> Morph.overRow (atLeast n0 (Char.Morph.only ' ' |> one))
+            (broad (ArraySized.l1 ())
+                |> Morph.overRow (atLeast n0 (String.Morph.only " "))
             )
-        |> grab .x Number.rationalRowChar
+        |> grab .x Decimal.rowChar
         |> skip
             (broad ArraySized.empty
-                |> Morph.overRow (atLeast n0 (Char.Morph.only ' ' |> one))
+                |> Morph.overRow (atLeast n0 (String.Morph.only " "))
             )
         |> skip (String.Morph.only ",")
         |> skip
-            (broad (ArraySized.l1 Blank.Space)
-                |> Morph.overRow (atLeast n0 (Char.Morph.only ' ' |> one))
+            (broad (ArraySized.l1 ())
+                |> Morph.overRow (atLeast n0 (String.Morph.only " "))
             )
-        |> grab .y Number.rationalRowChar
+        |> grab .y Decimal.rowChar
         |> skip
-            (broad (ArraySized.l1 Blank.Space)
-                |> Morph.overRow (atLeast n0 (Char.Morph.only ' ' |> one))
+            (broad (ArraySized.l1 ())
+                |> Morph.overRow (atLeast n0 (String.Morph.only " "))
             )
         |> skip (String.Morph.only ")")
 
@@ -181,11 +185,11 @@ local =
     succeed
         (\first afterFirst ->
             ArraySized.l1 first
-                |> ArraySized.minGlue Up
-                    (afterFirst |> ArraySized.min n1)
+                |> ArraySized.glueMin Up
+                    (afterFirst |> ArraySized.minTo n1)
         )
         |> grab (ArraySized.element ( Up, n0 )) localPart
-        |> grab (ArraySized.minElementRemove ( Up, n0 ))
+        |> grab (ArraySized.elementRemoveMin ( Up, n0 ))
             (atLeast n1
                 (succeed (\part -> part)
                     |> skip (String.Morph.only ".")
@@ -203,7 +207,7 @@ localPart =
     atLeast n1 (localSymbol |> one)
 
 
-localSymbol : Morph LocalSymbol Char (Morph.Error Char)
+localSymbol : Morph LocalSymbol Char
 localSymbol =
     choice
         (\printableVariant aToZVariant n0To9Variant localSymbolUnion ->
@@ -223,7 +227,7 @@ localSymbol =
                 (\letter -> { letter = letter, case_ = AToZ.CaseLower })
                 |> Morph.over AToZ.char
             )
-        |> Morph.try LocalSymbol0To9 Digit.n0To9Char
+        |> Morph.try LocalSymbol0To9 (N.Morph.charIn ( n0, n9 ))
         |> Morph.choiceFinish
 
 
@@ -231,11 +235,7 @@ localSymbol =
 -- local
 
 
-localSymbolPrintable :
-    Morph
-        LocalSymbolPrintable
-        Char
-        (Morph.Error Char)
+localSymbolPrintable : Morph LocalSymbolPrintable Char
 localSymbolPrintable =
     choice
         (\exclamationMark numberSign dollarSign percentSign ampersand asterisk lowLine hyphenMinus tilde verticalLine plusSign equalsSign graveAccent leftCurlyBracket rightCurlyBracket localSymbolPrintableNarrow ->
@@ -286,7 +286,7 @@ localSymbolPrintable =
                     rightCurlyBracket ()
         )
         |> Morph.try (\() -> ExclamationMark) (Char.Morph.only '!')
-        |> Morph.try (\() -> NumberSign) (Char.Morph.only '#')
+        |> Morph.try (\() -> DecimalSign) (Char.Morph.only '#')
         |> Morph.try (\() -> DollarSign) (Char.Morph.only '$')
         |> Morph.try (\() -> PercentSign) (Char.Morph.only '%')
         |> Morph.try (\() -> Ampersand) (Char.Morph.only '&')
@@ -309,16 +309,16 @@ domain =
         (\first hostLabels topLevel ->
             { first = first, hostLabels = hostLabels, topLevel = topLevel }
         )
-        |> MorphRow.grab .first hostLabel
-        |> MorphRow.skip (String.Morph.only ".")
-        |> MorphRow.grab .hostLabels
+        |> Morph.grab .first hostLabel
+        |> Morph.skip (String.Morph.only ".")
+        |> Morph.grab .hostLabels
             (atLeast n0
                 (succeed (\label -> label)
-                    |> MorphRow.grab (\label -> label) hostLabel
-                    |> MorphRow.skip (String.Morph.only ".")
+                    |> Morph.grab (\label -> label) hostLabel
+                    |> Morph.skip (String.Morph.only ".")
                 )
             )
-        |> MorphRow.grab .topLevel domainTopLevel
+        |> Morph.grab .topLevel domainTopLevel
 
 
 hostLabel : MorphRow Char HostLabel
@@ -338,7 +338,7 @@ hostLabel =
             (hostLabelSideSymbol |> one)
 
 
-hostLabelSideSymbol : Morph HostLabelSideSymbol Char (Morph.Error Char)
+hostLabelSideSymbol : Morph HostLabelSideSymbol Char
 hostLabelSideSymbol =
     choice
         (\aToZVariant n0To9Variant sideSymbol ->
@@ -350,11 +350,11 @@ hostLabelSideSymbol =
                     n0To9Variant n0To9Value
         )
         |> Morph.try HostLabelSideSymbolAToZ AToZ.char
-        |> Morph.try HostLabelSideSymbol0To9 Digit.n0To9Char
+        |> Morph.try HostLabelSideSymbol0To9 (N.Morph.charIn ( n0, n9 ))
         |> Morph.choiceFinish
 
 
-hostLabelSymbol : Morph HostLabelSymbol Char (Morph.Error Char)
+hostLabelSymbol : Morph HostLabelSymbol Char
 hostLabelSymbol =
     choice
         (\hyphenMinus aToZVariant n0To9Variant symbol ->
@@ -371,7 +371,7 @@ hostLabelSymbol =
         |> Morph.try (\() -> HostLabelHyphenMinus)
             (Char.Morph.only '-')
         |> Morph.try HostLabelSymbolAToZ AToZ.char
-        |> Morph.try HostLabelSymbol0To9 Digit.n0To9Char
+        |> Morph.try HostLabelSymbol0To9 (N.Morph.charIn ( n0, n9 ))
         |> Morph.choiceFinish
 
 
@@ -385,7 +385,7 @@ domainTopLevel =
             }
         )
         |> grab .startDigits
-            (atLeast n0 (Digit.n0To9Char |> one))
+            (atLeast n0 (N.Morph.charIn ( n0, n9 ) |> one))
         |> -- guarantees it can't be numeric only
            grab .firstAToZ
             (AToZ.char |> one)
@@ -397,11 +397,7 @@ domainTopLevel =
 -- domain
 
 
-domainTopLevelAfterFirstAToZSymbol :
-    Morph
-        DomainTopLevelAfterFirstAToZSymbol
-        Char
-        (Morph.Error Char)
+domainTopLevelAfterFirstAToZSymbol : Morph DomainTopLevelAfterFirstAToZSymbol Char
 domainTopLevelAfterFirstAToZSymbol =
     choice
         (\aToZVariant n0To9Variant domainTopLevelSymbolUnion ->
@@ -413,13 +409,13 @@ domainTopLevelAfterFirstAToZSymbol =
                     n0To9Variant n0To9Value
         )
         |> Morph.try DomainTopLevelSymbolAToZ AToZ.char
-        |> Morph.try DomainTopLevelSymbol0To9 Digit.n0To9Char
+        |> Morph.try DomainTopLevelSymbol0To9 (N.Morph.charIn ( n0, n9 ))
         |> Morph.choiceFinish
 
 
 type alias Point =
     RecordWithoutConstructorFunction
-        { x : Rational, y : Rational }
+        { x : Decimal, y : Decimal }
 
 
 type alias Email =
@@ -440,7 +436,7 @@ type alias LocalPart =
 type LocalSymbol
     = LocalSymbolPrintable LocalSymbolPrintable
     | LocalSymbolAToZ AToZ
-    | LocalSymbol0To9 Digit.N0To9
+    | LocalSymbol0To9 (N (InFixed N0 N9))
 
 
 type LocalSymbolPrintable
@@ -479,20 +475,20 @@ type alias HostLabel =
 
 type HostLabelSideSymbol
     = HostLabelSideSymbolAToZ { case_ : AToZ.Case, letter : AToZ }
-    | HostLabelSideSymbol0To9 Digit.N0To9
+    | HostLabelSideSymbol0To9 (N (InFixed N0 N9))
 
 
 type HostLabelSymbol
     = HostLabelHyphenMinus
     | HostLabelSymbolAToZ { case_ : AToZ.Case, letter : AToZ }
-    | HostLabelSymbol0To9 Digit.N0To9
+    | HostLabelSymbol0To9 (N (InFixed N0 N9))
 
 
 {-| <https://data.iana.org/TLD/tlds-alpha-by-domain.txt>
 -}
 type alias DomainTopLevel =
     RecordWithoutConstructorFunction
-        { startDigits : ArraySized (Min (Fixed N0)) Digit.N0To9
+        { startDigits : ArraySized (Min (Fixed N0)) (N (InFixed N0 N9))
         , firstAToZ : { case_ : AToZ.Case, letter : AToZ }
         , afterFirstAToZ : ArraySized (Min (Fixed N0)) DomainTopLevelAfterFirstAToZSymbol
         }
@@ -500,4 +496,4 @@ type alias DomainTopLevel =
 
 type DomainTopLevelAfterFirstAToZSymbol
     = DomainTopLevelSymbolAToZ { case_ : AToZ.Case, letter : AToZ }
-    | DomainTopLevelSymbol0To9 Digit.N0To9
+    | DomainTopLevelSymbol0To9 (N (InFixed N0 N9))

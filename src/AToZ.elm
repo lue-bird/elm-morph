@@ -14,7 +14,7 @@ import Char.Morph
 import Morph exposing (Morph, choice)
 
 
-{-| Latin letter without case information
+{-| Basic latin letter without [case](#Case) information
 -}
 type AToZ
     = A

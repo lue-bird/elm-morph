@@ -1,15 +1,16 @@
 module Yaml exposing (Any, LiteralAny, StructureAny)
 
-{-| [YAML](https://en.wikipedia.org/wiki/YAML) [`Morph`](#Morph)s
+{-| TODO [YAML](https://en.wikipedia.org/wiki/YAML) [`Morph`](#Morph)
 
   - previous art impl <https://github.com/MaybeJustJames/yaml/tree/master/src/Yaml>
+      - fork <https://github.com/myrho/yaml/tree/master/src/Yaml>
 
 -}
 
 import ArraySized exposing (ArraySized)
-import Morph exposing (Row, atLeast, exactly, grab, skip, succeed, translate)
+import Decimal exposing (Decimal)
+import Morph exposing (MorphRow, atLeast, exactly, grab, skip, succeed, translate)
 import N exposing (Exactly, Fixed, Min, N, N0, n0, n1)
-import Number exposing (Rational)
 import String.Morph
 import Value exposing (LiteralOrStructure(..))
 

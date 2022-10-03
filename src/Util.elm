@@ -1,8 +1,8 @@
 module Util exposing (restoreTry)
 
-{-| Helpers.
+{-| Helpers
 
-Putting them in a separate `module` helps with testing as well as preventing import cycles.
+Putting them in a separate `module` helps with testing as well as preventing import cycles
 
 @docs restoreTry
 

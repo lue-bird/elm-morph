@@ -1,6 +1,7 @@
 module Dict.Morph exposing
     ( valueTranslate
     , list, toList
+    , value
     )
 
 {-| [`Morph`](Morph#Morph) to and from a `Dict`
@@ -11,14 +12,16 @@ module Dict.Morph exposing
 @docs valueTranslate
 
 
-## `List`
+## transform
 
 @docs list, toList
+@docs value
 
 -}
 
 import Dict exposing (Dict)
 import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, Translate, translate, translateOn)
+import Value exposing (MorphValue)
 
 
 fromListImplementation :
@@ -112,3 +115,32 @@ valuesMap :
     -> (Dict key value -> Dict key valueMapped)
 valuesMap valueMap =
     Dict.map (\_ -> valueMap)
+
+
+
+--
+
+
+{-| `Dict` [`MorphValue`](Value#MorphValue)
+-}
+value :
+    { key : MorphValue comparableKey
+    , value : MorphValue value
+    }
+    -> MorphValue (Dict comparableKey value)
+value entryMorphs =
+    Dict.Morph.list
+        |> Morph.over (list (keyValueValue entryMorphs))
+
+
+keyValueValue :
+    { key : MorphValue key
+    , value : MorphValue value
+    }
+    -> MorphValue { key : key, value : value }
+keyValueValue entryMorph =
+    Value.record
+        (\key value -> { key = key, value = value })
+        |> Value.field ( .key, "key" ) entryMorph.key
+        |> Value.field ( .value, "value" ) entryMorph.value
+        |> Value.recordFinish

@@ -1,6 +1,7 @@
 module Set.Morph exposing
     ( elementTranslate
     , list, toList
+    , value
     )
 
 {-| [`Morph`](Morph) a `Set`
@@ -14,11 +15,13 @@ module Set.Morph exposing
 ## transform
 
 @docs list, toList
+@docs value
 
 -}
 
 import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, Translate, translate, translateOn)
 import Set exposing (Set)
+import Value exposing (MorphValue)
 
 
 {-| [`Translate`](Morph#Translate) from `List` to `Set`.
@@ -32,7 +35,9 @@ import Set exposing (Set)
 -}
 list :
     MorphIndependently
-        (List comparableNarrowElement -> Result error_ (Set comparableNarrowElement))
+        (List comparableNarrowElement
+         -> Result error_ (Set comparableNarrowElement)
+        )
         (Set broadElement -> List broadElement)
 list =
     translate Set.fromList Set.toList
@@ -49,8 +54,12 @@ list =
 -}
 toList :
     MorphIndependently
-        (Set narrowElement -> Result error_ (List narrowElement))
-        (List comparableBroadElement -> Set comparableBroadElement)
+        (Set narrowElement
+         -> Result error_ (List narrowElement)
+        )
+        (List comparableBroadElement
+         -> Set comparableBroadElement
+        )
 toList =
     translate Set.toList Set.fromList
 
@@ -77,3 +86,16 @@ elementTranslate :
             )
 elementTranslate elementTranslate_ =
     translateOn ( Set.map, Set.map ) elementTranslate_
+
+
+
+--
+
+
+{-| `Set` [`MorphValue`](Value#MorphValue)
+-}
+value :
+    MorphValue comparableElement
+    -> MorphValue (Set comparableElement)
+value elementMorph =
+    list |> Morph.over (List.Morph.value elementMorph)

@@ -75,9 +75,9 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
             ```elm
             import Char.Morph as Char
             succeed (\... -> ...)
-                |> skip (atLeast n0 (Char.Morph.only ' ' |> one))
+                |> skip (atLeast n0 (String.Morph.only " "))
                 |> grab ...
-                |> skip (atLeast n0 (Char.Morph.only ' ' |> one))
+                |> skip (atLeast n0 (String.Morph.only " "))
             ```
             explicitly
       - `textNoCase` name → `caseAny`

@@ -1,5 +1,5 @@
 module List.Morph exposing
-    ( reverse, elementTranslate
+    ( reverse, eachElement
     , for, forBroad
     )
 
@@ -8,7 +8,7 @@ module List.Morph exposing
 
 ## alter
 
-@docs reverse, elementTranslate
+@docs reverse, eachElement
 
 
 ## sequence
@@ -17,12 +17,16 @@ for, forBroad
 
 -}
 
+import Array
 import ArraySized
-import Emptiable
-import Linear exposing (DirectionLinear(..))
+import Emptiable exposing (Emptiable, filled)
+import Linear exposing (Direction(..))
 import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, MorphOrError, MorphRow, Translate, broad, broadenWith, narrowWith, translate, translateOn)
 import N exposing (Up)
-import Stack
+import Possibly exposing (Possibly(..))
+import Stack exposing (Stacked)
+import Value exposing (MorphValue)
+import Value.Unexposed
 
 
 
@@ -37,22 +41,6 @@ reverse :
         (List narrowElement -> List narrowElement)
 reverse =
     translate List.reverse List.reverse
-
-
-{-| [`Translate`](Morph#Translate) each element in a `List`
--}
-elementTranslate :
-    MorphIndependently
-        (beforeMapElement -> Result (ErrorWithDeadEnd Never) mappedElement)
-        (beforeUnmapElement -> unmappedElement)
-    ->
-        MorphIndependently
-            (List beforeMapElement
-             -> Result error_ (List mappedElement)
-            )
-            (List beforeUnmapElement -> List unmappedElement)
-elementTranslate elementTranslate_ =
-    translateOn ( List.map, List.map ) elementTranslate_
 
 
 
@@ -144,11 +132,11 @@ for morphRowByElement elementsToTraverseInSequence =
                 { custom = Emptiable.empty
                 , inner =
                     ArraySized.l2 element0 element1
-                        |> ArraySized.minGlue Up
+                        |> ArraySized.glueMin Up
                             (elements2Up |> ArraySized.fromList)
                         |> ArraySized.map
                             (morphRowByElement >> Morph.description)
-                        |> ArraySized.maxNo
+                        |> ArraySized.maxToInfinity
                         |> Morph.Group
                         |> Emptiable.filled
                 }
@@ -188,4 +176,109 @@ for morphRowByElement elementsToTraverseInSequence =
                 narrowSequence
                 |> List.concatMap Stack.toList
                 |> Stack.fromList
+    }
+
+
+
+--
+
+
+{-| `List` [`Morph`](#Morph)
+-}
+value : MorphValue element -> MorphValue (List element)
+value elementMorph =
+    eachElement elementMorph
+        |> Morph.over
+            (Morph.value "List"
+                { narrow =
+                    \broad ->
+                        case broad of
+                            Value.List listElements ->
+                                listElements |> Ok
+
+                            Value.Array arrayElements ->
+                                arrayElements |> Array.toList |> Ok
+
+                            structureExceptList ->
+                                structureExceptList
+                                    |> Value.Unexposed.structureKindToString
+                                    |> Err
+                , broaden = Value.List
+                }
+            )
+        |> Morph.over Value.structure
+
+
+{-| [`Morph`](Morph#Morph) all elements in sequence.
+On the narrowing side all [narrowed](Morph#narrowWith) values must be `Ok`
+for it to not result in a [`Morph.Error`](Morph#Error)
+
+If the element [`Morph`](Morph#Morph) is a [`Translate`](Morph#Translate),
+`eachElement` will be equivalent to
+
+    Morph.translateOn ( List.map, List.map )
+
+which always succeeds with the type knowing it does
+
+-}
+eachElement :
+    MorphIndependently
+        (beforeNarrow
+         -> Result (Morph.ErrorWithDeadEnd deadEnd) narrow
+        )
+        (beforeBroaden -> broad)
+    ->
+        MorphIndependently
+            (List beforeNarrow
+             ->
+                Result
+                    (Morph.ErrorWithDeadEnd deadEnd)
+                    (List narrow)
+            )
+            (List beforeBroaden -> List broad)
+eachElement elementMorph =
+    { description =
+        { custom = Stack.only "each"
+        , inner =
+            Morph.Elements (elementMorph |> Morph.description)
+                |> filled
+        }
+    , narrow =
+        \list ->
+            list
+                |> List.foldr
+                    (\element { index, collected } ->
+                        { collected =
+                            case element |> Morph.narrowWith elementMorph of
+                                Ok elementValue ->
+                                    collected
+                                        |> Result.map (\l -> l |> (::) elementValue)
+
+                                Err elementError ->
+                                    let
+                                        errorsSoFar =
+                                            case collected of
+                                                Ok _ ->
+                                                    Emptiable.empty
+
+                                                Err elementsAtIndexes ->
+                                                    elementsAtIndexes |> Emptiable.emptyAdapt (\_ -> Possible)
+                                    in
+                                    errorsSoFar
+                                        |> Stack.onTopLay
+                                            { index = index
+                                            , error = elementError
+                                            }
+                                        |> Err
+                        , index = index - 1
+                        }
+                    )
+                    { collected = [] |> Ok
+                    , index = (list |> List.length) - 1
+                    }
+                |> .collected
+                |> Result.mapError Morph.Parts
+    , broaden =
+        \list ->
+            list |> List.map (Morph.broadenWith elementMorph)
     }

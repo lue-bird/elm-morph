@@ -37,7 +37,7 @@ Also available: [`toggle`](Morph#toggle) [`Array.Extra.reverse`](https://dark.el
 
 import ArraySized exposing (ArraySized)
 import Emptiable exposing (Emptiable)
-import Linear exposing (DirectionLinear(..))
+import Linear exposing (Direction(..))
 import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, MorphOrError, MorphRow, Translate, broad, broadenWith, narrowWith, translate, translateOn)
 import N exposing (Add1, Fixed, In, InFixed, InValue, Min, N0, N1, To, Up, n0, n1)
 import Possibly exposing (Possibly)
@@ -350,7 +350,7 @@ for morphRowByElement elementsToTraverseInSequence =
                     atLeast2
                         |> ArraySized.map
                             (morphRowByElement >> Morph.description)
-                        |> ArraySized.maxNo
+                        |> ArraySized.maxToInfinity
                         |> Morph.Group
                         |> Emptiable.filled
                 }
@@ -369,8 +369,8 @@ for morphRowByElement elementsToTraverseInSequence =
                             let
                                 withStepParsed =
                                     soFar.narrow
-                                        |> ArraySized.minPush stepParsed.narrow
-                                        |> ArraySized.min n0
+                                        |> ArraySized.pushMin stepParsed.narrow
+                                        |> ArraySized.minTo n0
 
                                 traversalDone =
                                     withStepParsed
@@ -383,7 +383,7 @@ for morphRowByElement elementsToTraverseInSequence =
                             case traversalDone of
                                 Err notAllTraversed ->
                                     { broad = stepParsed.broad
-                                    , narrow = notAllTraversed |> ArraySized.maxNo
+                                    , narrow = notAllTraversed |> ArraySized.maxToInfinity
                                     }
                                         |> Partial
 
@@ -391,15 +391,16 @@ for morphRowByElement elementsToTraverseInSequence =
                                     { broad = stepParsed.broad
                                     , narrow =
                                         traversed
+                                            {- ArraySized.minTo
+                                               (elementsToTraverseInSequence
+                                                   |> ArraySized.length
+                                                   |> N.min
+                                                   |> N.exactly
+                                               )
+                                            -}
                                             |> ArraySized.take
                                                 ( Up
                                                 , elementsToTraverseInSequence |> ArraySized.length
-                                                , { atLeast =
-                                                        elementsToTraverseInSequence
-                                                            |> ArraySized.length
-                                                            |> N.minimumAsDifference
-                                                            |> N.specific
-                                                  }
                                                 )
                                     }
                                         |> Ok
@@ -410,7 +411,7 @@ for morphRowByElement elementsToTraverseInSequence =
                 traversed =
                     elementsToTraverseInSequence
                         |> ArraySized.foldFrom
-                            ({ narrow = ArraySized.empty |> ArraySized.maxNo
+                            ({ narrow = ArraySized.empty |> ArraySized.maxToInfinity
                              , broad = initialInput
                              }
                                 |> Partial

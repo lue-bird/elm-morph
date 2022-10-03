@@ -88,7 +88,7 @@ downToUpInLine inputSource =
 errorToString :
     { source : String }
     ->
-        (MorphRow.RowError Char
+        (Morph.Error
          -> List String
         )
 errorToString { source } =
