@@ -33,6 +33,7 @@ import Char.Morph
 import List.Morph
 import Morph exposing (Morph, MorphOrError, MorphRow, Translate, broad, one, translate, translateOn)
 import Value exposing (MorphValue)
+import Value.PackageInternal
 
 
 {-| [`Translate`](Morph#Translate) from a `String` to a `List Char`.
@@ -140,14 +141,14 @@ for charMorphRow expectedText =
 value : MorphValue String
 value =
     Morph.value "String"
-        { broaden = String
+        { broaden = Value.String
         , narrow =
-            \value ->
-                case value of
-                    String stringNarrow ->
+            \valueBroad ->
+                case valueBroad of
+                    Value.String stringNarrow ->
                         stringNarrow |> Ok
 
                     literalExceptString ->
-                        literalExceptString |> literalKindToString |> Err
+                        literalExceptString |> Value.PackageInternal.literalKindToString |> Err
         }
         |> Morph.over Value.literal

@@ -26,15 +26,8 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
             Parser delimiter
             -> Parser a
             -> Parser ( List a, delimiter )
-        to
-        ```elm
-        before :
-            { end : MorphRow broadElement () expectedCustom
-            , goOn : MorphRow broadElement goOnElement expectedCustom
-            }
-            -> MorphRow broadElement (List goOnElement) expectedCustom
         ```
-        and
+        →
         ```elm
         until :
             { commit :
@@ -49,14 +42,22 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
             }
             -> MorphRow broadElement commitResult expectedCustom
         ```
+        and its simpler cousin
+        ```elm
+        before :
+            { end : MorphRow broadElement () expectedCustom
+            , goOn : MorphRow broadElement goOnElement expectedCustom
+            }
+            -> MorphRow broadElement (List goOnElement) expectedCustom
+        ```
       - `split`, `splitIncluding` remove
           - in favor of
             ```elm
-            succeed
+            Morph.succeed
                 |> grab element
                 |> grab
                     (atLeast n0
-                        (succeed
+                        (Morph.succeed
                             |> grab separator
                             |> grab element
                         )
@@ -74,7 +75,7 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
           - in favor of
             ```elm
             import Char.Morph as Char
-            succeed (\... -> ...)
+            Morph.succeed (\... -> ...)
                 |> skip (atLeast n0 (String.Morph.only " "))
                 |> grab ...
                 |> skip (atLeast n0 (String.Morph.only " "))
@@ -97,11 +98,11 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
       - `lowercase` name → `caseLower`
       - `uppercase` name → `caseUpper`
       - `alphaNum` remove
-          - in favor of `Morph.choice ... |> Morph.rowTry |> MorphRow.choiceFinish`
+          - in favor of `Choice.between ... |> Choice.tryRow |> MorphRow.choiceFinish`
       - `space` name → `blank`
           - to emphasize it can be any whitespace
       - `except` remove
-          - in favor of `Morph.choice ... |> Morph.rowTry |> MorphRow.choiceFinish`
+          - in favor of `Choice.between ... |> Choice.tryRow |> MorphRow.choiceFinish`
   - `MorphRow`
       - `parse : String -> MorphRow narrow -> Result Error narrow` remove
           - in favor of
@@ -110,7 +111,7 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
           - in favor of `onFailDown [ first, second ]`
       - can parse any input list (not only `String`)
       - `map2`, `map3`, `map4`, `map5` remove
-          - in favor of `succeed |> grab |> grab ...`
+          - in favor of `Morph.succeed |> grab |> grab ...`
       - `andThenKeep`, `andThenIgnore` remove
           - in favor of `grab`, `skip`
       - `andThen2` remove
@@ -122,6 +123,6 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
       - `until` add
       - `while` add
       - `oneOf` remove
-          - in favor of `Morph.choice ... |> Morph.rowTry |> MorphRow.choiceFinish`
+          - in favor of `Choice.between ... |> Choice.tryRow |> MorphRow.choiceFinish`
       - `possibility` add
       - `choiceFinish` add

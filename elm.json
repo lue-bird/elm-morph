@@ -7,6 +7,8 @@
     "exposed-modules": [
         "Unit",
         "Morph",
+        "Group",
+        "Choice",
         "Char.Morph",
         "AToZ",
         "Sign",
@@ -24,7 +26,6 @@
         "ArraySized.Morph",
         "Set.Morph",
         "Dict.Morph",
-        "Morph.Error",
         "Value",
         "Json"
     ],

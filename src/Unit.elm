@@ -9,12 +9,15 @@ module Unit exposing (value)
 
 -}
 
+import Morph
 import Value exposing (MorphValue)
+import Value.PackageInternal
 
 
 {-| `()` [`Morph`](#Morph)
 
-Often used in when [morphing](Value#MorphValue) [`variant`](Value#variant)s with 0 attached values
+Often used in when [morphing](Value#MorphValue) a [variants](Choice#tryValue)
+with 0 attached values
 
 -}
 value : MorphValue ()
@@ -22,14 +25,14 @@ value =
     Morph.value "Unit"
         { broaden = Value.Unit
         , narrow =
-            \value ->
-                case value of
+            \value_ ->
+                case value_ of
                     Value.Unit unitValue ->
                         unitValue |> Ok
 
                     literalExceptUnit ->
                         literalExceptUnit
-                            |> Value.Unexposed.literalKindToString
+                            |> Value.PackageInternal.literalKindToString
                             |> Err
         }
         |> Morph.over Value.literal

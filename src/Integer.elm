@@ -22,10 +22,13 @@ module Integer exposing
 -}
 
 import ArraySized exposing (ArraySized)
+import ArraySized.Morph
 import Bit exposing (Bit)
 import Bits
+import Choice
+import Group
 import Linear exposing (Direction(..))
-import Morph exposing (MorphRow, choice)
+import Morph exposing (MorphRow)
 import N exposing (Add1, Fixed, In, Infinity, Min, N, N0, To, Up, Value, n0, n1, n2, n9)
 import N.Local exposing (N31, Up31, n32)
 import N.Morph
@@ -158,7 +161,7 @@ toInt =
 decimalRowChar : MorphRow Char (Integer (Min N0))
 decimalRowChar =
     Morph.to "whole"
-        (choice
+        (Choice.between
             (\n0Variant signedVariant integerNarrow ->
                 case integerNarrow of
                     N0 ->
@@ -167,30 +170,32 @@ decimalRowChar =
                     Signed signed ->
                         signedVariant signed
             )
-            |> Morph.rowTry (\() -> N0)
+            |> Choice.tryRow (\() -> N0)
                 (String.Morph.only "0")
-            |> Morph.rowTry Signed
+            |> Choice.tryRow Signed
                 (Morph.succeed
                     (\signPart absoluteAfterI ->
                         { sign = signPart
                         , absoluteAfterI = absoluteAfterI
                         }
                     )
-                    |> Morph.grab .sign Sign.emptiableMinusChar
-                    |> Morph.grab .absolute
+                    |> Group.grab .sign Sign.maybeMinusChar
+                    |> Group.grab .absolute
                         (Morph.translate digitsToBitsAfterI bitsToDigits
                             |> Morph.over
                                 (Morph.succeed
-                                    |> Morph.grab Stack.top (N.Morph.charIn ( n1, n9 ))
-                                    |> Morph.grab Stack.topRemove
+                                    |> Group.grab Stack.top (N.Morph.charIn ( n1, n9 ))
+                                    |> Group.grab Stack.topRemove
                                         (ArraySized.toStackEmptiable
                                             >> Morph.over
-                                                (Morph.atLeast n0 (N.Morph.charIn ( n1, n9 )))
+                                                (ArraySized.Morph.atLeast n0
+                                                    (N.Morph.charIn ( n1, n9 ))
+                                                )
                                         )
                                 )
                         )
                 )
-            |> Morph.rowChoiceFinish
+            |> Choice.finishRow
         )
 
 

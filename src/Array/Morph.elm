@@ -26,7 +26,7 @@ import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, Translate, t
 import Possibly exposing (Possibly(..))
 import Stack
 import Value exposing (MorphValue)
-import Value.Unexposed
+import Value.PackageInternal
 
 
 {-| [`Translate`](Morph#Translate) from `List` to `Array`
@@ -85,7 +85,7 @@ value elementMorph =
 
                             structureExceptArrayAndList ->
                                 structureExceptArrayAndList
-                                    |> Value.Unexposed.structureKindToString
+                                    |> Value.PackageInternal.structureKindToString
                                     |> Err
                 , broaden = Value.Array
                 }
@@ -113,13 +113,13 @@ eachElement :
         (beforeBroaden -> broad)
     ->
         MorphIndependently
-            (List beforeNarrow
+            (Array beforeNarrow
              ->
                 Result
                     (Morph.ErrorWithDeadEnd deadEnd)
-                    (List narrow)
+                    (Array narrow)
             )
-            (List beforeBroaden -> List broad)
+            (Array beforeBroaden -> Array broad)
 eachElement elementMorph =
     { description =
         { custom = Stack.only "each"
@@ -158,7 +158,7 @@ eachElement elementMorph =
                         }
                     )
                     { collected = [] |> Ok
-                    , index = (list |> List.length) - 1
+                    , index = (array |> Array.length) - 1
                     }
                 |> .collected
                 |> Result.map Array.fromList

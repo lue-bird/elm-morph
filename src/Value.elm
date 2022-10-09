@@ -1,12 +1,10 @@
 module Value exposing
     ( Value, Literal(..), Structure(..), Record, Tagged
     , MorphValue
-    , RecordMorph, record, field, recordFinish
-    , variant, choiceFinish
     , Name, Index, IndexOrName(..), IndexAndName
     , descriptive, compact, tagTranslate, tagMap
     , LiteralOrStructure(..)
-    , literalOrStructure, literal, structure, structureMap
+    , literal, structure, structureMap
     )
 
 {-| Generic, `case`-able elm value
@@ -38,20 +36,18 @@ for example
   - [`Array.Morph`](Array-Morph)
 
 
-### records
+### record
 
-@docs RecordMorph, record, field, recordFinish
+[`Group.MorphValue`](Group#MorphValue)
 
 
-### choices
+### Choice.between
 
 variant union [`MorphValue`](#MorphValue)
 
-  - starting from [`Morph.choice`](Morph#choice)
-  - over [`variant`](#variant)
-  - and completed with [`choiceFinish`](#choiceFinish)
-
-@docs variant, choiceFinish
+  - starting from [`Choice.between`](Choice#between)
+  - over [`Choice.tryValue`](Choice#tryValue)
+  - and completed with [`Choice.finishValue`](Choice#finishValue)
 
 
 ## tag
@@ -77,7 +73,7 @@ build on existing ones
 or define new literals, structures, ... (↓ are used by [`Json`](Json) for example)
 
 @docs LiteralOrStructure
-@docs literalOrStructure, literal, structure, structureMap
+@docs literal, structure, structureMap
 
 
 ## broad formats
@@ -126,7 +122,7 @@ import Array exposing (Array)
 import ArraySized
 import Emptiable exposing (Emptiable, fill, filled)
 import Linear exposing (Direction(..))
-import Morph exposing (ChoiceMorph(..), GroupError, GroupMorph(..), Morph, MorphIndependently, MorphOrError, NoPart, NoTry, broadenWith, choice, in_, narrowWith, to, translate)
+import Morph exposing (Morph, MorphIndependently, MorphOrError, broadenWith, narrowWith, to, translate)
 import N exposing (Up)
 import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
@@ -159,15 +155,20 @@ that can't be converted in a small amount of runtime
 (for example treating tuples the same as records is just O(1))?
 → PR!
 
+Please use to the [`MorphValue`](#MorphValue)s present in most `module`s
+to construct a [`Value`](#Value),
+as you can for example construct ↓ using the exposed(..) variants
+
+    Value.List [ Value.Float 3, Value.String "huh" ]
+
+which isn't a valid elm value
+
 -}
 type alias Value tag =
     LiteralOrStructure Literal (Structure tag)
 
 
 {-| elm structure that can itself contain values
-
-TODO include both array and list in narrow
-
 -}
 type Structure tag
     = List (List (Value tag))
@@ -189,21 +190,35 @@ type alias Record tag =
     Emptiable (Stacked (Tagged tag)) Possibly
 
 
+{-| EIther [`Index`](#Index) or [`Name`](#Name)
+
+Used as the narrow argument of a [`MorphValue`](#MorphValue)
+
+-}
 type IndexOrName
     = Index Int
     | Name String
 
 
+{-| Only its index identifies the variant or field
+-}
 type alias Index =
     RecordWithoutConstructorFunction
         { index : Int }
 
 
+{-| Only its name identifies the variant or field
+-}
 type alias Name =
     RecordWithoutConstructorFunction
         { name : String }
 
 
+{-| Both [`Index`](#Index) and [`Name`](#Name)
+
+Used as the broad result of a [`MorphValue`](#MorphValue)
+
+-}
 type alias IndexAndName =
     RecordWithoutConstructorFunction
         { index : Int, name : String }
@@ -295,8 +310,8 @@ tagMap tagChange =
         value |> structureMap (structureTagMap tagChange)
 
 
-{-| Change in a given way
-if the [`LiteralOrStructure`](#LiteralOrStructure) is a [`Structure`](#LiteralOrStructure)
+{-| If the [`LiteralOrStructure`](#LiteralOrStructure) is a [`Structure`](#LiteralOrStructure),
+change in a given way
 -}
 structureMap :
     (structure -> structureMapped)
@@ -381,51 +396,16 @@ type alias MorphValue narrow =
 -- literal or structure
 
 
-{-| [`Morph`](Morph#Morph) depending on whether it's a `Literal` or `Structure`
-in given ways
+{-| [`Morph`](Morph#Morph) to a [`LiteralOrStructure`](#LiteralOrStructure)'s literal if possible
 -}
-literalOrStructure :
-    { literal :
-        MorphIndependently
-            (beforeNarrow
-             -> Result (Morph.ErrorWithDeadEnd deadEnd) narrowLiteral
-            )
-            (literal -> broad)
-    , structure :
-        MorphIndependently
-            (beforeNarrow
-             -> Result (Morph.ErrorWithDeadEnd deadEnd) narrowStructure
-            )
-            (structure -> broad)
-    }
-    ->
-        MorphIndependently
-            (beforeNarrow
-             ->
-                Result
-                    (Morph.ErrorWithDeadEnd deadEnd)
-                    (LiteralOrStructure narrowLiteral narrowStructure)
-            )
-            (LiteralOrStructure literal structure -> broad)
-literalOrStructure =
-    \literalOrStructureMorphs ->
-        Morph.choice
-            (\variantLiteral variantStructure literalOrStructureUnion ->
-                case literalOrStructureUnion of
-                    Literal literalValue ->
-                        variantLiteral literalValue
-
-                    Structure structureValue ->
-                        variantStructure structureValue
-            )
-            |> Morph.try Literal
-                (Morph.to "Literal" literalOrStructureMorphs.literal)
-            |> Morph.try Structure
-                (Morph.to "Structure" literalOrStructureMorphs.structure)
-            |> Morph.choiceFinish
-
-
-literal : MorphValue Literal
+literal :
+    Morph.MorphIndependently
+        (LiteralOrStructure narrowLiteral narrowStructure_
+         -> Result Morph.Error narrowLiteral
+        )
+        (broadLiteral
+         -> LiteralOrStructure broadLiteral broadStructure_
+        )
 literal =
     Morph.value "Literal"
         { broaden = Literal
@@ -440,6 +420,8 @@ literal =
         }
 
 
+{-| [`Morph`](Morph#Morph) to a [`LiteralOrStructure`](#LiteralOrStructure)'s structure if possible
+-}
 structure :
     MorphIndependently
         (LiteralOrStructure narrowLiteral_ narrowStructure
@@ -460,393 +442,3 @@ structure =
                     Literal _ ->
                         "Literal" |> Err
         }
-
-
-structureKindToString : Structure tag_ -> String
-structureKindToString =
-    \structure_ ->
-        case structure_ of
-            List _ ->
-                "List"
-
-            Array _ ->
-                "Array"
-
-            Record _ ->
-                "Record"
-
-            Variant _ ->
-                "Variant"
-
-
-
---
-
-
-{-| Describe another variant value [`Morph`](#Morph) to [`Value`](#Value)
-
-Done? → [`Value.choiceFinish`](#choiceFinish)
-
-If a variant doesn't have any value attached, use [`Unit.value`](Unit#value)
-
-    {-| `Bool` `MorphValue`
-    -}
-    boolValue : MorphValue Bool
-    boolValue =
-        Morph.choice
-            (\true false bool ->
-                case bool of
-                    True ->
-                        true ()
-
-                    False ->
-                        false ()
-            )
-            |> Value.variant ( \() -> True, "True" ) Unit.value
-            |> Value.variant ( \() -> False, "False" ) Unit.value
-            |> Value.choiceFinish
-
--}
-variant :
-    ( possibilityNarrow -> choiceNarrow
-    , String
-    )
-    -> MorphValue possibilityNarrow
-    ->
-        (ChoiceMorph
-            choiceNarrow
-            (Tagged IndexOrName)
-            ((possibilityNarrow
-              -> Tagged IndexAndName
-             )
-             -> choiceBroadenFurther
-            )
-            Morph.Error
-            NoTry
-            noTryPossiblyOrNever_
-         ->
-            ChoiceMorph
-                choiceNarrow
-                (Tagged IndexOrName)
-                choiceBroadenFurther
-                Morph.Error
-                NoTry
-                noTryNever_
-        )
-variant ( possibilityToChoice, possibilityTag ) possibilityMorph =
-    \choiceMorphSoFar ->
-        choiceMorphSoFar
-            |> Morph.try possibilityToChoice
-                (let
-                    (Morph.ChoiceMorphInProgress inProgress) =
-                        choiceMorphSoFar
-                 in
-                 Morph.to possibilityTag
-                    { description = { custom = Emptiable.empty, inner = Emptiable.empty }
-                    , narrow =
-                        variantStepNarrow
-                            ( { name = possibilityTag
-                              , index = inProgress.description |> Stack.length
-                              }
-                            , narrowWith possibilityMorph
-                            )
-                    , broaden =
-                        \narrowValue ->
-                            { tag =
-                                { name = possibilityTag
-                                , index = inProgress.description |> Stack.length
-                                }
-                            , value = narrowValue |> broadenWith possibilityMorph
-                            }
-                    }
-                )
-
-
-variantStepNarrow :
-    ( IndexAndName
-    , Value IndexOrName
-      -> Result Morph.Error possibilityNarrow
-    )
-    ->
-        (Tagged IndexOrName
-         -> Result Morph.Error possibilityNarrow
-        )
-variantStepNarrow ( variantTag, possibilityNarrow ) =
-    \variantBroad ->
-        case variantBroad.tag of
-            Index index ->
-                if index == variantTag.index then
-                    variantBroad.value |> possibilityNarrow
-
-                else
-                    "tag " ++ (index |> String.fromInt) |> Morph.DeadEnd |> Err
-
-            Name name ->
-                if name == variantTag.name then
-                    variantBroad.value |> possibilityNarrow
-
-                else
-                    "tag " ++ name |> Morph.DeadEnd |> Err
-
-
-{-| Conclude a [`Morph.choice`](Morph#choice) |> [`Value.variant`](#variant) chain
--}
-choiceFinish :
-    ChoiceMorph
-        choiceNarrow
-        (Tagged IndexOrName)
-        (choiceNarrow -> Tagged IndexAndName)
-        Morph.Error
-        NoTry
-        Never
-    -> MorphValue choiceNarrow
-choiceFinish =
-    \choiceMorphComplete ->
-        choiceMorphComplete
-            |> Morph.choiceFinish
-            |> Morph.over
-                (Morph.value "Variant"
-                    { narrow =
-                        \value ->
-                            case value of
-                                Variant variant_ ->
-                                    variant_ |> Ok
-
-                                structureExceptVariant ->
-                                    structureExceptVariant
-                                        |> structureKindToString
-                                        |> Err
-                    , broaden = Variant
-                    }
-                )
-            |> Morph.over structure
-
-
-{-| Start a record assembly [`MorphValue`](#MorphValue)
-
-Continue with [`field`](#field)
-
-    {-| `( ..., ... )` `MorphValue`
-
-    Just use a record with descriptive names instead!
-
-    -}
-    tuple2 :
-        ( MorphValue part0
-        , MorphValue part1
-        )
-        -> MorphValue ( part0, part1 )
-    tuple2 ( part0Morph, part1Morph ) =
-        Morph.to "Tuple2"
-            (record
-                (\part0 part1 -> ( part0, part1 ))
-                |> field ( Tuple.first, "part0" ) part0Morph
-                |> field ( Tuple.second, "part1" ) part1Morph
-                |> recordFinish
-            )
-
-    {-| `( ..., ..., ... )` `MorphValue`
-
-    Just use a record with descriptive names instead!
-
-    -}
-    tuple3 :
-        ( MorphValue part0
-        , MorphValue part1
-        , MorphValue part2
-        )
-        -> MorphValue ( part0, part1, part2 )
-    tuple3 ( part0Morph, part1Morph, part2Morph ) =
-        Morph.to "Tuple3"
-            (record
-                (\part0 part1 part2 -> ( part0, part1, part2 ))
-                |> field ( \( part0, _, _ ) -> part0, "part0" ) part0Morph
-                |> field ( \( _, part1, _ ) -> part1, "part1" ) part1Morph
-                |> field ( \( _, _, part2 ) -> part2, "part2" ) part2Morph
-                |> recordFinish
-            )
-
--}
-record :
-    groupNarrowAssemble
-    -> RecordMorph groupNarrow_ groupNarrowAssemble NoPart Possibly
-record groupNarrowAssemble =
-    Morph.group ( groupNarrowAssemble, Emptiable.empty )
-
-
-{-| possibly incomplete [`MorphValue`](#MorphValue) step from and to a record
-
-building:
-
-  - start with [`record`](#record)
-  - continue with [`field`](#field)
-  - finish with [`recordFinish`](#recordFinish)
-
--}
-type alias RecordMorph groupNarrow groupNarrowFurther noPartTag noPartPossiblyOrNever =
-    GroupMorph
-        (Record IndexOrName
-         ->
-            Result
-                (GroupError Morph.Error)
-                groupNarrowFurther
-        )
-        (groupNarrow -> Record IndexAndName)
-        noPartTag
-        noPartPossiblyOrNever
-
-
-{-| Continue a group assembly [`Morph`](#Morph) to [`Value`](#Value).
-
-  - finish with [`groupFinish`](#groupFinish)
-
--}
-field :
-    ( group -> fieldValueNarrow
-    , String
-    )
-    -> MorphValue fieldValueNarrow
-    ->
-        (RecordMorph
-            group
-            (fieldValueNarrow -> groupNarrowFurther)
-            NoPart
-            noPartPossiblyOrNever_
-         ->
-            RecordMorph
-                group
-                groupNarrowFurther
-                NoPart
-                noPartNever_
-        )
-field ( accessFieldValue, fieldName ) fieldValueMorph =
-    \(GroupMorphInProgress groupMorphSoFar) ->
-        let
-            tag : IndexAndName
-            tag =
-                { index = groupMorphSoFar.description |> Stack.length
-                , name = fieldName
-                }
-        in
-        { description =
-            groupMorphSoFar.description
-                |> Stack.onTopLay
-                    (Morph.to tag.name fieldValueMorph
-                        |> Morph.description
-                    )
-        , narrow =
-            \groupBroad ->
-                fieldNarrow tag fieldValueMorph groupMorphSoFar.narrow groupBroad
-        , broaden =
-            \wholeNarrow ->
-                let
-                    fieldValueBroad : Value IndexAndName
-                    fieldValueBroad =
-                        wholeNarrow
-                            |> accessFieldValue
-                            |> broadenWith fieldValueMorph
-
-                    fieldBroad : Tagged IndexAndName
-                    fieldBroad =
-                        { tag = tag
-                        , value = fieldValueBroad
-                        }
-                in
-                wholeNarrow
-                    |> groupMorphSoFar.broaden
-                    |> Stack.onTopLay fieldBroad
-        }
-            |> GroupMorphInProgress
-
-
-fieldNarrow :
-    IndexAndName
-    -> MorphValue fieldValueNarrow
-    ->
-        (Emptiable (Stacked (Tagged IndexOrName)) possiblyOrNever_
-         ->
-            Result
-                (GroupError Morph.Error)
-                (fieldValueNarrow -> groupNarrowFurther)
-        )
-    ->
-        (Emptiable (Stacked (Tagged IndexOrName)) possiblyOrNever_
-         -> Result (GroupError Morph.Error) groupNarrowFurther
-        )
-fieldNarrow tag fieldValueMorph groupSoFarNarrow =
-    let
-        matches : IndexOrName -> Bool
-        matches =
-            \tagIndexOrName ->
-                case tagIndexOrName of
-                    Index index ->
-                        index == tag.index
-
-                    Name name ->
-                        name == tag.name
-    in
-    \groupBroad ->
-        let
-            wholeAssemblyResult :
-                Result
-                    (GroupError Morph.Error)
-                    (fieldValueNarrow -> groupNarrowFurther)
-            wholeAssemblyResult =
-                groupBroad |> groupSoFarNarrow
-
-            errorsSoFar : () -> Emptiable (Stacked { index : Int, error : Morph.Error }) Possibly
-            errorsSoFar () =
-                case wholeAssemblyResult of
-                    Ok _ ->
-                        Emptiable.empty
-
-                    Err expectations ->
-                        expectations |> Emptiable.emptyAdapt never
-        in
-        case groupBroad |> Stack.toList |> List.filter (.tag >> matches) of
-            partBroad :: _ ->
-                case partBroad.value |> narrowWith fieldValueMorph of
-                    Ok partNarrow ->
-                        wholeAssemblyResult
-                            |> Result.map (\eat -> eat partNarrow)
-
-                    Err innerError ->
-                        errorsSoFar ()
-                            |> Stack.onTopLay
-                                { index = tag.index
-                                , error = innerError
-                                }
-                            |> Err
-
-            [] ->
-                errorsSoFar ()
-                    |> Stack.onTopLay
-                        { index = tag.index
-                        , error = (tag.name ++ " missing") |> Morph.DeadEnd
-                        }
-                    |> Err
-
-
-{-| Finish the [`group`](#group) |> [`field`](#field) chain
--}
-recordFinish :
-    RecordMorph group group NoPart Never
-    -> MorphValue group
-recordFinish =
-    \groupMorphComplete ->
-        groupMorphComplete
-            |> Morph.groupFinish
-            |> Morph.over
-                (Morph.value "Record"
-                    { narrow =
-                        \structureBroad ->
-                            case structureBroad of
-                                Record recordNarrow ->
-                                    recordNarrow |> Ok
-
-                                structureNotRecord ->
-                                    structureNotRecord |> structureKindToString |> Err
-                    , broaden = Record
-                    }
-                )
-            |> Morph.over structure

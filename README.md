@@ -22,6 +22,8 @@ Independent of output format
 module Cause exposing (Cause, value)
 
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
+import Choice
+import Group
 import Value exposing (MorphValue)
 import Float.Morph
 import String.Morph
@@ -36,14 +38,14 @@ type alias Cause =
 
 value : MorphValue Cause
 value =
-    Value.record
+    Group.value
         (\name percent per100k ->
             { name = name, percent = percent, per100k = per100k }
         )
-        |> Value.field ( .name, "name" ) String.Morph.value
-        |> Value.field ( .percent, "percent" ) Float.Morph.value
-        |> Value.field ( .per100k, "per100k" ) Float.Morph.value
-        |> Value.recordFinish
+        |> Group.partValue ( .name, "name" ) String.Morph.value
+        |> Group.partValue ( .percent, "percent" ) Float.Morph.value
+        |> Group.partValue ( .per100k, "per100k" ) Float.Morph.value
+        |> Group.finishValue
 ```
 surprisingly easy!
 
@@ -52,8 +54,9 @@ Another example with a `type` adapted from [elm guide on custom types](https://g
 module User exposing (value)
 
 import Unit
+import Choice
+import Group
 import Value exposing (MorphValue)
-import Morph
 import String.Morph
 
 type User
@@ -66,7 +69,7 @@ type alias SignedIn =
 
 value : MorphValue User
 value =
-    Morph.choice
+    Choice.between
         (\variantAnonymous variantSignedIn user ->
             case user of
                 Anonymous ->
@@ -75,19 +78,19 @@ value =
                 SignedIn signedIn ->
                     variantSignedIn signedIn
         )
-        |> Value.variant ( \() -> Anonymous, "Anonymous" ) Unit.value
-        |> Value.variant ( SignedIn, "SignedIn" ) signedInValue
-        |> Value.choiceFinish
+        |> Choice.tryValue ( \() -> Anonymous, "Anonymous" ) Unit.value
+        |> Choice.tryValue ( SignedIn, "SignedIn" ) signedInValue
+        |> Choice.finishValue
 
 signedInValue : MorphValue SignedIn
 signedInValue =
-    Value.record
+    Group.value
         (\name status ->
             { name = name, status = status }
         )
-        |> Value.field ( .name, "name" ) String.Morph.value
-        |> Value.field ( .statue, "status" ) String.Morph.value
-        |> Value.recordFinish
+        |> Group.partValue ( .name, "name" ) String.Morph.value
+        |> Group.partValue ( .statue, "status" ) String.Morph.value
+        |> Group.finishValue
 ```
 clean
 
@@ -104,11 +107,14 @@ Like [`Morph`](Morph#Morph), [`MorphRow`](Morph#MorphRow) makes the process simp
 
 Here a 1:1 port of [an example from `elm/parser`](https://dark.elm.dmy.fr/packages/elm/parser/latest/Parser#lazy):
 ```elm
-import Morph exposing (MorphRow, broad, atLeast, grab, skip, one, narrow)
+import Choice
+import Group exposing (skip, grab)
+import Morph exposing (MorphRow, broad, narrowWith, one)
 import Char.Morph
 import String.Morph
 import N exposing (n0)
 import ArraySized
+import ArraySized.Morph exposing (atLeast)
 
 type Boolean
     = True
@@ -116,16 +122,16 @@ type Boolean
     | Or { left : Boolean, right : Boolean }
 
 "((true || false) || false)"
-    |> narrow
+    |> narrowWith
         (boolean
             |> Morph.rowFinish
-            |> Morph.over String.Morph.list
+            |> Morph.over Stack.Morph.string
         )
 --> Ok (BooleanOr { left = BooleanOr { left = BooleanTrue, right = BooleanFalse }, right = BooleanFalse })
 
 boolean : MorphRow Char Boolean
 boolean =
-    Morph.choice
+    Choice.between
         (\true false or booleanNarrow ->
             case booleanNarrow of
                 BooleanTrue ->
@@ -137,9 +143,9 @@ boolean =
                 BooleanOr arguments ->
                     or arguments
         )
-        |> Morph.rowTry (\() -> True) (String.Morph.only "true")
-        |> Morph.rowTry (\() -> False) (String.Morph.only "false")
-        |> Morph.rowTry Or or
+        |> Choice.tryRow (\() -> True) (String.Morph.only "true")
+        |> Choice.tryRow (\() -> False) (String.Morph.only "false")
+        |> Choice.tryRow Or or
 
 or : MorphRow Char { left : Boolean, right : Boolean }
 or =
@@ -164,7 +170,7 @@ or =
 What's different from writing a parser?
 
   - `broad ...` provides defaults for generated broad values
-  - `choice (\... -> case ... of ...)` exhaustively matches possibilities with according broad values
+  - `Choice.between (\... -> case ... of ...)` exhaustively matches possibilities with according broad values
   - `grab ... ...` also shows how to access the morphed positional part
 
 Confused? Hyped? Hit @lue up on anything on slack!

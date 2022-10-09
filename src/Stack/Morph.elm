@@ -1,16 +1,15 @@
 module Stack.Morph exposing
-    ( belowTopTranslate, topTranslate
+    ( reverse, eachElement
     , list, toList
     , string, toString
     )
 
-{-| [`Morph`](Morph#Morph) to and from a [`Stack`](https://dark.elm.dmy.fr/packages/lue-bird/elm-emptiness-typed/latest/Stack)
+{-| [`Morph`](Morph#Morph) a [`Stack`](https://dark.elm.dmy.fr/packages/lue-bird/elm-emptiness-typed/latest/Stack)
 
 
 ## alter
 
-@docs reverse
-@docs belowTopTranslate, topTranslate
+@docs reverse, eachElement
 
 
 ## transform
@@ -20,9 +19,11 @@ module Stack.Morph exposing
 
 -}
 
-import Emptiable exposing (Emptiable)
+import Emptiable exposing (Emptiable, filled)
+import Linear exposing (Direction(..))
+import List.Morph
 import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, MorphOrError, Translate, translate, translateOn)
-import Possibly exposing (Possibly)
+import Possibly exposing (Possibly(..))
 import Set exposing (Set)
 import Stack exposing (StackTopBelow, Stacked)
 
@@ -41,56 +42,62 @@ reverse =
     translate List.reverse List.reverse
 
 
-{-| [`Translate`](Morph#Translate) each stacked element except the top one
--}
-belowTopTranslate :
-    MorphIndependently
-        (beforeMapElement -> Result (ErrorWithDeadEnd Never) mappedElement)
-        (beforeUnmapElement -> unmappedElement)
-    ->
-        MorphIndependently
-            (Emptiable (StackTopBelow top beforeMapElement) possiblyOrNever
-             ->
-                Result
-                    error_
-                    (Emptiable (StackTopBelow top mappedElement) possiblyOrNever)
-            )
-            (Emptiable (StackTopBelow top beforeUnmapElement) possiblyOrNever
-             -> Emptiable (StackTopBelow top unmappedElement) possiblyOrNever
-            )
-belowTopTranslate elementMorph =
-    translateOn ( belowTopElementMap, belowTopElementMap ) elementMorph
+{-| [`Morph`](Morph#Morph) each stacked element
 
+If the given [`Morph`](Morph#Morph) is a [`Translate`](Morph#Translate),
+[`eachBelowTop`](#eachBelowTop) is equivalent to
 
-belowTopElementMap :
-    (belowElement -> belowElementMapped)
-    ->
-        (Emptiable (StackTopBelow top belowElement) possiblyOrNever
-         -> Emptiable (StackTopBelow top belowElementMapped) possiblyOrNever
+    Morph.translateOn
+        ( Stack.belowTopMap (\_ -> elementMap)
+        , Stack.belowTopMap (\_ -> elementMap)
         )
-belowTopElementMap elementMap =
-    Stack.belowTopMap (\_ -> elementMap)
 
-
-{-| [`Translate`](Morph#Translate) the top element
 -}
-topTranslate :
+eachElement :
     MorphIndependently
-        (beforeMapElement -> Result (ErrorWithDeadEnd Never) mappedElement)
-        (beforeUnmapElement -> unmappedElement)
+        (beforeNarrow
+         -> Result (Morph.ErrorWithDeadEnd deadEnd) narrow
+        )
+        (beforeBroaden -> broad)
     ->
         MorphIndependently
-            (Emptiable (StackTopBelow beforeMapElement narrowBelowTop) possiblyOrNever
+            (Emptiable (Stacked beforeNarrow) broadEmptiablePossiblyOrNever
              ->
                 Result
-                    error_
-                    (Emptiable (StackTopBelow mappedElement narrowBelowTop) possiblyOrNever)
+                    (Morph.ErrorWithDeadEnd deadEnd)
+                    (Emptiable (Stacked narrow) broadEmptiablePossiblyOrNever)
             )
-            (Emptiable (StackTopBelow beforeUnmapElement broadBelowTop) possiblyOrNever
-             -> Emptiable (StackTopBelow unmappedElement broadBelowTop) possiblyOrNever
+            (Emptiable (Stacked beforeBroaden) narrowPossiblyOrNever
+             -> Emptiable (Stacked broad) narrowPossiblyOrNever
             )
-topTranslate elementMorph =
-    translateOn ( Stack.topMap, Stack.topMap ) elementMorph
+eachElement elementMorph =
+    { description =
+        { custom = Stack.only "each"
+        , inner =
+            Morph.Elements (elementMorph |> Morph.description)
+                |> filled
+        }
+    , narrow =
+        \stack ->
+            case stack of
+                Emptiable.Empty emptyPossiblyOrNever ->
+                    Emptiable.Empty emptyPossiblyOrNever
+
+                Emptiable.Filled (Stack.TopDown top belowTop) ->
+                    stack
+                        |> Stack.toList
+                        |> List.Morph.eachElement elementMorph
+                        |> Result.map
+                            (\list ->
+                                case list of
+                                    -- is this branch is reached,
+                                    -- List.Morph.eachElement has a bug
+                                    [] ->
+                                        case top |> 
+                            )
+    , broaden =
+        Stack.map (\_ -> Morph.broadenWith elementMorph)
+    }
 
 
 

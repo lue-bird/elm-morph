@@ -20,6 +20,8 @@ module Dict.Morph exposing
 -}
 
 import Dict exposing (Dict)
+import Group
+import List.Morph
 import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, Translate, translate, translateOn)
 import Value exposing (MorphValue)
 
@@ -28,16 +30,20 @@ fromListImplementation :
     List { key : comparableKey, value : value }
     -> Dict comparableKey value
 fromListImplementation =
-    List.foldl
-        (\entry -> Dict.insert entry.key entry.value)
-        Dict.empty
+    \dict ->
+        dict
+            |> List.foldl
+                (\entry -> Dict.insert entry.key entry.value)
+                Dict.empty
 
 
 toListImplementation : Dict key value -> List { key : key, value : value }
 toListImplementation =
-    Dict.foldr
-        (\key value -> (::) { key = key, value = value })
-        []
+    \dict ->
+        dict
+            |> Dict.foldr
+                (\key value_ -> (::) { key = key, value = value_ })
+                []
 
 
 
@@ -129,8 +135,9 @@ value :
     }
     -> MorphValue (Dict comparableKey value)
 value entryMorphs =
-    Dict.Morph.list
-        |> Morph.over (list (keyValueValue entryMorphs))
+    list
+        |> Morph.over
+            (List.Morph.value (keyValueValue entryMorphs))
 
 
 keyValueValue :
@@ -139,8 +146,8 @@ keyValueValue :
     }
     -> MorphValue { key : key, value : value }
 keyValueValue entryMorph =
-    Value.record
-        (\key value -> { key = key, value = value })
-        |> Value.field ( .key, "key" ) entryMorph.key
-        |> Value.field ( .value, "value" ) entryMorph.value
-        |> Value.recordFinish
+    Group.value
+        (\key value_ -> { key = key, value = value_ })
+        |> Group.partValue ( .key, "key" ) entryMorph.key
+        |> Group.partValue ( .value, "value" ) entryMorph.value
+        |> Group.finishValue

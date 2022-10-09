@@ -35,7 +35,6 @@ import Emptiable exposing (Emptiable)
 import Json.Decode
 import Json.Encode
 import Morph exposing (Morph, MorphIndependently, Translate, translate)
-import Morph.Error
 import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Stack exposing (Stacked)
@@ -66,27 +65,32 @@ type alias JsValueMagic =
     Json.Encode.Value
 
 
-{-| A valid JSON value. `case`able. Elm doesn't crash on `==`.
+{-| A valid\* JSON value. `case`able. Elm doesn't crash on `==`.
 Can't contain any [spooky impure stuff](#JsValueMagic)
--}
-type alias Json tag =
-    LiteralOrStructure Literal (Structure tag)
 
+---
 
-{-| json literal. null, bool, number, string
+\*
 
   - json numbers don't strictly adhere to a `Float`
     as defined in the [IEEE 754 standard][ieee]
     which is hardcoded into almost all CPUs.
     This standard allows `Infinity` and `NaN`
   - elm `Decoder`s/`Encoder`s can only handle `Float`s
-  - [The JSON spec][json] does not include these values, so we encode them
-    [`elm/json` silently encodes both as `null`](https://github.com/elm/json/blob/0206c00884af953f2cba8823fee111ee71a0330e/src/Json/Encode.elm#L106)
-    matching `JSON.stringify` behavior in plain JS
+  - [The json.org spec][json] does not include `Infinity` and `NaN`
+    and [`elm/json` silently encodes both as `null`](https://github.com/elm/json/blob/0206c00884af953f2cba8823fee111ee71a0330e/src/Json/Encode.elm#L106)
+  - this behavior matches `JSON.stringify` behavior in plain JS
+  - In general, ["[...] JSON is a Minefield 💣"](https://seriot.ch/projects/parsing_json.html)
 
 [ieee]: https://en.wikipedia.org/wiki/IEEE_754
 [json]: https://www.json.org/
 
+-}
+type alias Json tag =
+    LiteralOrStructure Literal (Structure tag)
+
+
+{-| json literal. null, bool, number, string
 -}
 type Literal
     = Null ()
@@ -129,7 +133,7 @@ decodeErrorToMorph =
                 [ "field `"
                 , fieldName
                 , "`: "
-                , error |> decodeErrorToMorph |> Morph.Error.toString
+                , error |> decodeErrorToMorph |> Morph.Error.errorToString
                 , "\n\n"
                 , "`Morph` can't turn this into a more structured error"
                 , " because it refers to field errors by their location in the dict/record/object."
@@ -188,11 +192,15 @@ stringBroadWith : { indentation : Int } -> Morph (Json String) String
 stringBroadWith { indentation } =
     Morph.to "json"
         { narrow =
-            Json.Decode.decodeValue jsValueMagicDecoder
-                >> Result.mapError decodeErrorToMorph
+            \jsValueMagicBroad ->
+                jsValueMagicBroad
+                    |> Json.Decode.decodeValue jsValueMagicDecoder
+                    |> Result.mapError decodeErrorToMorph
         , broaden =
-            jsValueMagicEncode ()
-                >> Json.Encode.encode indentation
+            \json ->
+                json
+                    |> jsValueMagicEncode ()
+                    |> Json.Encode.encode indentation
         }
 
 
@@ -297,7 +305,7 @@ value :
         )
         (Json tag -> Value.Value tag)
 value =
-    translate toValue fromValue
+    translate toValue value
 
 
 toValue : Json Value.IndexAndName -> Value.Value Value.IndexAndName
@@ -356,8 +364,8 @@ structureToValue =
                     |> Value.Record
 
 
-fromValue : Value.Value tag -> Json tag
-fromValue =
+value : Value.Value tag -> Json tag
+value =
     \json ->
         case json of
             Literal literal ->

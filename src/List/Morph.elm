@@ -1,6 +1,7 @@
 module List.Morph exposing
     ( reverse, eachElement
     , for, forBroad
+    , value
     )
 
 {-| [`Morph`](Morph#Morph) to and from a `List`
@@ -13,7 +14,12 @@ module List.Morph exposing
 
 ## sequence
 
-for, forBroad
+@docs for, forBroad
+
+
+## transform
+
+@docs value
 
 -}
 
@@ -26,7 +32,7 @@ import N exposing (Up)
 import Possibly exposing (Possibly(..))
 import Stack exposing (Stacked)
 import Value exposing (MorphValue)
-import Value.Unexposed
+import Value.PackageInternal
 
 
 
@@ -108,7 +114,7 @@ Don't try to be clever with this.
             )
     --> Ok [ 'a', 'b' ]
 
-The usual [`succeed`](#succeed)`(\... -> ...) |>`[`grab`](#grab)-[`skip`](#skip) chain
+The usual [`Morph.succeed`](#Morph.succeed)`(\... -> ...) |>`[`grab`](#grab)-[`skip`](#skip) chain
 is often more explicit, descriptive and type-safe.
 
 Because of this, `MorphRow` only exposes `for`, not `sequence`,
@@ -201,7 +207,7 @@ value elementMorph =
 
                             structureExceptList ->
                                 structureExceptList
-                                    |> Value.Unexposed.structureKindToString
+                                    |> Value.PackageInternal.structureKindToString
                                     |> Err
                 , broaden = Value.List
                 }

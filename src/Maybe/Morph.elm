@@ -1,15 +1,18 @@
-module Maybe.Morph exposing (value)
+module Maybe.Morph exposing (row, value)
 
 {-| [`Morph`](Morph#Morph) a `Maybe`
 
 
 ## transform
 
-@docs value
+@docs row, value
 
 -}
 
-import Morph
+import Choice
+import Group
+import Morph exposing (MorphRow)
+import Unit
 import Value exposing (MorphValue)
 
 
@@ -17,7 +20,7 @@ import Value exposing (MorphValue)
 -}
 value : MorphValue element -> MorphValue (Maybe element)
 value contentMorph =
-    Morph.choice
+    Choice.between
         (\just nothing narrowMaybe ->
             case narrowMaybe of
                 Nothing ->
@@ -26,6 +29,44 @@ value contentMorph =
                 Just content ->
                     content |> just
         )
-        |> Value.variant ( Just, "Just" ) contentMorph
-        |> Value.variant ( \() -> Nothing, "Nothing" ) unit
-        |> Value.choiceFinish
+        |> Choice.tryValue ( Just, "Just" ) contentMorph
+        |> Choice.tryValue ( \() -> Nothing, "Nothing" ) Unit.value
+        |> Choice.finishValue
+
+
+{-| [`Morph`](Morph#Morph) an optional value and return it as a `Maybe`
+
+> ℹ️ Equivalent regular expression: `?`
+
+    import Char.Morph exposing (letter)
+    import String.Morph as Text
+
+    -- maybe we get `Just` a letter
+    "a"
+        |> Text.narrowWith
+            (Maybe.Morph.row (AToZ.Morph.char |> Morph.one))
+    --> Ok (Just 'a')
+
+    -- maybe we get `Nothing`
+    "123abc"
+        |> Text.narrowWith
+            (Maybe.Morph.row (AToZ.Morph.char |> Morph.one))
+    --> Ok Nothing
+
+-}
+row :
+    MorphRow broadElement contentNarrow
+    -> MorphRow broadElement (Maybe contentNarrow)
+row contentMorphRow =
+    Choice.between
+        (\nothingVariant justVariant maybeNarrow ->
+            case maybeNarrow of
+                Nothing ->
+                    nothingVariant ()
+
+                Just justValue ->
+                    justVariant justValue
+        )
+        |> Choice.tryRow (\() -> Nothing) (Morph.succeed ())
+        |> Choice.tryRow Just contentMorphRow
+        |> Choice.finishRow

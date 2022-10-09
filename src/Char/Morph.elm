@@ -8,7 +8,7 @@ module Char.Morph exposing (only, string, value)
 
 import Morph exposing (Morph)
 import Value exposing (MorphValue)
-import Value.Unexposed
+import Value.PackageInternal
 
 
 {-| `Char` [`MorphValue`](Value#MorphValue)
@@ -21,7 +21,7 @@ and therefore can't be [decoded](Morph#narrowWith) again
 value : MorphValue Char
 value =
     string
-        |> Morph.over Value.Unexposed.string
+        |> Morph.over Value.PackageInternal.string
 
 
 {-| [`Morph`] a `String` of length 1 to a `Char`

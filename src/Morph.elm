@@ -6,7 +6,7 @@ module Morph exposing
     , value, only, validate
     , translate, broad, toggle, keep, translateOn
     , lazy
-    , succeed, end, one
+    , end, one, succeed
     , to
     , reverse
     , deadEndMap
@@ -14,12 +14,7 @@ module Morph exposing
     , description
     , broadenWith, narrowWith, mapWith
     , over, overRow
-    , group, part, GroupMorph(..), NoPart(..), groupFinish
-    , choice, try, ChoiceMorph(..), NoTry(..), choiceFinish
     , MorphRow, MorphRowIndependently, rowFinish
-    , skip, grab
-    , rowTry, ChoiceMorphRow, rowChoiceFinish
-    , atLeast, in_, exactly, emptiable
     , before
     )
 
@@ -41,7 +36,7 @@ module Morph exposing
 
 ### create row
 
-@docs succeed, end, one
+@docs end, one, succeed
 
 
 ## alter
@@ -58,19 +53,19 @@ module Morph exposing
 @docs broadenWith, narrowWith, mapWith
 
 
-# combine
+## chain
 
 @docs over, overRow
 
 
-## groups
+## group
 
-@docs group, part, GroupMorph, NoPart, groupFinish
+[`Group.Morph`](Group#Morph)
 
 
-## choices
+## Choice.between
 
-@docs choice, try, ChoiceMorph, NoTry, choiceFinish
+[`Choice.Morph`](Choice#Morph)
 
 
 ## row
@@ -78,19 +73,13 @@ module Morph exposing
 @docs MorphRow, MorphRowIndependently, rowFinish
 
 
-## group row
+### sequence row
 
-@docs skip, grab
+  - optional → [`Maybe.Morph.row`](Maybe-Morph#row)
+  - [`atLeast`](ArraySized-Morph-atLeast)
+  - [`exactly`](ArraySized-Morph-exactly)
+  - between → [`ArraySized.Morph.in_`](ArraySized-Morph-exactly)
 
-
-## choice row
-
-@docs rowTry, ChoiceMorphRow, rowChoiceFinish
-
-
-## sequence row
-
-@docs atLeast, in_, exactly, emptiable
 @docs before
 
 `whileAccumulate`, `until` aren't exposed for simplicity.
@@ -192,6 +181,26 @@ aren't worth
   - making new structure-specific types for
   - the extra type variable which decreases simplicity
 
+
+## limits
+
+This can only fail one way and that might not fit the actual narrow-ness of parts.
+
+An example is translating one programming language to another,
+where both can represent stuff the other can't.
+This can fail in both directions
+
+I haven't done something like that,
+but the answer to these questions is often to have
+
+    Morph LanguageBSubset LanguageA
+    -- LanguageBSubset -> LanguageA will always work
+
+and
+
+    Morph LanguageBSubset LanguageB
+    -- LanguageBSubset -> LanguageB will always work
+
 -}
 type alias Morph narrow broad =
     MorphIndependently
@@ -213,7 +222,7 @@ This general form is helpful to describe a step in building an incomplete [`Morp
 TODO: add error as type parameter to allow translate
 
 TODO: dream:
-Choice by group/choice/... associating errors and description
+Choice by group/Choice.between/... associating errors and description
 
 -}
 type alias MorphIndependently narrow broaden =
@@ -254,7 +263,7 @@ type alias Description =
 
   - chained morphs
   - narrow group of multiple
-  - narrow choice between multiple
+  - narrow Choice.between between multiple
 
 -}
 type DescriptionInner
@@ -321,6 +330,91 @@ type alias GroupError partError =
         Never
 
 
+{-| Create a message from the [`Error`](#Error)
+
+TODO: update examples
+
+    import Morph
+    import String.Morph as Text
+    import Char.Morph exposing (letter)
+
+    -- Getting a digit instead of a letter
+    "123"
+        |> Text.narrowWith letter
+        |> Result.mapError Morph.errorToString
+    --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '1'."
+
+    -- Running out of input characters
+    ""
+        |> Text.narrowWith letter
+        |> Result.mapError Morph.errorToString
+    --> Err "1:0: I was expecting a letter [a-zA-Z]. I reached the end of the input."
+
+-}
+errorToString : Error -> Emptiable (Stacked String) Never
+errorToString =
+    \expected ->
+        case expected of
+            DeadEnd unexpectedDescription ->
+                Stack.only unexpectedDescription
+
+            Row row ->
+                Stack.onTopLay
+                    ([ row.startDown |> String.fromInt
+                     , " elements from the last"
+                     ]
+                        |> String.concat
+                    )
+                    (row.error |> errorToString)
+
+            Parts parts ->
+                Stack.onTopLay
+                    "in the parts"
+                    (parts
+                        |> Emptiable.emptyAdapt never
+                        |> Stack.map
+                            (\_ part ->
+                                Stack.onTopLay
+                                    ([ "part ", part.index |> String.fromInt, ":" ]
+                                        |> String.concat
+                                    )
+                                    (part.error |> errorToString)
+                                    |> markdownElement
+                            )
+                        |> Stack.flatten
+                    )
+
+            Possibilities possibilities ->
+                Stack.onTopLay
+                    "i tried"
+                    (possibilities
+                        |> Emptiable.emptyAdapt never
+                        |> Stack.map
+                            (\_ possibility ->
+                                Stack.onTopLay
+                                    ([ "possibility:" ]
+                                        |> String.concat
+                                    )
+                                    (possibility |> errorToString)
+                                    |> markdownElement
+                            )
+                        |> Stack.flatten
+                    )
+
+
+markdownElement :
+    Emptiable (Stacked String) Never
+    -> Emptiable (Stacked String) never_
+markdownElement =
+    \elementMarkdown ->
+        Stack.onTopLay
+            ([ "  - ", elementMarkdown |> Stack.top ] |> String.concat)
+            (elementMarkdown
+                |> Stack.topRemove
+                |> Stack.map (\_ possibilityLine -> "    " ++ possibilityLine)
+            )
+
+
 {-| Describe the context to improve error messages.
 
     import Morph.Error
@@ -331,13 +425,13 @@ type alias GroupError partError =
     "123"
         |> Text.narrowWith
             (Morph.to "variable name"
-                (atLeast n1 Char.letter)
+                (atLeast n1 AToZ.Morph.char)
             )
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting a name consisting of letters. I got stuck when I got '1'."
 
 
-    import Morph exposing (take, drop, succeed, expect, one)
+    import Morph exposing (take, drop, Morph.succeed, expect, one)
     import String.Morph as Text
 
     type alias Point =
@@ -352,7 +446,7 @@ type alias GroupError partError =
     point : MorphRow Point
     point =
         Morph.to "point"
-            (succeed (\x y -> { x = x, y = y })
+            (Morph.succeed (\x y -> { x = x, y = y })
                 |> skip (Char.Morph.only '(' |> one)
                 |> grab .x Text.number
                 |> skip (Char.Morph.only ',' |> one)
@@ -460,7 +554,7 @@ Narrowing gives you
 ```
 printable : Morph LocalSymbolPrintable Char (Morph.Error Char)
 printable =
-    choice
+    Choice.between
         (\exclamationMark numberSign dollarSign percentSign ampersand asterisk lowLine hyphenMinus backSlash printable ->
             case printable of
                 ExclamationMark ->
@@ -487,15 +581,15 @@ printable =
                 HyphenMinus ->
                     hyphenMinus ()
         )
-        |> Morph.try (\() -> ExclamationMark) (Char.Morph.only '!')
-        |> Morph.try (\() -> NumberSign) (Char.Morph.only '#')
-        |> Morph.try (\() -> DollarSign) (Char.Morph.only '$')
-        |> Morph.try (\() -> PercentSign) (Char.Morph.only '%')
-        |> Morph.try (\() -> Ampersand) (Char.Morph.only '&')
-        |> Morph.try (\() -> Asterisk) (Char.Morph.only '*')
-        |> Morph.try (\() -> LowLine) (Char.Morph.only '_')
-        |> Morph.try (\() -> HyphenMinus) (Char.Morph.only '-')
-        |> Morph.choiceFinish
+        |> Choice.try (\() -> ExclamationMark) (Char.Morph.only '!')
+        |> Choice.try (\() -> NumberSign) (Char.Morph.only '#')
+        |> Choice.try (\() -> DollarSign) (Char.Morph.only '$')
+        |> Choice.try (\() -> PercentSign) (Char.Morph.only '%')
+        |> Choice.try (\() -> Ampersand) (Char.Morph.only '&')
+        |> Choice.try (\() -> Asterisk) (Char.Morph.only '*')
+        |> Choice.try (\() -> LowLine) (Char.Morph.only '_')
+        |> Choice.try (\() -> HyphenMinus) (Char.Morph.only '-')
+        |> Choice.finish
 ```
 
 -}
@@ -742,544 +836,6 @@ value descriptionCustom morphTransformations =
 
 
 
--- group
-
-
-{-| [`Morph`](#Morph) on groups in progress.
-Start with [`group`](#group), complete with [`part`](#part), finally [`groupFinish`](#groupFinish)
--}
-type GroupMorph narrow broaden noPartTag_ noPartPossiblyOrNever
-    = GroupMorphInProgress
-        { description :
-            -- parts
-            Emptiable (Stacked Description) noPartPossiblyOrNever
-        , narrow : narrow
-        , broaden : broaden
-        }
-
-
-{-| Word in a [`GroupMorph`](#GroupMorph) in progress. For example
-
-    choiceFinish :
-        Value.GroupMorph (N (InFixed N0 N9)) Char (N (InFixed N0 N9) -> Char) NoPart Never
-        -> Morph (N (InFixed N0 N9)) Char
-
--}
-type NoPart
-    = NoPartTag Never
-
-
-{-| Assemble a from its morphed [`part`](#part)s
-
-    ( "4", "5" )
-        |> narrowWith
-            (Morph.group
-                ( \x y -> { x = x, y = y }
-                , \x y -> ( x, y )
-                )
-                |> Morph.part ( .x, Tuple.first )
-                    (Integer.Morph.toInt
-                        |> Morph.overRow Integer.Morph.fromText
-                        |> Morph.rowFinish
-                    )
-                |> Morph.part ( .y, Tuple.second )
-                    (Integer.Morph.toInt
-                        |> Morph.overRow Integer.Morph.fromText
-                        |> Morph.rowFinish
-                    )
-            )
-    --> Ok { x = 4, y = 5 }
-
--}
-group :
-    ( narrowAssemble
-    , broadAssemble
-    )
-    ->
-        GroupMorph
-            (broad_
-             -> Result error_ narrowAssemble
-            )
-            (groupNarrow_ -> broadAssemble)
-            NoPart
-            Possibly
-group ( narrowAssemble, broadAssemble ) =
-    { description = Emptiable.empty
-    , narrow = \_ -> narrowAssemble |> Ok
-    , broaden = \_ -> broadAssemble
-    }
-        |> GroupMorphInProgress
-
-
-{-| The [`Morph`](#Morph) of the next part in a [`group`](#group).
-
-    Morph.group
-        ( \nameFirst nameLast email ->
-            { nameFirst = nameFirst, nameLast = nameLast, email = email }
-        , \nameFirst nameLast email ->
-            { nameFirst = nameFirst, nameLast = nameLast, email = email }
-        )
-        |> Morph.part ( .nameFirst, .nameFirst ) remain
-        |> Morph.part ( .nameLast, .nameLast ) remain
-        |> Morph.part ( .email, .email ) emailMorph
-
--}
-part :
-    ( groupNarrow -> partNarrow
-    , groupBroad -> partBroad
-    )
-    -> MorphOrError partNarrow partBroad partError
-    ->
-        (GroupMorph
-            (groupBroad
-             ->
-                Result
-                    (GroupError partError)
-                    (partNarrow -> groupNarrowFurther)
-            )
-            (groupNarrow -> (partBroad -> groupBroadenFurther))
-            NoPart
-            noPartPossiblyOrNever_
-         ->
-            GroupMorph
-                (groupBroad
-                 ->
-                    Result
-                        (GroupError partError)
-                        groupNarrowFurther
-                )
-                (groupNarrow -> groupBroadenFurther)
-                NoPart
-                noPartNever_
-        )
-part ( narrowPartAccess, broadPartAccess ) partMorph =
-    \(GroupMorphInProgress groupMorphSoFar) ->
-        { description =
-            groupMorphSoFar.description
-                |> Stack.onTopLay partMorph.description
-        , narrow =
-            groupMorphSoFar.narrow
-                |> narrowPart
-                    (groupMorphSoFar.description |> Stack.length)
-                    broadPartAccess
-                    (narrowWith partMorph)
-        , broaden =
-            groupMorphSoFar.broaden
-                |> broadenPart narrowPartAccess (broadenWith partMorph)
-        }
-            |> GroupMorphInProgress
-
-
-broadenPart :
-    (groupNarrow -> partNarrow)
-    -> (partNarrow -> partBroad)
-    ->
-        ((groupNarrow -> (partBroad -> groupBroadenFurther))
-         -> (groupNarrow -> groupBroadenFurther)
-        )
-broadenPart narrowPartAccess broadenPartMorph =
-    \groupMorphSoFarBroaden ->
-        \groupNarrow ->
-            (groupNarrow |> groupMorphSoFarBroaden)
-                (groupNarrow
-                    |> narrowPartAccess
-                    |> broadenPartMorph
-                )
-
-
-narrowPart :
-    Int
-    -> (groupBroad -> partBroad)
-    -> (partBroad -> Result partError partNarrow)
-    ->
-        ((groupBroad
-          ->
-            Result
-                (GroupError partError)
-                (partNarrow -> groupNarrowFurther)
-         )
-         ->
-            (groupBroad
-             ->
-                Result
-                    (GroupError partError)
-                    groupNarrowFurther
-            )
-        )
-narrowPart index broadPartAccess narrowPartMorph =
-    \groupMorphSoFarNarrow ->
-        \groupBroad ->
-            let
-                narrowPartOrError : Result partError partNarrow
-                narrowPartOrError =
-                    groupBroad
-                        |> broadPartAccess
-                        |> narrowPartMorph
-            in
-            case ( groupBroad |> groupMorphSoFarNarrow, narrowPartOrError ) of
-                ( Ok groupMorphSoFarEat, Ok partNarrow ) ->
-                    groupMorphSoFarEat partNarrow |> Ok
-
-                ( Ok _, Err partError ) ->
-                    { index = index, error = partError }
-                        |> Stack.only
-                        |> Err
-
-                ( Err partsSoFarErrors, Ok _ ) ->
-                    partsSoFarErrors |> Err
-
-                ( Err partsSoFarErrors, Err partError ) ->
-                    partsSoFarErrors
-                        |> Stack.onTopLay { index = index, error = partError }
-                        |> Err
-
-
-{-| Conclude a [`Morph.group`](#group) |> [`Morph.part`](#part) chain
--}
-groupFinish :
-    GroupMorph
-        (beforeNarrow
-         ->
-            Result
-                (GroupError (ErrorWithDeadEnd deadEnd))
-                narrowed
-        )
-        (beforeBroaden -> broadened)
-        NoPart
-        Never
-    ->
-        MorphIndependently
-            (beforeNarrow -> Result (ErrorWithDeadEnd deadEnd) narrowed)
-            (beforeBroaden -> broadened)
-groupFinish =
-    \(GroupMorphInProgress groupMorphInProgress) ->
-        { description =
-            case groupMorphInProgress.description |> Emptiable.fill of
-                Stack.TopDown part0 (part1 :: parts2Up) ->
-                    { inner =
-                        ArraySized.l2 part0 part1
-                            |> ArraySized.glueMin Up
-                                (parts2Up |> ArraySized.fromList)
-                            |> Group
-                            |> Emptiable.filled
-                    , custom = Emptiable.empty
-                    }
-
-                Stack.TopDown partOnly [] ->
-                    partOnly
-        , narrow =
-            groupMorphInProgress.narrow
-                >> Result.mapError Parts
-        , broaden = groupMorphInProgress.broaden
-        }
-
-
-
--- choice
-
-
-{-| Possibly incomplete [`Morph`](#Morph) to and from a choice.
-See [`choice`](#choice), [`possibility`](#try), [`choiceFinish`](#choiceFinish)
--}
-type ChoiceMorph choiceNarrow choiceBroad choiceBroaden error noTryTag_ noTryPossiblyOrNever
-    = ChoiceMorphInProgress
-        { description :
-            -- possibilities
-            Emptiable (Stacked Description) noTryPossiblyOrNever
-        , narrow :
-            choiceBroad
-            ->
-                Result
-                    (-- possibilities
-                     Emptiable (Stacked error) noTryPossiblyOrNever
-                    )
-                    choiceNarrow
-        , broaden : choiceBroaden
-        }
-
-
-{-| Word in an incomplete morph in progress. For example
-
-    choiceFinish :
-        Morph.Choice (N (InFixed N0 N9)) Char (N (InFixed N0 N9) -> Char) NoTry Never
-        -> Morph (N (InFixed N0 N9)) Char
-
--}
-type NoTry
-    = NoTryTag Never
-
-
-{-| If the previous [`possibility`](#try) fails
-try this [`Morph`](#Morph).
-
-> ℹ️ Equivalent regular expression: `|`
-
-    import Char.Morph as Char
-    import Morph.Error
-    import AToZ exposing (AToZ)
-
-    type UnderscoreOrLetter
-        = Underscore
-        | Letter Char
-
-    underscoreOrLetter : Morph UnderscoreOrLetter Char
-    underscoreOrLetter =
-        choice
-            (\underscore letter underscoreOrLetter ->
-                case underscoreOrLetter of
-                    Underscore ->
-                        underscore ()
-
-                    Letter aToZ ->
-                        letter aToZ
-            )
-            |> try Underscore (Char.Morph.only '_')
-            |> try Letter AToZ.char
-
-    -- try the first possibility
-    "_" |> Text.narrowWith (underscoreOrLetter |> one)
-    --> Ok Underscore
-
-    -- if it fails, try the next
-    "a" |> Text.narrowWith (underscoreOrLetter |> one)
-    --> Ok 'a'
-
-    -- if none work, we get the error from all possible steps
-    "1"
-        |> Text.narrowWith (underscoreOrLetter |> one)
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '1'."
-
--}
-try :
-    (possibilityNarrow -> narrowChoice)
-    ->
-        MorphIndependently
-            (possibilityBeforeNarrow
-             -> Result error possibilityNarrow
-            )
-            (possibilityBeforeBroaden -> possibilityBroad)
-    ->
-        (ChoiceMorph
-            narrowChoice
-            possibilityBeforeNarrow
-            ((possibilityBeforeBroaden -> possibilityBroad)
-             -> choiceBroadenFurther
-            )
-            error
-            NoTry
-            noTryPossiblyOrNever_
-         ->
-            ChoiceMorph
-                narrowChoice
-                possibilityBeforeNarrow
-                choiceBroadenFurther
-                error
-                NoTry
-                noTryNever_
-        )
-try possibilityToChoice possibilityMorph =
-    \(ChoiceMorphInProgress choiceMorphSoFar) ->
-        { description =
-            choiceMorphSoFar.description
-                |> Stack.onTopLay possibilityMorph.description
-        , narrow =
-            \broadValue ->
-                broadValue
-                    |> choiceMorphSoFar.narrow
-                    |> restoreTry
-                        (\soFarExpectationPossibilities ->
-                            case broadValue |> narrowWith possibilityMorph of
-                                Ok possibilityNarrow ->
-                                    possibilityNarrow
-                                        |> possibilityToChoice
-                                        |> Ok
-
-                                Err possibilityExpectation ->
-                                    soFarExpectationPossibilities
-                                        |> Stack.onTopLay possibilityExpectation
-                                        |> Err
-                        )
-        , broaden =
-            choiceMorphSoFar.broaden
-                (broadenWith possibilityMorph)
-        }
-            |> ChoiceMorphInProgress
-
-
-{-| Discriminate into [possibilities](#try).
-
-    {-| Invisible spacing character.
-    -}
-    type Blank
-        = Space
-        | Tab
-        | Return Line.Return
-        | FormFeed
-
-    blankChar : Morph Blank Char (Morph.Error Char)
-    blankChar =
-        Morph.to "blank"
-            (choice
-                (\spaceVariant tabVariant returnVariant formFeedVariant blankNarrow ->
-                    case blankNarrow of
-                        Space ->
-                            spaceVariant ()
-
-                        Tab ->
-                            tabVariant ()
-
-                        Return return_ ->
-                            returnVariant return_
-
-                        FormFeed ->
-                            formFeedVariant ()
-                )
-                |> Morph.try (\() -> Space) (Char.Morph.only ' ')
-                |> Morph.try (\() -> Tab) (Char.Morph.only '\t')
-                |> Morph.try Return Line.returnChar
-                |> Morph.try (\() -> FormFeed)
-                    -- \f
-                    (Char.Morph.only '\u{000C}')
-                |> Morph.choiceFinish
-            )
-
-    {-| Line break character
-    -}
-    type Return
-        = NewLine
-        | CarriageReturn
-
-    {-| Match a line break character: Either
-
-      - new line `'\n'`
-      - carriage return `'\r'`
-
-    > ℹ️ Equivalent regular expression: `[\n\r]`
-
-        import Morph.Error
-        import String.Morph as Text
-
-        -- match a blank
-        "\n\t abc" |> Text.narrowWith blank --> Ok '\n'
-
-        -- anything else makes it fail
-        "abc"
-            |> Text.narrowWith blank
-            |> Result.mapError Morph.Error.textMessage
-        --> Err "1:1: I was expecting a blank space or new line. I got stuck when I got 'a'."
-
-    -}
-    returnChar : Morph Return Char (Morph.Error Char)
-    returnChar =
-        choice
-            (\newLineVariant carriageReturnVariant returnNarrow ->
-                case returnNarrow of
-                    NewLine ->
-                        newLineVariant ()
-
-                    CarriageReturn ->
-                        carriageReturnVariant ()
-            )
-            |> Morph.try (\() -> NewLine)
-                (Char.Morph.only '\n')
-            |> Morph.try (\() -> CarriageReturn)
-                -- \r
-                (Char.Morph.only '\u{000D}')
-            |> Morph.choiceFinish
-
-    {-| The end of a text line:
-    either a [return character](Return#Return) or the end of the whole text.
-    -}
-    type LineEnd
-        = InputEnd
-        | Return Return
-
-    {-| Consume the end of the current line or succeed if there are
-    no more remaining characters in the input text.
-
-    > ℹ️ Equivalent regular expression: `$`
-
-    -}
-    endText : MorphRow Char LineEnd
-    endText =
-        Morph.choice
-            (\returnVariant inputEndVariant maybeChoice ->
-                case maybeChoice of
-                    Return returnValue ->
-                        returnVariant returnValue
-
-                    InputEnd ->
-                        inputEndVariant ()
-            )
-            |> Morph.rowTry Return
-                (returnChar |> Morph.one)
-            |> Morph.rowTry (\() -> InputEnd)
-                Morph.end
-            |> Morph.rowChoiceFinish
-
--}
-choice :
-    choiceBroadenByPossibility
-    ->
-        ChoiceMorph
-            choiceNarrow_
-            choiceBroad_
-            choiceBroadenByPossibility
-            error_
-            NoTry
-            Possibly
-choice choiceBroadenDiscriminatedByPossibility =
-    { description = Emptiable.empty
-    , narrow =
-        \_ ->
-            Emptiable.empty |> Err
-    , broaden = choiceBroadenDiscriminatedByPossibility
-    }
-        |> ChoiceMorphInProgress
-
-
-{-| Conclude a [`Morph.choice`](#choice) |> [`Morph.try`](#try) chain
--}
-choiceFinish :
-    ChoiceMorph
-        narrow
-        beforeNarrow
-        broaden
-        (ErrorWithDeadEnd deadEnd)
-        NoTry
-        Never
-    ->
-        MorphIndependently
-            (beforeNarrow
-             -> Result (ErrorWithDeadEnd deadEnd) narrow
-            )
-            broaden
-choiceFinish =
-    \(ChoiceMorphInProgress choiceMorphComplete) ->
-        { description =
-            case choiceMorphComplete.description |> Emptiable.fill of
-                Stack.TopDown variantOnly [] ->
-                    variantOnly
-
-                Stack.TopDown variant0 (variant1 :: variants2Up) ->
-                    { custom = Emptiable.empty
-                    , inner =
-                        ArraySized.l2 variant0 variant1
-                            |> ArraySized.glueMin Up
-                                (variants2Up |> ArraySized.fromList)
-                            |> Choice
-                            |> Emptiable.filled
-                    }
-        , narrow =
-            choiceMorphComplete.narrow
-                >> Result.mapError Possibilities
-        , broaden =
-            choiceMorphComplete.broaden
-        }
-
-
-
 --
 
 
@@ -1295,7 +851,7 @@ choiceFinish =
 
     lazyList : MorphRow LazyList
     lazyList =
-        choice
+        Choice.between
             (\endVariant nextVariant lazyListNarrow ->
                 case lazyListNarrow of
                     End ->
@@ -1303,10 +859,10 @@ choiceFinish =
                     Next next ->
                         nextVariant next
             )
-            |> Morph.try (\() -> End)
+            |> Choice.try (\() -> End)
                 (String.Morph.only "[]")
-            |> Morph.try Next
-                (succeed Tuple.pair
+            |> Choice.try Next
+                (Morph.succeed Tuple.pair
                     |> grab
                         (Integer.Morph.toInt
                             |> Morph.overRow Integer.Morph.text
@@ -1489,8 +1045,10 @@ See also: [`deadEndNever`](#deadEndNever)
 -}
 deadEndMap :
     (deadEnd -> deadEndMapped)
-    -> ErrorWithDeadEnd deadEnd
-    -> ErrorWithDeadEnd deadEndMapped
+    ->
+        (ErrorWithDeadEnd deadEnd
+         -> ErrorWithDeadEnd deadEndMapped
+        )
 deadEndMap deadEndChange =
     \error ->
         case error of
@@ -1635,7 +1193,7 @@ type alias MorphText narrow =
 
 ## example: 2D point
 
-    import Morph exposing (MorphRow, atLeast, skip, into, succeed, grab, one)
+    import Morph exposing (MorphRow, atLeast, skip, into, Morph.succeed, grab, one)
     import Char.Morph as Char
     import String.Morph as Text exposing (number)
     import Morph.Error
@@ -1659,7 +1217,7 @@ type alias MorphText narrow =
     point : MorphRow Point
     point =
         Morph.to "point"
-            (succeed (\x y -> { x = x, y = y })
+            (Morph.succeed (\x y -> { x = x, y = y })
                 |> skip (String.Morph.only "(")
                 |> skip
                     (broad [ () ]
@@ -1732,7 +1290,7 @@ type alias MorphRow broadElement narrow =
 
 
 {-| Incomplete [`MorphRow`](#MorphRow) for a thing composed of multiple parts = group.
-It's what you supply during a [`succeed`](#succeed)`|>`[`grab`](#grab)/[`skip`](#skip) build
+It's what you supply during a [`Morph.succeed`](#Morph.succeed)`|>`[`grab`](#grab)/[`skip`](#skip) build
 -}
 type alias MorphRowIndependently broadElement beforeBroaden narrowed =
     MorphIndependently
@@ -1747,118 +1305,6 @@ type alias MorphRowIndependently broadElement beforeBroaden narrowed =
         (beforeBroaden
          -> Emptiable (Stacked broadElement) Possibly
         )
-
-
-
---
-
-
-{-| Take what we get from [converting](#MorphRow) the next section
-and channel it back up to the [`succeed`](#succeed) grouping
--}
-grab :
-    (groupNarrow -> partNextNarrow)
-    -> MorphRow broadElement partNextNarrow
-    ->
-        (MorphRowIndependently
-            broadElement
-            groupNarrow
-            (partNextNarrow -> groupNarrowFurther)
-         ->
-            MorphRowIndependently
-                broadElement
-                groupNarrow
-                groupNarrowFurther
-        )
-grab partAccess grabbedNextMorphRow =
-    \groupMorphRowSoFar ->
-        { description = groupMorphRowSoFar |> description
-        , narrow =
-            \broad_ ->
-                broad_
-                    |> narrowWith groupMorphRowSoFar
-                    |> Result.andThen
-                        (\result ->
-                            result.broad
-                                |> narrowWith grabbedNextMorphRow
-                                |> Result.map
-                                    (\nextParsed ->
-                                        { narrow = result.narrow nextParsed.narrow
-                                        , broad = nextParsed.broad
-                                        }
-                                    )
-                        )
-        , broaden =
-            \groupNarrow ->
-                groupNarrow
-                    |> partAccess
-                    |> grabbedNextMorphRow.broaden
-                    |> Stack.onTopStack
-                        (groupNarrow
-                            |> groupMorphRowSoFar.broaden
-                        )
-        }
-
-
-
--- basic
-
-
-{-| Require values to be matched next to continue but ignore the result.
-
-    import String.Morph exposing (text)
-    import Morph exposing (succeed, atLeast, take, drop)
-
-    -- parse a simple email, but we're only interested in the username
-    "user@example.com"
-        |> Text.narrowWith
-            (succeed (\userName -> { username = userName })
-                |> grab .username (atLeast n1 aToZ)
-                |> skip (one '@')
-                |> skip
-                    (Text.fromList
-                        |> Morph.overRow (atLeast n1 aToZ)
-                        |> broad "example"
-                    )
-                |> skip (text ".com")
-            )
-    --> Ok { username = "user" }
-
-[`broad`](#broad) `... |>` [`Morph.overRow`](MorphRow#over) is cool:
-when multiple kinds of input can be dropped,
-it allows choosing a default possibility for building.
-
--}
-skip :
-    MorphRow broadElement ()
-    ->
-        (MorphRowIndependently broadElement groupNarrow narrow
-         -> MorphRowIndependently broadElement groupNarrow narrow
-        )
-skip ignoredNext =
-    \groupMorphRowSoFar ->
-        { description = groupMorphRowSoFar |> description
-        , narrow =
-            \broad_ ->
-                broad_
-                    |> narrowWith groupMorphRowSoFar
-                    |> Result.andThen
-                        (\result ->
-                            result.broad
-                                |> narrowWith ignoredNext
-                                |> Result.map
-                                    (\nextParsed ->
-                                        { narrow = result.narrow
-                                        , broad = nextParsed.broad
-                                        }
-                                    )
-                        )
-        , broaden =
-            \groupNarrow ->
-                (() |> ignoredNext.broaden)
-                    |> Stack.onTopStack
-                        (groupNarrow |> groupMorphRowSoFar.broaden)
-        }
 
 
 {-| [`MorphRow`](#MorphRow) from and to a single broad input.
@@ -1928,23 +1374,15 @@ one =
         }
 
 
-{-| Always [`narrow`](#narrow) to a given constant.
-
-    import Morph exposing (succeed)
-
-    "no matter the input text"
-        |> Text.narrowWith (succeed "abc")
-    --> Ok "abc"
+{-| Never consumes anything.
+Always returns the given narrow constant.
+Never fails.
 
 For anything composed of multiple parts,
+first declaratively describes what you expect to get in the end,
+then [taking](#grab) and [dropping](#skip) what you need to parse
 
-> `succeed` is the key to success
-> – folks from [elm radio](https://elm-radio.com/)
-
-first declaratively describing what you expect to get in the end,
-then [taking](#grab) and [dropping](#skip) what you need to parse.
-
-    import Morph exposing (succeed, one)
+    import Morph exposing (Morph.succeed, one)
     import String.Morph exposing (integer)
 
     type alias Point =
@@ -1957,7 +1395,7 @@ then [taking](#grab) and [dropping](#skip) what you need to parse.
 
     point : MorphRow Char Point
     point =
-        succeed (\x y -> { x = x, y = y })
+        Morph.succeed (\x y -> { x = x, y = y })
             |> grab .x integer
             |> skip (MorphRow.only [ ',' ])
             |> grab .y integer
@@ -1966,29 +1404,33 @@ then [taking](#grab) and [dropping](#skip) what you need to parse.
     --> Ok { x = 12, y = 34 }
 
 
-### `succeed` anti-patterns
+### `Morph.succeed` anti-patterns
 
 One example you'll run into when using other parsers is using
 
-    succeed identity
+    Morph.succeed identity
         |> skip ...
         |> skip ...
         |> grab ...
         |> skip ...
 
-it get's pretty hard to read as you have to jump around the code to know what you're actually producing.
+it get's pretty hard to read as you have to jump around the code to know what you're actually producing
 
-    succeed (\sum -> sum) |> ...
+    Morph.succeed (\sum -> sum) |> ...
 
-is already nicer.
+is already nicer
 
 -}
 succeed :
-    constant
-    -> MorphRowIndependently broadElement_ narrow_ constant
+    narrowConstant
+    ->
+        MorphRowIndependently
+            broadElement_
+            beforeBroaden_
+            narrowConstant
 succeed narrowConstant =
     { description =
-        { custom = Emptiable.empty -- "any"
+        { custom = Emptiable.empty
         , inner = Emptiable.empty
         }
     , narrow =
@@ -2004,207 +1446,6 @@ succeed narrowConstant =
 
 
 -- chain
-
-
-{-| Possibly incomplete [`MorphRow`](#MorphRow) to and from a choice.
-See [`Morph.choice`](#choice), [`Morph.rowTry`](#try), [`MorphRow.choiceFinish`](#choiceFinish)
--}
-type alias ChoiceMorphRow broadElement choiceNarrow choiceBroaden noTryTag noTryPossiblyOrNever =
-    ChoiceMorph
-        { narrow : choiceNarrow
-        , broad : Emptiable (Stacked broadElement) Possibly
-        }
-        (Emptiable (Stacked broadElement) Possibly)
-        choiceBroaden
-        Error
-        noTryTag
-        noTryPossiblyOrNever
-
-
-{-| If the previous [`possibility`](#try) fails
-try this [`MorphRow`](#MorphRow).
-
-> ℹ️ Equivalent regular expression: `|`
-
-    import Morph
-    import Char.Morph as Char
-    import Morph.Error
-
-    type UnderscoreOrLetter
-        = Underscore
-        | Letter Char
-
-    underscoreOrLetter : MorphRow Char UnderscoreOrLetter
-    underscoreOrLetter =
-        choice
-            (\underscoreVariant letterVariant underscoreOrLetterNarrow ->
-                case underscoreOrLetterNarrow of
-                    Underscore ->
-                        underscoreVariant ()
-
-                    Letter letter ->
-                        letterVariant letter
-            )
-            |> try (\() -> Underscore) (Char.Morph.only '_')
-            |> try Letter AToZ.caseAny
-            |> choiceFinish
-
-    -- try the first possibility
-    "_"
-        |> Text.narrowWith underscoreOrLetter
-    --> Ok Underscore
-
-    -- if it fails, try the next
-    "a"
-        |> Text.narrowWith underscoreOrLetter
-    --> Ok 'a'
-
-    -- if none work, we get the error from all possible steps
-    "1"
-        |> Text.narrowWith (onFailDown [ one '_', Char.letter ])
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '1'."
-
-
-### example: fallback step if the previous step fails
-
-    import Morph
-    import Char.Morph as Char
-    import Morph.Error
-
-    type AlphaNum
-        = Digits (List (N (InFixed N0 N9)))
-        | Letters String
-
-    alphaNum : MorphRow Char AlphaNum
-    alphaNum =
-        Morph.choice
-            (\digit letter alphaNum ->
-                case alphaNum of
-                    Digits int ->
-                        digit int
-
-                    Letters char ->
-                        letter char
-            )
-            |> Morph.try Letter
-                (map String.Morph.fromList
-                    (atLeast n1 Char.letter)
-                )
-            |> Morph.try Digit
-                (atLeast n1 Digit.n0To9)
-            |> MorphRow.choiceFinish
-
-    -- try letters, or else give me some digits
-    "abc"
-        |> Text.narrowWith alphaNum
-    --> Ok "abc"
-
-    -- we didn't get letters, but we still got digits
-    "123"
-        |> Text.narrowWith alphaNum
-    --> Ok "123"
-
-    -- but if we still fail, give the expectations of all steps
-    "_"
-        |> Text.narrowWith alphaNum
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting at least 1 digit [0-9]. I got stuck when I got the character '_'."
-
--}
-rowTry :
-    (possibilityNarrow -> choiceNarrow)
-    -> MorphRow broadElement possibilityNarrow
-    ->
-        (ChoiceMorphRow
-            broadElement
-            choiceNarrow
-            ((possibilityNarrow -> Emptiable (Stacked broadElement) Possibly)
-             -> choiceBroadenFurther
-            )
-            NoTry
-            noTryPossiblyOrNever_
-         ->
-            ChoiceMorphRow
-                broadElement
-                choiceNarrow
-                choiceBroadenFurther
-                NoTry
-                never_
-        )
-rowTry possibilityToChoice possibilityMorph (ChoiceMorphInProgress choiceMorphSoFar) =
-    { description =
-        choiceMorphSoFar.description
-            |> Stack.onTopLay (possibilityMorph |> description)
-    , narrow =
-        \choiceBroad ->
-            choiceBroad
-                |> choiceMorphSoFar.narrow
-                |> restoreTry
-                    (\soFarErrorPossibilities ->
-                        case choiceBroad |> narrowWith possibilityMorph of
-                            Ok possibilityParsed ->
-                                { broad = possibilityParsed.broad
-                                , narrow =
-                                    possibilityParsed.narrow
-                                        |> possibilityToChoice
-                                }
-                                    |> Ok
-
-                            Err possibilityExpectation ->
-                                soFarErrorPossibilities
-                                    |> Stack.onTopLay possibilityExpectation
-                                    |> Err
-                    )
-    , broaden =
-        choiceMorphSoFar.broaden
-            (broadenWith possibilityMorph)
-    }
-        |> ChoiceMorphInProgress
-
-
-{-| Always the last step in a [`Morph.choice`](#choice) `|>` [`Morph.rowTry`](#try) build process
--}
-rowChoiceFinish :
-    ChoiceMorphRow
-        broadElement
-        choiceNarrow
-        (choiceNarrow -> Emptiable (Stacked broadElement) Possibly)
-        NoTry
-        Never
-    -> MorphRow broadElement choiceNarrow
-rowChoiceFinish =
-    \(ChoiceMorphInProgress choiceMorphRowComplete) ->
-        { description =
-            case choiceMorphRowComplete.description |> Emptiable.fill of
-                Stack.TopDown descriptionOnly [] ->
-                    descriptionOnly
-
-                Stack.TopDown description0 (description1 :: description2Up) ->
-                    { custom = Emptiable.empty
-                    , inner =
-                        ArraySized.l2 description0 description1
-                            |> ArraySized.glueMin Up
-                                (description2Up |> ArraySized.fromList)
-                            |> Group
-                            |> Emptiable.filled
-                    }
-        , narrow =
-            \broad_ ->
-                broad_
-                    |> choiceMorphRowComplete.narrow
-                    |> Result.mapError
-                        (\errorPossibilities ->
-                            { startDown = broad_ |> Stack.length
-                            , error = errorPossibilities |> Possibilities
-                            }
-                                |> Row
-                        )
-        , broaden = choiceMorphRowComplete.broaden
-        }
-
-
-
 {-
 
    `next` existed once:
@@ -2229,11 +1470,10 @@ rowChoiceFinish =
      - one should try to know what to morph by tracking context,
        independent of what narrow result the last morph gave
          - for example, don't use [`next`](#next) for versioning etc.
-           Use [`choice`](#choice) where each [`possibility`](#try) expects a specific number
+           Use [`Choice.between`](#Choice.between) where each [`possibility`](#try) expects a specific number
 
 
 -}
--- transform
 
 
 {-| Describe how to reach an even broader type.
@@ -2253,7 +1493,7 @@ rowChoiceFinish =
     -- get some letters, make them lowercase
     "ABC"
         |> Text.narrowWith
-            (atLeast n1 Char.letter
+            (atLeast n1 AToZ.Morph.char
                 |> map Text.fromList
                 |> map (toggle String.toLower)
             )
@@ -2318,315 +1558,6 @@ overRow morphRowBeforeMorph =
 -- sequence
 
 
-{-| Match an optional value and returns it as a `Maybe`.
-
-> ℹ️ Equivalent regular expression: `?`
-
-    import Char.Morph exposing (letter)
-    import String.Morph as Text
-
-    -- maybe we get `Just` a letter
-    "abc" |> Text.narrowWith (emptiable Char.letter)
-    --> Ok (Just 'a')
-
-    -- maybe we get `Nothing`
-    "123abc" |> Text.narrowWith (emptiable Char.letter)
-    --> Ok Nothing
-
--}
-emptiable :
-    MorphRow broadElement contentNarrow
-    -> MorphRow broadElement (Emptiable contentNarrow Possibly)
-emptiable contentMorphRow =
-    choice
-        (\justVariant nothingVariant maybeNarrow ->
-            case maybeNarrow of
-                Emptiable.Filled justValue ->
-                    justVariant justValue
-
-                Emptiable.Empty _ ->
-                    nothingVariant ()
-        )
-        |> rowTry filled contentMorphRow
-        |> rowTry (\() -> Emptiable.empty) (succeed ())
-        |> rowChoiceFinish
-
-
-{-| Match a value `exactly` a number of times
-and return them as a [`ArraySized`](https://package.elm-lang.org/packages/lue-bird/elm-typesafe-array/latest/ArraySized)
-
-> ℹ️ Equivalent regular expression: `{n}`
-
-    import Morph.Error
-    import Char.Morph as Char
-    import String.Morph as Text
-    import N exposing (n3)
-
-    -- we want `exactly 3` letters
-    "abcdef" |> narrow (map Text.fromList (exactly n3 Char.letter))
-    --> Ok [ 'a', 'b', 'c' ]
-
-    -- not 2 or 4, we want 3
-    "ab_def"
-        |> narrow (map Text.fromList (exactly n3 Char.letter))
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:3: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '_'."
-
--}
-exactly :
-    N (Exactly howMany)
-    -> MorphRow broadElement element
-    ->
-        MorphRow
-            broadElement
-            (ArraySized (Exactly howMany) element)
-exactly repeatCount repeatedMorphRow =
-    { description =
-        case repeatCount |> N.is n1 of
-            Err (N.Below _) ->
-                { custom = Emptiable.empty
-                , inner = Emptiable.empty
-                }
-
-            Ok _ ->
-                repeatedMorphRow |> description
-
-            Err (N.Above repeatCountAtLeast2) ->
-                { custom =
-                    Stack.only
-                        ([ "exactly "
-                         , repeatCountAtLeast2 |> N.toInt |> String.fromInt
-                         ]
-                            |> String.concat
-                        )
-                , inner =
-                    ArraySized.repeat
-                        (repeatedMorphRow |> description)
-                        repeatCountAtLeast2
-                        |> ArraySized.maxToInfinity
-                        |> ArraySized.minTo n2
-                        |> Group
-                        |> Emptiable.filled
-                }
-    , narrow =
-        let
-            narrowRepeatStep :
-                { soFar : ArraySized (Min (Fixed N0)) element }
-                ->
-                    (Emptiable (Stacked broadElement) Possibly
-                     ->
-                        Result
-                            Error
-                            { narrow : ArraySized (Exactly howMany) element
-                            , broad : Emptiable (Stacked broadElement) Possibly
-                            }
-                    )
-            narrowRepeatStep { soFar } =
-                \broad_ ->
-                    case soFar |> ArraySized.hasAtLeast (repeatCount |> N.maxUp n1) of
-                        Ok arraySizedAtLeastHowOften ->
-                            { narrow =
-                                arraySizedAtLeastHowOften
-                                    |> ArraySized.take ( Up, repeatCount )
-                            , broad = broad_
-                            }
-                                |> Ok
-
-                        Err _ ->
-                            case broad_ |> narrowWith repeatedMorphRow of
-                                Err error ->
-                                    error |> Err
-
-                                Ok parsed ->
-                                    -- does this blow the stack?
-                                    narrowRepeatStep
-                                        { soFar =
-                                            ArraySized.minDown n1
-                                                (ArraySized.pushMin parsed.narrow soFar)
-                                        }
-                                        parsed.broad
-        in
-        narrowRepeatStep { soFar = ArraySized.empty |> ArraySized.maxToInfinity }
-    , broaden =
-        \repeated ->
-            repeated
-                |> ArraySized.toList
-                |> Stack.fromList
-                |> Stack.map (\_ -> broadenWith repeatedMorphRow)
-                |> Stack.flatten
-    }
-
-
-{-| Match a value at least a number of times and returns them as a `List`.
-
-> ℹ️ Equivalent regular expression: `{min,}`
-
-    import Morph.Error
-    import Char.Morph as Char
-    import String.Morph as Text
-
-    -- we want at least three letters, we are okay with more than three
-    "abcdef"
-        |> Text.narrowWith (atLeast n3 Char.letter)
-    --> Ok [ 'a', 'b', 'c', 'd', 'e', 'f' ]
-
-    -- but not two, that's sacrilegious
-    "ab_def"
-        |> Text.narrowWith (atLeast n3 Char.letter)
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:3: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '_'."
-
-
-## `atLeast n0`
-
-> ℹ️ Equivalent regular expression: `*`
-
-    import Char.Morph as Char
-    import String.Morph as Text
-
-    -- We want as many letters as there are.
-    "abc" |> Text.narrowWith (atLeast n0 Char.letter)
-    --> Ok [ 'a', 'b', 'c' ]
-
-    "abc123" |> Text.narrowWith (atLeast n0 Char.letter)
-    --> Ok [ 'a', 'b', 'c' ]
-
-    -- even zero letters is okay
-    "123abc" |> Text.narrowWith (atLeast n0 Char.letter)
-    --> Ok []
-
-
-### `atLeast n1`
-
-> ℹ️ Equivalent regular expression: `+`
-
-    import N exposing (n1)
-    import Morph.Error
-    import Char.Morph as Char
-    import String.Morph as Text
-
-    -- we want as many letters as there are
-    "abc" |> Text.narrowWith (atLeast n1 Char.letter)
-    --> Ok [ 'a', 'b', 'c' ]
-
-    "abc123" |> Text.narrowWith (atLeast n1 Char.letter)
-    --> Ok [ 'a', 'b', 'c' ]
-
-    -- but we want at least one
-    "123abc"
-        |> Text.narrowWith (atLeast n1 Char.letter)
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting a letter a|..|z or A|...|Z. I got stuck when I got the character '1'."
-
-
-### example: interspersed separators
-
-    import Stack
-    import Morph exposing (separatedBy, atLeast, one)
-    import String.Morph as Text exposing (text)
-    import Char.Morph as Char
-
-
-    tag =
-        atLeast n0 (Morph.AToZ.caseAnyLower |> one)
-
-    tags =
-        succeed (\first afterFirst -> Stack.topDown first afterFirst)
-            |> grab .first tag
-            |> grab .afterFirst
-                (ArraySized.Morph.toList
-                    |> Morph.overRow
-                        (atLeast n0
-                            (succeed (\part -> part)
-                                |> skip separator
-                                |> grab .tag tag
-                            )
-                        )
-                )
-
-    -- note that both values and separators must be of the same type
-    "a,bc,def"
-        |> Text.narrowWith tags
-    --> Ok
-    -->     { first = [ 'a' ]
-    -->     , afterFirst =
-    -->         [ { separator = (), part = [ 'b', 'c' ] }
-    -->         , { separator = (), part = [ 'd', 'e', 'f' ] }
-    -->         ]
-    -->     }
-
-    ",a,,"
-        |> Text.narrowWith tags
-    --> Ok
-    -->     (Stack.topDown
-    -->         []
-    -->         [ { separator = (), part = [ 'a' ] }
-    -->         , { separator = (), part = [] }
-    -->         , { separator = (), part = [] }
-    -->         ]
-    -->     )
-
-    -- an empty input text gives a single element from an empty string
-    ""
-        |> Text.narrowWith tags
-    --> Ok (topDown [] [])
-
-
-### anti-example: parsing infinitely
-
-    succeed ...
-        |> grab (atLeast n0 (Morph.keep |> Morph.one))
-        |> grab ...
-
-would only parse the first part until the end
-because it always [`succeed`](#succeed)s.
-Nothing after would ever be parsed, making the whole thing fail.
-
--}
-atLeast :
-    N (In (Fixed lowerLimitMin) (Up minNewMaxToMin_ To min))
-    -> MorphRow broadElement narrow
-    ->
-        MorphRowIndependently
-            broadElement
-            (ArraySized (In (Fixed min) max_) narrow)
-            (ArraySized (Min (Fixed lowerLimitMin)) narrow)
-atLeast minimum =
-    \elementStepMorphRow ->
-        broaden (ArraySized.minTo minimum >> ArraySized.maxToInfinity)
-            |> overRow
-                (let
-                    minimumExactly =
-                        minimum |> N.min |> N.exactly
-                 in
-                 succeed
-                    (\minimumArraySized overMinimum ->
-                        minimumArraySized
-                            |> ArraySized.glueMin Up
-                                (overMinimum |> ArraySized.minTo n0)
-                    )
-                    |> grab
-                        (ArraySized.take ( Up, minimumExactly ))
-                        (exactly minimumExactly elementStepMorphRow)
-                    |> grab
-                        (ArraySized.dropMin ( Up, minimumExactly ))
-                        (translate ArraySized.fromList ArraySized.toList
-                            |> overRow (untilFail elementStepMorphRow)
-                        )
-                )
-
-
-untilFail :
-    MorphRow broadElement element
-    -> MorphRow broadElement (List element)
-untilFail elementStepMorphRow =
-    whileAccumulate
-        { initial = ()
-        , step = \_ () -> () |> Ok
-        , element = elementStepMorphRow
-        }
-
-
 {-| [Morph](#MorphRow) multiple elements from now to when `end` matches.
 
     decoderNameSubject : MorphRow String Char expectationCustom
@@ -2635,7 +1566,7 @@ untilFail elementStepMorphRow =
             |> Morph.overRow
                 (MorphRow.before
                     { end =
-                        MorphRow.succeed ()
+                        MorphRow.Morph.succeed ()
                             |> skip (String.Morph.only "Decoder")
                             |> skip Morph.end
                     , goOn = Morph.keep |> Morph.one
@@ -2646,13 +1577,13 @@ You might think: Why not use
 
     decoderNameSubject : MorphRow String Char expectationCustom
     decoderNameSubject =
-        MorphRow.succeed (\subject -> subject)
+        MorphRow.Morph.succeed (\subject -> subject)
             |> grab (\subject -> subject)
                 (atLeast n0 (Morph.keep |> Morph.one))
             |> skip (String.Morph.only "Decoder")
             |> skip Morph.end
 
-Problem is: This will never succeed.
+Problem is: This will never Morph.succeed.
 `atLeast n0 (Morph.keep |> Morph.one)` always goes on.
 We never reach the necessary [`skip`](#skip)ped things.
 
@@ -2672,6 +1603,14 @@ before untilStep =
         }
 
 
+{-| How to continue a loop.
+Either continue with a partial result or return with a complete value
+-}
+type LoopStep partial complete
+    = GoOn partial
+    | Commit complete
+
+
 {-| How are [`in_`](#in_), ... defined?
 
     decoderNameSubject : MorphRow String Char expectationCustom
@@ -2683,7 +1622,7 @@ before untilStep =
                         translate .before
                             (\before -> { before = before, end = () })
                     , end =
-                        MorphRow.succeed ()
+                        MorphRow.Morph.succeed ()
                             |> skip (String.Morph.only "Decoder")
                             |> skip Morph.end
                     , goOn = Morph.keep |> Morph.one
@@ -2710,7 +1649,7 @@ until :
 until untilStep =
     let
         loopStep =
-            choice
+            choiceBetween
                 (\commit goOn loopStepNarrow ->
                     case loopStepNarrow of
                         Commit commitElement ->
@@ -2719,9 +1658,9 @@ until untilStep =
                         GoOn goOnELement ->
                             goOn goOnELement
                 )
-                |> rowTry Commit untilStep.end
-                |> rowTry GoOn untilStep.goOn
-                |> rowChoiceFinish
+                |> choiceTryRow Commit untilStep.end
+                |> choiceTryRow GoOn untilStep.goOn
+                |> choiceFinishRow
     in
     { description =
         { custom = Emptiable.empty
@@ -2823,288 +1762,152 @@ until untilStep =
     }
 
 
-{-| Match a value between a range of times and returns them as a `List`.
 
-> ℹ️ Equivalent regular expression: `{min,max}`
-
-    import Morph.Error
-    import Char.Morph as Char
-    import String.Morph as Text
-
-    -- we want between two and four letters
-    "abcdef" |> Text.narrowWith (in_ 2 4 Char.letter)
-    --> Ok [ 'a', 'b', 'c', 'd' ]
-
-    "abc_ef" |> Text.narrowWith (in_ ( n2, n4 ) Char.letter)
-    --> Ok [ 'a', 'b', 'c' ]
-
-    "ab_def" |> Text.narrowWith (in_ ( n2, n4 ) Char.letter)
-    --> Ok [ 'a', 'b' ]
+-- copied from module Choice to avoid cyclic import
 
 
-    -- but less than that is not cool
-    "i_am_here"
-        |> Text.narrowWith (in_ ( n2, n3 ) letter)
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:2: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '_'."
-
-
-### example: `in_ ( n0, n1 )`
-
-Alternative to [`maybe`](#maybe) which instead returns a `List`.
-
-> ℹ️ Equivalent regular expression: `?`
-
-    import Char.Morph as Char
-    import String.Morph as Text
-
-    -- we want one letter, optionally
-    "abc" |> Text.narrowWith (in_ ( n0, n1 ) Char.letter)
-    --> Ok [ 'a' ]
-
-    -- if we don't get any, that's still okay
-    "123abc" |> Text.narrowWith (in_ ( n0, n1 ) Char.letter)
-    --> Ok []
-
-
-### example: at most
-
-> ℹ️ Equivalent regular expression: `{0,max}`
-
-    import Morph
-    import Char.Morph as Char
-    import String.Morph as Text
-
-    -- we want a maximum of three letters
-    "abcdef" |> Text.narrowWith (in_ ( n0, n3 ) Char.letter)
-    --> Ok [ 'a', 'b', 'c' ]
-
-    -- less than that is also okay
-    "ab_def" |> Text.narrowWith (in_ ( n0, n3 ) Char.letter)
-    --> Ok [ 'a', 'b' ]
-
-    -- even zero letters are fine
-    "_underscore" |> Text.narrowWith (in_ ( n0, n3 ) Char.letter)
-    --> Ok []
-
-    -- make sure we don't consume more than three letters
-    "abcdef"
-        |> Text.narrowWith
-            (succeed (\letters -> letters)
-                |> grab (in_ ( n0, n3 ) Char.letter)
-                |> skip (one 'd')
-            )
-    --> Ok [ 'a', 'b', 'c' ]
-
--}
-in_ :
-    ( N (In (Fixed lowerLimitMin) (Up minToLowerLimitMin_ To min))
-    , N (In (Fixed lowerLimitMin) (Fixed upperLimitMax))
-    )
-    -> MorphRow broadElement element
-    ->
-        MorphRowIndependently
-            broadElement
-            (ArraySized
-                (In (Fixed min) (Up maxToUpperLimitMax_ To upperLimitMax))
-                element
-            )
-            (ArraySized
-                (InFixed lowerLimitMin upperLimitMax)
-                element
-            )
-in_ ( lowerLimit, upperLimit ) repeatedElementMorphRow =
-    translate identity
-        (ArraySized.minTo lowerLimit)
-        |> overRow
-            (let
-                lowerLimitExactly =
-                    lowerLimit |> N.min |> N.exactly
-             in
-             succeed
-                (\minimumList overMinimum ->
-                    minimumList
-                        |> ArraySized.glueMin Up (overMinimum |> ArraySized.minTo n0)
-                        |> ArraySized.minTo lowerLimitExactly
-                        |> ArraySized.take ( Up, upperLimit )
-                )
-                |> grab
-                    (ArraySized.take
-                        ( Up
-                        , lowerLimitExactly
-                        )
+type alias MorphNoTry noTryPossiblyOrNever choiceNarrow choiceBroad choiceBroaden error =
+    RecordWithoutConstructorFunction
+        { description :
+            -- possibilities
+            Emptiable (Stacked Description) noTryPossiblyOrNever
+        , narrow :
+            choiceBroad
+            ->
+                Result
+                    (-- tries
+                     Emptiable (Stacked error) noTryPossiblyOrNever
                     )
-                    (exactly lowerLimitExactly repeatedElementMorphRow)
-                |> grab
-                    (ArraySized.dropMin ( Up, lowerLimitExactly )
-                        >> ArraySized.maxToInfinity
-                    )
-                    (atMostLoop
-                        ((upperLimit |> N.toInt)
-                            - (lowerLimit |> N.toInt)
-                            |> N.intAtLeast n0
-                        )
-                        repeatedElementMorphRow
-                    )
-            )
-
-
-{-| Match a value at less or equal a number of times.
-
-**Shouldn't be exposed**
-
--}
-atMostLoop :
-    N
-        (In
-            upperLimitMin_
-            (Up upperLimitMaxX_ To upperLimitMaxPlusX_)
-        )
-    -> MorphRow broadElement narrow
-    ->
-        MorphRowIndependently
-            broadElement
-            (ArraySized (In min_ max_) narrow)
-            (ArraySized (Min (Up narrowX To narrowX)) narrow)
-atMostLoop upperLimit elementStepMorphRow =
-    to
-        ([ "<= ", upperLimit |> N.toInt |> String.fromInt ]
-            |> String.concat
-        )
-        (translate ArraySized.fromList ArraySized.toList
-            |> overRow
-                (whileAccumulate
-                    { initial = { length = n0 |> N.maxToInfinity }
-                    , step =
-                        \_ soFar ->
-                            case soFar.length |> N.isAtLeast (upperLimit |> N.maxUp n1) of
-                                Ok _ ->
-                                    Err ()
-
-                                Err _ ->
-                                    { length = soFar.length |> N.addMin n1 } |> Ok
-                    , element = elementStepMorphRow
-                    }
-                )
-        )
-
-
-{-| How are [`atLeast`](#atLeast), ... defined?
-
-    import Morph exposing (choice, validate)
-    import Morph exposing (MorphRow, one, succeed, atLeast, take, drop, whileAccumulate)
-    import Char.Morph
-    import String.Morph
-    import Number.Morph
-
-    sumWhileLessThan : Float -> MorphRow Char (List Number)
-    sumWhileLessThan max =
-        whileAccumulate
-            { initial = 0
-            , step =
-                \element stepped ->
-                    let
-                        floats =
-                            stepped + (element |> Morph.map Number.Morph.toFloat)
-                    in
-                    if floats >= max then
-                        Err ()
-                    else
-                        floats |> Ok
-            , element =
-                succeed (\n -> n)
-                    |> grab (\n -> n) Number.Morph.text
-                    |> skip (atLeast n0 (String.Morph.only " "))
-            }
-
-    -- stops before we reach a maximum of 6 in the sum
-    "2 3 4"
-        |> narrow
-            (String.Morph.fromList
-                |> Morph.overRow
-                    (succeed (\numbers -> numbers)
-                        |> grab (\numbers -> numbers) (sumWhileLessThan 6)
-                        |> skip (String.Morph.only "4")
-                    )
-            )
-    --> Ok 5
-
--}
-whileAccumulate :
-    { initial : accumulationValue
-    , step :
-        goOnElement
-        -> accumulationValue
-        -> Result () accumulationValue
-    , element : MorphRow broadElement goOnElement
-    }
-    -> MorphRow broadElement (List goOnElement)
-whileAccumulate { initial, step, element } =
-    { description =
-        { custom = Emptiable.empty
-        , inner =
-            While (element |> description)
-                |> Emptiable.filled
+                    choiceNarrow
+        , broaden : choiceBroaden
         }
-    , broaden =
-        List.map (broadenWith element)
-            >> Stack.fromList
-            >> Stack.flatten
-    , narrow =
-        let
-            loopNarrowStep :
-                { accumulationValue : accumulationValue }
-                ->
-                    (Emptiable (Stacked broadElement) Possibly
-                     ->
-                        Result
-                            Error
-                            { narrow : List goOnElement
-                            , broad : Emptiable (Stacked broadElement) Possibly
-                            }
-                    )
-            loopNarrowStep { accumulationValue } =
-                \broad_ ->
-                    broad_
-                        |> narrowWith element
-                        |> Result.andThen
-                            (\stepped ->
-                                case accumulationValue |> step stepped.narrow of
-                                    Err () ->
-                                        { broad = broad_
-                                        , narrow = []
-                                        }
-                                            |> Ok
 
-                                    Ok accumulationValueAltered ->
-                                        stepped.broad
-                                            |> loopNarrowStep
-                                                { accumulationValue = accumulationValueAltered }
-                                            |> Result.map
-                                                (\tail ->
-                                                    { broad = tail.broad
-                                                    , narrow =
-                                                        tail.narrow
-                                                            |> (::) stepped.narrow
-                                                    }
-                                                )
-                            )
-        in
-        loopNarrowStep { accumulationValue = initial }
+
+choiceBetween :
+    choiceBroadenByPossibility
+    ->
+        MorphNoTry
+            Possibly
+            choiceNarrow_
+            choiceBroad_
+            choiceBroadenByPossibility
+            error_
+choiceBetween choiceBroadenDiscriminatedByPossibility =
+    { description = Emptiable.empty
+    , narrow =
+        \_ ->
+            Emptiable.empty |> Err
+    , broaden = choiceBroadenDiscriminatedByPossibility
     }
 
 
-{-| How to continue this `loop`.
-Either continue with a partial result or return with a complete value
+type alias MorphRowNoTry noTryPossiblyOrNever broadElement choiceNarrow choiceBroaden =
+    MorphNoTry
+        noTryPossiblyOrNever
+        { narrow : choiceNarrow
+        , broad : Emptiable (Stacked broadElement) Possibly
+        }
+        (Emptiable (Stacked broadElement) Possibly)
+        choiceBroaden
+        Error
+
+
+choiceTryRow :
+    (possibilityNarrow -> choiceNarrow)
+    -> MorphRow broadElement possibilityNarrow
+    ->
+        (MorphRowNoTry
+            noTryPossiblyOrNever_
+            broadElement
+            choiceNarrow
+            ((possibilityNarrow -> Emptiable (Stacked broadElement) Possibly)
+             -> choiceBroadenFurther
+            )
+         ->
+            MorphRowNoTry
+                never_
+                broadElement
+                choiceNarrow
+                choiceBroadenFurther
+        )
+choiceTryRow possibilityToChoice possibilityMorph =
+    \choiceMorphSoFar ->
+        { description =
+            choiceMorphSoFar.description
+                |> Stack.onTopLay (possibilityMorph |> description)
+        , narrow =
+            \choiceBroad ->
+                choiceBroad
+                    |> choiceMorphSoFar.narrow
+                    |> restoreTry
+                        (\soFarErrorPossibilities ->
+                            case choiceBroad |> narrowWith possibilityMorph of
+                                Ok possibilityParsed ->
+                                    { broad = possibilityParsed.broad
+                                    , narrow =
+                                        possibilityParsed.narrow
+                                            |> possibilityToChoice
+                                    }
+                                        |> Ok
+
+                                Err possibilityExpectation ->
+                                    soFarErrorPossibilities
+                                        |> Stack.onTopLay possibilityExpectation
+                                        |> Err
+                        )
+        , broaden =
+            choiceMorphSoFar.broaden
+                (broadenWith possibilityMorph)
+        }
+
+
+{-| Always the last step in a [`Choice.between`](#Choice.between) `|>` [`Choice.tryRow`](#try) build process
 -}
-type LoopStep partial complete
-    = GoOn partial
-    | Commit complete
+choiceFinishRow :
+    MorphRowNoTry
+        Never
+        broadElement
+        choiceNarrow
+        (choiceNarrow -> Emptiable (Stacked broadElement) Possibly)
+    -> MorphRow broadElement choiceNarrow
+choiceFinishRow =
+    \choiceMorphRowComplete ->
+        { description =
+            case choiceMorphRowComplete.description |> Emptiable.fill of
+                Stack.TopDown descriptionOnly [] ->
+                    descriptionOnly
+
+                Stack.TopDown description0 (description1 :: description2Up) ->
+                    { custom = Emptiable.empty
+                    , inner =
+                        ArraySized.l2 description0 description1
+                            |> ArraySized.glueMin Up
+                                (description2Up |> ArraySized.fromList)
+                            |> Group
+                            |> Emptiable.filled
+                    }
+        , narrow =
+            \broad_ ->
+                broad_
+                    |> choiceMorphRowComplete.narrow
+                    |> Result.mapError
+                        (\errorPossibilities ->
+                            { startDown = broad_ |> Stack.length
+                            , error = errorPossibilities |> Possibilities
+                            }
+                                |> Row
+                        )
+        , broaden = choiceMorphRowComplete.broaden
+        }
+
+
+
+--
 
 
 {-| Only matches when there's no further broad input afterwards.
 
-This is not required for [`narrow`](#narrow)ing to succeed.
+This is not required for [`narrow`](#narrow)ing to Morph.succeed.
 
 It can, however simplify checking for specific endings:
 
@@ -3117,7 +1920,7 @@ It can, however simplify checking for specific endings:
                         translate .before
                             (\before -> { before = before, end = () })
                     , end =
-                        MorphRow.succeed ()
+                        MorphRow.Morph.succeed ()
                             |> skip (String.Morph.only "Decoder")
                             |> skip Morph.end
                     , goOn = Morph.keep |> Morph.one
@@ -3135,7 +1938,10 @@ end =
         \broad_ ->
             case broad_ of
                 Emptiable.Empty _ ->
-                    Emptiable.empty |> narrowWith (succeed ())
+                    { narrow = ()
+                    , broad = Emptiable.empty
+                    }
+                        |> Ok
 
                 Emptiable.Filled stacked ->
                     { startDown = stacked |> filled |> Stack.length
@@ -3166,8 +1972,16 @@ rowFinish =
     \morphRow ->
         { description = morphRow.description
         , narrow =
-            narrowWith (morphRow |> skip end)
-                >> Result.map .narrow
+            \broadElements ->
+                broadElements
+                    |> narrowWith morphRow
+                    |> Result.andThen
+                        (\result ->
+                            result.broad
+                                |> narrowWith end
+                                |> Result.map
+                                    (\_ -> result.narrow)
+                        )
         , broaden =
-            broadenWith morphRow
+            \narrow -> narrow |> broadenWith morphRow
         }

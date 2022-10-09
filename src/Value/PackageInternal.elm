@@ -1,4 +1,4 @@
-module Value.Unexposed exposing (float, string, structureKindToString)
+module Value.PackageInternal exposing (float, literalKindToString, string, structureKindToString)
 
 import Morph exposing (MorphIndependently)
 import Value exposing (MorphValue)

@@ -9,6 +9,7 @@ module Result.Morph exposing (value)
 
 -}
 
+import Choice
 import Morph
 import Value exposing (MorphValue)
 
@@ -21,15 +22,15 @@ value :
     }
     -> MorphValue (Result error okValue)
 value caseMorphs =
-    Morph.choice
+    Choice.between
         (\ok err narrowResult ->
             case narrowResult of
-                Ok value ->
-                    value |> ok
+                Ok narrowValue ->
+                    narrowValue |> ok
 
-                Err error ->
-                    error |> err
+                Err narrowError ->
+                    narrowError |> err
         )
-        |> Value.variant ( Ok, "Ok" ) caseMorphs.ok
-        |> Value.variant ( Err, "Err" ) caseMorphs.err
-        |> Value.choiceFinish
+        |> Choice.tryValue ( Ok, "Ok" ) caseMorphs.ok
+        |> Choice.tryValue ( Err, "Err" ) caseMorphs.err
+        |> Choice.finishValue

@@ -3,13 +3,15 @@ module Morph.Test exposing (tests)
 import AToZ exposing (AToZ)
 import Array
 import ArraySized exposing (ArraySized)
-import ArraySized.Morph
+import ArraySized.Morph exposing (atLeast)
 import Char.Morph
+import Choice
 import Decimal exposing (Decimal)
 import Expect
 import Fuzz
+import Group exposing (grab, skip)
 import Linear exposing (Direction(..))
-import Morph exposing (Morph, MorphRow, MorphRowIndependently, atLeast, broad, broadenWith, choice, grab, narrowWith, one, skip, succeed, translate)
+import Morph exposing (Morph, MorphRow, MorphRowIndependently, broad, broadenWith, narrowWith, one, translate)
 import N exposing (Fixed, In, InFixed, Min, N, N0, N1, N2, N9, n0, n1, n9)
 import N.Morph
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
@@ -38,12 +40,12 @@ pointTest =
             (\() ->
                 "(3,  -9999.124)"
                     |> narrowWith
-                        (Morph.group
+                        (Group.build
                             ( \x y -> { x = x, y = y }
                             , \x y -> { x = x, y = y }
                             )
-                            |> Morph.part ( .x, .x ) Decimal.float
-                            |> Morph.part ( .y, .y ) Decimal.float
+                            |> Group.part ( .x, .x ) Decimal.float
+                            |> Group.part ( .y, .y ) Decimal.float
                             |> Morph.overRow point
                             |> Morph.rowFinish
                             |> Morph.over Stack.Morph.string
@@ -54,12 +56,12 @@ pointTest =
             (\() ->
                 { x = 3.0, y = -9999.124 }
                     |> broadenWith
-                        (Morph.group
+                        (Group.build
                             ( \x y -> { x = x, y = y }
                             , \x y -> { x = x, y = y }
                             )
-                            |> Morph.part ( .x, .x ) Decimal.float
-                            |> Morph.part ( .y, .y ) Decimal.float
+                            |> Group.part ( .x, .x ) Decimal.float
+                            |> Group.part ( .y, .y ) Decimal.float
                             |> Morph.overRow point
                             |> Morph.rowFinish
                             |> Morph.over Stack.Morph.string
@@ -71,7 +73,7 @@ pointTest =
 
 point : MorphRow Char Point
 point =
-    succeed (\x y -> { x = x, y = y })
+    Morph.succeed (\x y -> { x = x, y = y })
         |> skip (String.Morph.only "(")
         |> skip
             (broad (ArraySized.l1 ())
@@ -169,7 +171,7 @@ emailTest =
 
 email : MorphRow Char Email
 email =
-    succeed
+    Morph.succeed
         (\local_ domain_ ->
             { local = local_
             , domain = domain_
@@ -182,7 +184,7 @@ email =
 
 local : MorphRow Char Local
 local =
-    succeed
+    Morph.succeed
         (\first afterFirst ->
             ArraySized.l1 first
                 |> ArraySized.glueMin Up
@@ -191,7 +193,7 @@ local =
         |> grab (ArraySized.element ( Up, n0 )) localPart
         |> grab (ArraySized.elementRemoveMin ( Up, n0 ))
             (atLeast n1
-                (succeed (\part -> part)
+                (Morph.succeed (\part -> part)
                     |> skip (String.Morph.only ".")
                     |> grab (\part -> part) localPart
                 )
@@ -209,7 +211,7 @@ localPart =
 
 localSymbol : Morph LocalSymbol Char
 localSymbol =
-    choice
+    Choice.between
         (\printableVariant aToZVariant n0To9Variant localSymbolUnion ->
             case localSymbolUnion of
                 LocalSymbolPrintable printableValue ->
@@ -221,14 +223,14 @@ localSymbol =
                 LocalSymbol0To9 n0To9Value ->
                     n0To9Variant n0To9Value
         )
-        |> Morph.try LocalSymbolPrintable localSymbolPrintable
-        |> Morph.try LocalSymbolAToZ
+        |> Choice.try LocalSymbolPrintable localSymbolPrintable
+        |> Choice.try LocalSymbolAToZ
             (translate .letter
                 (\letter -> { letter = letter, case_ = AToZ.CaseLower })
                 |> Morph.over AToZ.char
             )
-        |> Morph.try LocalSymbol0To9 (N.Morph.charIn ( n0, n9 ))
-        |> Morph.choiceFinish
+        |> Choice.try LocalSymbol0To9 (N.Morph.charIn ( n0, n9 ))
+        |> Choice.finish
 
 
 
@@ -237,7 +239,7 @@ localSymbol =
 
 localSymbolPrintable : Morph LocalSymbolPrintable Char
 localSymbolPrintable =
-    choice
+    Choice.between
         (\exclamationMark numberSign dollarSign percentSign ampersand asterisk lowLine hyphenMinus tilde verticalLine plusSign equalsSign graveAccent leftCurlyBracket rightCurlyBracket localSymbolPrintableNarrow ->
             case localSymbolPrintableNarrow of
                 ExclamationMark ->
@@ -285,45 +287,45 @@ localSymbolPrintable =
                 RightCurlyBracket ->
                     rightCurlyBracket ()
         )
-        |> Morph.try (\() -> ExclamationMark) (Char.Morph.only '!')
-        |> Morph.try (\() -> DecimalSign) (Char.Morph.only '#')
-        |> Morph.try (\() -> DollarSign) (Char.Morph.only '$')
-        |> Morph.try (\() -> PercentSign) (Char.Morph.only '%')
-        |> Morph.try (\() -> Ampersand) (Char.Morph.only '&')
-        |> Morph.try (\() -> Asterisk) (Char.Morph.only '*')
-        |> Morph.try (\() -> LowLine) (Char.Morph.only '_')
-        |> Morph.try (\() -> HyphenMinus) (Char.Morph.only '-')
-        |> Morph.try (\() -> Tilde) (Char.Morph.only '~')
-        |> Morph.try (\() -> VerticalLine) (Char.Morph.only '|')
-        |> Morph.try (\() -> PlusSign) (Char.Morph.only '+')
-        |> Morph.try (\() -> EqualsSign) (Char.Morph.only '=')
-        |> Morph.try (\() -> GraveAccent) (Char.Morph.only '`')
-        |> Morph.try (\() -> LeftCurlyBracket) (Char.Morph.only '{')
-        |> Morph.try (\() -> RightCurlyBracket) (Char.Morph.only '}')
-        |> Morph.choiceFinish
+        |> Choice.try (\() -> ExclamationMark) (Char.Morph.only '!')
+        |> Choice.try (\() -> NumberSign) (Char.Morph.only '#')
+        |> Choice.try (\() -> DollarSign) (Char.Morph.only '$')
+        |> Choice.try (\() -> PercentSign) (Char.Morph.only '%')
+        |> Choice.try (\() -> Ampersand) (Char.Morph.only '&')
+        |> Choice.try (\() -> Asterisk) (Char.Morph.only '*')
+        |> Choice.try (\() -> LowLine) (Char.Morph.only '_')
+        |> Choice.try (\() -> HyphenMinus) (Char.Morph.only '-')
+        |> Choice.try (\() -> Tilde) (Char.Morph.only '~')
+        |> Choice.try (\() -> VerticalLine) (Char.Morph.only '|')
+        |> Choice.try (\() -> PlusSign) (Char.Morph.only '+')
+        |> Choice.try (\() -> EqualsSign) (Char.Morph.only '=')
+        |> Choice.try (\() -> GraveAccent) (Char.Morph.only '`')
+        |> Choice.try (\() -> LeftCurlyBracket) (Char.Morph.only '{')
+        |> Choice.try (\() -> RightCurlyBracket) (Char.Morph.only '}')
+        |> Choice.finish
 
 
 domain : MorphRow Char Domain
 domain =
-    succeed
+    Morph.succeed
         (\first hostLabels topLevel ->
             { first = first, hostLabels = hostLabels, topLevel = topLevel }
         )
-        |> Morph.grab .first hostLabel
-        |> Morph.skip (String.Morph.only ".")
-        |> Morph.grab .hostLabels
+        |> Group.grab .first hostLabel
+        |> Group.skip (String.Morph.only ".")
+        |> Group.grab .hostLabels
             (atLeast n0
-                (succeed (\label -> label)
-                    |> Morph.grab (\label -> label) hostLabel
-                    |> Morph.skip (String.Morph.only ".")
+                (Morph.succeed (\label -> label)
+                    |> Group.grab (\label -> label) hostLabel
+                    |> Group.skip (String.Morph.only ".")
                 )
             )
-        |> Morph.grab .topLevel domainTopLevel
+        |> Group.grab .topLevel domainTopLevel
 
 
 hostLabel : MorphRow Char HostLabel
 hostLabel =
-    succeed
+    Morph.succeed
         (\firstSymbol betweenFirstAndLastSymbols lastSymbol ->
             { firstSymbol = firstSymbol
             , betweenFirstAndLastSymbols = betweenFirstAndLastSymbols
@@ -340,7 +342,7 @@ hostLabel =
 
 hostLabelSideSymbol : Morph HostLabelSideSymbol Char
 hostLabelSideSymbol =
-    choice
+    Choice.between
         (\aToZVariant n0To9Variant sideSymbol ->
             case sideSymbol of
                 HostLabelSideSymbolAToZ aToZValue ->
@@ -349,14 +351,14 @@ hostLabelSideSymbol =
                 HostLabelSideSymbol0To9 n0To9Value ->
                     n0To9Variant n0To9Value
         )
-        |> Morph.try HostLabelSideSymbolAToZ AToZ.char
-        |> Morph.try HostLabelSideSymbol0To9 (N.Morph.charIn ( n0, n9 ))
-        |> Morph.choiceFinish
+        |> Choice.try HostLabelSideSymbolAToZ AToZ.char
+        |> Choice.try HostLabelSideSymbol0To9 (N.Morph.charIn ( n0, n9 ))
+        |> Choice.finish
 
 
 hostLabelSymbol : Morph HostLabelSymbol Char
 hostLabelSymbol =
-    choice
+    Choice.between
         (\hyphenMinus aToZVariant n0To9Variant symbol ->
             case symbol of
                 HostLabelHyphenMinus ->
@@ -368,16 +370,16 @@ hostLabelSymbol =
                 HostLabelSymbol0To9 n0To9Value ->
                     n0To9Variant n0To9Value
         )
-        |> Morph.try (\() -> HostLabelHyphenMinus)
+        |> Choice.try (\() -> HostLabelHyphenMinus)
             (Char.Morph.only '-')
-        |> Morph.try HostLabelSymbolAToZ AToZ.char
-        |> Morph.try HostLabelSymbol0To9 (N.Morph.charIn ( n0, n9 ))
-        |> Morph.choiceFinish
+        |> Choice.try HostLabelSymbolAToZ AToZ.char
+        |> Choice.try HostLabelSymbol0To9 (N.Morph.charIn ( n0, n9 ))
+        |> Choice.finish
 
 
 domainTopLevel : MorphRow Char DomainTopLevel
 domainTopLevel =
-    succeed
+    Morph.succeed
         (\startDigits firstAToZ afterFirstAToZ ->
             { startDigits = startDigits
             , firstAToZ = firstAToZ
@@ -399,7 +401,7 @@ domainTopLevel =
 
 domainTopLevelAfterFirstAToZSymbol : Morph DomainTopLevelAfterFirstAToZSymbol Char
 domainTopLevelAfterFirstAToZSymbol =
-    choice
+    Choice.between
         (\aToZVariant n0To9Variant domainTopLevelSymbolUnion ->
             case domainTopLevelSymbolUnion of
                 DomainTopLevelSymbolAToZ aToZValue ->
@@ -408,9 +410,9 @@ domainTopLevelAfterFirstAToZSymbol =
                 DomainTopLevelSymbol0To9 n0To9Value ->
                     n0To9Variant n0To9Value
         )
-        |> Morph.try DomainTopLevelSymbolAToZ AToZ.char
-        |> Morph.try DomainTopLevelSymbol0To9 (N.Morph.charIn ( n0, n9 ))
-        |> Morph.choiceFinish
+        |> Choice.try DomainTopLevelSymbolAToZ AToZ.char
+        |> Choice.try DomainTopLevelSymbol0To9 (N.Morph.charIn ( n0, n9 ))
+        |> Choice.finish
 
 
 type alias Point =

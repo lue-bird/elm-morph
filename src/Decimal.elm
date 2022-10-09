@@ -2,6 +2,7 @@ module Decimal exposing
     ( Decimal(..), Absolute(..), Fraction
     , rowChar
     , toFloat, float
+    , Signed
     )
 
 {-| number TODO MorphIndependently
@@ -19,8 +20,9 @@ import Bit exposing (Bit)
 import Char.Morph
 import Emptiable exposing (Emptiable, fill, fillMap, fillMapFlat, filled)
 import Linear exposing (Direction(..))
-import Morph exposing (Morph, MorphIndependently, MorphOrError, MorphRow, atLeast, broadenWith, choice, emptiable, grab, narrowWith, one, skip, succeed, translate)
-import N exposing (Add1, In, InFixed, Min, N, N0, N1, N9, To, Up, n0, n1, n9)
+import Maybe.Morph
+import Morph exposing (Morph, MorphIndependently, MorphOrError, MorphRow, broadenWith, narrowWith, one, translate)
+import N exposing (Add1, In, InFixed, Min, N, N0, N1, N9, To, Up, Up0, Up1, Up9, n0, n1, n9)
 import N.Morph
 import Natural exposing (Natural)
 import Possibly exposing (Possibly)
@@ -34,19 +36,25 @@ import String.Morph
 -- number
 
 
-{-| A decimal number that can have a floating point.
+{-| A decimal number that can have a floating point
 
 Don't shy away from spinning your own version of this if needed, like
 
     type FieldNumber
         = DivisionByZeroResult
         | Infinity Sign
-        | Decimal Number
+        | Decimal Decimal
 
 -}
 type Decimal
     = N0
-    | Signed
+    | Signed Signed
+
+
+{-| Any [`Decimal`](#Decimal) except `0` is represented this way
+-}
+type alias Signed =
+    RecordWithoutConstructorFunction
         { sign : Sign
         , absolute : Absolute
         }
@@ -55,7 +63,10 @@ type Decimal
 type Absolute
     = Fraction Fraction
     | AtLeast1
-        { whole : StackTopBelow (N (InFixed N1 N9)) (N (InFixed N0 N9))
+        { whole :
+            Emptiable
+                (StackTopBelow (N (InFixed N1 N9)) (N (InFixed N0 N9)))
+                Never
         , fraction : Emptiable Fraction Possibly
         }
 
@@ -102,21 +113,21 @@ toFloat =
                 Nothing ->
                     N0
 
-                Just signed ->
+                Just signed_ ->
                     let
                         wholeAbsolute =
-                            signed.absolute |> truncate
+                            signed_.absolute |> truncate
                     in
-                    { sign = signed.sign
+                    { sign = signed_.sign
                     , absolute =
-                        if signed.absolute < 1 then
-                            signed.absolute |> floatToFraction |> Fraction
+                        if signed_.absolute < 1 then
+                            signed_.absolute |> floatToFraction |> Fraction
 
                         else
                             { whole =
-                                wholeAbsolute |> intAbsoluteTo0To9s
+                                wholeAbsolute |> intPositiveToDigits
                             , fraction =
-                                (signed.absolute - (wholeAbsolute |> Basics.toFloat))
+                                (signed_.absolute - (wholeAbsolute |> Basics.toFloat))
                                     |> abs
                                     |> floatToFraction
                             }
@@ -137,27 +148,80 @@ toFloat =
 
 absoluteToFloat : Absolute -> Float
 absoluteToFloat =
-    \absolute ->
-        case absolute of
-            Fraction fraction ->
-                fraction |> fractionToFloat
+    \absolute_ ->
+        case absolute_ of
+            Fraction fraction_ ->
+                fraction_ |> fractionToFloat
 
             AtLeast1 atLeast1 ->
-                (atLeast1.whole |> n0To9sToInt |> Basics.toFloat)
+                (atLeast1.whole
+                    |> Stack.topMap (N.minTo n0)
+                    |> digitsToInt
+                    |> Basics.toFloat
+                )
                     + (case atLeast1.fraction of
                         Emptiable.Empty _ ->
                             0
 
-                        Emptiable.Filled fraction ->
-                            fraction |> filled |> fractionToFloat
+                        Emptiable.Filled fraction_ ->
+                            fraction_ |> filled |> fractionToFloat
                       )
+
+
+intPositiveToDigits :
+    Int
+    ->
+        Emptiable
+            (StackTopBelow
+                (N (In (Up1 digit0MinX_) (Up9 digit0MaxX_)))
+                (N (In (Up0 digit1UpMinX_) (Up9 digit1UpMaxX_)))
+            )
+            never_
+intPositiveToDigits =
+    \int ->
+        let
+            highest10Exponent : Int
+            highest10Exponent =
+                logBase 10 (int |> toFloat) |> floor
+        in
+        Stack.topDown
+            (int |> digitFor10Exponent highest10Exponent |> N.atLeast n1 |> N.maxTo n9)
+            (List.range 0 (highest10Exponent - 1)
+                |> List.map
+                    (\n10Exponent ->
+                        int |> digitFor10Exponent n10Exponent
+                    )
+            )
+
+
+digitFor10Exponent : Int -> (Int -> N (In (Up0 minX_) (Up9 maxX_)))
+digitFor10Exponent n10Exponent =
+    \int ->
+        (int // (10 ^ n10Exponent))
+            |> remainderBy 10
+            |> N.intIn ( n0, n9 )
+
+
+digitsToInt : Emptiable (Stacked (N range_)) possiblyOrNever_ -> Int
+digitsToInt =
+    \digits ->
+        let
+            lastIndex =
+                (digits |> Stack.length) - 1
+        in
+        digits
+            |> Stack.map
+                (\{ index } digit ->
+                    (digit |> N.toInt) * (10 ^ (lastIndex - index))
+                )
+            |> Stack.sum
 
 
 fractionToFloat : Fraction -> Float
 fractionToFloat =
-    \fraction ->
+    \fraction_ ->
         Stack.only fraction.last
-            |> Stack.onTopStack fraction.beforeLast
+            |> Stack.onTopStack fraction_.beforeLast
             |> Stack.map
                 (\decimal digit ->
                     (digit |> N.toFloat)
@@ -200,35 +264,39 @@ floatToFraction =
 --
 
 
-{-| Match a decimal value as a `Float`.
+{-| Match a decimal number
 
     import Morph.Error
 
-    "12" |> Text.narrowWith number     --> Ok 12.0
     "12.34" |> Text.narrowWith number  --> Ok 12.34
     "12." |> Text.narrowWith number    --> Ok 12.0
     ".12" |> Text.narrowWith number    --> Ok 0.12
     "-12.34" |> Text.narrowWith number --> Ok -12.34
     "-.12" |> Text.narrowWith number   --> Ok -0.12
 
+
+    "12"
+        |> Text.narrowWith number
+        |> Result.mapError Morph.Error.textMessage
+    --> Err ...
+
     "."
         |> Text.narrowWith number
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting a digit [0-9]. I got stuck when I got the character '.'."
 
-    "abc" |> Text.narrowWith number
+    "abc"
+        |> Text.narrowWith number
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting a digit [0-9]. I got stuck when I got the character 'a'."
 
 -}
 rowChar : MorphRow Char Decimal
 rowChar =
-    -- TODO:
-    --   rethink: split off rationalPointSeparated
-    --   and redefine below as try whole |> try rationalPointSeparated
+    -- TODO: make decimal point obligatory
     Morph.to "rational"
-        (Morph.choice
-            (\n0Variant signedVariant numberNarrow ->
+        (Choice.between
+            (\signedVariant n0Variant numberNarrow ->
                 case numberNarrow of
                     N0 ->
                         n0Variant ()
@@ -236,44 +304,102 @@ rowChar =
                     Signed signedValue ->
                         signedVariant signedValue
             )
-            |> Morph.rowTry (\() -> N0)
-                (String.Morph.only "0")
-            |> Morph.rowTry Signed
-                (succeed
-                    (\signPart wholePart fractionPart ->
-                        { sign = signPart
-                        , whole = wholePart
-                        , fraction = fractionPart
+            |> Choice.tryRow Signed signed
+            |> Choice.tryRow (\() -> N0) (String.Morph.only "0.")
+            |> Choice.finishRow
+        )
+
+
+signed : MorphRow Char Signed
+signed =
+    Morph.to "signed"
+        (Morph.succeed
+            (\signPart absolutePart ->
+                { sign = signPart
+                , absolute = absolutePart
+                }
+            )
+            |> grab .sign Sign.maybeMinusChar
+            |> grab .absolute
+                absolute
+        )
+
+
+absolute : MorphRow Char Absolute
+absolute =
+    Morph.to "absolute"
+        (Choice.between
+            (\fractionVariant atLeast1Variant absoluteUnion ->
+                case absoluteUnion of
+                    Fraction fractionValue ->
+                        fractionVariant fractionValue
+
+                    AtLeast1 atLeast1Value ->
+                        atLeast1Variant atLeast1Value
+            )
+            |> Choice.tryRow Fraction
+                (Morph.succeed (\fraction_ -> fraction)
+                    |> skip
+                        (Morph.broad (Just ())
+                            |> Morph.overRow
+                                (Maybe.Morph.row (String.Morph.only "0"))
+                        )
+                    |> skip (String.Morph.only ".")
+                    |> grab (\fraction_ -> fraction_) fraction
+                )
+            |> Choice.tryRow AtLeast1
+                (let
+                    whole :
+                        MorphRow
+                            Char
+                            (Emptiable
+                                (StackTopBelow (N (InFixed N1 N9)) (N (InFixed N0 N9)))
+                                Never
+                            )
+                    whole =
+                        Morph.to "whole"
+                            (Morph.succeed Stack.onTopLay
+                                |> grab Stack.top (N.Morph.charIn ( n1, n9 ) |> one)
+                                |> grab Stack.topRemove
+                                    (ArraySized.Morph.toStackEmptiable
+                                        (ArraySized.Morph.atLeast n0
+                                            (N.Morph.charIn ( n0, n9 ) |> one)
+                                        )
+                                    )
+                            )
+                 in
+                 Morph.succeed
+                    (\wholePart fractionPart ->
+                        { whole = wholePart
+                        , fraction = fractionPart.whole
                         }
                     )
-                    |> grab .sign Sign.emptiableMinusChar
-                    |> grab .whole
-                        (Morph.to "whole"
-                            (ArraySized.Morph.toStackFilled
-                                |> Morph.overRow
-                                    (atLeast n1 (N.Morph.charIn ( n0, n9 ) |> one))
-                            )
-                        )
-                    |> grab .fraction
-                        (translate
-                            (fillMapFlat ArraySized.toStackFilled)
-                            (fillMap
-                                (\(Stack.TopDown top down) ->
-                                    ArraySized.l1 top
-                                        |> ArraySized.glueMin Up (down |> ArraySized.fromList)
-                                )
-                            )
-                            |> Morph.overRow
-                                (emptiable
-                                    (succeed (\fractionDigits -> fractionDigits)
-                                        |> skip (String.Morph.only ".")
-                                        |> grab (\fractionDigits -> fractionDigits)
-                                            (atLeast n1 (N.Morph.charIn ( n0, n9 ) |> one))
-                                    )
-                                )
-                        )
+                    |> grab .whole whole
+                    |> skip (String.Morph.only ".")
+                    |> grab .fraction (Maybe.Morph.row fraction)
                 )
-            |> Morph.rowChoiceFinish
+            |> Choice.finishRow
+        )
+
+
+fraction : Morph.MorphRow Char Fraction
+fraction =
+    Morph.to "fraction"
+        (translate
+            (fillMap ArraySized.toStackFilled)
+            (fillMap
+                (\stack ->
+                    ArraySized.l1 (stack |> Stack.top)
+                        |> ArraySized.glueMin Up
+                            (stack |> Stack.topRemove |> ArraySized.fromStackEmptiable)
+                )
+            )
+            |> Morph.overRow
+                (Maybe.Morph.row
+                    (ArraySized.Morph.atLeast n1
+                        (N.Morph.charIn ( n0, n9 ) |> one)
+                    )
+                )
         )
 
 

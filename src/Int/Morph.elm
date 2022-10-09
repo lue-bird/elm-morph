@@ -1,5 +1,6 @@
 module Int.Morph exposing (float)
 
+import Float.Morph
 import Morph exposing (Morph)
 import Value
 
@@ -27,5 +28,4 @@ float =
 int : Value.MorphValue Int
 int =
     float
-        |> Morph.over number
-        |> Morph.over literal
+        |> Morph.over Float.Morph.value
