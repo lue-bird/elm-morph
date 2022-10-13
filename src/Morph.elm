@@ -12,13 +12,14 @@ module Morph exposing
     , deadEndMap
     , deadEndNever, narrowErrorMap
     , description
-    , broadenWith, narrowWith, mapWith
+    , broadenFrom, narrowTo, mapTo
     , over, overRow
     , MorphRow, MorphRowIndependently, rowFinish
     , before
     )
 
-{-| Call it Codec, Conversion, Transformation, Shape, PrismReversible, ParseBuild
+{-| Call it Codec, ToFrom, ParserBuilder, Convert-, Transform-, Shape-, FormReversible, ...
+We call it
 
 @docs Morph, Translate, MorphOrError, MorphIndependently
 @docs Description, DescriptionInner
@@ -50,7 +51,7 @@ module Morph exposing
 ## scan
 
 @docs description
-@docs broadenWith, narrowWith, mapWith
+@docs broadenFrom, narrowTo, mapTo
 
 
 ## chain
@@ -233,7 +234,7 @@ type alias MorphIndependently narrow broaden =
         }
 
 
-{-| [`Morph`](#Morph) that can [narrow](#narrowWith)
+{-| [`Morph`](#Morph) that can [narrow](#narrowTo)
 to an error that can be different from the default [`Error`](#Error)
 
     type alias Translate mapped unmapped =
@@ -246,7 +247,7 @@ type alias MorphOrError narrow broad error =
         (narrow -> broad)
 
 
-{-| Describing what the Morph [narrows to](#narrowWith) and [broadens from](#broadenWith)
+{-| Describing what the Morph [narrows to](#narrowTo) and [broadens from](#broadenFrom)
 
   - custom description of the context
   - maybe [a description depending on structure](#DescriptionInner)
@@ -267,7 +268,8 @@ type alias Description =
 
 -}
 type DescriptionInner
-    = Over { narrow : Description, broad : Description }
+    = Translate
+    | Over { narrow : Description, broad : Description }
     | Group (ArraySized (Min (Fixed N2)) Description)
     | Choice (ArraySized (Min (Fixed N2)) Description)
     | Elements Description
@@ -276,7 +278,7 @@ type DescriptionInner
     | Until { end : Description, element : Description }
 
 
-{-| Where [narrowing](#narrowWith) has failed.
+{-| Where [narrowing](#narrowTo) has failed.
 
 `String` is not enough for display?
 → use [`MorphOrError`](#MorphOrError) [`ErrorWithDeadEnd`](#ErrorWithDeadEnd) doing [`mapDeadEnd`](#mapDeadEnd)
@@ -340,13 +342,13 @@ TODO: update examples
 
     -- Getting a digit instead of a letter
     "123"
-        |> Text.narrowWith letter
+        |> Text.narrowTo letter
         |> Result.mapError Morph.errorToString
     --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '1'."
 
     -- Running out of input characters
     ""
-        |> Text.narrowWith letter
+        |> Text.narrowTo letter
         |> Result.mapError Morph.errorToString
     --> Err "1:0: I was expecting a letter [a-zA-Z]. I reached the end of the input."
 
@@ -423,7 +425,7 @@ markdownElement =
 
     -- we can redefine an error message if something goes wrong
     "123"
-        |> Text.narrowWith
+        |> Text.narrowTo
             (Morph.to "variable name"
                 (atLeast n1 AToZ.Morph.char)
             )
@@ -501,33 +503,33 @@ description =
 {-| Its transformation that turns `narrow` into `broad`.
 Some call it "build"
 -}
-broadenWith : MorphIndependently narrow_ broaden -> broaden
-broadenWith =
+broadenFrom : MorphIndependently narrow_ broaden -> broaden
+broadenFrom =
     .broaden
 
 
 {-| Its transformation that turns `broad` into `narrow` or an `error`.
 Some call it "parse"
 -}
-narrowWith : MorphIndependently narrow broaden_ -> narrow
-narrowWith =
+narrowTo : MorphIndependently narrow broaden_ -> narrow
+narrowTo =
     .narrow
 
 
 {-| Convert values of the arbitrarily chosen types `unmapped -> mapped`.
 
-    "3456" |> |> Morph.mapWith String.Morph.toList
+    "3456" |> |> Morph.mapTo String.Morph.toList
     --> [ '3', '4', '5', '6' ]
 
 -}
-mapWith :
+mapTo :
     MorphIndependently
         (unmapped -> Result (ErrorWithDeadEnd Never) mapped)
         broaden_
     -> (unmapped -> mapped)
-mapWith translate_ =
+mapTo translate_ =
     \unmapped ->
-        case unmapped |> narrowWith translate_ of
+        case unmapped |> narrowTo translate_ of
             Ok mappedNarrow ->
                 mappedNarrow
 
@@ -610,7 +612,7 @@ validate descriptionCustom narrowConvert =
 {-| Mutual [`Morph`](#Morph) between representations
 that have the same structural information
 and can be mapped 1:1 into each other.
-[narrowing](#mapWith) can `Never` fail
+[narrowing](#mapTo) can `Never` fail
 
 Examples:
 
@@ -715,11 +717,11 @@ translate :
         MorphIndependently
             (beforeMap -> Result error_ mapped)
             (beforeUnmap -> unmapped)
-translate mapTo unmapFrom =
+translate map unmap =
     { description =
         { custom = Emptiable.empty, inner = Emptiable.empty }
-    , narrow = mapTo >> Ok
-    , broaden = unmapFrom
+    , narrow = map >> Ok
+    , broaden = unmap
     }
 
 
@@ -740,7 +742,7 @@ What is great is using this to make inputs more "user-usable":
 However! This can also often be an anti-pattern. See [`validate`](#validate).
 
     "WOW"
-        |> Morph.broadenWith
+        |> Morph.broadenFrom
             (Morph.broaden String.toLower
                 |> Morph.over stringValidation
             )
@@ -753,8 +755,8 @@ broaden :
         MorphIndependently
             (narrow -> Result error_ narrow)
             (beforeBroaden -> broad)
-broaden broadenFrom =
-    translate identity broadenFrom
+broaden broadenFromNarrow =
+    translate identity broadenFromNarrow
 
 
 {-| [`Morph`](#Morph) that always [`broaden`](#broaden)s to a given constant.
@@ -816,13 +818,13 @@ only broadConstantToString broadConstant =
 value :
     String
     ->
-        { narrow : beforeNarrow -> Result deadEnd narrowed
-        , broaden : beforeBroaden -> broadened
+        { narrow : beforeNarrow -> Result deadEnd narrow
+        , broaden : beforeBroaden -> broad
         }
     ->
         MorphIndependently
-            (beforeNarrow -> Result (ErrorWithDeadEnd deadEnd) narrowed)
-            (beforeBroaden -> broadened)
+            (beforeNarrow -> Result (ErrorWithDeadEnd deadEnd) narrow)
+            (beforeBroaden -> broad)
 value descriptionCustom morphTransformations =
     { description =
         { custom = Stack.only descriptionCustom
@@ -881,13 +883,13 @@ value descriptionCustom morphTransformations =
                     |> grab (Morph.lazy (\() -> lazyList))
                 )
 
-    "[]" |> Text.narrowWith lazyList
+    "[]" |> Text.narrowTo lazyList
     --> Ok End
 
-    "a :: []" |> Text.narrowWith lazyList
+    "a :: []" |> Text.narrowTo lazyList
     --> Ok (Next 'a' End)
 
-    "a :: b :: []" |> Text.narrowWith lazyList
+    "a :: b :: []" |> Text.narrowTo lazyList
     --> Ok (Next 'a' (Next 'b' End))
 
 Without `lazy`, you would get an error like:
@@ -902,6 +904,10 @@ Without `lazy`, you would get an error like:
 >           │     ↓
 >           │    lazyListNext
 >           └─────┘
+
+Read more about why this limitation exists
+in [compiler hint "bad recursion"](https://github.com/elm/compiler/blob/master/hints/bad-recursion.md#tricky-recursion)
+up until the end
 
 -}
 lazy :
@@ -919,10 +925,10 @@ lazy morphLazy =
     { description = morphLazy () |> description
     , narrow =
         \broadValue ->
-            broadValue |> narrowWith (morphLazy ())
+            broadValue |> narrowTo (morphLazy ())
     , broaden =
         \narrowValue ->
-            narrowValue |> broadenWith (morphLazy ())
+            narrowValue |> broadenFrom (morphLazy ())
     }
 
 
@@ -935,7 +941,7 @@ Chaining
 
 This can be used to, for example
 
-  - [`Translate`](#Translate) what was [narrowed](#narrowWith)
+  - [`Translate`](#Translate) what was [narrowed](#narrowTo)
   - narrow only one variant,
     then of that variant's value type one of their variants
 
@@ -965,11 +971,11 @@ over morphNarrowBroad =
                     |> Emptiable.filled
             }
         , broaden =
-            broadenWith morph
-                >> broadenWith morphNarrowBroad
+            broadenFrom morph
+                >> broadenFrom morphNarrowBroad
         , narrow =
-            narrowWith morphNarrowBroad
-                >> Result.andThen (narrowWith morph)
+            narrowTo morphNarrowBroad
+                >> Result.andThen (narrowTo morph)
         }
 
 
@@ -1027,8 +1033,8 @@ reverse =
         { description = translate_ |> description
         , narrow =
             \unmapped ->
-                unmapped |> broadenWith translate_ |> Ok
-        , broaden = mapWith translate_
+                unmapped |> broadenFrom translate_ |> Ok
+        , broaden = mapTo translate_
         }
 
 
@@ -1125,9 +1131,9 @@ narrowErrorMap :
 narrowErrorMap errorChange =
     \morph ->
         { description = morph |> description
-        , broaden = broadenWith morph
+        , broaden = broadenFrom morph
         , narrow =
-            narrowWith morph
+            narrowTo morph
                 >> Result.mapError errorChange
         }
 
@@ -1163,10 +1169,10 @@ translateOn ( structureMap, structureUnmap ) elementTranslate =
         , inner = Emptiable.empty
         }
     , narrow =
-        structureMap (mapWith elementTranslate)
+        structureMap (mapTo elementTranslate)
             >> Ok
     , broaden =
-        structureUnmap (broadenWith elementTranslate)
+        structureUnmap (broadenFrom elementTranslate)
     }
 
 
@@ -1243,7 +1249,7 @@ type alias MorphText narrow =
 
     -- we can get a nice error message if it fails
     "(2.71, x)"
-        |> Text.narrowWith point
+        |> Text.narrowTo point
         |> Result.mapError (Morph.Error.dump "filename.txt")
     --> Err
     -->     [ "[ERROR] filename.txt: line 1:8: I was expecting a digit [0-9]. I got stuck when I got 'x'."
@@ -1319,15 +1325,15 @@ type alias MorphRowIndependently broadElement beforeBroaden narrowed =
     import String.Morph as Text
 
     -- can match any character
-    "a" |> Text.narrowWith (Morph.keep |> one)
+    "a" |> Text.narrowTo (Morph.keep |> one)
     --> Ok 'a'
 
-    "#" |> Text.narrowWith (Morph.keep |> one)
+    "#" |> Text.narrowTo (Morph.keep |> one)
     --> Ok '#'
 
     -- only fails if we run out of inputs
     ""
-        |> Text.narrowWith (Morph.keep |> one)
+        |> Text.narrowTo (Morph.keep |> one)
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:0: I was expecting a character. I reached the end of the input."
 
@@ -1352,7 +1358,7 @@ one =
                     Emptiable.Filled (Stack.TopDown nextBroadElement afterNextBroadElement) ->
                         case
                             nextBroadElement
-                                |> narrowWith morph
+                                |> narrowTo morph
                         of
                             Ok narrowNarrow ->
                                 { narrow = narrowNarrow
@@ -1369,7 +1375,7 @@ one =
                                     |> Row
                                     |> Err
         , broaden =
-            broadenWith morph
+            broadenFrom morph
                 >> Stack.only
         }
 
@@ -1400,7 +1406,7 @@ then [taking](#grab) and [dropping](#skip) what you need to parse
             |> skip (MorphRow.only [ ',' ])
             |> grab .y integer
 
-    "12,34" |> Text.narrowWith point
+    "12,34" |> Text.narrowTo point
     --> Ok { x = 12, y = 34 }
 
 
@@ -1492,7 +1498,7 @@ succeed narrowConstant =
 
     -- get some letters, make them lowercase
     "ABC"
-        |> Text.narrowWith
+        |> Text.narrowTo
             (atLeast n1 AToZ.Morph.char
                 |> map Text.fromList
                 |> map (toggle String.toLower)
@@ -1529,11 +1535,11 @@ overRow morphRowBeforeMorph =
         , narrow =
             \broad_ ->
                 broad_
-                    |> narrowWith morphRowBeforeMorph
+                    |> narrowTo morphRowBeforeMorph
                     |> Result.andThen
                         (\narrowed ->
                             narrowed.narrow
-                                |> narrowWith narrowMorph
+                                |> narrowTo narrowMorph
                                 |> Result.map
                                     (\narrowNarrow ->
                                         { narrow = narrowNarrow
@@ -1549,8 +1555,8 @@ overRow morphRowBeforeMorph =
                                     )
                         )
         , broaden =
-            broadenWith narrowMorph
-                >> broadenWith morphRowBeforeMorph
+            broadenFrom narrowMorph
+                >> broadenFrom morphRowBeforeMorph
         }
 
 
@@ -1695,7 +1701,7 @@ until untilStep =
 
                         top :: tail ->
                             (top |> GoOn)
-                                |> broadenWith loopStep
+                                |> broadenFrom loopStep
                                 |> Stack.onTopStack
                                     (tail |> broadenStepBack ())
         in
@@ -1703,7 +1709,7 @@ until untilStep =
             let
                 committedBack =
                     commitResultNarrow
-                        |> broadenWith untilStep.commit
+                        |> broadenFrom untilStep.commit
             in
             (committedBack.before
                 |> List.reverse
@@ -1711,7 +1717,7 @@ until untilStep =
             )
                 |> Stack.onTopStack
                     ((committedBack.end |> Commit)
-                        |> broadenWith loopStep
+                        |> broadenFrom loopStep
                     )
     , narrow =
         let
@@ -1731,14 +1737,14 @@ until untilStep =
                     )
             loopNarrowStep () =
                 \before_ ->
-                    narrowWith loopStep
+                    narrowTo loopStep
                         >> Result.andThen
                             (\stepped ->
                                 case stepped.narrow of
                                     Commit committed ->
                                         case
                                             { before = before_, end = committed }
-                                                |> narrowWith untilStep.commit
+                                                |> narrowTo untilStep.commit
                                         of
                                             Err error ->
                                                 { error = error
@@ -1841,7 +1847,7 @@ choiceTryRow possibilityToChoice possibilityMorph =
                     |> choiceMorphSoFar.narrow
                     |> restoreTry
                         (\soFarErrorPossibilities ->
-                            case choiceBroad |> narrowWith possibilityMorph of
+                            case choiceBroad |> narrowTo possibilityMorph of
                                 Ok possibilityParsed ->
                                     { broad = possibilityParsed.broad
                                     , narrow =
@@ -1857,7 +1863,7 @@ choiceTryRow possibilityToChoice possibilityMorph =
                         )
         , broaden =
             choiceMorphSoFar.broaden
-                (broadenWith possibilityMorph)
+                (broadenFrom possibilityMorph)
         }
 
 
@@ -1958,7 +1964,7 @@ end =
 transforming it into a [`Morph`](#Morph) on the full stack of input elements.
 
     fromString =
-        narrowWith
+        narrowTo
             (Point.morphRowChar
                 |> Morph.rowFinish
                 |> Morph.over Stack.Morph.toString
@@ -1974,14 +1980,14 @@ rowFinish =
         , narrow =
             \broadElements ->
                 broadElements
-                    |> narrowWith morphRow
+                    |> narrowTo morphRow
                     |> Result.andThen
                         (\result ->
                             result.broad
-                                |> narrowWith end
+                                |> narrowTo end
                                 |> Result.map
                                     (\_ -> result.narrow)
                         )
         , broaden =
-            \narrow -> narrow |> broadenWith morphRow
+            \narrow -> narrow |> broadenFrom morphRow
         }

@@ -16,7 +16,7 @@ import Value.PackageInternal
 
 {-| `()` [`Morph`](#Morph)
 
-Often used in when [morphing](Value#MorphValue) a [variants](Choice#tryValue)
+Often used in when [morphing](Value#MorphValue) a [variants](Choice#variantValue)
 with 0 attached values
 
 -}

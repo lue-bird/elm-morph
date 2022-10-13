@@ -140,20 +140,20 @@ toInt =
     import Morph.Error
 
     -- you can parse integers as `Int` instead of `String`
-    "123" |> Text.narrowWith integer --> Ok 123
+    "123" |> Text.narrowTo integer --> Ok 123
 
     -- It also works with negative numbers.
-    "-123" |> Text.narrowWith integer --> Ok -123
+    "-123" |> Text.narrowTo integer --> Ok -123
 
     -- a decimal number is _not_ an integer
     "3.14"
-        |> Text.narrowWith integer
+        |> Text.narrowTo integer
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:2: I was expecting an integer value. I got stuck when I got the character '.'."
 
     -- but not with invalid numbers
     "abc"
-        |> Text.narrowWith integer
+        |> Text.narrowTo integer
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting an integer value. I got stuck when I got the character 'a'."
 
@@ -184,12 +184,17 @@ decimalRowChar =
                         (Morph.translate digitsToBitsAfterI bitsToDigits
                             |> Morph.over
                                 (Morph.succeed
-                                    |> Group.grab Stack.top (N.Morph.charIn ( n1, n9 ))
+                                    |> Group.grab Stack.top
+                                        (N.Morph.in_ ( n1, n9 )
+                                            |> Morph.over N.Morph.char
+                                        )
                                     |> Group.grab Stack.topRemove
                                         (ArraySized.toStackEmptiable
                                             >> Morph.over
                                                 (ArraySized.Morph.atLeast n0
-                                                    (N.Morph.charIn ( n1, n9 ))
+                                                    (N.Morph.in_ ( n1, n9 )
+                                                        |> Morph.over N.Morph.char
+                                                    )
                                                 )
                                         )
                                 )

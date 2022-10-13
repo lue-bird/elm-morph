@@ -1,10 +1,18 @@
-module Int.Morph exposing (float)
+module Int.Morph exposing (float, value)
+
+{-| `Int` [`Morph`](Morph#Morph)
+
+@docs float, value
+
+-}
 
 import Float.Morph
 import Morph exposing (Morph)
 import Value
 
 
+{-| Only [`Morph`](Morph#Morph) a `Float` without a fraction
+-}
 float : Morph Int Float
 float =
     Morph.value "Int"
@@ -23,9 +31,9 @@ float =
         }
 
 
-{-| `Int` [`Morph`](#Morph)
+{-| `Int` [`MorphValue`](Value#MorphValue)
 -}
-int : Value.MorphValue Int
-int =
+value : Value.MorphValue Int
+value =
     float
         |> Morph.over Float.Morph.value

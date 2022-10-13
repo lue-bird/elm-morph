@@ -45,12 +45,15 @@ import ArraySized exposing (ArraySized)
 import Emptiable exposing (Emptiable)
 import Group exposing (grab)
 import Linear exposing (Direction(..))
-import Morph exposing (Error, ErrorWithDeadEnd, Morph, MorphIndependently, MorphOrError, MorphRow, MorphRowIndependently, Translate, broad, broadenWith, narrowWith, translate, translateOn)
+import Morph exposing (Error, ErrorWithDeadEnd, Morph, MorphIndependently, MorphOrError, MorphRow, MorphRowIndependently, Translate, broad, broadenFrom, narrowTo, translate, translateOn)
 import N exposing (Add1, Exactly, Fixed, In, InFixed, InValue, Min, N, N0, N1, To, Up, n0, n1, n2)
 import Possibly exposing (Possibly)
 import Stack exposing (Stacked)
 
 
+{-| [`Morph`](Morph#Morph) from an `ArraySized` with an equatable range `InValue`
+to an `InFixed` to operate on it
+-}
 value :
     MorphIndependently
         (ArraySized (InValue narrowMin narrowMax) narrowElement
@@ -63,6 +66,9 @@ value =
     translate ArraySized.fromValue ArraySized.toValue
 
 
+{-| [`Morph`](Morph#Morph) from an `ArraySized` with a range `InFixed`
+to an `InValue` to make it equatable
+-}
 toValue :
     MorphIndependently
         (ArraySized (InFixed narrowMin narrowMax) narrowElement
@@ -81,7 +87,7 @@ toValue =
     import ArraySized
 
     [ 0, 1, 2, 3 ]
-        |> Morph.mapWith ArraySized.Morph.fromList
+        |> Morph.mapTo ArraySized.Morph.fromList
     --: ArraySized (Min (Up x To x)) number_
 
 -}
@@ -129,7 +135,7 @@ toList =
     import ArraySized
 
     Stack.topDown 0 [ 1, 2, 3, 4 ]
-        |> Morph.mapWith ArraySized.Morph.stackEmptiable
+        |> Morph.mapTo ArraySized.Morph.stackEmptiable
     --: ArraySized (Min (Up x To x)) number_
 
 Have `>= 1` element (`Emptiable (Stacked ...) Never`)? → [`fromStackFilled`](#fromStackFilled)
@@ -185,7 +191,7 @@ toStackEmptiable =
     import ArraySized
 
     Stack.topDown 0 [ 1, 2, 3, 4 ]
-        |> Morph.mapWith ArraySized.Morph.stackFilled
+        |> Morph.mapTo ArraySized.Morph.stackFilled
     --: ArraySized (Min (Up x To (Add1 x))) number_
 
 Have `>= 1` element (`Emptiable (Stacked ...) Possibly`)? → [`fromStackEmptiable`](#fromStackEmptiable)
@@ -267,7 +273,7 @@ elementTranslate elementTranslate_ =
 
 
 {-| Match broad [`MorphRow`](#MorphRow)s
-(those that can always [produce its broad value](#broadenWith))
+(those that can always [produce its broad value](#broadenFrom))
 based given input elements in sequence
 
 This can get verbose, so create helpers with it where you see common patterns!
@@ -283,12 +289,12 @@ This can get verbose, so create helpers with it where you see common patterns!
 
     -- Match a specific character, case sensitive
     "abc"
-        |> Text.narrowWith (textOnly "abc")
+        |> Text.narrowTo (textOnly "abc")
     --> Ok ()
 
     -- It fails if it's not _exactly_ the same
     "abC"
-        |> Text.narrowWith (textOnly "abC")
+        |> Text.narrowTo (textOnly "abC")
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting the character 'a'. I got stuck when I got the character 'A'."
 
@@ -367,7 +373,7 @@ for morphRowByElement elementsToTraverseInSequence =
                 \soFar ->
                     case
                         soFar.broad
-                            |> narrowWith (traversedElement |> morphRowByElement)
+                            |> narrowTo (traversedElement |> morphRowByElement)
                     of
                         Err error ->
                             error |> Err |> Result
@@ -445,7 +451,7 @@ for morphRowByElement elementsToTraverseInSequence =
         \narrowSequence ->
             List.map2
                 (\morphInSequence ->
-                    broadenWith (morphInSequence |> morphRowByElement)
+                    broadenFrom (morphInSequence |> morphRowByElement)
                 )
                 (elementsToTraverseInSequence |> ArraySized.toList)
                 (narrowSequence |> ArraySized.toList)
@@ -539,7 +545,7 @@ exactly repeatCount repeatedMorphRow =
                                 |> Ok
 
                         Err _ ->
-                            case broad_ |> narrowWith repeatedMorphRow of
+                            case broad_ |> narrowTo repeatedMorphRow of
                                 Err error ->
                                     error |> Err
 
@@ -558,7 +564,7 @@ exactly repeatCount repeatedMorphRow =
             repeated
                 |> ArraySized.toList
                 |> Stack.fromList
-                |> Stack.map (\_ -> broadenWith repeatedMorphRow)
+                |> Stack.map (\_ -> broadenFrom repeatedMorphRow)
                 |> Stack.flatten
     }
 
@@ -573,12 +579,12 @@ exactly repeatCount repeatedMorphRow =
 
     -- we want at least three letters, we are okay with more than three
     "abcdef"
-        |> Text.narrowWith (atLeast n3 AToZ.Morph.char)
+        |> Text.narrowTo (atLeast n3 AToZ.Morph.char)
     --> Ok [ 'a', 'b', 'c', 'd', 'e', 'f' ]
 
     -- but not two, that's sacrilegious
     "ab_def"
-        |> Text.narrowWith (atLeast n3 AToZ.Morph.char)
+        |> Text.narrowTo (atLeast n3 AToZ.Morph.char)
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:3: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '_'."
 
@@ -591,14 +597,14 @@ exactly repeatCount repeatedMorphRow =
     import String.Morph as Text
 
     -- We want as many letters as there are.
-    "abc" |> Text.narrowWith (atLeast n0 AToZ.Morph.char)
+    "abc" |> Text.narrowTo (atLeast n0 AToZ.Morph.char)
     --> Ok [ 'a', 'b', 'c' ]
 
-    "abc123" |> Text.narrowWith (atLeast n0 AToZ.Morph.char)
+    "abc123" |> Text.narrowTo (atLeast n0 AToZ.Morph.char)
     --> Ok [ 'a', 'b', 'c' ]
 
     -- even zero letters is okay
-    "123abc" |> Text.narrowWith (atLeast n0 AToZ.Morph.char)
+    "123abc" |> Text.narrowTo (atLeast n0 AToZ.Morph.char)
     --> Ok []
 
 
@@ -612,15 +618,15 @@ exactly repeatCount repeatedMorphRow =
     import String.Morph as Text
 
     -- we want as many letters as there are
-    "abc" |> Text.narrowWith (atLeast n1 AToZ.Morph.char)
+    "abc" |> Text.narrowTo (atLeast n1 AToZ.Morph.char)
     --> Ok [ 'a', 'b', 'c' ]
 
-    "abc123" |> Text.narrowWith (atLeast n1 AToZ.Morph.char)
+    "abc123" |> Text.narrowTo (atLeast n1 AToZ.Morph.char)
     --> Ok [ 'a', 'b', 'c' ]
 
     -- but we want at least one
     "123abc"
-        |> Text.narrowWith (atLeast n1 AToZ.Morph.char)
+        |> Text.narrowTo (atLeast n1 AToZ.Morph.char)
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting a letter a|..|z or A|...|Z. I got stuck when I got the character '1'."
 
@@ -652,7 +658,7 @@ exactly repeatCount repeatedMorphRow =
 
     -- note that both values and separators must be of the same type
     "a,bc,def"
-        |> Text.narrowWith tags
+        |> Text.narrowTo tags
     --> Ok
     -->     { first = [ 'a' ]
     -->     , afterFirst =
@@ -662,7 +668,7 @@ exactly repeatCount repeatedMorphRow =
     -->     }
 
     ",a,,"
-        |> Text.narrowWith tags
+        |> Text.narrowTo tags
     --> Ok
     -->     (Stack.topDown
     -->         []
@@ -674,7 +680,7 @@ exactly repeatCount repeatedMorphRow =
 
     -- an empty input text gives a single element from an empty string
     ""
-        |> Text.narrowWith tags
+        |> Text.narrowTo tags
     --> Ok (topDown [] [])
 
 
@@ -742,19 +748,19 @@ untilFail elementStepMorphRow =
     import String.Morph as Text
 
     -- we want between two and four letters
-    "abcdef" |> Text.narrowWith (in_ 2 4 AToZ.Morph.char)
+    "abcdef" |> Text.narrowTo (in_ 2 4 AToZ.Morph.char)
     --> Ok [ 'a', 'b', 'c', 'd' ]
 
-    "abc_ef" |> Text.narrowWith (in_ ( n2, n4 ) AToZ.Morph.char)
+    "abc_ef" |> Text.narrowTo (in_ ( n2, n4 ) AToZ.Morph.char)
     --> Ok [ 'a', 'b', 'c' ]
 
-    "ab_def" |> Text.narrowWith (in_ ( n2, n4 ) AToZ.Morph.char)
+    "ab_def" |> Text.narrowTo (in_ ( n2, n4 ) AToZ.Morph.char)
     --> Ok [ 'a', 'b' ]
 
 
     -- but less than that is not cool
     "i_am_here"
-        |> Text.narrowWith (in_ ( n2, n3 ) letter)
+        |> Text.narrowTo (in_ ( n2, n3 ) letter)
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:2: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '_'."
 
@@ -769,11 +775,11 @@ Alternative to [`maybe`](#maybe) which instead returns a `List`.
     import String.Morph as Text
 
     -- we want one letter, optionally
-    "abc" |> Text.narrowWith (in_ ( n0, n1 ) AToZ.Morph.char)
+    "abc" |> Text.narrowTo (in_ ( n0, n1 ) AToZ.Morph.char)
     --> Ok [ 'a' ]
 
     -- if we don't get any, that's still okay
-    "123abc" |> Text.narrowWith (in_ ( n0, n1 ) AToZ.Morph.char)
+    "123abc" |> Text.narrowTo (in_ ( n0, n1 ) AToZ.Morph.char)
     --> Ok []
 
 
@@ -786,20 +792,20 @@ Alternative to [`maybe`](#maybe) which instead returns a `List`.
     import String.Morph as Text
 
     -- we want a maximum of three letters
-    "abcdef" |> Text.narrowWith (in_ ( n0, n3 ) AToZ.Morph.char)
+    "abcdef" |> Text.narrowTo (in_ ( n0, n3 ) AToZ.Morph.char)
     --> Ok [ 'a', 'b', 'c' ]
 
     -- less than that is also okay
-    "ab_def" |> Text.narrowWith (in_ ( n0, n3 ) AToZ.Morph.char)
+    "ab_def" |> Text.narrowTo (in_ ( n0, n3 ) AToZ.Morph.char)
     --> Ok [ 'a', 'b' ]
 
     -- even zero letters are fine
-    "_underscore" |> Text.narrowWith (in_ ( n0, n3 ) AToZ.Morph.char)
+    "_underscore" |> Text.narrowTo (in_ ( n0, n3 ) AToZ.Morph.char)
     --> Ok []
 
     -- make sure we don't consume more than three letters
     "abcdef"
-        |> Text.narrowWith
+        |> Text.narrowTo
             (Morph.succeed (\letters -> letters)
                 |> grab (in_ ( n0, n3 ) AToZ.Morph.char)
                 |> skip (one 'd')
@@ -957,7 +963,7 @@ whileAccumulate { initial, step, element } =
                 |> Emptiable.filled
         }
     , broaden =
-        List.map (broadenWith element)
+        List.map (broadenFrom element)
             >> Stack.fromList
             >> Stack.flatten
     , narrow =
@@ -976,7 +982,7 @@ whileAccumulate { initial, step, element } =
             loopNarrowStep { accumulationValue } =
                 \broad_ ->
                     broad_
-                        |> narrowWith element
+                        |> narrowTo element
                         |> Result.andThen
                             (\stepped ->
                                 case accumulationValue |> step stepped.narrow of

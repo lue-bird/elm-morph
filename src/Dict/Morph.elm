@@ -57,7 +57,7 @@ toListImplementation =
     [ { key = "hi", value = "there" }
     , { key = "git", value = "gud" }
     ]
-        |> Morph.mapWith Dict.Morph.list
+        |> Morph.mapTo Dict.Morph.list
     --> Dict.fromList [ ( "Hi", "there" ), ( "git", "gud" ) ]
 
 -}
@@ -148,6 +148,6 @@ keyValueValue :
 keyValueValue entryMorph =
     Group.value
         (\key value_ -> { key = key, value = value_ })
-        |> Group.partValue ( .key, "key" ) entryMorph.key
-        |> Group.partValue ( .value, "value" ) entryMorph.value
+        |> Group.fieldValue ( .key, "key" ) entryMorph.key
+        |> Group.fieldValue ( .value, "value" ) entryMorph.value
         |> Group.finishValue

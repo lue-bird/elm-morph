@@ -31,6 +31,6 @@ value caseMorphs =
                 Err narrowError ->
                     narrowError |> err
         )
-        |> Choice.tryValue ( Ok, "Ok" ) caseMorphs.ok
-        |> Choice.tryValue ( Err, "Err" ) caseMorphs.err
+        |> Choice.variantValue ( Ok, "Ok" ) caseMorphs.ok
+        |> Choice.variantValue ( Err, "Err" ) caseMorphs.err
         |> Choice.finishValue

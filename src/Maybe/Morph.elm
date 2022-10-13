@@ -29,8 +29,8 @@ value contentMorph =
                 Just content ->
                     content |> just
         )
-        |> Choice.tryValue ( Just, "Just" ) contentMorph
-        |> Choice.tryValue ( \() -> Nothing, "Nothing" ) Unit.value
+        |> Choice.variantValue ( Just, "Just" ) contentMorph
+        |> Choice.variantValue ( \() -> Nothing, "Nothing" ) Unit.value
         |> Choice.finishValue
 
 
@@ -43,13 +43,13 @@ value contentMorph =
 
     -- maybe we get `Just` a letter
     "a"
-        |> Text.narrowWith
+        |> Text.narrowTo
             (Maybe.Morph.row (AToZ.Morph.char |> Morph.one))
     --> Ok (Just 'a')
 
     -- maybe we get `Nothing`
     "123abc"
-        |> Text.narrowWith
+        |> Text.narrowTo
             (Maybe.Morph.row (AToZ.Morph.char |> Morph.one))
     --> Ok Nothing
 

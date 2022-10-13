@@ -49,11 +49,11 @@ toList =
 
 {-| [`Translate`](Morph#Translate) from `List Char` to a `String`.
 
-    "0123" |> Morph.mapWith String.Morph.fromList
+    "0123" |> Morph.mapTo String.Morph.fromList
     --> [ '0', '1', '2', '3' ]
 
 Parse-build a `String` →
-Use [`narrowWith`](Morph#narrow), [`broadenWith`](Morph#broaden)
+Use [`narrowTo`](Morph#narrow), [`broadenFrom`](Morph#broaden)
 with [`Morph.rowFinish`](MorphRow#finish) `|> over` [`Text.fromList`](#fromList)
 
 -}
@@ -85,11 +85,11 @@ This is case sensitive.
     import Morph.Error
 
     -- match an exact text, case sensitive
-    "abcdef" |> Text.narrowWith (text "abc") --> Ok "abc"
+    "abcdef" |> Text.narrowTo (text "abc") --> Ok "abc"
 
     -- but anything else makes it fail
     "abCDEF"
-        |> Text.narrowWith (text "abc")
+        |> Text.narrowTo (text "abc")
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:3: I was expecting the text 'abc'. I got stuck when I got the character 'C'."
 
@@ -106,7 +106,7 @@ only expectedText =
 
 
 {-| Match broad [`MorphRow`](#MorphRow)s
-(those that can always [produce its broad value](Morph#broadenWith))
+(those that can always [produce its broad value](Morph#broadenFrom))
 based a given `String`s `Char`s in sequence
 
 See [`Morph.forBroad`](Morph#forBroad)

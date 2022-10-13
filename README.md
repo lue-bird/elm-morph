@@ -42,9 +42,9 @@ value =
         (\name percent per100k ->
             { name = name, percent = percent, per100k = per100k }
         )
-        |> Group.partValue ( .name, "name" ) String.Morph.value
-        |> Group.partValue ( .percent, "percent" ) Float.Morph.value
-        |> Group.partValue ( .per100k, "per100k" ) Float.Morph.value
+        |> Group.fieldValue ( .name, "name" ) String.Morph.value
+        |> Group.fieldValue ( .percent, "percent" ) Float.Morph.value
+        |> Group.fieldValue ( .per100k, "per100k" ) Float.Morph.value
         |> Group.finishValue
 ```
 surprisingly easy!
@@ -78,8 +78,8 @@ value =
                 SignedIn signedIn ->
                     variantSignedIn signedIn
         )
-        |> Choice.tryValue ( \() -> Anonymous, "Anonymous" ) Unit.value
-        |> Choice.tryValue ( SignedIn, "SignedIn" ) signedInValue
+        |> Choice.variantValue ( \() -> Anonymous, "Anonymous" ) Unit.value
+        |> Choice.variantValue ( SignedIn, "SignedIn" ) signedInValue
         |> Choice.finishValue
 
 signedInValue : MorphValue SignedIn
@@ -88,8 +88,8 @@ signedInValue =
         (\name status ->
             { name = name, status = status }
         )
-        |> Group.partValue ( .name, "name" ) String.Morph.value
-        |> Group.partValue ( .statue, "status" ) String.Morph.value
+        |> Group.fieldValue ( .name, "name" ) String.Morph.value
+        |> Group.fieldValue ( .statue, "status" ) String.Morph.value
         |> Group.finishValue
 ```
 clean
@@ -109,7 +109,7 @@ Here a 1:1 port of [an example from `elm/parser`](https://dark.elm.dmy.fr/packag
 ```elm
 import Choice
 import Group exposing (skip, grab)
-import Morph exposing (MorphRow, broad, narrowWith, one)
+import Morph exposing (MorphRow, broad, narrowTo, one)
 import Char.Morph
 import String.Morph
 import N exposing (n0)
@@ -122,7 +122,7 @@ type Boolean
     | Or { left : Boolean, right : Boolean }
 
 "((true || false) || false)"
-    |> narrowWith
+    |> narrowTo
         (boolean
             |> Morph.rowFinish
             |> Morph.over Stack.Morph.string

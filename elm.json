@@ -15,6 +15,7 @@
         "Natural",
         "Integer",
         "Decimal",
+        "FloatExplicit",
         "N.Morph",
         "Int.Morph",
         "Maybe.Morph",

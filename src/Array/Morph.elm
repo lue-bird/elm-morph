@@ -1,6 +1,7 @@
 module Array.Morph exposing
     ( eachElement
     , list, toList
+    , value
     )
 
 {-| [`Morph`](Morph) an `Array`
@@ -34,7 +35,7 @@ import Value.PackageInternal
     import Array
 
     [ 0, 1, 2, 3 ]
-        |> Morph.mapWith Array.Morph.list
+        |> Morph.mapTo Array.Morph.list
     --> Array.fromList [ 0, 1, 2, 3 ]
 
 -}
@@ -51,7 +52,7 @@ list =
     import Array
 
     Array.fromList [ 0, 1, 2, 3 ]
-        |> Morph.mapWith Array.Morph.list
+        |> Morph.mapTo Array.Morph.list
     --> [ 0, 1, 2, 3 ]
 
 -}
@@ -94,7 +95,7 @@ value elementMorph =
 
 
 {-| [`Morph`](Morph#Morph) all elements in sequence.
-On the narrowing side all [narrowed](Morph#narrowWith) values must be `Ok`
+On the narrowing side all [narrowed](Morph#narrowTo) values must be `Ok`
 for it to not result in a [`Morph.Error`](Morph#Error)
 
 If the element [`Morph`](Morph#Morph) is a [`Translate`](Morph#Translate),
@@ -133,7 +134,7 @@ eachElement elementMorph =
                 |> Array.foldr
                     (\element { index, collected } ->
                         { collected =
-                            case element |> Morph.narrowWith elementMorph of
+                            case element |> Morph.narrowTo elementMorph of
                                 Ok elementValue ->
                                     collected
                                         |> Result.map (\l -> l |> (::) elementValue)
@@ -165,5 +166,5 @@ eachElement elementMorph =
                 |> Result.mapError Morph.Parts
     , broaden =
         \array ->
-            array |> Array.map (Morph.broadenWith elementMorph)
+            array |> Array.map (Morph.broadenFrom elementMorph)
     }

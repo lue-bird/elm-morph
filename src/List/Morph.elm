@@ -27,7 +27,7 @@ import Array
 import ArraySized
 import Emptiable exposing (Emptiable, filled)
 import Linear exposing (Direction(..))
-import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, MorphOrError, MorphRow, Translate, broad, broadenWith, narrowWith, translate, translateOn)
+import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, MorphOrError, MorphRow, Translate, broad, broadenFrom, narrowTo, translate, translateOn)
 import N exposing (Up)
 import Possibly exposing (Possibly(..))
 import Stack exposing (Stacked)
@@ -54,7 +54,7 @@ reverse =
 
 
 {-| Match broad [`MorphRow`](#MorphRow)s
-(those that can always [produce its broad value](#broadenWith))
+(those that can always [produce its broad value](#broadenFrom))
 based given input elements in sequence
 
 This can get verbose, so create helpers with it where you see common patterns!
@@ -70,12 +70,12 @@ This can get verbose, so create helpers with it where you see common patterns!
 
     -- Match a specific character, case sensitive
     "abc"
-        |> Text.narrowWith (textOnly "abc")
+        |> Text.narrowTo (textOnly "abc")
     --> Ok ()
 
     -- It fails if it's not _exactly_ the same
     "abC"
-        |> Text.narrowWith (textOnly "abC")
+        |> Text.narrowTo (textOnly "abC")
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting the character 'a'. I got stuck when I got the character 'A'."
 
@@ -151,7 +151,7 @@ for morphRowByElement elementsToTraverseInSequence =
             stepFrom traversedElement =
                 \soFar ->
                     soFar.broad
-                        |> narrowWith (traversedElement |> morphRowByElement)
+                        |> narrowTo (traversedElement |> morphRowByElement)
                         |> Result.map
                             (\stepParsed ->
                                 { broad = stepParsed.broad
@@ -176,7 +176,7 @@ for morphRowByElement elementsToTraverseInSequence =
         \narrowSequence ->
             List.map2
                 (\morphInSequence ->
-                    broadenWith (morphInSequence |> morphRowByElement)
+                    broadenFrom (morphInSequence |> morphRowByElement)
                 )
                 elementsToTraverseInSequence
                 narrowSequence
@@ -216,7 +216,7 @@ value elementMorph =
 
 
 {-| [`Morph`](Morph#Morph) all elements in sequence.
-On the narrowing side all [narrowed](Morph#narrowWith) values must be `Ok`
+On the narrowing side all [narrowed](Morph#narrowTo) values must be `Ok`
 for it to not result in a [`Morph.Error`](Morph#Error)
 
 If the element [`Morph`](Morph#Morph) is a [`Translate`](Morph#Translate),
@@ -255,7 +255,7 @@ eachElement elementMorph =
                 |> List.foldr
                     (\element { index, collected } ->
                         { collected =
-                            case element |> Morph.narrowWith elementMorph of
+                            case element |> Morph.narrowTo elementMorph of
                                 Ok elementValue ->
                                     collected
                                         |> Result.map (\l -> l |> (::) elementValue)
@@ -286,5 +286,5 @@ eachElement elementMorph =
                 |> Result.mapError Morph.Parts
     , broaden =
         \list ->
-            list |> List.map (Morph.broadenWith elementMorph)
+            list |> List.map (Morph.broadenFrom elementMorph)
     }

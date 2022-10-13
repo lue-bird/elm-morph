@@ -73,7 +73,7 @@ toList =
 
 
 {-| [`Morph`](Morph#Morph) all elements in sequence.
-On the narrowing side all [narrowed](Morph#narrowWith) values must be `Ok`
+On the narrowing side all [narrowed](Morph#narrowTo) values must be `Ok`
 for it to not result in a [`Morph.Error`](Morph#Error)
 
 If the given element [`Morph`](Morph#Morph) is a [`Translate`](Morph#Translate),
@@ -112,7 +112,7 @@ eachElement elementMorph =
                 |> Set.foldl
                     (\element { index, collected } ->
                         { collected =
-                            case element |> Morph.narrowWith elementMorph of
+                            case element |> Morph.narrowTo elementMorph of
                                 Ok elementValue ->
                                     collected
                                         |> Result.map (\l -> l |> Set.insert elementValue)
@@ -143,7 +143,7 @@ eachElement elementMorph =
                 |> Result.mapError Morph.Parts
     , broaden =
         \set ->
-            set |> Set.map (Morph.broadenWith elementMorph)
+            set |> Set.map (Morph.broadenFrom elementMorph)
     }
 
 

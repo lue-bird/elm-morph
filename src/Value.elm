@@ -46,7 +46,7 @@ for example
 variant union [`MorphValue`](#MorphValue)
 
   - starting from [`Choice.between`](Choice#between)
-  - over [`Choice.tryValue`](Choice#tryValue)
+  - over [`Choice.variantValue`](Choice#variantValue)
   - and completed with [`Choice.finishValue`](Choice#finishValue)
 
 
@@ -120,9 +120,10 @@ Motivated? Explore, PR ↓
 
 import Array exposing (Array)
 import ArraySized
+import Decimal.Internal exposing (Decimal)
 import Emptiable exposing (Emptiable, fill, filled)
 import Linear exposing (Direction(..))
-import Morph exposing (Morph, MorphIndependently, MorphOrError, broadenWith, narrowWith, to, translate)
+import Morph exposing (Morph, MorphIndependently, MorphOrError, broadenFrom, narrowTo, to, translate)
 import N exposing (Up)
 import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
@@ -133,7 +134,7 @@ import Stack exposing (Stacked)
 -}
 type Literal
     = Unit ()
-    | Float Float
+    | Decimal Decimal
     | String String
 
 
@@ -159,7 +160,7 @@ Please use to the [`MorphValue`](#MorphValue)s present in most `module`s
 to construct a [`Value`](#Value),
 as you can for example construct ↓ using the exposed(..) variants
 
-    Value.List [ Value.Float 3, Value.String "huh" ]
+    Value.List [ Value.Unit (), Value.String "huh" ]
 
 which isn't a valid elm value
 
@@ -296,8 +297,8 @@ tagTranslate :
             (Value tagBeforeUnmap -> Value tagUnmapped)
 tagTranslate tagTranslate_ =
     translate
-        (tagMap (Morph.mapWith tagTranslate_))
-        (tagMap (Morph.broadenWith tagTranslate_))
+        (tagMap (Morph.mapTo tagTranslate_))
+        (tagMap (Morph.broadenFrom tagTranslate_))
 
 
 {-| Reduce the amount of tag information of the [`Value`](#Value)

@@ -11,7 +11,7 @@ import Expect
 import Fuzz
 import Group exposing (grab, skip)
 import Linear exposing (Direction(..))
-import Morph exposing (Morph, MorphRow, MorphRowIndependently, broad, broadenWith, narrowWith, one, translate)
+import Morph exposing (Morph, MorphRow, MorphRowIndependently, broad, broadenFrom, narrowTo, one, translate)
 import N exposing (Fixed, In, InFixed, Min, N, N0, N1, N2, N9, n0, n1, n9)
 import N.Morph
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
@@ -39,13 +39,13 @@ pointTest =
         [ test "narrow"
             (\() ->
                 "(3,  -9999.124)"
-                    |> narrowWith
-                        (Group.build
+                    |> narrowTo
+                        (Group.toFrom
                             ( \x y -> { x = x, y = y }
                             , \x y -> { x = x, y = y }
                             )
-                            |> Group.part ( .x, .x ) Decimal.float
-                            |> Group.part ( .y, .y ) Decimal.float
+                            |> Group.part ( .x, .x ) Decimal.floatExplicit
+                            |> Group.part ( .y, .y ) Decimal.floatExplicit
                             |> Morph.overRow point
                             |> Morph.rowFinish
                             |> Morph.over Stack.Morph.string
@@ -55,13 +55,13 @@ pointTest =
         , test "broaden"
             (\() ->
                 { x = 3.0, y = -9999.124 }
-                    |> broadenWith
-                        (Group.build
+                    |> broadenFrom
+                        (Group.toFrom
                             ( \x y -> { x = x, y = y }
                             , \x y -> { x = x, y = y }
                             )
-                            |> Group.part ( .x, .x ) Decimal.float
-                            |> Group.part ( .y, .y ) Decimal.float
+                            |> Group.part ( .x, .x ) Decimal.floatExplicit
+                            |> Group.part ( .y, .y ) Decimal.floatExplicit
                             |> Morph.overRow point
                             |> Morph.rowFinish
                             |> Morph.over Stack.Morph.string
@@ -126,10 +126,10 @@ emailTest =
                         test
                             exampleEmail
                             (\() ->
-                                case exampleEmail |> narrowWith emailToText of
+                                case exampleEmail |> narrowTo emailToText of
                                     Ok emailParsed ->
                                         emailParsed
-                                            |> broadenWith emailToText
+                                            |> broadenFrom emailToText
                                             |> Expect.equal exampleEmail
 
                                     Err _ ->
@@ -152,7 +152,7 @@ emailTest =
                         test
                             exampleEmail
                             (\() ->
-                                case exampleEmail |> narrowWith emailToText of
+                                case exampleEmail |> narrowTo emailToText of
                                     Ok _ ->
                                         Expect.fail exampleEmail
 
@@ -223,13 +223,13 @@ localSymbol =
                 LocalSymbol0To9 n0To9Value ->
                     n0To9Variant n0To9Value
         )
-        |> Choice.try LocalSymbolPrintable localSymbolPrintable
-        |> Choice.try LocalSymbolAToZ
+        |> Choice.variantValue LocalSymbolPrintable localSymbolPrintable
+        |> Choice.variantValue LocalSymbolAToZ
             (translate .letter
                 (\letter -> { letter = letter, case_ = AToZ.CaseLower })
                 |> Morph.over AToZ.char
             )
-        |> Choice.try LocalSymbol0To9 (N.Morph.charIn ( n0, n9 ))
+        |> Choice.variantValue LocalSymbol0To9 (N.Morph.charIn ( n0, n9 ))
         |> Choice.finish
 
 
@@ -287,21 +287,21 @@ localSymbolPrintable =
                 RightCurlyBracket ->
                     rightCurlyBracket ()
         )
-        |> Choice.try (\() -> ExclamationMark) (Char.Morph.only '!')
-        |> Choice.try (\() -> NumberSign) (Char.Morph.only '#')
-        |> Choice.try (\() -> DollarSign) (Char.Morph.only '$')
-        |> Choice.try (\() -> PercentSign) (Char.Morph.only '%')
-        |> Choice.try (\() -> Ampersand) (Char.Morph.only '&')
-        |> Choice.try (\() -> Asterisk) (Char.Morph.only '*')
-        |> Choice.try (\() -> LowLine) (Char.Morph.only '_')
-        |> Choice.try (\() -> HyphenMinus) (Char.Morph.only '-')
-        |> Choice.try (\() -> Tilde) (Char.Morph.only '~')
-        |> Choice.try (\() -> VerticalLine) (Char.Morph.only '|')
-        |> Choice.try (\() -> PlusSign) (Char.Morph.only '+')
-        |> Choice.try (\() -> EqualsSign) (Char.Morph.only '=')
-        |> Choice.try (\() -> GraveAccent) (Char.Morph.only '`')
-        |> Choice.try (\() -> LeftCurlyBracket) (Char.Morph.only '{')
-        |> Choice.try (\() -> RightCurlyBracket) (Char.Morph.only '}')
+        |> Choice.variantValue (\() -> ExclamationMark) (Char.Morph.only '!')
+        |> Choice.variantValue (\() -> NumberSign) (Char.Morph.only '#')
+        |> Choice.variantValue (\() -> DollarSign) (Char.Morph.only '$')
+        |> Choice.variantValue (\() -> PercentSign) (Char.Morph.only '%')
+        |> Choice.variantValue (\() -> Ampersand) (Char.Morph.only '&')
+        |> Choice.variantValue (\() -> Asterisk) (Char.Morph.only '*')
+        |> Choice.variantValue (\() -> LowLine) (Char.Morph.only '_')
+        |> Choice.variantValue (\() -> HyphenMinus) (Char.Morph.only '-')
+        |> Choice.variantValue (\() -> Tilde) (Char.Morph.only '~')
+        |> Choice.variantValue (\() -> VerticalLine) (Char.Morph.only '|')
+        |> Choice.variantValue (\() -> PlusSign) (Char.Morph.only '+')
+        |> Choice.variantValue (\() -> EqualsSign) (Char.Morph.only '=')
+        |> Choice.variantValue (\() -> GraveAccent) (Char.Morph.only '`')
+        |> Choice.variantValue (\() -> LeftCurlyBracket) (Char.Morph.only '{')
+        |> Choice.variantValue (\() -> RightCurlyBracket) (Char.Morph.only '}')
         |> Choice.finish
 
 
@@ -351,8 +351,8 @@ hostLabelSideSymbol =
                 HostLabelSideSymbol0To9 n0To9Value ->
                     n0To9Variant n0To9Value
         )
-        |> Choice.try HostLabelSideSymbolAToZ AToZ.char
-        |> Choice.try HostLabelSideSymbol0To9 (N.Morph.charIn ( n0, n9 ))
+        |> Choice.variantValue HostLabelSideSymbolAToZ AToZ.char
+        |> Choice.variantValue HostLabelSideSymbol0To9 (N.Morph.charIn ( n0, n9 ))
         |> Choice.finish
 
 
@@ -370,10 +370,10 @@ hostLabelSymbol =
                 HostLabelSymbol0To9 n0To9Value ->
                     n0To9Variant n0To9Value
         )
-        |> Choice.try (\() -> HostLabelHyphenMinus)
+        |> Choice.variantValue (\() -> HostLabelHyphenMinus)
             (Char.Morph.only '-')
-        |> Choice.try HostLabelSymbolAToZ AToZ.char
-        |> Choice.try HostLabelSymbol0To9 (N.Morph.charIn ( n0, n9 ))
+        |> Choice.variantValue HostLabelSymbolAToZ AToZ.char
+        |> Choice.variantValue HostLabelSymbol0To9 (N.Morph.charIn ( n0, n9 ))
         |> Choice.finish
 
 
@@ -410,8 +410,8 @@ domainTopLevelAfterFirstAToZSymbol =
                 DomainTopLevelSymbol0To9 n0To9Value ->
                     n0To9Variant n0To9Value
         )
-        |> Choice.try DomainTopLevelSymbolAToZ AToZ.char
-        |> Choice.try DomainTopLevelSymbol0To9 (N.Morph.charIn ( n0, n9 ))
+        |> Choice.variantValue DomainTopLevelSymbolAToZ AToZ.char
+        |> Choice.variantValue DomainTopLevelSymbol0To9 (N.Morph.charIn ( n0, n9 ))
         |> Choice.finish
 
 

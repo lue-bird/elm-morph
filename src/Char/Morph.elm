@@ -14,8 +14,8 @@ import Value.PackageInternal
 {-| `Char` [`MorphValue`](Value#MorphValue)
 
 Be aware, that [special-cased characters as the result of `Char.toUpper`](https://github.com/elm/core/issues/1001)
-are [encoded](Morph#broadenWith) as 2 `Char`s in a `String`
-and therefore can't be [decoded](Morph#narrowWith) again
+are [encoded](Morph#broadenFrom) as 2 `Char`s in a `String`
+and therefore can't be [decoded](Morph#narrowTo) again
 
 -}
 value : MorphValue Char
@@ -24,11 +24,11 @@ value =
         |> Morph.over Value.PackageInternal.string
 
 
-{-| [`Morph`] a `String` of length 1 to a `Char`
+{-| [`Morph`](Morph#Morph) a `String` of length 1 to a `Char`
 
 Be aware, that [special-cased characters as the result of `Char.toUpper`](https://github.com/elm/core/issues/1001)
-are [encoded](Morph#broadenWith) as 2 `Char`s in a `String`
-and therefore can't be [decoded](Morph#narrowWith) again
+are [encoded](Morph#broadenFrom) as 2 `Char`s in a `String`
+and therefore can't be [decoded](Morph#narrowTo) again
 
 -}
 string : Morph Char String

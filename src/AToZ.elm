@@ -62,14 +62,14 @@ This is case insensitive.
     import String.Morph as Text
 
     -- match any letter, case insensitive
-    "abc" |> Text.narrowWith letter --> Ok 'a'
-    "ABC" |> Text.narrowWith letter --> Ok 'A'
+    "abc" |> Text.narrowTo letter --> Ok 'a'
+    "ABC" |> Text.narrowTo letter --> Ok 'A'
 
     -- But anything else makes it fail.
     import Morph.Error
 
     "123"
-        |> Text.narrowWith letter
+        |> Text.narrowTo letter
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '1'."
 
@@ -84,14 +84,14 @@ This is case insensitive.
 
     -- match many letters, case insensitive
     "aBcEY"
-        |> Text.narrowWith
+        |> Text.narrowTo
             (atLeast n1 aToZ
                 |> map String.fromList
             )
     --> Ok "aBcEY"
 
     "π123abc"
-        |> Text.narrowWith
+        |> Text.narrowTo
             (atLeast n1 aToZ
                 |> map String.fromList
             )
@@ -99,7 +99,7 @@ This is case insensitive.
     --> Err "1:1: I was expecting at least 1 letters [a-zA-Z]+. I got stuck when I got 'π'."
 
     "abc-efg"
-        |> Text.narrowWith
+        |> Text.narrowTo
             (atLeast n1 aToZ
                 |> map String.fromList
             )
@@ -113,10 +113,9 @@ char =
 
 
 cased :
-    { lower :
-        Morph possibilityNarrow broad
-    , upper :
-        Morph possibilityNarrow broad
+    -- TODO: MorphIndependently
+    { lower : Morph possibilityNarrow broad
+    , upper : Morph possibilityNarrow broad
     }
     ->
         Morph
@@ -150,11 +149,11 @@ This is case sensitive.
     import String.Morph as Text
 
     -- match a lowercase letter
-    "abc" |> Text.narrowWith aToZLower --> Ok 'a'
+    "abc" |> Text.narrowTo aToZLower --> Ok 'a'
 
     -- but anything else makes it fail
     "ABC"
-        |> Text.narrowWith aToZLower
+        |> Text.narrowTo aToZLower
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting a lowercase letter [a-z]. I got stuck when I got the character 'A'."
 
@@ -281,11 +280,11 @@ This is case sensitive.
     import String.Morph as Text
 
     -- match an uppercase letter
-    aToZUpper |> Text.narrowWith "ABC" --> Ok 'A'
+    aToZUpper |> Text.narrowTo "ABC" --> Ok 'A'
 
     -- but anything else makes it fail
     "abc"
-        |> Text.narrowWith aToZUpper
+        |> Text.narrowTo aToZUpper
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting a letter uppercase [A-Z]. I got stuck when I got the character 'a'."
 

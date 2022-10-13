@@ -1,23 +1,7 @@
-module Value.PackageInternal exposing (float, literalKindToString, string, structureKindToString)
+module Value.PackageInternal exposing (literalKindToString, string, structureKindToString)
 
 import Morph exposing (MorphIndependently)
 import Value exposing (MorphValue)
-
-
-float : MorphValue Float
-float =
-    Morph.value "Float"
-        { broaden = Value.Float
-        , narrow =
-            \value ->
-                case value of
-                    Value.Float floatValue ->
-                        floatValue |> Ok
-
-                    literalExceptFloat ->
-                        literalExceptFloat |> literalKindToString |> Err
-        }
-        |> Morph.over Value.literal
 
 
 literalKindToString : Value.Literal -> String
@@ -27,8 +11,8 @@ literalKindToString =
             Value.Unit _ ->
                 "Unit"
 
-            Value.Float _ ->
-                "Number"
+            Value.Decimal _ ->
+                "Decimal"
 
             Value.String _ ->
                 "String"

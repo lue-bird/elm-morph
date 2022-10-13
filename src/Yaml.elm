@@ -9,7 +9,7 @@ module Yaml exposing (Any, LiteralAny, StructureAny)
 
 import ArraySized exposing (ArraySized)
 import Decimal exposing (Decimal)
-import Morph exposing (MorphRow, atLeast, exactly, grab, skip, succeed, translate)
+import Morph exposing (MorphRow, translate)
 import N exposing (Exactly, Fixed, Min, N, N0, n0, n1)
 import String.Morph
 import Value exposing (LiteralOrStructure(..))
@@ -40,7 +40,7 @@ text =
 
 textIndented : N (Exactly n) -> MorphRow Char Any
 textIndented indentation =
-    succeed YmlAny
+    Morph.succeed YmlAny
         |> grab (\(YmlAny list) -> list)
             (atLeast n1 (Debug.todo ""))
         |> skip

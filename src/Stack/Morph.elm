@@ -32,6 +32,8 @@ import Stack exposing (StackTopBelow, Stacked)
 -- alter
 
 
+{-| Flip the elements' order
+-}
 reverse :
     MorphIndependently
         (List narrowElement
@@ -82,21 +84,64 @@ eachElement elementMorph =
             case stack of
                 Emptiable.Empty emptyPossiblyOrNever ->
                     Emptiable.Empty emptyPossiblyOrNever
+                        |> Ok
 
-                Emptiable.Filled (Stack.TopDown top belowTop) ->
-                    stack
-                        |> Stack.toList
-                        |> List.Morph.eachElement elementMorph
-                        |> Result.map
-                            (\list ->
-                                case list of
-                                    -- is this branch is reached,
-                                    -- List.Morph.eachElement has a bug
-                                    [] ->
-                                        case top |> 
+                Emptiable.Filled stacked ->
+                    let
+                        reversed =
+                            stacked |> filled |> Stack.reverse
+
+                        lastIndex =
+                            (reversed |> Stack.length) - 1
+                    in
+                    reversed
+                        |> Stack.topRemove
+                        |> Stack.foldFrom
+                            { collected =
+                                case reversed |> Stack.top |> Morph.narrowTo elementMorph of
+                                    Err topError ->
+                                        { index = lastIndex, error = topError }
+                                            |> Stack.only
+                                            |> Err
+
+                                    Ok topNarrow ->
+                                        topNarrow
+                                            |> Stack.only
+                                            |> Ok
+                            , index = lastIndex
+                            }
+                            Up
+                            (\element { index, collected } ->
+                                { collected =
+                                    case element |> Morph.narrowTo elementMorph of
+                                        Ok elementValue ->
+                                            collected
+                                                |> Result.map
+                                                    (\l -> l |> Stack.onTopLay elementValue)
+
+                                        Err elementError ->
+                                            let
+                                                errorsSoFar =
+                                                    case collected of
+                                                        Ok _ ->
+                                                            Emptiable.empty
+
+                                                        Err elementsAtIndexes ->
+                                                            elementsAtIndexes |> Emptiable.emptyAdapt (\_ -> Possible)
+                                            in
+                                            errorsSoFar
+                                                |> Stack.onTopLay
+                                                    { index = index
+                                                    , error = elementError
+                                                    }
+                                                |> Err
+                                , index = index - 1
+                                }
                             )
+                        |> .collected
+                        |> Result.mapError Morph.Parts
     , broaden =
-        Stack.map (\_ -> Morph.broadenWith elementMorph)
+        Stack.map (\_ -> Morph.broadenFrom elementMorph)
     }
 
 
@@ -130,7 +175,7 @@ toList =
     import Stack
 
     [ 0, 12, 3 ]
-        |> Morph.mapWith Stack.Morph.list
+        |> Morph.mapTo Stack.Morph.list
     --> Stack.topDown 0 [ 12, 3 ]
 
 -}
@@ -171,7 +216,7 @@ toString =
 
     import Stack
 
-    "012" |> Morph.mapWith Stack.Morph.string
+    "012" |> Morph.mapTo Stack.Morph.string
     --> Stack.fromList [ '0', '1', '2' ]
 
 -}

@@ -177,7 +177,7 @@ decodeErrorToMorph =
 
 {-| [Morph](#Morph) to valid [`Json.Any` value](#Any) format from a `String`
 
-[Broadens](Morph#broadenWith) to a compact `String`.
+[Broadens](Morph#broadenFrom) to a compact `String`.
 To adjust format readability → [`stringBroadWith`](#stringBroadWith)
 
 -}
@@ -425,8 +425,8 @@ tagTranslate :
             (Json tagBeforeUnmap -> Json tagUnmapped)
 tagTranslate tagTranslate_ =
     translate
-        (tagMap (Morph.mapWith tagTranslate_))
-        (tagMap (Morph.broadenWith tagTranslate_))
+        (tagMap (Morph.mapTo tagTranslate_))
+        (tagMap (Morph.broadenFrom tagTranslate_))
 
 
 {-| Reduce the amount of tag information.

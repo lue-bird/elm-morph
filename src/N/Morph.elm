@@ -1,7 +1,7 @@
 module N.Morph exposing
     ( in_
     , value, toValue
-    , intIn, char
+    , int, char
     )
 
 {-| [`Morph`](Morph#Morph) an [`N`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bounded-nat/latest/)
@@ -15,41 +15,33 @@ module N.Morph exposing
 
 ## transform
 
-@docs intIn, char
+@docs int, char
 
 -}
 
 import Morph exposing (Morph, MorphIndependently, translate)
-import N exposing (Add1, Fixed, In, InFixed, InValue, N, N9, To, Up, Up0, Up9, n0, n1, n2, n3, n4, n5, n6, n7, n8, n9)
+import N exposing (Add1, Fixed, In, InFixed, InValue, Min, N, N9, To, Up, Up0, Up9, n0, n1, n2, n3, n4, n5, n6, n7, n8, n9)
 
 
-intIn :
-    ( N (In (Up minX To minPlusX) (Up lowerLimitMaxToUpperLimitMin_ To minMax))
-    , N (In (Fixed minMax) (Up upperLimitMaxX To maxPlusX))
-    )
-    ->
-        -- TODO: MorphIndependently
-        Morph
-            (N
-                (In
-                    (Up minX To minPlusX)
-                    (Up upperLimitMaxX To maxPlusX)
-                )
-            )
-            Int
-intIn ( min, max ) =
-    Morph.value (( min, max ) |> rangeDescription)
+{-| [`Morph`](Morph#Morph) an `Int` to an `N`,
+[erroring](Morph#Error) on negative numbers
+-}
+int :
+    MorphIndependently
+        (Int
+         -> Result Morph.Error (N (Min (Up0 narrowX_)))
+        )
+        (N broadRange_ -> Int)
+int =
+    Morph.value ">= 0"
         { narrow =
-            N.intIsIn ( min, max )
-                >> Result.mapError
-                    (\error ->
-                        case error of
-                            N.Below _ ->
-                                [ "below ", min |> N.toInt |> String.fromInt ] |> String.concat
-
-                            N.Above _ ->
-                                [ "above ", max |> N.toInt |> String.fromInt ] |> String.concat
-                    )
+            \narrowInt ->
+                narrowInt
+                    |> N.intIsAtLeast n0
+                    |> Result.mapError
+                        (\intNegative ->
+                            [ intNegative |> String.fromInt, " is <= -1 " ] |> String.concat
+                        )
         , broaden = N.toInt
         }
 
@@ -64,6 +56,8 @@ rangeDescription =
             |> String.concat
 
 
+{-| [`Morph`](Morph#Morph) the `N` to a more narrow range
+-}
 in_ :
     ( N (In lowerLimitMin (Up lowerLimitMinX To (Add1 lowerLimitMinPlusX)))
     , N (In (Up upperLimitMinX To upperLimitMinPlusX) upperLimitMax)
@@ -76,9 +70,7 @@ in_ :
                     Morph.Error
                     (N (In lowerLimitMin upperLimitMax))
             )
-            (N (In lowerLimitMin upperLimitMax)
-             -> N (In narrowMin narrowMax)
-            )
+            (N broadRange -> N broadRange)
 in_ ( lowerLimit, upperLimit ) =
     Morph.value (( lowerLimit, upperLimit ) |> rangeDescription)
         { narrow =
@@ -96,19 +88,14 @@ in_ ( lowerLimit, upperLimit ) =
                                     [ ">= ", (above |> N.toInt) + 1 |> String.fromInt ]
                                         |> String.concat
                         )
-        , broaden =
-            \n ->
-                Debug.todo """
-how do we broaden its range to a wider range without having both limits in the argument?
-Do we only narrow and let the user minTo/maxTo?
-                """
+        , broaden = identity
         }
 
 
 {-| [`Morph`](Morph#Morph) a digit in a given range
 
 You can require a maximum >= 10.
-In that case, the [narrowed](Morph#narrowWith) `N` will also have a maximum >= 10
+In that case, the [narrowed](Morph#narrowTo) `N` will also have a maximum >= 10
 even though every possible `Char` can only show a digit <= 9
 
 -}
@@ -194,60 +181,7 @@ char =
         }
 
 
-charIn :
-    ( N (In min (Up lowerLimitMaxToUpperLimitMin_ To minMax))
-    , N (In (Fixed minMax) (Up upperLimitMaxX To upperLimitMaxPlusX))
-    )
-    ->
-        MorphIndependently
-            (Char
-             ->
-                Result
-                    Morph.Error
-                    (N (In min (Up upperLimitMaxX To upperLimitMaxPlusX)))
-            )
-            (N (In narrowMin_ (Up narrowMaxTo9_ To N9)) -> Char)
-charIn ( min, max ) =
-    Morph.value (( min, max ) |> rangeDescription)
-        { narrow =
-            Debug.todo ""
-        , broaden =
-            \n ->
-                case n |> N.toInt of
-                    0 ->
-                        '0'
-
-                    1 ->
-                        '1'
-
-                    2 ->
-                        '2'
-
-                    3 ->
-                        '3'
-
-                    4 ->
-                        '4'
-
-                    5 ->
-                        '5'
-
-                    6 ->
-                        '6'
-
-                    7 ->
-                        '7'
-
-                    8 ->
-                        '8'
-
-                    -- 9
-                    _ ->
-                        '9'
-        }
-
-
-{-| [`Morph`] from an `N` with an equatable range `InValue`
+{-| [`Morph`](Morph#Morph) from an `N` with an equatable range `InValue`
 to an `InFixed` to operate on it
 -}
 value :
@@ -262,7 +196,7 @@ value =
     translate N.fromValue N.toValue
 
 
-{-| [`Morph`] from an `N` with a range `InFixed`
+{-| [`Morph`](Morph#Morph) from an `N` with a range `InFixed`
 to an `InValue` to make it equatable
 -}
 toValue :

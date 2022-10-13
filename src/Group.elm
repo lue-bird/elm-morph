@@ -1,8 +1,8 @@
 module Group exposing
     ( MorphNoPart
-    , build, part, finish
+    , toFrom, part, finish
     , grab, skip
-    , MorphValueNoPart, value, partValue, finishValue
+    , MorphValueNoPart, value, fieldValue, finishValue
     )
 
 {-| [`Morph`](Morph#Morph) a thing that can be split into smaller pieces
@@ -12,7 +12,7 @@ module Group exposing
 
 ## [`Morph`]
 
-@docs build, part, finish
+@docs toFrom, part, finish
 
 
 ## [`MorphRow`](Morph#MorphRow)
@@ -24,7 +24,7 @@ Start with [`Morph.succeed`](Morph#succeed), then chain
 
 ## [`MorphValue`](Value#MorphValue)
 
-@docs MorphValueNoPart, value, partValue, finishValue
+@docs MorphValueNoPart, value, fieldValue, finishValue
 
 -}
 
@@ -67,29 +67,34 @@ type NoPart
     = NoPartTag Never
 
 
-{-| Assemble a from its morphed [`part`](#part)s
+{-| Assemble a group from narrow and broad [`part`](#part)s
+
+Use [`Group.toFrom`](Group#toFrom)
+when each broad, narrow [`part`](#part) always has their respective counterpart
 
     ( "4", "5" )
-        |> narrowWith
-            (Group.build
+        |> Morph.narrowTo
+            (Group.toFrom
                 ( \x y -> { x = x, y = y }
                 , \x y -> ( x, y )
                 )
                 |> Group.part ( .x, Tuple.first )
                     (Integer.Morph.toInt
-                        |> Morph.overRow Integer.Morph.fromText
+                        |> Morph.overRow Integer.Morph.rowChar
                         |> Morph.rowFinish
                     )
                 |> Group.part ( .y, Tuple.second )
                     (Integer.Morph.toInt
-                        |> Morph.overRow Integer.Morph.fromText
+                        |> Morph.over (Integer.Morph.bitSizeAtMost n32)
+                        |> Morph.overRow Integer.Morph.rowChar
                         |> Morph.rowFinish
                     )
+                |> Group.finish
             )
     --> Ok { x = 4, y = 5 }
 
 -}
-build :
+toFrom :
     ( narrowAssemble
     , broadAssemble
     )
@@ -100,7 +105,7 @@ build :
              -> Result error_ narrowAssemble
             )
             (groupNarrow_ -> broadAssemble)
-build ( narrowAssemble, broadAssemble ) =
+toFrom ( narrowAssemble, broadAssemble ) =
     { description = Emptiable.empty
     , narrow = \_ -> narrowAssemble |> Ok
     , broaden = \_ -> broadAssemble
@@ -118,6 +123,7 @@ build ( narrowAssemble, broadAssemble ) =
         |> Group.part ( .nameFirst, .nameFirst ) remain
         |> Group.part ( .nameLast, .nameLast ) remain
         |> Group.part ( .email, .email ) emailMorph
+        |> Group.finish
 
 -}
 part :
@@ -156,10 +162,10 @@ part ( narrowPartAccess, broadPartAccess ) partMorph =
                 |> narrowPart
                     (groupMorphSoFar.description |> Stack.length)
                     broadPartAccess
-                    (Morph.narrowWith partMorph)
+                    (Morph.narrowTo partMorph)
         , broaden =
             groupMorphSoFar.broaden
-                |> broadenPart narrowPartAccess (Morph.broadenWith partMorph)
+                |> broadenPart narrowPartAccess (Morph.broadenFrom partMorph)
         }
 
 
@@ -297,11 +303,11 @@ grab partAccess grabbedNextMorphRow =
         , narrow =
             \broad_ ->
                 broad_
-                    |> Morph.narrowWith groupMorphRowSoFar
+                    |> Morph.narrowTo groupMorphRowSoFar
                     |> Result.andThen
                         (\result ->
                             result.broad
-                                |> Morph.narrowWith grabbedNextMorphRow
+                                |> Morph.narrowTo grabbedNextMorphRow
                                 |> Result.map
                                     (\nextParsed ->
                                         { narrow = result.narrow nextParsed.narrow
@@ -328,7 +334,7 @@ grab partAccess grabbedNextMorphRow =
 
     -- parse a simple email, but we're only interested in the username
     "user@example.com"
-        |> Text.narrowWith
+        |> Text.narrowTo
             (Morph.succeed (\userName -> { username = userName })
                 |> grab .username (atLeast n1 aToZ)
                 |> skip (one '@')
@@ -358,11 +364,11 @@ skip ignoredNext =
         , narrow =
             \broad_ ->
                 broad_
-                    |> Morph.narrowWith groupMorphRowSoFar
+                    |> Morph.narrowTo groupMorphRowSoFar
                     |> Result.andThen
                         (\result ->
                             result.broad
-                                |> Morph.narrowWith ignoredNext
+                                |> Morph.narrowTo ignoredNext
                                 |> Result.map
                                     (\nextParsed ->
                                         { narrow = result.narrow
@@ -431,7 +437,7 @@ value :
     groupNarrowAssemble
     -> MorphValueNoPart Possibly groupNarrow_ groupNarrowAssemble
 value groupNarrowAssemble =
-    build ( groupNarrowAssemble, Emptiable.empty )
+    toFrom ( groupNarrowAssemble, Emptiable.empty )
 
 
 {-| possibly incomplete step from and to a [`Value.Record`](Value#Record)
@@ -439,7 +445,7 @@ value groupNarrowAssemble =
 building:
 
   - start with [`Group.value`](#value)
-  - continue with [`Group.partValue`](#partValue)
+  - continue with [`Group.fieldValue`](#fieldValue)
   - finish with [`Group.finishValue`](#finishValue)
 
 -}
@@ -460,7 +466,7 @@ type alias MorphValueNoPart noPartPossiblyOrNever groupNarrow groupNarrowFurther
   - finish with [`groupFinish`](#groupFinish)
 
 -}
-partValue :
+fieldValue :
     ( group -> fieldValueNarrow
     , String
     )
@@ -476,7 +482,7 @@ partValue :
                 group
                 groupNarrowFurther
         )
-partValue ( accessFieldValue, fieldName ) fieldValueMorph =
+fieldValue ( accessFieldValue, fieldName ) fieldValueMorph =
     \groupMorphSoFar ->
         let
             tag : Value.IndexAndName
@@ -501,7 +507,7 @@ partValue ( accessFieldValue, fieldName ) fieldValueMorph =
                     fieldValueBroad =
                         wholeNarrow
                             |> accessFieldValue
-                            |> Morph.broadenWith fieldValueMorph
+                            |> Morph.broadenFrom fieldValueMorph
 
                     fieldBroad : Value.Tagged Value.IndexAndName
                     fieldBroad =
@@ -561,7 +567,7 @@ partValueNarrow tag fieldValueMorph groupSoFarNarrow =
         in
         case groupBroad |> Stack.toList |> List.filter (.tag >> matches) of
             partBroad :: _ ->
-                case partBroad.value |> Morph.narrowWith fieldValueMorph of
+                case partBroad.value |> Morph.narrowTo fieldValueMorph of
                     Ok partNarrow ->
                         wholeAssemblyResult
                             |> Result.map (\eat -> eat partNarrow)
@@ -583,7 +589,7 @@ partValueNarrow tag fieldValueMorph groupSoFarNarrow =
                     |> Err
 
 
-{-| Conclude the [`Group.value`](#value) |> [`Group.partValue`](#partValue) chain
+{-| Conclude the [`Group.value`](#value) |> [`Group.fieldValue`](#fieldValue) chain
 -}
 finishValue :
     MorphValueNoPart Never group group
