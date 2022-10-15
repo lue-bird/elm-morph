@@ -1,8 +1,9 @@
 module Integer exposing
     ( Integer(..)
-    , fromInt, fromNatural
-    , toInt
-    , decimalRowChar
+    , int, toInt
+    , decimal
+    , value
+    , rowChar
     )
 
 {-| Typed-precision `Int`
@@ -10,14 +11,12 @@ module Integer exposing
 @docs Integer
 
 
-## create
+## [`Morph`](Morph#Morph)
 
-@docs fromInt, fromNatural
-
-
-## transform
-
-@docs toInt
+@docs int, toInt
+@docs decimal
+@docs value
+@docs rowChar
 
 -}
 
@@ -26,46 +25,40 @@ import ArraySized.Morph
 import Bit exposing (Bit)
 import Bits
 import Choice
+import Decimal exposing (Decimal)
 import Group
 import Linear exposing (Direction(..))
-import Morph exposing (MorphRow)
-import N exposing (Add1, Fixed, In, Infinity, Min, N, N0, To, Up, Value, n0, n1, n2, n9)
+import Morph exposing (Morph, MorphRow, Translate)
+import N exposing (Add1, Fixed, In, Infinity, InfinityValue, Min, N, N0, To, Up, Value, n0, n1, n2, n9)
 import N.Local exposing (N31, Up31, n32)
 import N.Morph
-import Natural exposing (Natural)
 import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Sign exposing (Sign)
 import Stack
 import String.Morph
+import Value exposing (MorphValue)
 
 
-type Integer afterIBitCountMax
+type Integer
     = N0
     | Signed
         { sign : Sign
-        , absoluteAfterI : ArraySized (In (Value N0) afterIBitCountMax) Bit
+        , absoluteAfterI : ArraySized (In (Value N0) InfinityValue) Bit
         }
 
 
-{-| TODO
+decimal : Morph Integer Decimal
+decimal =
+    Debug.todo ""
 
-How about
 
-    import Natural
-
-    |> Natural.fromN |> Integer.fromNatural
-
+{-| [`MorphValue`](Value#MorphValue) from an [`Integer`](#Integer)
 -}
-fromNatural : Natural afterIBitCountMax -> Integer afterIBitCountMax
-fromNatural =
-    \natural ->
-        case natural of
-            Natural.N0 ->
-                N0
-
-            Natural.Positive { afterI } ->
-                Signed { sign = Sign.Positive, absoluteAfterI = afterI }
+value : MorphValue Integer
+value =
+    decimal
+        |> Morph.over Decimal.value
 
 
 {-| [`Translate`](Morph#Translate) between an `Int` and a [decimal representation](#Integer).
@@ -74,12 +67,12 @@ Keep in mind that `Integer -> Int` can overflow
 since `Int` is fixed in bit size while [`Integer`](#Integer) is not.
 
 -}
-fromInt : Int -> Integer (Up31 x_)
-fromInt =
-    internalFromInt
+int : Translate Integer Int
+int =
+    Morph.translate internalFromInt internalToInt
 
 
-internalFromInt : Int -> Integer (Up31 x_)
+internalFromInt : Int -> Integer
 internalFromInt =
     \intBroad ->
         case
@@ -94,7 +87,7 @@ internalFromInt =
             Ok absoluteAtLeast1 ->
                 Signed
                     { sign =
-                        if intBroad >= 1 then
+                        if intBroad >= 0 then
                             Sign.Positive
 
                         else
@@ -115,8 +108,13 @@ Keep in mind that `Integer -> Int` can overflow
 since `Int` is fixed in bit size while [`Integer`](#Integer) is not.
 
 -}
-toInt : Integer afterIBitCountMax_ -> Int
+toInt : Translate Int Integer
 toInt =
+    Morph.reverse int
+
+
+internalToInt : Integer -> Int
+internalToInt =
     \integerNarrow ->
         case integerNarrow of
             N0 ->
@@ -158,8 +156,8 @@ toInt =
     --> Err "1:1: I was expecting an integer value. I got stuck when I got the character 'a'."
 
 -}
-decimalRowChar : MorphRow Char (Integer (Min N0))
-decimalRowChar =
+rowChar : MorphRow Char Integer
+rowChar =
     Morph.to "whole"
         (Choice.between
             (\n0Variant signedVariant integerNarrow ->

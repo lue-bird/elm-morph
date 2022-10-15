@@ -25,7 +25,7 @@ import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFuncti
 import Choice
 import Group
 import Value exposing (MorphValue)
-import Float.Morph
+import FloatExplicit
 import String.Morph
 
 type alias Cause =
@@ -43,8 +43,8 @@ value =
             { name = name, percent = percent, per100k = per100k }
         )
         |> Group.fieldValue ( .name, "name" ) String.Morph.value
-        |> Group.fieldValue ( .percent, "percent" ) Float.Morph.value
-        |> Group.fieldValue ( .per100k, "per100k" ) Float.Morph.value
+        |> Group.fieldValue ( .percent, "percent" ) FloatExplicit.value
+        |> Group.fieldValue ( .per100k, "per100k" ) FloatExplicit.value
         |> Group.finishValue
 ```
 surprisingly easy!

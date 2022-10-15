@@ -13,6 +13,8 @@ TODO bits, toBits
 
 TODO rowChar
 
+TODO integer
+
 Feeling motivated? implement & PR
 
   - int2 (bin), int8 (oct), int6 (hex)
@@ -23,8 +25,9 @@ import ArraySized exposing (ArraySized)
 import Bit exposing (Bit)
 import Bits
 import Bitwise
+import Integer exposing (Integer)
 import Linear exposing (Direction(..))
-import Morph exposing (MorphIndependently)
+import Morph exposing (Morph, MorphIndependently)
 import N exposing (Add1, Down, Fixed, In, InfinityValue, Min, MinValue, N, N0, N1, To, Up, Up0, Up1, Value, n0, n1)
 import N.Local exposing (Add31, N31, N32, n31)
 
@@ -54,6 +57,27 @@ for arbitrary-precision arithmetic like addition, multiplication, ...
 type Natural
     = N0
     | Positive { afterI : ArraySized (In (Value N0) InfinityValue) Bit }
+
+
+
+-- Morph
+
+
+{-| TODO
+-}
+integer : Morph Natural Integer
+integer =
+    Morph.value "natural"
+        { narrow = Debug.todo ""
+        , broaden =
+            \natural ->
+                case natural of
+                    Natural.N0 ->
+                        N0
+
+                    Natural.Positive { afterI } ->
+                        Signed { sign = Sign.Positive, absoluteAfterI = afterI }
+        }
 
 
 

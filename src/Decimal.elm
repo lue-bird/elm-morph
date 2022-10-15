@@ -3,7 +3,8 @@ module Decimal exposing
     , rowChar, floatExplicit, value
     )
 
-{-| number TODO MorphIndependently
+{-| safe and explicit `Float`
+without the possibility of [exceptions](FloatExplicit#Exception)
 
 @docs Decimal, Signed, Absolute, Fraction
 
@@ -28,7 +29,6 @@ import Maybe.Morph
 import Morph exposing (Morph, MorphIndependently, MorphOrError, MorphRow, Translate, broadenFrom, narrowTo, one, translate)
 import N exposing (Add1, In, InFixed, Min, N, N0, N1, N9, To, Up, Up0, Up1, Up9, n0, n1, n9)
 import N.Morph
-import Natural exposing (Natural)
 import Possibly exposing (Possibly)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Sign exposing (Sign(..))
@@ -67,6 +67,8 @@ type alias Signed =
         }
 
 
+{-| What comes after its [`Sign`](Sign#Sign)
+-}
 type Absolute
     = Fraction Fraction
     | AtLeast1
@@ -78,6 +80,8 @@ type Absolute
         }
 
 
+{-| _Some_ digits after the decimal point. Can't be none
+-}
 type alias Fraction =
     RecordWithoutConstructorFunction
         { beforeLast : Emptiable (Stacked (N (InFixed N0 N9))) Possibly
@@ -293,6 +297,12 @@ fraction =
         )
 
 
+{-| [`MorphValue`](Value#MorphValue) from a [`Decimal`](#Decimal)
+
+To get a [`MorphValue`](Value#MorphValue) from a `Float`,
+see [`FloatExplicit.value`](FloatExplicit#value)
+
+-}
 value : MorphValue Decimal
 value =
     internal

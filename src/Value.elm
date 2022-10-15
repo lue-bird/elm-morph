@@ -26,7 +26,7 @@ for example
 
   - [`Unit`](Unit)
   - [`Int.Morph`](Int-Morph)
-  - [`Float.Morph`](Float-Morph)
+  - [`FloatExplicit`](Float-Morph)
   - [`String.Morph`](String-Morph)
   - [`Maybe.Morph`](Maybe-Morph)
   - [`Result.Morph`](Result-Morph)
