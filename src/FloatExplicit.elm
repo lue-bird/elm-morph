@@ -21,6 +21,7 @@ module FloatExplicit exposing
 
 import Choice
 import Decimal.Internal
+import Digits
 import Emptiable exposing (Emptiable)
 import Morph exposing (MorphOrError)
 import N exposing (In, InFixed, N, N0, N1, N9, Up0, Up1, Up9, n0, n1, n9)
@@ -125,7 +126,7 @@ float =
 
                                 wholeAbsoluteExcept0 ->
                                     { whole =
-                                        wholeAbsoluteExcept0 |> intPositiveToAtLeast1Whole
+                                        wholeAbsoluteExcept0 |> Digits.fromIntPositive
                                     , fraction =
                                         let
                                             floatFraction =
@@ -222,7 +223,7 @@ absoluteToFloat =
                 fraction |> fractionToFloat
 
             Decimal.Internal.AtLeast1 atLeast1 ->
-                (atLeast1.whole |> atLeast1WholeToInt |> Basics.toFloat)
+                (atLeast1.whole |> Digits.toIntPositive |> Basics.toFloat)
                     + (case atLeast1.fraction of
                         Nothing ->
                             0
@@ -230,63 +231,6 @@ absoluteToFloat =
                         Just fraction_ ->
                             fraction_ |> fractionToFloat
                       )
-
-
-intPositiveToAtLeast1Whole :
-    Int
-    ->
-        Emptiable
-            (StackTopBelow
-                (N (In (Up1 digit0MinX_) (Up9 digit0MaxX_)))
-                (N (In (Up0 digit1UpMinX_) (Up9 digit1UpMaxX_)))
-            )
-            never_
-intPositiveToAtLeast1Whole =
-    \int ->
-        let
-            highest10Exponent : Int
-            highest10Exponent =
-                logBase 10 (int |> Basics.toFloat) |> floor
-        in
-        Stack.topDown
-            (int |> digitFor10Exponent highest10Exponent |> N.atLeast n1 |> N.maxTo n9)
-            (List.range 0 (highest10Exponent - 1)
-                |> List.map
-                    (\n10Exponent ->
-                        int |> digitFor10Exponent n10Exponent
-                    )
-            )
-
-
-digitFor10Exponent : Int -> (Int -> N (In (Up0 minX_) (Up9 maxX_)))
-digitFor10Exponent n10Exponent =
-    \int ->
-        (int // (10 ^ n10Exponent))
-            |> remainderBy 10
-            |> N.intIn ( n0, n9 )
-
-
-atLeast1WholeToInt :
-    Emptiable
-        (StackTopBelow
-            (N (InFixed N1 N9))
-            (N (InFixed N0 N9))
-        )
-        Never
-    -> Int
-atLeast1WholeToInt =
-    \digits ->
-        let
-            lastIndex =
-                (digits |> Stack.length) - 1
-        in
-        digits
-            |> Stack.topMap (N.minTo n0)
-            |> Stack.map
-                (\{ index } digit ->
-                    (digit |> N.toInt) * (10 ^ (lastIndex - index))
-                )
-            |> Stack.sum
 
 
 fractionToFloat : Decimal.Internal.Fraction -> Float
@@ -367,14 +311,14 @@ decimalInternalValue =
         { narrow =
             \literal ->
                 case literal of
-                    Value.Decimal decimal ->
+                    Value.Number decimal ->
                         decimal |> Ok
 
                     literalExceptDecimal ->
                         literalExceptDecimal
                             |> Value.PackageInternal.literalKindToString
                             |> Err
-        , broaden = Value.Decimal
+        , broaden = Value.Number
         }
         |> Morph.over Value.literal
 

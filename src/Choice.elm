@@ -359,6 +359,29 @@ A use case is [morphing](Morph#Morph) from and to an internal type
             |> Choice.tryToFrom ( AtLeast1, Decimal.Internal.AtLeast1 ) atLeast1Internal
             |> Choice.finish
 
+For morphing choices with simple variants without values (enums),
+a simple [`translate`](Morph#translate) also does the job
+
+    signInternal : MorphOrError Sign Sign.Internal.Sign error_
+    signInternal =
+        Morph.translate
+            (\signInternalBeforeNarrow ->
+                case signInternalBeforeNarrow of
+                    Sign.Internal.Negative ->
+                        Sign.Negative
+
+                    Sign.Internal.Positive ->
+                        Sign.Positive
+            )
+            (\signBeforeBroaden ->
+                case signBeforeBroaden of
+                    Sign.Negative ->
+                        Sign.Internal.Negative
+
+                    Sign.Positive ->
+                        Sign.Internal.Positive
+            )
+
 -}
 toFrom :
     ( narrowByPossibility

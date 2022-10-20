@@ -311,12 +311,12 @@ value =
                 { narrow =
                     \literal ->
                         case literal of
-                            Value.Decimal decimal ->
+                            Value.Number decimal ->
                                 decimal |> Ok
 
                             literalExceptDecimal ->
                                 literalExceptDecimal |> Value.PackageInternal.literalKindToString |> Err
-                , broaden = Value.Decimal
+                , broaden = Value.Number
                 }
             )
         |> Morph.over Value.literal
@@ -387,36 +387,22 @@ absoluteInternal =
         |> Choice.finishToFrom
 
 
-
--- sign
-
-
 signInternal : MorphOrError Sign Sign.Internal.Sign error_
 signInternal =
-    Debug.todo ""
+    Morph.translate
+        (\signInternalBeforeNarrow ->
+            case signInternalBeforeNarrow of
+                Sign.Internal.Negative ->
+                    Sign.Negative
 
+                Sign.Internal.Positive ->
+                    Sign.Positive
+        )
+        (\signBeforeBroaden ->
+            case signBeforeBroaden of
+                Sign.Negative ->
+                    Sign.Internal.Negative
 
-numberSignWith : Sign -> (number -> number)
-numberSignWith signToAdapt =
-    case signToAdapt of
-        Positive ->
-            abs
-
-        Negative ->
-            abs >> negate
-
-
-numberSign : number -> Maybe { sign : Sign, absolute : number }
-numberSign =
-    \numberSigned ->
-        case compare numberSigned 0 of
-            EQ ->
-                Nothing
-
-            LT ->
-                { sign = Negative, absolute = numberSigned |> abs }
-                    |> Just
-
-            GT ->
-                { sign = Positive, absolute = numberSigned }
-                    |> Just
+                Sign.Positive ->
+                    Sign.Internal.Positive
+        )

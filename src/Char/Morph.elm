@@ -57,8 +57,4 @@ string =
 -}
 only : Char -> Morph () Char
 only broadConstant =
-    Morph.only
-        (\char ->
-            [ "'", char |> String.fromChar, "'" ] |> String.concat
-        )
-        broadConstant
+    Morph.only String.fromChar broadConstant

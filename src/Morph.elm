@@ -11,6 +11,7 @@ module Morph exposing
     , reverse
     , deadEndMap
     , deadEndNever, narrowErrorMap
+    , errorToLines
     , description
     , broadenFrom, narrowTo, mapTo
     , over, overRow
@@ -48,6 +49,11 @@ We call it
 @docs deadEndNever, narrowErrorMap
 
 
+## transform
+
+@docs errorToLines
+
+
 ## scan
 
 @docs description
@@ -64,7 +70,7 @@ We call it
 [`Group.Morph`](Group#Morph)
 
 
-## Choice.between
+## choice
 
 [`Choice.Morph`](Choice#Morph)
 
@@ -353,8 +359,8 @@ TODO: update examples
     --> Err "1:0: I was expecting a letter [a-zA-Z]. I reached the end of the input."
 
 -}
-errorToString : Error -> Emptiable (Stacked String) Never
-errorToString =
+errorToLines : Error -> Emptiable (Stacked String) Never
+errorToLines =
     \expected ->
         case expected of
             DeadEnd unexpectedDescription ->
@@ -367,7 +373,7 @@ errorToString =
                      ]
                         |> String.concat
                     )
-                    (row.error |> errorToString)
+                    (row.error |> errorToLines)
 
             Parts parts ->
                 Stack.onTopLay
@@ -380,7 +386,7 @@ errorToString =
                                     ([ "part ", part.index |> String.fromInt, ":" ]
                                         |> String.concat
                                     )
-                                    (part.error |> errorToString)
+                                    (part.error |> errorToLines)
                                     |> markdownElement
                             )
                         |> Stack.flatten
@@ -397,7 +403,7 @@ errorToString =
                                     ([ "possibility:" ]
                                         |> String.concat
                                     )
-                                    (possibility |> errorToString)
+                                    (possibility |> errorToLines)
                                     |> markdownElement
                             )
                         |> Stack.flatten
@@ -776,15 +782,10 @@ broad broadConstantSeed =
 
 {-| Match only the specific given broad input.
 
-Make helpers for each type of constant for convenience!
+Make helpers for each type of constant for convenience
 
     Char.Morph.only broadCharConstant =
-        Morph.only
-            (\char ->
-                [ "'", char |> String.fromChar, "'" ]
-                    |> String.concat
-            )
-            broadCharConstant
+        Morph.only String.fromChar broadCharConstant
 
 -}
 only :
@@ -793,7 +794,7 @@ only :
     -> Morph () broadConstant
 only broadConstantToString broadConstant =
     value
-        (broadConstant |> broadConstantToString)
+        ([ "only ", broadConstant |> broadConstantToString ] |> String.concat)
         { narrow =
             \broadValue ->
                 if broadValue == broadConstant then

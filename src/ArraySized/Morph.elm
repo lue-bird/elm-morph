@@ -51,7 +51,7 @@ import Possibly exposing (Possibly)
 import Stack exposing (Stacked)
 
 
-{-| [`Morph`](Morph#Morph) from an `ArraySized` with an equatable range `InValue`
+{-| [`Morph`](Morph#Morph) from an `ArraySized` with an equatable range `InFixedValue`
 to an `InFixed` to operate on it
 -}
 value :
@@ -172,7 +172,7 @@ Have `>= 1` element (`Emptiable (Stacked ...) Never`)? → [`toStackFilled`](#to
 -}
 toStackEmptiable :
     MorphIndependently
-        (ArraySized (Min narrowRange_) narrowElement
+        (ArraySized narrowRange_ narrowElement
          ->
             Result
                 error_

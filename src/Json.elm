@@ -29,14 +29,21 @@ module Json exposing
 -}
 
 import Array
+import Choice
 import Decimal exposing (Decimal)
+import Decimal.Internal
 import Dict exposing (Dict)
 import Emptiable exposing (Emptiable)
+import FloatExplicit exposing (FloatExplicit)
+import Group
 import Json.Decode
 import Json.Encode
-import Morph exposing (Morph, MorphIndependently, Translate, translate)
+import Linear exposing (Direction(..))
+import Morph exposing (Morph, MorphIndependently, MorphOrError, Translate, translate)
 import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
+import Sign exposing (Sign)
+import Sign.Internal
 import Stack exposing (Stacked)
 import Value exposing (LiteralOrStructure(..))
 
@@ -95,7 +102,7 @@ type alias Json tag =
 type Literal
     = Null ()
     | Bool Bool
-    | Number Float
+    | Number Decimal
     | String String
 
 
@@ -103,7 +110,7 @@ type Literal
 -}
 type Structure tag
     = Array (Array.Array (Json tag))
-    | Object (Emptiable (Stacked (Value.Tagged tag)) Possibly)
+    | Object (Emptiable (Stacked (Tagged tag)) Possibly)
 
 
 type alias Tagged tag =
@@ -116,9 +123,12 @@ type alias Tagged tag =
 jsValueMagic : Morph (Json String) JsValueMagic
 jsValueMagic =
     Morph.to "JSON"
-        { narrow =
-            Json.Decode.decodeValue jsValueMagicDecoder
-                >> Result.mapError decodeErrorToMorph
+        { description = { custom = Emptiable.empty, inner = Emptiable.empty }
+        , narrow =
+            \jsValueMagicBeforeNarrow ->
+                jsValueMagicBeforeNarrow
+                    |> Json.Decode.decodeValue jsValueMagicDecoder
+                    |> Result.mapError decodeErrorToMorph
         , broaden = jsValueMagicEncode ()
         }
 
@@ -132,8 +142,11 @@ decodeErrorToMorph =
             Json.Decode.Field fieldName error ->
                 [ "field `"
                 , fieldName
-                , "`: "
-                , error |> decodeErrorToMorph |> Morph.Error.errorToString
+                , "`:\n"
+                , error
+                    |> decodeErrorToMorph
+                    |> Morph.errorToLines
+                    |> Stack.fold Up (\line soFar -> soFar ++ "\n" ++ line)
                 , "\n\n"
                 , "`Morph` can't turn this into a more structured error"
                 , " because it refers to field errors by their location in the dict/record/object."
@@ -190,11 +203,12 @@ string =
 -}
 stringBroadWith : { indentation : Int } -> Morph (Json String) String
 stringBroadWith { indentation } =
-    Morph.to "json"
-        { narrow =
+    Morph.to "JSON"
+        { description = { custom = Emptiable.empty, inner = Emptiable.empty }
+        , narrow =
             \jsValueMagicBroad ->
                 jsValueMagicBroad
-                    |> Json.Decode.decodeValue jsValueMagicDecoder
+                    |> Json.Decode.decodeString jsValueMagicDecoder
                     |> Result.mapError decodeErrorToMorph
         , broaden =
             \json ->
@@ -226,7 +240,10 @@ literalJsValueMagicEncode =
                 boolLiteral |> Json.Encode.bool
 
             Number floatLiteral ->
-                floatLiteral |> Json.Encode.float
+                floatLiteral
+                    |> Morph.broadenFrom
+                        (Decimal.floatExplicit |> Morph.over FloatExplicit.float)
+                    |> Json.Encode.float
 
             String stringLiteral ->
                 stringLiteral |> Json.Encode.string
@@ -244,7 +261,7 @@ structureJsValueMagicEncode () =
                 objectAny
                     |> Stack.map
                         (\_ field ->
-                            ( field.tag.name
+                            ( field.tag
                             , field.value |> jsValueMagicEncode ()
                             )
                         )
@@ -273,39 +290,62 @@ jsonLiteralDecoder =
     Json.Decode.oneOf
         [ Null () |> Json.Decode.null
         , Json.Decode.map Bool Json.Decode.bool
-        , Json.Decode.map Number Json.Decode.float
+        , Json.Decode.andThen
+            (\float ->
+                case
+                    float
+                        |> Morph.narrowTo
+                            (Decimal.floatExplicit
+                                |> Morph.over FloatExplicit.float
+                            )
+                of
+                    Ok decimal ->
+                        Number decimal |> Json.Decode.succeed
+
+                    Err exception ->
+                        exception
+                            |> Morph.errorToLines
+                            |> Stack.fold Up (\line soFar -> soFar ++ "\n" ++ line)
+                            |> Json.Decode.fail
+            )
+            Json.Decode.float
         , Json.Decode.map String Json.Decode.string
         ]
 
 
-jsonStructureDecoder : Json.Decode.Decoder (Structure Value.Name)
+jsonStructureDecoder : Json.Decode.Decoder (Structure String)
 jsonStructureDecoder =
-    Json.Decode.oneOf
-        [ Json.Decode.map Array
-            (Json.Decode.array jsValueMagicDecoder)
-        , Json.Decode.map Object
-            (Json.Decode.keyValuePairs jsValueMagicDecoder
-                |> Json.Decode.map
-                    (\keyValuePairs ->
-                        keyValuePairs
-                            |> List.map
-                                (\( tag, v ) -> { tag = tag, value = v })
-                            |> Stack.fromList
+    Json.Decode.lazy
+        (\() ->
+            Json.Decode.oneOf
+                [ Json.Decode.map Array
+                    (Json.Decode.array jsValueMagicDecoder)
+                , Json.Decode.map Object
+                    (Json.Decode.keyValuePairs jsValueMagicDecoder
+                        |> Json.Decode.map
+                            (\keyValuePairs ->
+                                keyValuePairs
+                                    |> List.map
+                                        (\( tag, v ) -> { tag = tag, value = v })
+                                    |> Stack.fromList
+                            )
                     )
-            )
-        ]
+                ]
+        )
 
 
 {-| Convert a [representation of an elm value](Value#Value) to a [valid `Json` value](#Json)
 -}
 value :
     MorphIndependently
-        (Value.Value Value.IndexAndName
-         -> Result error_ (Json Value.IndexAndName)
+        (Value.Value narrowTag
+         -> Result error_ (Json narrowTag)
         )
-        (Json tag -> Value.Value tag)
+        (Json Value.IndexAndName
+         -> Value.Value Value.IndexAndName
+        )
 value =
-    translate toValue value
+    translate fromValueImplementation toValue
 
 
 toValue : Json Value.IndexAndName -> Value.Value Value.IndexAndName
@@ -326,8 +366,8 @@ literalToValue =
             Null unit ->
                 unit |> Value.Unit |> Literal
 
-            Number float ->
-                float |> Value.Float |> Literal
+            Number decimal ->
+                decimal |> Morph.broadenFrom decimalInternal |> Value.Number |> Literal
 
             String string_ ->
                 string_ |> Value.String |> Literal
@@ -346,7 +386,9 @@ literalToValue =
                     |> Structure
 
 
-structureToValue : Structure tag -> Value.Structure tag
+structureToValue :
+    Structure Value.IndexAndName
+    -> Value.Structure Value.IndexAndName
 structureToValue =
     \structure ->
         case structure of
@@ -364,8 +406,8 @@ structureToValue =
                     |> Value.Record
 
 
-value : Value.Value tag -> Json tag
-value =
+fromValueImplementation : Value.Value tag -> Json tag
+fromValueImplementation =
     \json ->
         case json of
             Literal literal ->
@@ -393,8 +435,8 @@ literalFromValue =
             Value.String stringLiteral ->
                 stringLiteral |> String
 
-            Value.Float float ->
-                float |> Number
+            Value.Number decimal ->
+                decimal |> Morph.mapTo decimalInternal |> Number
 
 
 
@@ -457,3 +499,93 @@ taggedTagMap tagChange =
         { tag = tagged.tag |> tagChange
         , value = tagged.value |> tagMap tagChange
         }
+
+
+
+-- Decimal
+
+
+decimalInternal :
+    MorphOrError
+        Decimal
+        Decimal.Internal.Decimal
+        (Morph.ErrorWithDeadEnd deadEnd_)
+decimalInternal =
+    Choice.toFrom
+        ( \variantN0 variantSigned decimalInternalBeforeNarrow ->
+            case decimalInternalBeforeNarrow of
+                Decimal.Internal.N0 ->
+                    variantN0 ()
+
+                Decimal.Internal.Signed signedValue ->
+                    variantSigned signedValue
+        , \variantN0 variantSigned decimal ->
+            case decimal of
+                Decimal.N0 ->
+                    variantN0 ()
+
+                Decimal.Signed signedValue ->
+                    variantSigned signedValue
+        )
+        |> Choice.variant ( \() -> Decimal.N0, \() -> Decimal.Internal.N0 ) Morph.keep
+        |> Choice.variant ( Decimal.Signed, Decimal.Internal.Signed ) signedInternal
+        |> Choice.finishToFrom
+
+
+signedInternal :
+    MorphOrError
+        Decimal.Signed
+        Decimal.Internal.Signed
+        (Morph.ErrorWithDeadEnd deadEnd_)
+signedInternal =
+    Group.toFrom
+        ( \sign absolutePart -> { sign = sign, absolute = absolutePart }
+        , \sign absolutePart -> { sign = sign, absolute = absolutePart }
+        )
+        |> Group.part ( .sign, .sign ) signInternal
+        |> Group.part ( .absolute, .absolute ) absoluteInternal
+        |> Group.finish
+
+
+absoluteInternal : MorphOrError Decimal.Absolute Decimal.Internal.Absolute error_
+absoluteInternal =
+    Choice.toFrom
+        ( \variantFraction variantAtLeast1 decimal ->
+            case decimal of
+                Decimal.Internal.Fraction fractionValue ->
+                    variantFraction fractionValue
+
+                Decimal.Internal.AtLeast1 atLeast1Value ->
+                    variantAtLeast1 atLeast1Value
+        , \variantFraction variantAtLeast1 decimal ->
+            case decimal of
+                Decimal.Fraction fractionValue ->
+                    variantFraction fractionValue
+
+                Decimal.AtLeast1 atLeast1Value ->
+                    variantAtLeast1 atLeast1Value
+        )
+        |> Choice.variant ( Decimal.Fraction, Decimal.Internal.Fraction ) Morph.keep
+        |> Choice.variant ( Decimal.AtLeast1, Decimal.Internal.AtLeast1 ) Morph.keep
+        |> Choice.finishToFrom
+
+
+signInternal : MorphOrError Sign Sign.Internal.Sign error_
+signInternal =
+    Morph.translate
+        (\signInternalBeforeNarrow ->
+            case signInternalBeforeNarrow of
+                Sign.Internal.Negative ->
+                    Sign.Negative
+
+                Sign.Internal.Positive ->
+                    Sign.Positive
+        )
+        (\signBeforeBroaden ->
+            case signBeforeBroaden of
+                Sign.Negative ->
+                    Sign.Internal.Negative
+
+                Sign.Positive ->
+                    Sign.Internal.Positive
+        )

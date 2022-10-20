@@ -134,7 +134,7 @@ import Stack exposing (Stacked)
 -}
 type Literal
     = Unit ()
-    | Decimal Decimal
+    | Number Decimal
     | String String
 
 

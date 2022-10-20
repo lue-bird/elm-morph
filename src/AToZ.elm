@@ -1,12 +1,18 @@
 module AToZ exposing
-    ( AToZ(..), lowerChar, upperChar
-    , Case(..), char
+    ( AToZ(..), Case(..)
+    , only
+    , lowerChar, upperChar, char
     )
 
 {-| Basic latin letter a|...|z
 
-@docs AToZ, lowerChar, upperChar
-@docs Case, char
+@docs AToZ, Case
+
+
+## [`Morph`](Morph#Morph)
+
+@docs only
+@docs lowerChar, upperChar, char
 
 -}
 
@@ -53,13 +59,12 @@ type Case
     | CaseUpper
 
 
-{-| Parses exactly 1 ASCII lower or upper case letter character.
-This is case insensitive.
+{-| Parses exactly 1 lower or upper case [`AToZ`](#AToZ).
 
 > ℹ️ Equivalent regular expression: `[a-zA-Z]`
 
-    import Char.Morph exposing (letter)
-    import String.Morph as Text
+    import AToZ
+    import String.Morph
 
     -- match any letter, case insensitive
     "abc" |> Text.narrowTo letter --> Ok 'a'
@@ -74,7 +79,7 @@ This is case insensitive.
     --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '1'."
 
 
-### example `atLeast n1 letter`
+### example `ArraySized.Morph.atLeast n1 (AToZ.char |> Morph.one)`
 
 > ℹ️ Equivalent regular expression: `[a-zA-Z]+`
 
@@ -399,3 +404,15 @@ upperChar =
         |> Choice.try (\() -> Y) (Char.Morph.only 'Y')
         |> Choice.try (\() -> Z) (Char.Morph.only 'Z')
         |> Choice.finish
+
+
+{-| Match only the specific given broad input. See [`Morph.only`](Morph#only)
+-}
+only : AToZ -> Morph () AToZ
+only =
+    Morph.only
+        (\aToZ ->
+            aToZ
+                |> Morph.broadenFrom upperChar
+                |> String.fromChar
+        )

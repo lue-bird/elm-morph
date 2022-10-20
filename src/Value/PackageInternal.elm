@@ -11,7 +11,7 @@ literalKindToString =
             Value.Unit _ ->
                 "Unit"
 
-            Value.Decimal _ ->
+            Value.Number _ ->
                 "Decimal"
 
             Value.String _ ->
