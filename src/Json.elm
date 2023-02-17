@@ -72,26 +72,8 @@ type alias JsValueMagic =
     Json.Encode.Value
 
 
-{-| A valid\* JSON value. `case`able. Elm doesn't crash on `==`.
+{-| A valid JSON value. `case`able. Elm doesn't crash on `==`.
 Can't contain any [spooky impure stuff](#JsValueMagic)
-
----
-
-\*
-
-  - json numbers don't strictly adhere to a `Float`
-    as defined in the [IEEE 754 standard][ieee]
-    which is hardcoded into almost all CPUs.
-    This standard allows `Infinity` and `NaN`
-  - elm `Decoder`s/`Encoder`s can only handle `Float`s
-  - [The json.org spec][json] does not include `Infinity` and `NaN`
-    and [`elm/json` silently encodes both as `null`](https://github.com/elm/json/blob/0206c00884af953f2cba8823fee111ee71a0330e/src/Json/Encode.elm#L106)
-  - this behavior matches `JSON.stringify` behavior in plain JS
-  - In general, ["[...] JSON is a Minefield 💣"](https://seriot.ch/projects/parsing_json.html)
-
-[ieee]: https://en.wikipedia.org/wiki/IEEE_754
-[json]: https://www.json.org/
-
 -}
 type alias Json tag =
     AtomOrComposed Atom (Composed tag)
@@ -106,7 +88,7 @@ type Atom
     | String String
 
 
-{-| json composed. record/object/dict and array
+{-| json structure. record/object/dict or array
 -}
 type Composed tag
     = Array (Array.Array (Json tag))
@@ -119,6 +101,21 @@ type alias Tagged tag =
 
 
 {-| [Morph](#Morph) to valid [`Json` value](#Json) format from [`JsValueMagic`](#JsValueMagic)
+
+About json numbers...
+
+  - json numbers don't strictly adhere to a `Float`
+    as defined in the [IEEE 754 standard][ieee]
+    which is hardcoded into almost all CPUs.
+    This standard allows `Infinity` and `NaN` which the [json.org spec][json] does not include.
+  - [`elm/json` silently encodes both as `null`](https://github.com/elm/json/blob/0206c00884af953f2cba8823fee111ee71a0330e/src/Json/Encode.elm#L106).
+    This behavior matches `JSON.stringify` behavior in plain JS
+  - our json representation doesn't have this footgun since it uses [`Decimal`](Decimal#Decimal)
+  - elm `Decoder`s/`Encoder`s can only handle `Float` range which dictates the range we can use for [`Decimal`](Decimal#Decimal)s
+
+[ieee]: https://en.wikipedia.org/wiki/IEEE_754
+[json]: https://www.json.org/
+
 -}
 jsValueMagic : Morph (Json String) JsValueMagic
 jsValueMagic =
