@@ -9,7 +9,7 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
   - `Parser.Expression` remove
   - `Parser.Sequence` merge → `MorphRow`
       - `zeroOrMore` remove
-          - in favor of `atLeast n0`
+          - in favor of `atLeast ... n0`
       - `oneOrMore` remove
           - in favor of `atLeast n1`
       - `zeroOrOne` remove
@@ -56,29 +56,30 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
             Morph.succeed
                 |> grab element
                 |> grab
-                    (atLeast n0
+                    (atLeast
                         (Morph.succeed
                             |> grab separator
                             |> grab element
                         )
+                        n0
                     )
             ```
   - `Parser.Common` merge → `String.Morph`
       - `digits` remove
-          - in favor of `atLeast n0 (Digit.n0To9 |> one)` explicitly
+          - in favor of `atLeast (Digit.n0To9 |> one) n0` explicitly
       - `letters` remove
-          - in favor of `atLeast n0 (Morph.AToZ.caseAny |> one)` explicitly
+          - in favor of `atLeast (Morph.AToZ.caseAny |> one) n0` explicitly
       - `spaces` remove
-          - in favor of `atLeast n0 (blankChar |> one)` explicitly
+          - in favor of `atLeast (blankChar |> one) n0` explicitly
             where `blankChar` is a custom definition or just `Char.Morph.only ' '`
       - `token` token
           - in favor of
             ```elm
             import Char.Morph as Char
             Morph.succeed (\... -> ...)
-                |> skip (atLeast n0 (String.Morph.only " "))
+                |> skip (atLeast (String.Morph.only " ") n0)
                 |> grab ...
-                |> skip (atLeast n0 (String.Morph.only " "))
+                |> skip (atLeast (String.Morph.only " ") n0)
             ```
             explicitly
       - `textNoCase` name → `caseAny`

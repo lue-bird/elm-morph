@@ -96,7 +96,7 @@ This is case sensitive.
 See [`for`](#for), [`forBroad`](#forBroad) to control what to [morph](MorphRow#Row) for each `Char`.
 
 -}
-only : String -> MorphRow Char ()
+only : String -> MorphRow () Char
 only expectedText =
     Morph.to ([ "\"", expectedText, "\"" ] |> String.concat)
         (forBroad
@@ -113,9 +113,11 @@ See [`Morph.forBroad`](Morph#forBroad)
 
 -}
 forBroad :
-    (Char -> MorphRow broadElement ())
+    (Char
+     -> MorphRow () broadElement
+    )
     -> String
-    -> MorphRow broadElement ()
+    -> MorphRow () broadElement
 forBroad charMorphRow expectedText =
     List.Morph.forBroad charMorphRow
         (expectedText |> String.toList)
@@ -124,9 +126,11 @@ forBroad charMorphRow expectedText =
 {-| Traverse a `String`: See [`Morph.for`](#for)
 -}
 for :
-    (Char -> MorphRow broadElement narrowElement)
+    (Char
+     -> MorphRow narrowElement broadElement
+    )
     -> String
-    -> MorphRow broadElement (List narrowElement)
+    -> MorphRow (List narrowElement) broadElement
 for charMorphRow expectedText =
     List.Morph.for charMorphRow
         (expectedText |> String.toList)
@@ -148,7 +152,7 @@ value =
                     Value.String stringNarrow ->
                         stringNarrow |> Ok
 
-                    literalExceptString ->
-                        literalExceptString |> Value.PackageInternal.literalKindToString |> Err
+                    atomExceptString ->
+                        atomExceptString |> Value.PackageInternal.atomKindToString |> Err
         }
-        |> Morph.over Value.literal
+        |> Morph.over Value.atom

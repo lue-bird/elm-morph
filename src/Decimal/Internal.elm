@@ -1,8 +1,8 @@
-module Decimal.Internal exposing (Decimal(..), Absolute(..), Fraction, Signed)
+module Decimal.Internal exposing (Decimal(..), Absolute(..), Fraction, Signed, Whole)
 
 {-| Used by `module Decimal` and `module Value`
 
-@docs Decimal, Absolute, Fraction, Signed
+@docs Decimal, Absolute, Fraction, Signed, Whole
 
 
 ## [`Morph`](Morph#Morph)
@@ -11,11 +11,11 @@ module Decimal.Internal exposing (Decimal(..), Absolute(..), Fraction, Signed)
 
 import Emptiable exposing (Emptiable)
 import Morph
-import N exposing (InFixed, N, N0, N1, N9)
+import N exposing (In, N, N0, N1, N9)
 import Possibly exposing (Possibly)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Sign.Internal exposing (Sign)
-import Stack exposing (StackTopBelow, Stacked)
+import Stack exposing (Stacked)
 
 
 type Decimal
@@ -35,16 +35,20 @@ type alias Signed =
 type Absolute
     = Fraction Fraction
     | AtLeast1
-        { whole :
-            Emptiable
-                (StackTopBelow (N (InFixed N1 N9)) (N (InFixed N0 N9)))
-                Never
+        { whole : Whole
         , fraction : Maybe Fraction
         }
 
 
+type alias Whole =
+    { first : N (In N1 N9)
+    , afterFirst :
+        Emptiable (Stacked (N (In N0 N9))) Possibly
+    }
+
+
 type alias Fraction =
     RecordWithoutConstructorFunction
-        { beforeLast : Emptiable (Stacked (N (InFixed N0 N9))) Possibly
-        , last : N (InFixed N1 N9)
+        { beforeLast : Emptiable (Stacked (N (In N0 N9))) Possibly
+        , last : N (In N1 N9)
         }

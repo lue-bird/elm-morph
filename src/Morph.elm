@@ -1,14 +1,14 @@
 module Morph exposing
     ( Morph, Translate, MorphOrError, MorphIndependently
     , Description, DescriptionInner(..)
-    , Error, ErrorWithDeadEnd(..), GroupError
+    , Error, ErrorWithDeadEnd(..), PartsError
     , broaden
     , value, only, validate
     , translate, broad, toggle, keep, translateOn
     , lazy
     , end, one, succeed
     , to
-    , reverse
+    , invert
     , deadEndMap
     , deadEndNever, narrowErrorMap
     , errorToLines
@@ -24,7 +24,7 @@ We call it
 
 @docs Morph, Translate, MorphOrError, MorphIndependently
 @docs Description, DescriptionInner
-@docs Error, ErrorWithDeadEnd, GroupError
+@docs Error, ErrorWithDeadEnd, PartsError
 
 
 ## create
@@ -44,7 +44,7 @@ We call it
 ## alter
 
 @docs to
-@docs reverse
+@docs invert
 @docs deadEndMap
 @docs deadEndNever, narrowErrorMap
 
@@ -106,7 +106,7 @@ Up for a challenge? implement & PR
 import ArraySized exposing (ArraySized)
 import Emptiable exposing (Emptiable, filled)
 import Linear exposing (Direction(..))
-import N exposing (Add1, Exactly, Fixed, In, InFixed, Min, N, N0, N2, To, Up, n0, n1, n2)
+import N exposing (Add1, Exactly, In, Min, N, N0, N2, On, To, Up, n0, n1, n2)
 import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Stack exposing (Stacked)
@@ -276,8 +276,8 @@ type alias Description =
 type DescriptionInner
     = Translate
     | Over { narrow : Description, broad : Description }
-    | Group (ArraySized (Min (Fixed N2)) Description)
-    | Choice (ArraySized (Min (Fixed N2)) Description)
+    | Group (ArraySized Description (Min (On N2)))
+    | Choice (ArraySized Description (Min (On N2)))
     | Elements Description
       -- row
     | While Description
@@ -320,21 +320,20 @@ Then again: They don't have to be.
 type ErrorWithDeadEnd deadEnd
     = DeadEnd deadEnd
     | Row { startDown : Int, error : ErrorWithDeadEnd deadEnd }
-    | Parts (GroupError (ErrorWithDeadEnd deadEnd))
-    | -- TODO: Stack → ArraySized (Min (Fixed N2))
-      -- TODO: error → { index : Int, error : error }
-      Possibilities (Emptiable (Stacked (ErrorWithDeadEnd deadEnd)) Never)
-
-
-{-| A group's part [`Error`](#Error)s with their locations
--}
-type alias GroupError partError =
-    Emptiable
-        (Stacked
-            { index : Int
-            , error : partError
-            }
+      --? TODO | Variant { index : Int, error : ErrorWithDeadEnd deadEnd }
+    | Parts (PartsError (ErrorWithDeadEnd deadEnd))
+    | Tries
+        (Emptiable
+            (Stacked (ErrorWithDeadEnd deadEnd))
+            Never
         )
+
+
+{-| A group's part [`Error`](#Error)s, each with their part index
+-}
+type alias PartsError partError =
+    Emptiable
+        (Stacked { index : Int, error : partError })
         Never
 
 
@@ -359,12 +358,12 @@ TODO: update examples
     --> Err "1:0: I was expecting a letter [a-zA-Z]. I reached the end of the input."
 
 -}
-errorToLines : Error -> Emptiable (Stacked String) Never
+errorToLines : Error -> Emptiable (Stacked String) never_
 errorToLines =
     \expected ->
         case expected of
             DeadEnd unexpectedDescription ->
-                Stack.only unexpectedDescription
+                Stack.one unexpectedDescription
 
             Row row ->
                 Stack.onTopLay
@@ -373,7 +372,7 @@ errorToLines =
                      ]
                         |> String.concat
                     )
-                    (row.error |> errorToLines)
+                    (Stack.onTopLay "" (row.error |> errorToLines))
 
             Parts parts ->
                 Stack.onTopLay
@@ -383,16 +382,16 @@ errorToLines =
                         |> Stack.map
                             (\_ part ->
                                 Stack.onTopLay
-                                    ([ "part ", part.index |> String.fromInt, ":" ]
+                                    ([ "part ", part.index |> String.fromInt ]
                                         |> String.concat
                                     )
-                                    (part.error |> errorToLines)
+                                    (Stack.onTopLay "" (part.error |> errorToLines))
                                     |> markdownElement
                             )
                         |> Stack.flatten
                     )
 
-            Possibilities possibilities ->
+            Tries possibilities ->
                 Stack.onTopLay
                     "i tried"
                     (possibilities
@@ -400,14 +399,16 @@ errorToLines =
                         |> Stack.map
                             (\_ possibility ->
                                 Stack.onTopLay
-                                    ([ "possibility:" ]
-                                        |> String.concat
-                                    )
+                                    "possibility:"
                                     (possibility |> errorToLines)
                                     |> markdownElement
                             )
                         |> Stack.flatten
                     )
+
+
+indent =
+    \line -> "    " ++ line
 
 
 markdownElement :
@@ -418,8 +419,8 @@ markdownElement =
         Stack.onTopLay
             ([ "  - ", elementMarkdown |> Stack.top ] |> String.concat)
             (elementMarkdown
-                |> Stack.topRemove
-                |> Stack.map (\_ possibilityLine -> "    " ++ possibilityLine)
+                |> Stack.removeTop
+                |> Stack.map (\_ -> indent)
             )
 
 
@@ -433,7 +434,7 @@ markdownElement =
     "123"
         |> Text.narrowTo
             (Morph.to "variable name"
-                (atLeast n1 AToZ.Morph.char)
+                (atLeast n1 AToZ.char)
             )
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting a name consisting of letters. I got stuck when I got '1'."
@@ -739,8 +740,8 @@ What is great is using this to make inputs more "user-usable":
     ArraySized.Morph.maxToInfinity :
         MorphIndependently
             (narrow -> Result error_ narrow)
-            (ArraySized (In (Fixed min) max_)
-             -> ArraySized (In (Fixed min) max_)
+            (ArraySized element (In (On min) max_)
+             -> ArraySized element (In (On min) Infinity)
             )
     ArraySized.Morph.maxToInfinity =
         Morph.broaden ArraySized.maxToInfinity
@@ -794,14 +795,14 @@ only :
     -> Morph () broadConstant
 only broadConstantToString broadConstant =
     value
-        ([ "only ", broadConstant |> broadConstantToString ] |> String.concat)
+        ([ "only '", broadConstant |> broadConstantToString, "'" ] |> String.concat)
         { narrow =
             \broadValue ->
                 if broadValue == broadConstant then
                     () |> Ok
 
                 else
-                    broadConstant
+                    broadValue
                         |> broadConstantToString
                         |> Err
         , broaden =
@@ -828,7 +829,7 @@ value :
             (beforeBroaden -> broad)
 value descriptionCustom morphTransformations =
     { description =
-        { custom = Stack.only descriptionCustom
+        { custom = Stack.one descriptionCustom
         , inner = Emptiable.empty
         }
     , narrow =
@@ -985,7 +986,7 @@ by swapping the functions [`map`](#map) <-> [`unmap`](#unmap).
 
     [ 'O', 'h', 'a', 'y', 'o' ]
         |> Morph.map
-           (Text.toList |> Morph.reverse)
+           (Text.toList |> Morph.invert)
     --> "Ohayo"
 
 This can be used to easily create a `fromX`/`toX` pair
@@ -1005,7 +1006,7 @@ This can be used to easily create a `fromX`/`toX` pair
              -> List.NonEmpty.NonEmpty element
             )
     fromListNonEmpty =
-        toListNonEmpty |> Morph.reverse
+        toListNonEmpty |> Morph.invert
 
     toListNonEmpty :
         MorphIndependently
@@ -1021,7 +1022,7 @@ This can be used to easily create a `fromX`/`toX` pair
 [`unmap`](#unmap) `...` is equivalent to `map (... |> reverse)`.
 
 -}
-reverse :
+invert :
     MorphIndependently
         (beforeMap -> Result (ErrorWithDeadEnd Never) mapped)
         (beforeUnmap -> unmapped)
@@ -1029,7 +1030,7 @@ reverse :
         MorphIndependently
             (beforeUnmap -> Result error_ unmapped)
             (beforeMap -> mapped)
-reverse =
+invert =
     \translate_ ->
         { description = translate_ |> description
         , narrow =
@@ -1078,11 +1079,11 @@ deadEndMap deadEndChange =
                         )
                     |> Parts
 
-            Possibilities possibilities ->
+            Tries possibilities ->
                 possibilities
                     |> Stack.map
                         (\_ -> deadEndMap deadEndChange)
-                    |> Possibilities
+                    |> Tries
 
 
 {-| An [`Error`](#ErrorWithDeadEnd) where running into a dead end is impossible can't be created.
@@ -1107,7 +1108,7 @@ deadEndNever =
                     |> .error
                     |> deadEndNever
 
-            Possibilities possibilities ->
+            Tries possibilities ->
                 possibilities
                     |> Stack.top
                     |> deadEndNever
@@ -1157,7 +1158,9 @@ translateOn :
     )
     ->
         (MorphIndependently
-            (elementBeforeMap -> Result (ErrorWithDeadEnd Never) elementMapped)
+            (elementBeforeMap
+             -> Result (ErrorWithDeadEnd Never) elementMapped
+            )
             (elementBeforeUnmap -> elementUnmapped)
          ->
             MorphIndependently
@@ -1170,8 +1173,10 @@ translateOn ( structureMap, structureUnmap ) elementTranslate =
         , inner = Emptiable.empty
         }
     , narrow =
-        structureMap (mapTo elementTranslate)
-            >> Ok
+        \broad_ ->
+            broad_
+                |> structureMap (mapTo elementTranslate)
+                |> Ok
     , broaden =
         structureUnmap (broadenFrom elementTranslate)
     }
@@ -1192,7 +1197,7 @@ translateOn ( structureMap, structureUnmap ) elementTranslate =
 {-| [`MorphRow`](#MorphRow) on input characters
 -}
 type alias MorphText narrow =
-    MorphRow Char narrow
+    MorphRow narrow Char
 ```
 
 [`MorphRow`](#MorphRow) is inspired by [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/parser/latest/)
@@ -1221,29 +1226,29 @@ type alias MorphText narrow =
     { x = 2.71, y = 3.14 } |> broad (listToString |> over point)
     --> "( 2.71, 3.14 )"
 
-    point : MorphRow Point
+    point : MorphRow Point Char
     point =
         Morph.to "point"
             (Morph.succeed (\x y -> { x = x, y = y })
                 |> skip (String.Morph.only "(")
                 |> skip
-                    (broad [ () ]
-                        |> Morph.overRow (atLeast n0 (String.Morph.only " "))
+                    (broad (ArraySIzed.one ())
+                        |> Morph.overRow (atLeast (String.Morph.only " ") n0)
                     )
                 |> grab number
                 |> skip
-                    (broad []
-                        |> Morph.overRow (atLeast n0 (String.Morph.only " "))
+                    (broad ArraySIzed.empty
+                        |> Morph.overRow (atLeast (String.Morph.only " ") n0)
                     )
                 |> skip (String.Morph.only ",")
                 |> skip
-                    (broad [ () ]
-                        |> Morph.overRow (atLeast n0 (String.Morph.only " "))
+                    (broad (ArraySIzed.one ())
+                        |> Morph.overRow (atLeast (String.Morph.only " ") n0)
                     )
                 |> grab .x Number.Morph.text
                 |> skip
-                    (broad [ () ]
-                        |> Morph.overRow (atLeast n0 (String.Morph.only " "))
+                    (broad (ArraySIzed.one ())
+                        |> Morph.overRow (atLeast (String.Morph.only " ") n0)
                     )
                 |> skip (String.Morph.only ")")
             )
@@ -1280,10 +1285,10 @@ Note before we start:
   - 👍 error messages will always show all options and why they failed,
     showing those that came the furthest first
 
-  - 👎 performs worse as there are more [possibilities](#try) to parse to know it failed
+  - 👎 performs worse as there are more [possibilities](Choice#try) to parse to know it failed
 
 -}
-type alias MorphRow broadElement narrow =
+type alias MorphRow narrow broadElement =
     MorphIndependently
         (Emptiable (Stacked broadElement) Possibly
          ->
@@ -1299,7 +1304,7 @@ type alias MorphRow broadElement narrow =
 {-| Incomplete [`MorphRow`](#MorphRow) for a thing composed of multiple parts = group.
 It's what you supply during a [`Morph.succeed`](#Morph.succeed)`|>`[`grab`](#grab)/[`skip`](#skip) build
 -}
-type alias MorphRowIndependently broadElement beforeBroaden narrowed =
+type alias MorphRowIndependently beforeBroaden narrowed broadElement =
     MorphIndependently
         (Emptiable (Stacked broadElement) Possibly
          ->
@@ -1340,8 +1345,8 @@ type alias MorphRowIndependently broadElement beforeBroaden narrowed =
 
 -}
 one :
-    Morph narrow element
-    -> MorphRow element narrow
+    Morph narrow broadElement
+    -> MorphRow narrow broadElement
 one =
     \morph ->
         { description =
@@ -1356,7 +1361,7 @@ one =
                             |> Row
                             |> Err
 
-                    Emptiable.Filled (Stack.TopDown nextBroadElement afterNextBroadElement) ->
+                    Emptiable.Filled (Stack.TopBelow ( nextBroadElement, afterNextBroadElement )) ->
                         case
                             nextBroadElement
                                 |> narrowTo morph
@@ -1377,7 +1382,7 @@ one =
                                     |> Err
         , broaden =
             broadenFrom morph
-                >> Stack.only
+                >> Stack.one
         }
 
 
@@ -1430,11 +1435,7 @@ is already nicer
 -}
 succeed :
     narrowConstant
-    ->
-        MorphRowIndependently
-            broadElement_
-            beforeBroaden_
-            narrowConstant
+    -> MorphRowIndependently beforeBroaden_ narrowConstant broadElement_
 succeed narrowConstant =
     { description =
         { custom = Emptiable.empty
@@ -1500,7 +1501,7 @@ succeed narrowConstant =
     -- get some letters, make them lowercase
     "ABC"
         |> Text.narrowTo
-            (atLeast n1 AToZ.Morph.char
+            (atLeast n1 AToZ.char
                 |> map Text.fromList
                 |> map (toggle String.toLower)
             )
@@ -1508,19 +1509,12 @@ succeed narrowConstant =
 
 -}
 overRow :
-    MorphRowIndependently
-        broadElement
-        beforeBroaden
-        beforeNarrow
+    MorphRowIndependently beforeBroaden beforeNarrow broadElement
     ->
         (MorphIndependently
             (beforeNarrow -> Result Error narrow)
             (beforeBeforeBroaden -> beforeBroaden)
-         ->
-            MorphRowIndependently
-                broadElement
-                beforeBeforeBroaden
-                narrow
+         -> MorphRowIndependently beforeBeforeBroaden narrow broadElement
         )
 overRow morphRowBeforeMorph =
     \narrowMorph ->
@@ -1586,20 +1580,20 @@ You might think: Why not use
     decoderNameSubject =
         MorphRow.Morph.succeed (\subject -> subject)
             |> grab (\subject -> subject)
-                (atLeast n0 (Morph.keep |> Morph.one))
+                (atLeast (Morph.keep |> Morph.one) n0)
             |> skip (String.Morph.only "Decoder")
             |> skip Morph.end
 
 Problem is: This will never Morph.succeed.
-`atLeast n0 (Morph.keep |> Morph.one)` always goes on.
+`atLeast (Morph.keep |> Morph.one) n0` always goes on.
 We never reach the necessary [`skip`](#skip)ped things.
 
 -}
 before :
-    { end : MorphRow broadElement ()
-    , goOn : MorphRow broadElement goOnElement
+    { end : MorphRow () broadElement
+    , goOn : MorphRow goOnElement broadElement
     }
-    -> MorphRow broadElement (List goOnElement)
+    -> MorphRow (List goOnElement) broadElement
 before untilStep =
     until
         { commit =
@@ -1649,10 +1643,10 @@ until :
             { end : endElement
             , before : List goOnElement
             }
-    , end : MorphRow broadElement endElement
-    , goOn : MorphRow broadElement goOnElement
+    , end : MorphRow endElement broadElement
+    , goOn : MorphRow goOnElement broadElement
     }
-    -> MorphRow broadElement commitResult
+    -> MorphRow commitResult broadElement
 until untilStep =
     let
         loopStep =
@@ -1703,7 +1697,7 @@ until untilStep =
                         top :: tail ->
                             (top |> GoOn)
                                 |> broadenFrom loopStep
-                                |> Stack.onTopStack
+                                |> Stack.attach Down
                                     (tail |> broadenStepBack ())
         in
         \commitResultNarrow ->
@@ -1716,7 +1710,7 @@ until untilStep =
                 |> List.reverse
                 |> broadenStepBack ()
             )
-                |> Stack.onTopStack
+                |> Stack.attach Down
                     ((committedBack.end |> Commit)
                         |> broadenFrom loopStep
                     )
@@ -1808,7 +1802,7 @@ choiceBetween choiceBroadenDiscriminatedByPossibility =
     }
 
 
-type alias MorphRowNoTry noTryPossiblyOrNever broadElement choiceNarrow choiceBroaden =
+type alias MorphRowNoTry noTryPossiblyOrNever choiceNarrow choiceBroaden broadElement =
     MorphNoTry
         noTryPossiblyOrNever
         { narrow : choiceNarrow
@@ -1821,21 +1815,21 @@ type alias MorphRowNoTry noTryPossiblyOrNever broadElement choiceNarrow choiceBr
 
 choiceTryRow :
     (possibilityNarrow -> choiceNarrow)
-    -> MorphRow broadElement possibilityNarrow
+    -> MorphRow possibilityNarrow broadElement
     ->
         (MorphRowNoTry
             noTryPossiblyOrNever_
-            broadElement
             choiceNarrow
             ((possibilityNarrow -> Emptiable (Stacked broadElement) Possibly)
              -> choiceBroadenFurther
             )
+            broadElement
          ->
             MorphRowNoTry
                 never_
-                broadElement
                 choiceNarrow
                 choiceBroadenFurther
+                broadElement
         )
 choiceTryRow possibilityToChoice possibilityMorph =
     \choiceMorphSoFar ->
@@ -1873,22 +1867,24 @@ choiceTryRow possibilityToChoice possibilityMorph =
 choiceFinishRow :
     MorphRowNoTry
         Never
-        broadElement
         choiceNarrow
-        (choiceNarrow -> Emptiable (Stacked broadElement) Possibly)
-    -> MorphRow broadElement choiceNarrow
+        (choiceNarrow
+         -> Emptiable (Stacked broadElement) Possibly
+        )
+        broadElement
+    -> MorphRow choiceNarrow broadElement
 choiceFinishRow =
     \choiceMorphRowComplete ->
         { description =
             case choiceMorphRowComplete.description |> Emptiable.fill of
-                Stack.TopDown descriptionOnly [] ->
+                Stack.TopBelow ( descriptionOnly, [] ) ->
                     descriptionOnly
 
-                Stack.TopDown description0 (description1 :: description2Up) ->
+                Stack.TopBelow ( description0, description1 :: description2Up ) ->
                     { custom = Emptiable.empty
                     , inner =
                         ArraySized.l2 description0 description1
-                            |> ArraySized.glueMin Up
+                            |> ArraySized.attachMin Up
                                 (description2Up |> ArraySized.fromList)
                             |> Group
                             |> Emptiable.filled
@@ -1900,7 +1896,7 @@ choiceFinishRow =
                     |> Result.mapError
                         (\errorPossibilities ->
                             { startDown = broad_ |> Stack.length
-                            , error = errorPossibilities |> Possibilities
+                            , error = errorPossibilities |> Tries
                             }
                                 |> Row
                         )
@@ -1935,10 +1931,10 @@ It can, however simplify checking for specific endings:
                 )
 
 -}
-end : MorphRow broadElement_ ()
+end : MorphRow () broadElement_
 end =
     { description =
-        { custom = Stack.only "end"
+        { custom = Stack.one "end"
         , inner = Emptiable.empty
         }
     , narrow =
@@ -1973,7 +1969,7 @@ transforming it into a [`Morph`](#Morph) on the full stack of input elements.
 
 -}
 rowFinish :
-    MorphRow broadElement narrow
+    MorphRow narrow broadElement
     -> Morph narrow (Emptiable (Stacked broadElement) Possibly)
 rowFinish =
     \morphRow ->

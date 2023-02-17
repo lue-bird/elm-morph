@@ -1,10 +1,11 @@
 module Value exposing
-    ( Value, Literal(..), Structure(..), Record, Tagged
+    ( Value, Atom(..), Composed(..), Record, Tagged
     , MorphValue
+    , unit
     , Name, Index, IndexOrName(..), IndexAndName
     , descriptive, compact, tagTranslate, tagMap
-    , LiteralOrStructure(..)
-    , literal, structure, structureMap
+    , AtomOrComposed(..)
+    , atom, composed, composedMap
     )
 
 {-| Generic, `case`-able elm value
@@ -14,17 +15,17 @@ explicitly describing how to serialize individual data types that all have the s
 
 Plus it makes it harder to switch to a different format
 
-@docs Value, Literal, Structure, Record, Tagged
+@docs Value, Atom, Composed, Record, Tagged
 
 
 ## morph
 
 @docs MorphValue
+@docs unit
 
 Basically every `module` here has a [`MorphValue`](#MorphValue),
 for example
 
-  - [`Unit`](Unit)
   - [`Int.Morph`](Int-Morph)
   - [`FloatExplicit`](Float-Morph)
   - [`String.Morph`](String-Morph)
@@ -70,10 +71,10 @@ build on existing ones
             Time.millisToPosix
             |> Morph.over Int.Morph.value
 
-or define new literals, structures, ... (↓ are used by [`Json`](Json) for example)
+or define new atoms, composed structures, ... (↓ are used by [`Json`](Json) for example)
 
-@docs LiteralOrStructure
-@docs literal, structure, structureMap
+@docs AtomOrComposed
+@docs atom, composed, composedMap
 
 
 ## broad formats
@@ -130,9 +131,9 @@ import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFuncti
 import Stack exposing (Stacked)
 
 
-{-| A supported elm literal (that don't contain other [values](#Value))
+{-| A supported elm atom (that don't contain other [values](#Value))
 -}
-type Literal
+type Atom
     = Unit ()
     | Number Decimal
     | String String
@@ -140,18 +141,18 @@ type Literal
 
 {-| elm value. Either
 
-  - a literal that don't itself contain values
-  - a structure that can itself contain values
+  - a atom that don't itself contain values
+  - a composed that can itself contain values
 
 -}
-type LiteralOrStructure literal structure
-    = Literal literal
-    | Structure structure
+type AtomOrComposed atom composed
+    = Atom atom
+    | Composed composed
 
 
 {-| Any value representable in elm
 
-Like to see a structure or literal
+Like to see a composed or atom
 that can't be converted in a small amount of runtime
 (for example treating tuples the same as records is just O(1))?
 → PR!
@@ -166,12 +167,12 @@ which isn't a valid elm value
 
 -}
 type alias Value tag =
-    LiteralOrStructure Literal (Structure tag)
+    AtomOrComposed Atom (Composed tag)
 
 
-{-| elm structure that can itself contain values
+{-| elm composed that can itself contain values
 -}
-type Structure tag
+type Composed tag
     = List (List (Value tag))
     | Array (Array (Value tag))
     | Record (Record tag)
@@ -185,7 +186,7 @@ type alias Tagged tag =
         { tag : tag, value : Value tag }
 
 
-{-| The structure of a record that can hold [any](#Value) field value
+{-| The composed of a record that can hold [any](#Value) field value
 -}
 type alias Record tag =
     Emptiable (Stacked (Tagged tag)) Possibly
@@ -308,39 +309,39 @@ tagMap :
     -> (Value tag -> Value tagMapped)
 tagMap tagChange =
     \value ->
-        value |> structureMap (structureTagMap tagChange)
+        value |> composedMap (composedTagMap tagChange)
 
 
-{-| If the [`LiteralOrStructure`](#LiteralOrStructure) is a [`Structure`](#LiteralOrStructure),
+{-| If the [`AtomOrComposed`](#AtomOrComposed) is a [`Composed`](#AtomOrComposed),
 change in a given way
 -}
-structureMap :
-    (structure -> structureMapped)
+composedMap :
+    (composed -> composedMapped)
     ->
-        (LiteralOrStructure literal structure
-         -> LiteralOrStructure literal structureMapped
+        (AtomOrComposed atom composed
+         -> AtomOrComposed atom composedMapped
         )
-structureMap structureChange =
+composedMap composedChange =
     \value ->
         case value of
-            Literal literal_ ->
-                literal_ |> Literal
+            Atom atom_ ->
+                atom_ |> Atom
 
-            Structure structure_ ->
-                structure_
-                    |> structureChange
-                    |> Structure
+            Composed composed_ ->
+                composed_
+                    |> composedChange
+                    |> Composed
 
 
-structureTagMap :
+composedTagMap :
     (tag -> tagMapped)
     ->
-        (Structure tag
-         -> Structure tagMapped
+        (Composed tag
+         -> Composed tagMapped
         )
-structureTagMap tagChange =
-    \structureAny_ ->
-        case structureAny_ of
+composedTagMap tagChange =
+    \composedAny_ ->
+        case composedAny_ of
             List list_ ->
                 list_
                     |> List.map (tagMap tagChange)
@@ -394,52 +395,74 @@ type alias MorphValue narrow =
 
 
 
--- literal or structure
+-- atom or composed
 
 
-{-| [`Morph`](Morph#Morph) to a [`LiteralOrStructure`](#LiteralOrStructure)'s literal if possible
+{-| [`Morph`](Morph#Morph) to a [`AtomOrComposed`](#AtomOrComposed)'s atom if possible
 -}
-literal :
+atom :
     Morph.MorphIndependently
-        (LiteralOrStructure narrowLiteral narrowStructure_
-         -> Result Morph.Error narrowLiteral
+        (AtomOrComposed narrowAtom narrowComposed_
+         -> Result Morph.Error narrowAtom
         )
-        (broadLiteral
-         -> LiteralOrStructure broadLiteral broadStructure_
+        (broadAtom
+         -> AtomOrComposed broadAtom broadComposed_
         )
-literal =
-    Morph.value "Literal"
-        { broaden = Literal
+atom =
+    Morph.value "Atom"
+        { broaden = Atom
         , narrow =
             \value ->
                 case value of
-                    Literal literalAny ->
-                        literalAny |> Ok
+                    Atom atomAny ->
+                        atomAny |> Ok
 
-                    Structure _ ->
-                        "Structure" |> Err
+                    Composed _ ->
+                        "Composed" |> Err
         }
 
 
-{-| [`Morph`](Morph#Morph) to a [`LiteralOrStructure`](#LiteralOrStructure)'s structure if possible
+{-| [`Morph`](Morph#Morph) to a [`AtomOrComposed`](#AtomOrComposed)'s composed if possible
 -}
-structure :
+composed :
     MorphIndependently
-        (LiteralOrStructure narrowLiteral_ narrowStructure
-         -> Result Morph.Error narrowStructure
+        (AtomOrComposed narrowAtom_ narrowComposed
+         -> Result Morph.Error narrowComposed
         )
-        (broadStructure
-         -> LiteralOrStructure broadLiteral_ broadStructure
+        (broadComposed
+         -> AtomOrComposed broadAtom_ broadComposed
         )
-structure =
-    Morph.value "Structure"
-        { broaden = Structure
+composed =
+    Morph.value "Composed"
+        { broaden = Composed
         , narrow =
             \value ->
                 case value of
-                    Structure structure_ ->
-                        structure_ |> Ok
+                    Composed composed_ ->
+                        composed_ |> Ok
 
-                    Literal _ ->
-                        "Literal" |> Err
+                    Atom _ ->
+                        "Atom" |> Err
         }
+
+
+{-| `()` [`Morph`](#Morph)
+
+Often used in when [morphing](Value#MorphValue) a [variants](Choice#variantValue)
+with 0 attached values
+
+-}
+unit : MorphValue ()
+unit =
+    Morph.value "Unit"
+        { broaden = Unit
+        , narrow =
+            \value_ ->
+                case value_ of
+                    Unit unitValue ->
+                        unitValue |> Ok
+
+                    atomExceptUnit ->
+                        "Unit" |> Err
+        }
+        |> Morph.over atom

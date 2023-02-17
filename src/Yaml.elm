@@ -1,4 +1,4 @@
-module Yaml exposing (Any, LiteralAny, StructureAny)
+module Yaml exposing (Any, AtomAny, ComposedAny)
 
 {-| TODO [YAML](https://en.wikipedia.org/wiki/YAML) [`Morph`](#Morph)
 
@@ -10,27 +10,27 @@ module Yaml exposing (Any, LiteralAny, StructureAny)
 import ArraySized exposing (ArraySized)
 import Decimal exposing (Decimal)
 import Morph exposing (MorphRow, translate)
-import N exposing (Exactly, Fixed, Min, N, N0, n0, n1)
+import N exposing (Exactly, Min, N, N0, On, n0, n1)
 import String.Morph
-import Value exposing (LiteralOrStructure(..))
+import Value exposing (AtomOrComposed(..))
 
 
 type alias Any =
-    LiteralOrStructure LiteralAny StructureAny
+    AtomOrComposed AtomAny ComposedAny
 
 
-type alias LiteralAny =
-    Literaly String Int Float
+type alias AtomAny =
+    Atomy String Int Float
 
 
-type Literaly stringy floaty inty
+type Atomy stringy floaty inty
     = Stringy stringy
     | Floaty floaty
     | Inty inty
 
 
-type StructureAny
-    = YmlAny (ArraySized (Min (Fixed N0)) Any)
+type ComposedAny
+    = YmlAny (ArraySized (Min (On N0)) Any)
 
 
 text : MorphRow Char Any

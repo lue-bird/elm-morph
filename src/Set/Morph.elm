@@ -101,7 +101,7 @@ eachElement :
             (Set comparableBeforeBroaden -> Set comparableBroad)
 eachElement elementMorph =
     { description =
-        { custom = Stack.only "each"
+        { custom = Stack.one "each"
         , inner =
             Morph.Elements (elementMorph |> Morph.description)
                 |> filled

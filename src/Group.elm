@@ -59,8 +59,8 @@ type alias MorphNoPart noPartPossiblyOrNever narrow broaden =
 {-| Word in a [`GroupMorph`](#GroupMorph) in progress. For example
 
     choiceFinish :
-        Value.GroupMorph (N (InFixed N0 N9)) Char (N (InFixed N0 N9) -> Char) NoPart Never
-        -> Morph (N (InFixed N0 N9)) Char
+        Value.GroupMorph (N (In N0 N9)) Char (N (In N0 N9) -> Char) NoPart Never
+        -> Morph (N (In N0 N9)) Char
 
 -}
 type NoPart
@@ -137,7 +137,7 @@ part :
             (groupBroad
              ->
                 Result
-                    (Morph.GroupError partError)
+                    (Morph.PartsError partError)
                     (partNarrow -> groupNarrowFurther)
             )
             (groupNarrow -> (partBroad -> groupBroadenFurther))
@@ -147,7 +147,7 @@ part :
                 (groupBroad
                  ->
                     Result
-                        (Morph.GroupError partError)
+                        (Morph.PartsError partError)
                         groupNarrowFurther
                 )
                 (groupNarrow -> groupBroadenFurther)
@@ -194,14 +194,14 @@ narrowPart :
         ((groupBroad
           ->
             Result
-                (Morph.GroupError partError)
+                (Morph.PartsError partError)
                 (partNarrow -> groupNarrowFurther)
          )
          ->
             (groupBroad
              ->
                 Result
-                    (Morph.GroupError partError)
+                    (Morph.PartsError partError)
                     groupNarrowFurther
             )
         )
@@ -221,7 +221,7 @@ narrowPart index broadPartAccess narrowPartMorph =
 
                 ( Ok _, Err partError ) ->
                     { index = index, error = partError }
-                        |> Stack.only
+                        |> Stack.one
                         |> Err
 
                 ( Err partsSoFarErrors, Ok _ ) ->
@@ -241,7 +241,7 @@ finish :
         (beforeNarrow
          ->
             Result
-                (Morph.GroupError (Morph.ErrorWithDeadEnd deadEnd))
+                (Morph.PartsError (Morph.ErrorWithDeadEnd deadEnd))
                 narrowed
         )
         (beforeBroaden -> broadened)
@@ -255,17 +255,17 @@ finish =
     \groupMorphInProgress ->
         { description =
             case groupMorphInProgress.description |> Emptiable.fill of
-                Stack.TopDown part0 (part1 :: parts2Up) ->
+                Stack.TopBelow ( part0, part1 :: parts2Up ) ->
                     { inner =
                         ArraySized.l2 part0 part1
-                            |> ArraySized.glueMin Up
+                            |> ArraySized.attachMin Up
                                 (parts2Up |> ArraySized.fromList)
                             |> Morph.Group
                             |> Emptiable.filled
                     , custom = Emptiable.empty
                     }
 
-                Stack.TopDown partOnly [] ->
+                Stack.TopBelow ( partOnly, [] ) ->
                     partOnly
         , narrow =
             \broad ->
@@ -285,17 +285,17 @@ and channel it back up to the [`Morph.succeed`](#Morph.succeed) grouping
 -}
 grab :
     (groupNarrow -> partNextNarrow)
-    -> Morph.MorphRow broadElement partNextNarrow
+    -> Morph.MorphRow partNextNarrow broadElement
     ->
         (Morph.MorphRowIndependently
-            broadElement
             groupNarrow
             (partNextNarrow -> groupNarrowFurther)
+            broadElement
          ->
             Morph.MorphRowIndependently
-                broadElement
                 groupNarrow
                 groupNarrowFurther
+                broadElement
         )
 grab partAccess grabbedNextMorphRow =
     \groupMorphRowSoFar ->
@@ -320,7 +320,7 @@ grab partAccess grabbedNextMorphRow =
                 groupNarrow
                     |> partAccess
                     |> grabbedNextMorphRow.broaden
-                    |> Stack.onTopStack
+                    |> Stack.attach Down
                         (groupNarrow
                             |> groupMorphRowSoFar.broaden
                         )
@@ -353,10 +353,10 @@ it allows choosing a default possibility for building.
 
 -}
 skip :
-    Morph.MorphRow broadElement ()
+    Morph.MorphRow () broadElement
     ->
-        (Morph.MorphRowIndependently broadElement groupNarrow narrow
-         -> Morph.MorphRowIndependently broadElement groupNarrow narrow
+        (Morph.MorphRowIndependently groupNarrow narrow broadElement
+         -> Morph.MorphRowIndependently groupNarrow narrow broadElement
         )
 skip ignoredNext =
     \groupMorphRowSoFar ->
@@ -379,7 +379,7 @@ skip ignoredNext =
         , broaden =
             \groupNarrow ->
                 (() |> ignoredNext.broaden)
-                    |> Stack.onTopStack
+                    |> Stack.attach Down
                         (groupNarrow |> groupMorphRowSoFar.broaden)
         }
 
@@ -455,7 +455,7 @@ type alias MorphValueNoPart noPartPossiblyOrNever groupNarrow groupNarrowFurther
         (Value.Record Value.IndexOrName
          ->
             Result
-                (Morph.GroupError Morph.Error)
+                (Morph.PartsError Morph.Error)
                 groupNarrowFurther
         )
         (groupNarrow -> Value.Record Value.IndexAndName)
@@ -528,12 +528,12 @@ partValueNarrow :
         (Emptiable (Stacked (Value.Tagged Value.IndexOrName)) possiblyOrNever_
          ->
             Result
-                (Morph.GroupError Morph.Error)
+                (Morph.PartsError Morph.Error)
                 (fieldValueNarrow -> groupNarrowFurther)
         )
     ->
         (Emptiable (Stacked (Value.Tagged Value.IndexOrName)) possiblyOrNever_
-         -> Result (Morph.GroupError Morph.Error) groupNarrowFurther
+         -> Result (Morph.PartsError Morph.Error) groupNarrowFurther
         )
 partValueNarrow tag fieldValueMorph groupSoFarNarrow =
     let
@@ -551,7 +551,7 @@ partValueNarrow tag fieldValueMorph groupSoFarNarrow =
         let
             wholeAssemblyResult :
                 Result
-                    (Morph.GroupError Morph.Error)
+                    (Morph.PartsError Morph.Error)
                     (fieldValueNarrow -> groupNarrowFurther)
             wholeAssemblyResult =
                 groupBroad |> groupSoFarNarrow
@@ -601,16 +601,16 @@ finishValue =
             |> Morph.over
                 (Morph.value "Record"
                     { narrow =
-                        \structureBroad ->
-                            case structureBroad of
+                        \composedBroad ->
+                            case composedBroad of
                                 Value.Record recordNarrow ->
                                     recordNarrow |> Ok
 
-                                structureExceptRecord ->
-                                    structureExceptRecord
-                                        |> Value.PackageInternal.structureKindToString
+                                composedExceptRecord ->
+                                    composedExceptRecord
+                                        |> Value.PackageInternal.composedKindToString
                                         |> Err
                     , broaden = Value.Record
                     }
                 )
-            |> Morph.over Value.structure
+            |> Morph.over Value.composed

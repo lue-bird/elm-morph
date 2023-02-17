@@ -12,7 +12,6 @@ module Maybe.Morph exposing (row, value)
 import Choice
 import Group
 import Morph exposing (MorphRow)
-import Unit
 import Value exposing (MorphValue)
 
 
@@ -30,7 +29,7 @@ value contentMorph =
                     content |> just
         )
         |> Choice.variantValue ( Just, "Just" ) contentMorph
-        |> Choice.variantValue ( \() -> Nothing, "Nothing" ) Unit.value
+        |> Choice.variantValue ( \() -> Nothing, "Nothing" ) Value.unit
         |> Choice.finishValue
 
 
@@ -44,19 +43,19 @@ value contentMorph =
     -- maybe we get `Just` a letter
     "a"
         |> Text.narrowTo
-            (Maybe.Morph.row (AToZ.Morph.char |> Morph.one))
+            (Maybe.Morph.row (AToZ.char |> Morph.one))
     --> Ok (Just 'a')
 
     -- maybe we get `Nothing`
     "123abc"
         |> Text.narrowTo
-            (Maybe.Morph.row (AToZ.Morph.char |> Morph.one))
+            (Maybe.Morph.row (AToZ.char |> Morph.one))
     --> Ok Nothing
 
 -}
 row :
-    MorphRow broadElement contentNarrow
-    -> MorphRow broadElement (Maybe contentNarrow)
+    MorphRow contentNarrow broadElement
+    -> MorphRow (Maybe contentNarrow) broadElement
 row contentMorphRow =
     Choice.between
         (\nothingVariant justVariant maybeNarrow ->

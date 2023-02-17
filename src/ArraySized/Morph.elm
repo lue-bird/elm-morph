@@ -1,8 +1,7 @@
 module ArraySized.Morph exposing
-    ( value, toValue
+    ( inNumber, inOn
     , list, toList
-    , stackEmptiable, toStackEmptiable
-    , stackFilled, toStackFilled
+    , stack, toStack
     , elementTranslate
     , for, forBroad
     , exactly, atLeast, in_
@@ -13,14 +12,13 @@ module ArraySized.Morph exposing
 
 ## alter
 
-@docs value, toValue
+@docs inNumber, inOn
 
 
 ## structure
 
 @docs list, toList
-@docs stackEmptiable, toStackEmptiable
-@docs stackFilled, toStackFilled
+@docs stack, toStack
 
 
 ## transform
@@ -46,39 +44,45 @@ import Emptiable exposing (Emptiable)
 import Group exposing (grab)
 import Linear exposing (Direction(..))
 import Morph exposing (Error, ErrorWithDeadEnd, Morph, MorphIndependently, MorphOrError, MorphRow, MorphRowIndependently, Translate, broad, broadenFrom, narrowTo, translate, translateOn)
-import N exposing (Add1, Exactly, Fixed, In, InFixed, InValue, Min, N, N0, N1, To, Up, n0, n1, n2)
+import N exposing (Add1, Exactly, In, Min, N, N0, N0OrAdd1, N1, On, To, Up, Up0, Up1, n0, n1, n2)
 import Possibly exposing (Possibly)
 import Stack exposing (Stacked)
 
 
-{-| [`Morph`](Morph#Morph) from an `ArraySized` with an equatable range `InFixedValue`
-to an `InFixed` to operate on it
+{-| [`Morph`](Morph#Morph) from an `ArraySized` with an equatable range `In`
+to an `In (On ...) (On ...)` to operate on it
 -}
-value :
+inOn :
     MorphIndependently
-        (ArraySized (InValue narrowMin narrowMax) narrowElement
-         -> Result error_ (ArraySized (InFixed narrowMin narrowMax) narrowElement)
+        (ArraySized narrowElement (In (On narrowMin) (On narrowMax))
+         ->
+            Result
+                error_
+                (ArraySized narrowElement (In narrowMin narrowMax))
         )
-        (ArraySized (InFixed broadMin broadMax) broadElement
-         -> ArraySized (InValue broadMin broadMax) broadElement
+        (ArraySized broadElement (In broadMin broadMax)
+         -> ArraySized broadElement (In (On broadMin) (On broadMax))
         )
-value =
-    translate ArraySized.fromValue ArraySized.toValue
+inOn =
+    translate ArraySized.inToNumber ArraySized.inToOn
 
 
-{-| [`Morph`](Morph#Morph) from an `ArraySized` with a range `InFixed`
-to an `InValue` to make it equatable
+{-| [`Morph`](Morph#Morph) from an `ArraySized` with a range `In (On ...) (On ...)`
+to an `In` to make it equatable
 -}
-toValue :
+inNumber :
     MorphIndependently
-        (ArraySized (InFixed narrowMin narrowMax) narrowElement
-         -> Result error_ (ArraySized (InValue narrowMin narrowMax) narrowElement)
+        (ArraySized narrowElement (In narrowMin narrowMax)
+         ->
+            Result
+                error_
+                (ArraySized narrowElement (In (On narrowMin) (On narrowMax)))
         )
-        (ArraySized (InValue broadMin broadMax) broadElement
-         -> ArraySized (InFixed broadMin broadMax) broadElement
+        (ArraySized broadElement (In (On broadMin) (On broadMax))
+         -> ArraySized broadElement (In broadMin broadMax)
         )
-toValue =
-    translate ArraySized.toValue ArraySized.fromValue
+inNumber =
+    translate ArraySized.inToOn ArraySized.inToNumber
 
 
 {-| [`Translate`](Morph#Translate) from `List` to `ArraySized`
@@ -97,9 +101,9 @@ list :
          ->
             Result
                 error_
-                (ArraySized (Min (Up narrowX To narrowX)) narrowElement)
+                (ArraySized narrowElement (Min (Up0 narrowX_)))
         )
-        (ArraySized broadRange_ broadElement
+        (ArraySized broadElement broadRange_
          -> List broadElement
         )
 list =
@@ -119,128 +123,65 @@ list =
 -}
 toList :
     MorphIndependently
-        (ArraySized narrowRange_ narrowElement
+        (ArraySized narrowElement narrowRange_
          -> Result error_ (List narrowElement)
         )
         (List broadElement
-         -> ArraySized (Min (Up broadX To broadX)) broadElement
+         -> ArraySized broadElement (Min (Up0 broadX_))
         )
 toList =
     translate ArraySized.toList ArraySized.fromList
 
 
-{-| [`Translate`](Morph#Translate) from `Emptiable (Stacked ...) Possibly` to `ArraySized`
+{-| [`Translate`](Morph#Translate) from `Emptiable (Stacked ...) ...` to `ArraySized`
 
     import N exposing (n0)
     import ArraySized
 
-    Stack.topDown 0 [ 1, 2, 3, 4 ]
-        |> Morph.mapTo ArraySized.Morph.stackEmptiable
-    --: ArraySized (Min (Up x To x)) number_
-
-Have `>= 1` element (`Emptiable (Stacked ...) Never`)? → [`fromStackFilled`](#fromStackFilled)
+    Stack.topBelow 0 [ 1, 2, 3, 4 ]
+        |> Morph.mapTo ArraySized.Morph.stack
+    --: ArraySized (Min (Up1 x)) number_
 
 -}
-stackEmptiable :
+stack :
     MorphIndependently
-        (Emptiable (Stacked narrowElement) Possibly
+        (Emptiable (Stacked narrowElement) narrowPossiblyOrNever
          ->
             Result
                 error_
-                (ArraySized (Min (Up narrowX To narrowX)) narrowElement)
+                (ArraySized narrowElement (Min (On (N0OrAdd1 narrowPossiblyOrNever N0))))
         )
-        (ArraySized (Min broadRange_) broadElement
-         -> Emptiable (Stacked broadElement) Possibly
+        (ArraySized broadElement (In (On (N0OrAdd1 broadPossiblyOrNever minFrom1_)) max_)
+         -> Emptiable (Stacked broadElement) broadPossiblyOrNever
         )
-stackEmptiable =
-    translate ArraySized.fromStackEmptiable ArraySized.toStackEmptiable
+stack =
+    translate ArraySized.fromStack ArraySized.toStack
 
 
-{-| [`Translate`](Morph#Translate) from `ArraySized` to `Emptiable (Stacked ...) Possibly`
-
-    import N exposing (n0)
-    import ArraySized
-
-    ArraySized.l4 0 1 2 3
-        |> ArraySized.minLower n0
-        |> (ArraySized.Morph.toStackEmptiable |> Morph.map)
-    --> Stack.topDown 0 [ 1, 2, 3 ]
-    --: Emptiable (Stacked number_) Possibly
-
-Have `>= 1` element (`Emptiable (Stacked ...) Never`)? → [`toStackFilled`](#toStackFilled)
-
--}
-toStackEmptiable :
-    MorphIndependently
-        (ArraySized narrowRange_ narrowElement
-         ->
-            Result
-                error_
-                (Emptiable (Stacked narrowElement) Possibly)
-        )
-        (Emptiable (Stacked broadElement) Possibly
-         -> ArraySized (Min (Up broadX To broadX)) broadElement
-        )
-toStackEmptiable =
-    translate ArraySized.toStackEmptiable ArraySized.fromStackEmptiable
-
-
-{-| [`Translate`](Morph#Translate) from `Emptiable (Stacked ...) Never` to `ArraySized`
-
-    import N exposing (n0)
-    import ArraySized
-
-    Stack.topDown 0 [ 1, 2, 3, 4 ]
-        |> Morph.mapTo ArraySized.Morph.stackFilled
-    --: ArraySized (Min (Up x To (Add1 x))) number_
-
-Have `>= 1` element (`Emptiable (Stacked ...) Possibly`)? → [`fromStackEmptiable`](#fromStackEmptiable)
-
--}
-stackFilled :
-    MorphIndependently
-        (Emptiable (Stacked narrowElement) Never
-         ->
-            Result
-                error_
-                (ArraySized (Min (Up narrowX To (Add1 narrowX))) narrowElement)
-        )
-        (ArraySized
-            (In (Fixed (Add1 beforeUnmapMinMinus1_)) beforeUnmapMax_)
-            broadElement
-         -> Emptiable (Stacked broadElement) unmappedNever_
-        )
-stackFilled =
-    translate ArraySized.fromStackFilled ArraySized.toStackFilled
-
-
-{-| [`Translate`](Morph#Translate) from `ArraySized` to `Emptiable (Stacked ...) Never`
+{-| [`Translate`](Morph#Translate) from `ArraySized` to `Emptiable (Stacked ...) ...`
 
     import N exposing (n0)
     import ArraySized
 
     ArraySized.l4 0 1 2 3
         |> ArraySized.minLower n0
-        |> Morph.map ArraySized.Morph.toStackFilled
-    --> Stack.topDown 0 [ 1, 2, 3 ]
-    --: Emptiable (Stacked number_) never_
-
-Have `>= 1` element (`Emptiable (Stacked ...) Possibly`)? → [`toStackEmptiable`](#toStackEmptiable)
+        |> Morph.map ArraySized.Morph.toStack
+    --> Stack.topBelow 0 [ 1, 2, 3 ]
 
 -}
-toStackFilled :
+toStack :
     MorphIndependently
-        (ArraySized (In (Fixed (Add1 beforeMapMinMinus1_)) beforeMapMax_) narrowElement
+        (ArraySized narrowElement (In (On (N0OrAdd1 narrowPossiblyOrNever minFrom1_)) max_)
          ->
             Result
                 error_
-                (Emptiable (Stacked narrowElement) narrowNever_)
+                (Emptiable (Stacked narrowElement) narrowPossiblyOrNever)
         )
-        (Emptiable (Stacked broadElement) Never
-         -> ArraySized (Min (Up broadX To (Add1 broadX))) broadElement
+        (Emptiable (Stacked broadElement) broadPossiblyOrNever
+         -> ArraySized broadElement (Min (On (N0OrAdd1 broadPossiblyOrNever N0)))
         )
-toStackFilled =
-    translate ArraySized.toStackFilled ArraySized.fromStackFilled
+toStack =
+    Morph.invert stack
 
 
 
@@ -251,18 +192,20 @@ toStackFilled =
 -}
 elementTranslate :
     MorphIndependently
-        (narrowBeforeMap -> Result (ErrorWithDeadEnd Never) narrowMapped)
+        (narrowBeforeMap
+         -> Result (ErrorWithDeadEnd Never) narrowMapped
+        )
         (broadBeforeUnmap -> broadUnmapped)
     ->
         MorphIndependently
-            (ArraySized narrowRange narrowBeforeMap
+            (ArraySized narrowBeforeMap narrowRange
              ->
                 Result
                     error_
-                    (ArraySized narrowRange narrowMapped)
+                    (ArraySized narrowMapped narrowRange)
             )
-            (ArraySized broadRange broadBeforeUnmap
-             -> ArraySized broadRange broadUnmapped
+            (ArraySized broadBeforeUnmap broadRange
+             -> ArraySized broadUnmapped broadRange
             )
 elementTranslate elementTranslate_ =
     translateOn ( ArraySized.map, ArraySized.map ) elementTranslate_
@@ -300,9 +243,9 @@ This can get verbose, so create helpers with it where you see common patterns!
 
 -}
 forBroad :
-    (element -> MorphRow broadElement ())
-    -> ArraySized (InFixed min_ max_) element
-    -> MorphRow broadElement ()
+    (element -> MorphRow () broadElement)
+    -> ArraySized element (In (On min_) (On max_))
+    -> MorphRow () broadElement
 forBroad morphRowByElement expectedConstantInputArraySized =
     broad
         (ArraySized.repeat ()
@@ -345,9 +288,14 @@ making misuse a bit more obvious.
 
 -}
 for :
-    (element -> MorphRow broadElement narrow)
-    -> ArraySized (InFixed min max) element
-    -> MorphRow broadElement (ArraySized (InFixed min max) narrow)
+    (element
+     -> MorphRow elementNarrow broadElement
+    )
+    -> ArraySized element (In min max)
+    ->
+        MorphRow
+            (ArraySized elementNarrow (In min max))
+            broadElement
 for morphRowByElement elementsToTraverseInSequence =
     { description =
         case elementsToTraverseInSequence |> ArraySized.has n1 of
@@ -355,98 +303,63 @@ for morphRowByElement elementsToTraverseInSequence =
                 { inner = Emptiable.empty, custom = Emptiable.empty }
 
             Ok only1 ->
-                only1 |> ArraySized.to1 |> morphRowByElement |> Morph.description
+                only1 |> ArraySized.toOne |> morphRowByElement |> Morph.description
 
             Err (N.Above atLeast2) ->
                 { custom = Emptiable.empty
                 , inner =
                     atLeast2
                         |> ArraySized.map
-                            (morphRowByElement >> Morph.description)
+                            (\elementToTraverse ->
+                                elementToTraverse
+                                    |> morphRowByElement
+                                    |> Morph.description
+                            )
                         |> ArraySized.maxToInfinity
                         |> Morph.Group
                         |> Emptiable.filled
                 }
     , narrow =
-        let
-            stepFrom traversedElement =
-                \soFar ->
-                    case
-                        soFar.broad
-                            |> narrowTo (traversedElement |> morphRowByElement)
-                    of
-                        Err error ->
-                            error |> Err |> Result
-
-                        Ok stepParsed ->
-                            let
-                                withStepParsed =
-                                    soFar.narrow
-                                        |> ArraySized.pushMin stepParsed.narrow
-                                        |> ArraySized.minTo n0
-
-                                traversalDone =
-                                    withStepParsed
-                                        |> ArraySized.hasAtLeast
-                                            (elementsToTraverseInSequence
-                                                |> ArraySized.length
-                                                |> N.maxUp n1
-                                            )
-                            in
-                            case traversalDone of
-                                Err notAllTraversed ->
-                                    { broad = stepParsed.broad
-                                    , narrow = notAllTraversed |> ArraySized.maxToInfinity
-                                    }
-                                        |> Partial
-
-                                Ok traversed ->
-                                    { broad = stepParsed.broad
-                                    , narrow =
-                                        traversed
-                                            {- ArraySized.minTo
-                                               (elementsToTraverseInSequence
-                                                   |> ArraySized.length
-                                                   |> N.min
-                                                   |> N.exactly
-                                               )
-                                            -}
-                                            |> ArraySized.take
-                                                ( Up
-                                                , elementsToTraverseInSequence |> ArraySized.length
-                                                )
-                                    }
-                                        |> Ok
-                                        |> Result
-        in
         \initialInput ->
             let
                 traversed =
                     elementsToTraverseInSequence
-                        |> ArraySized.foldFrom
-                            ({ narrow = ArraySized.empty |> ArraySized.maxToInfinity
-                             , broad = initialInput
-                             }
-                                |> Partial
-                            )
+                        |> ArraySized.mapFoldFrom
+                            (initialInput |> Ok)
                             Up
-                            (\stepElement soFar ->
-                                case soFar of
-                                    Result result ->
-                                        result |> Result
+                            (\state ->
+                                case state.folded of
+                                    Ok broadSoFar ->
+                                        case broadSoFar |> narrowTo (state.element |> morphRowByElement) of
+                                            Ok parsed ->
+                                                { element = parsed.narrow |> Emptiable.filled
+                                                , folded = parsed.broad |> Ok
+                                                }
 
-                                    Partial partial ->
-                                        partial |> stepFrom stepElement
+                                            Err error ->
+                                                { element = Emptiable.empty
+                                                , folded = error |> Err
+                                                }
+
+                                    Err error ->
+                                        { element = Emptiable.empty
+                                        , folded = error |> Err
+                                        }
                             )
             in
-            case traversed of
-                Result result ->
-                    result
+            case traversed.folded of
+                Err error ->
+                    error |> Err
 
-                Partial _ ->
-                    "lue-bird/elm-morph: `Morph.for` bug! Please open an issue with details on the given `ArraySized`."
-                        |> Morph.DeadEnd
-                        |> Err
+                Ok broadRemaining ->
+                    case traversed.mapped |> ArraySized.allFill of
+                        Emptiable.Empty _ ->
+                            "lue-bird/elm-morph: ArraySized.Morph.for bug: narrowing succeeded but not all parsed elements found! Please open an issue with details on the given ArraySized."
+                                |> Morph.DeadEnd
+                                |> Err
+
+                        Emptiable.Filled arraySizedNarrow ->
+                            { narrow = arraySizedNarrow, broad = broadRemaining } |> Ok
     , broaden =
         \narrowSequence ->
             List.map2
@@ -475,23 +388,23 @@ and return them as a [`ArraySized`](https://package.elm-lang.org/packages/lue-bi
     import N exposing (n3)
 
     -- we want `exactly 3` letters
-    "abcdef" |> narrow (map Text.fromList (exactly n3 AToZ.Morph.char))
+    "abcdef" |> narrow (map Text.fromList (exactly n3 AToZ.char))
     --> Ok [ 'a', 'b', 'c' ]
 
     -- not 2 or 4, we want 3
     "ab_def"
-        |> narrow (map Text.fromList (exactly n3 AToZ.Morph.char))
+        |> narrow (map Text.fromList (exactly n3 AToZ.char))
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:3: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '_'."
 
 -}
 exactly :
-    N (Exactly howMany)
-    -> MorphRow broadElement element
+    N (Exactly (On howMany))
+    -> MorphRow element broadElement
     ->
         MorphRow
+            (ArraySized element (Exactly (On howMany)))
             broadElement
-            (ArraySized (Exactly howMany) element)
 exactly repeatCount repeatedMorphRow =
     { description =
         case repeatCount |> N.is n1 of
@@ -505,7 +418,7 @@ exactly repeatCount repeatedMorphRow =
 
             Err (N.Above repeatCountAtLeast2) ->
                 { custom =
-                    Stack.only
+                    Stack.one
                         ([ "exactly "
                          , repeatCountAtLeast2 |> N.toInt |> String.fromInt
                          ]
@@ -523,23 +436,23 @@ exactly repeatCount repeatedMorphRow =
     , narrow =
         let
             narrowRepeatStep :
-                { soFar : ArraySized (Min (Fixed N0)) element }
+                { soFar : ArraySized element (Min (On N0)) }
                 ->
                     (Emptiable (Stacked broadElement) Possibly
                      ->
                         Result
                             Error
-                            { narrow : ArraySized (Exactly howMany) element
+                            { narrow : ArraySized element (Exactly (On howMany))
                             , broad : Emptiable (Stacked broadElement) Possibly
                             }
                     )
             narrowRepeatStep { soFar } =
                 \broad_ ->
-                    case soFar |> ArraySized.hasAtLeast (repeatCount |> N.maxUp n1) of
+                    case soFar |> ArraySized.hasAtLeast (repeatCount |> N.maxAdd n1) of
                         Ok arraySizedAtLeastHowOften ->
                             { narrow =
                                 arraySizedAtLeastHowOften
-                                    |> ArraySized.take ( Up, repeatCount )
+                                    |> ArraySized.take Up { atLeast = repeatCount } repeatCount
                             , broad = broad_
                             }
                                 |> Ok
@@ -553,8 +466,8 @@ exactly repeatCount repeatedMorphRow =
                                     -- does this blow the stack?
                                     narrowRepeatStep
                                         { soFar =
-                                            ArraySized.minDown n1
-                                                (ArraySized.pushMin parsed.narrow soFar)
+                                            ArraySized.minSubtract n1
+                                                (ArraySized.pushMin parsed.narrow (soFar |> ArraySized.maxToOn))
                                         }
                                         parsed.broad
         in
@@ -579,17 +492,17 @@ exactly repeatCount repeatedMorphRow =
 
     -- we want at least three letters, we are okay with more than three
     "abcdef"
-        |> Text.narrowTo (atLeast n3 AToZ.Morph.char)
+        |> Text.narrowTo (atLeast n3 AToZ.char)
     --> Ok [ 'a', 'b', 'c', 'd', 'e', 'f' ]
 
     -- but not two, that's sacrilegious
     "ab_def"
-        |> Text.narrowTo (atLeast n3 AToZ.Morph.char)
+        |> Text.narrowTo (atLeast n3 AToZ.char)
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:3: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '_'."
 
 
-## `atLeast n0`
+## `atLeast ... n0`
 
 > ℹ️ Equivalent regular expression: `*`
 
@@ -597,14 +510,14 @@ exactly repeatCount repeatedMorphRow =
     import String.Morph as Text
 
     -- We want as many letters as there are.
-    "abc" |> Text.narrowTo (atLeast n0 AToZ.Morph.char)
+    "abc" |> Text.narrowTo (atLeast AToZ.char n0)
     --> Ok [ 'a', 'b', 'c' ]
 
-    "abc123" |> Text.narrowTo (atLeast n0 AToZ.Morph.char)
+    "abc123" |> Text.narrowTo (atLeast AToZ.char n0)
     --> Ok [ 'a', 'b', 'c' ]
 
     -- even zero letters is okay
-    "123abc" |> Text.narrowTo (atLeast n0 AToZ.Morph.char)
+    "123abc" |> Text.narrowTo (atLeast AToZ.char n0)
     --> Ok []
 
 
@@ -618,15 +531,15 @@ exactly repeatCount repeatedMorphRow =
     import String.Morph as Text
 
     -- we want as many letters as there are
-    "abc" |> Text.narrowTo (atLeast n1 AToZ.Morph.char)
+    "abc" |> Text.narrowTo (atLeast AToZ.char n1)
     --> Ok [ 'a', 'b', 'c' ]
 
-    "abc123" |> Text.narrowTo (atLeast n1 AToZ.Morph.char)
+    "abc123" |> Text.narrowTo (atLeast AToZ.char n1)
     --> Ok [ 'a', 'b', 'c' ]
 
     -- but we want at least one
     "123abc"
-        |> Text.narrowTo (atLeast n1 AToZ.Morph.char)
+        |> Text.narrowTo (atLeast n1 AToZ.char)
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting a letter a|..|z or A|...|Z. I got stuck when I got the character '1'."
 
@@ -640,19 +553,20 @@ exactly repeatCount repeatedMorphRow =
 
 
     tag =
-        atLeast n0 (Morph.AToZ.caseAnyLower |> one)
+        atLeast (Morph.AToZ.caseAnyLower |> one) n0
 
     tags =
-        Morph.succeed (\first afterFirst -> Stack.topDown first afterFirst)
-            |> grab .first tag
-            |> grab .afterFirst
-                (ArraySized.Morph.toList
+        Morph.succeed Stack.onTopLay
+            |> grab Stack.top tag
+            |> grab Stack.removeTop
+                (ArraySized.Morph.toStack
                     |> Morph.overRow
-                        (atLeast n0
-                            (Morph.succeed (\part -> part)
+                        (atLeast
+                            (Morph.succeed (\tag -> tag)
                                 |> skip separator
-                                |> grab .tag tag
+                                |> grab (\tag -> tag) tag
                             )
+                            n0
                         )
                 )
 
@@ -670,7 +584,7 @@ exactly repeatCount repeatedMorphRow =
     ",a,,"
         |> Text.narrowTo tags
     --> Ok
-    -->     (Stack.topDown
+    -->     (Stack.topBelow
     -->         []
     -->         [ { separator = (), part = [ 'a' ] }
     -->         , { separator = (), part = [] }
@@ -687,7 +601,7 @@ exactly repeatCount repeatedMorphRow =
 ### anti-example: parsing infinitely
 
     Morph.succeed ...
-        |> grab (atLeast n0 (Morph.keep |> Morph.one))
+        |> grab (atLeast (Morph.keep |> Morph.one) n0)
         |> grab ...
 
 would only parse the first part until the end
@@ -696,41 +610,40 @@ Nothing after would ever be parsed, making the whole thing fail.
 
 -}
 atLeast :
-    N (In (Fixed lowerLimitMin) (Up minNewMaxToMin_ To min))
-    -> MorphRow broadElement narrow
+    MorphRow narrow broadElement
+    -> N (Exactly (On min))
     ->
         MorphRowIndependently
+            (ArraySized narrow (In (On min) max_))
+            (ArraySized narrow (Min (On min)))
             broadElement
-            (ArraySized (In (Fixed min) max_) narrow)
-            (ArraySized (Min (Fixed lowerLimitMin)) narrow)
-atLeast minimum =
-    \elementStepMorphRow ->
-        Morph.broaden (ArraySized.minTo minimum >> ArraySized.maxToInfinity)
-            |> Morph.overRow
-                (let
-                    minimumExactly =
-                        minimum |> N.min |> N.exactly
-                 in
-                 Morph.succeed
-                    (\minimumArraySized overMinimum ->
-                        minimumArraySized
-                            |> ArraySized.glueMin Up
-                                (overMinimum |> ArraySized.minTo n0)
-                    )
-                    |> grab
-                        (ArraySized.take ( Up, minimumExactly ))
-                        (exactly minimumExactly elementStepMorphRow)
-                    |> grab
-                        (ArraySized.dropMin ( Up, minimumExactly ))
-                        (list
-                            |> Morph.overRow (untilFail elementStepMorphRow)
-                        )
+atLeast elementStepMorphRow minimum =
+    Morph.broaden ArraySized.maxToInfinity
+        |> Morph.overRow
+            (let
+                minimumExactly =
+                    minimum
+             in
+             Morph.succeed
+                (\minimumArraySized overMinimum ->
+                    minimumArraySized
+                        |> ArraySized.attachMin Up
+                            (overMinimum |> ArraySized.minTo n0)
                 )
+                |> grab
+                    (ArraySized.take Up { atLeast = minimumExactly } minimumExactly)
+                    (exactly minimumExactly elementStepMorphRow)
+                |> grab
+                    (ArraySized.dropMin Up minimumExactly)
+                    (list
+                        |> Morph.overRow (untilFail elementStepMorphRow)
+                    )
+            )
 
 
 untilFail :
-    MorphRow broadElement element
-    -> MorphRow broadElement (List element)
+    MorphRow element broadElement
+    -> MorphRow (List element) broadElement
 untilFail elementStepMorphRow =
     whileAccumulate
         { initial = ()
@@ -748,24 +661,24 @@ untilFail elementStepMorphRow =
     import String.Morph as Text
 
     -- we want between two and four letters
-    "abcdef" |> Text.narrowTo (in_ 2 4 AToZ.Morph.char)
+    "abcdef" |> Text.narrowTo (in_ AToZ.char ( n2, n4 ))
     --> Ok [ 'a', 'b', 'c', 'd' ]
 
-    "abc_ef" |> Text.narrowTo (in_ ( n2, n4 ) AToZ.Morph.char)
+    "abc_ef" |> Text.narrowTo (in_ AToZ.char ( n2, n4 ))
     --> Ok [ 'a', 'b', 'c' ]
 
-    "ab_def" |> Text.narrowTo (in_ ( n2, n4 ) AToZ.Morph.char)
+    "ab_def" |> Text.narrowTo (in_ AToZ.char ( n2, n4 ))
     --> Ok [ 'a', 'b' ]
 
 
     -- but less than that is not cool
     "i_am_here"
-        |> Text.narrowTo (in_ ( n2, n3 ) letter)
+        |> Text.narrowTo (in_ letter ( n2, n3 ))
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:2: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '_'."
 
 
-### example: `in_ ( n0, n1 )`
+### example: `in_ ... ( n0, n1 )`
 
 Alternative to [`maybe`](#maybe) which instead returns a `List`.
 
@@ -775,11 +688,11 @@ Alternative to [`maybe`](#maybe) which instead returns a `List`.
     import String.Morph as Text
 
     -- we want one letter, optionally
-    "abc" |> Text.narrowTo (in_ ( n0, n1 ) AToZ.Morph.char)
+    "abc" |> Text.narrowTo (in_ AToZ.char ( n0, n1 ))
     --> Ok [ 'a' ]
 
     -- if we don't get any, that's still okay
-    "123abc" |> Text.narrowTo (in_ ( n0, n1 ) AToZ.Morph.char)
+    "123abc" |> Text.narrowTo (in_ AToZ.char ( n0, n1 ))
     --> Ok []
 
 
@@ -792,108 +705,102 @@ Alternative to [`maybe`](#maybe) which instead returns a `List`.
     import String.Morph as Text
 
     -- we want a maximum of three letters
-    "abcdef" |> Text.narrowTo (in_ ( n0, n3 ) AToZ.Morph.char)
+    "abcdef" |> Text.narrowTo (in_ AToZ.char ( n0, n3 ))
     --> Ok [ 'a', 'b', 'c' ]
 
     -- less than that is also okay
-    "ab_def" |> Text.narrowTo (in_ ( n0, n3 ) AToZ.Morph.char)
+    "ab_def" |> Text.narrowTo (in_ AToZ.char ( n0, n3 ))
     --> Ok [ 'a', 'b' ]
 
     -- even zero letters are fine
-    "_underscore" |> Text.narrowTo (in_ ( n0, n3 ) AToZ.Morph.char)
+    "_underscore" |> Text.narrowTo (in_ AToZ.char ( n0, n3 ))
     --> Ok []
 
     -- make sure we don't consume more than three letters
     "abcdef"
         |> Text.narrowTo
             (Morph.succeed (\letters -> letters)
-                |> grab (in_ ( n0, n3 ) AToZ.Morph.char)
+                |> grab (in_ AToZ.char ( n0, n3 ))
                 |> skip (one 'd')
             )
     --> Ok [ 'a', 'b', 'c' ]
 
 -}
 in_ :
-    ( N (In (Fixed lowerLimitMin) (Up minToLowerLimitMin_ To min))
-    , N (In (Fixed lowerLimitMin) (Fixed upperLimitMax))
-    )
-    -> MorphRow broadElement element
+    MorphRow element broadElement
     ->
-        MorphRowIndependently
+        ( N (Exactly (On min))
+        , N (In (On min) (On max))
+        )
+    ->
+        MorphRow
+            (ArraySized element (In (On min) (On max)))
             broadElement
-            (ArraySized
-                (In (Fixed min) (Up maxToUpperLimitMax_ To upperLimitMax))
-                element
-            )
-            (ArraySized
-                (InFixed lowerLimitMin upperLimitMax)
-                element
-            )
-in_ ( lowerLimit, upperLimit ) repeatedElementMorphRow =
+in_ repeatedElementMorphRow ( lowerLimit, upperLimit ) =
     translate identity
         (ArraySized.minTo lowerLimit)
         |> Morph.overRow
             (let
                 lowerLimitExactly =
-                    lowerLimit |> N.min |> N.exactly
+                    lowerLimit
              in
              Morph.succeed
                 (\minimumList overMinimum ->
                     minimumList
-                        |> ArraySized.glueMin Up (overMinimum |> ArraySized.minTo n0)
+                        |> ArraySized.attachMin Up
+                            (overMinimum |> ArraySized.minTo n0)
                         |> ArraySized.minTo lowerLimitExactly
-                        |> ArraySized.take ( Up, upperLimit )
+                        |> ArraySized.take Up { atLeast = lowerLimit } upperLimit
                 )
                 |> grab
-                    (ArraySized.take
-                        ( Up
-                        , lowerLimitExactly
-                        )
-                    )
+                    (ArraySized.take Up { atLeast = lowerLimitExactly } lowerLimitExactly)
                     (exactly lowerLimitExactly repeatedElementMorphRow)
                 |> grab
-                    (ArraySized.dropMin ( Up, lowerLimitExactly )
-                        >> ArraySized.maxToInfinity
+                    (\arraySized ->
+                        arraySized
+                            |> ArraySized.dropMin Up lowerLimitExactly
+                            |> ArraySized.maxToInfinity
                     )
-                    (atMostLoop
+                    (atMostLoop repeatedElementMorphRow
                         ((upperLimit |> N.toInt)
                             - (lowerLimit |> N.toInt)
-                            |> N.intAtLeast n0
+                            |> N.intToAtLeast n0
+                            |> N.maxToOn
                         )
-                        repeatedElementMorphRow
                     )
             )
 
 
-{-| Match a value at less or equal a number of times.
+{-| Match a value at less or equal a number of times
 
 **Shouldn't be exposed**
 
 -}
 atMostLoop :
-    N
-        (In
-            upperLimitMin_
-            (Up upperLimitMaxX_ To upperLimitMaxPlusX_)
-        )
-    -> MorphRow broadElement narrow
+    MorphRow narrow broadElement
+    ->
+        N
+            (In
+                upperLimitMin_
+                (Up upperLimitMaxX_ To upperLimitMaxPlusX_)
+            )
     ->
         MorphRowIndependently
+            (ArraySized narrow (In min_ max_))
+            (ArraySized narrow (Min (Up narrowX To narrowX)))
             broadElement
-            (ArraySized (In min_ max_) narrow)
-            (ArraySized (Min (Up narrowX To narrowX)) narrow)
-atMostLoop upperLimit elementStepMorphRow =
+atMostLoop elementStepMorphRow upperLimit =
     Morph.to
         ([ "<= ", upperLimit |> N.toInt |> String.fromInt ]
             |> String.concat
         )
-        (translate ArraySized.fromList ArraySized.toList
+        (list
             |> Morph.overRow
                 (whileAccumulate
                     { initial = { length = n0 |> N.maxToInfinity }
                     , step =
                         \_ soFar ->
-                            case soFar.length |> N.isAtLeast (upperLimit |> N.maxUp n1) of
+                            case soFar.length |> N.isAtLeast (upperLimit |> N.maxAdd n1) of
                                 Ok _ ->
                                     Err ()
 
@@ -930,7 +837,7 @@ atMostLoop upperLimit elementStepMorphRow =
             , element =
                 Morph.succeed (\n -> n)
                     |> grab (\n -> n) Number.Morph.text
-                    |> skip (atLeast n0 (String.Morph.only " "))
+                    |> skip (atLeast (String.Morph.only " ") n0)
             }
 
     -- stops before we reach a maximum of 6 in the sum
@@ -950,11 +857,13 @@ whileAccumulate :
     { initial : accumulationValue
     , step :
         goOnElement
-        -> accumulationValue
-        -> Result () accumulationValue
-    , element : MorphRow broadElement goOnElement
+        ->
+            (accumulationValue
+             -> Result () accumulationValue
+            )
+    , element : MorphRow goOnElement broadElement
     }
-    -> MorphRow broadElement (List goOnElement)
+    -> MorphRow (List goOnElement) broadElement
 whileAccumulate { initial, step, element } =
     { description =
         { custom = Emptiable.empty
@@ -963,9 +872,11 @@ whileAccumulate { initial, step, element } =
                 |> Emptiable.filled
         }
     , broaden =
-        List.map (broadenFrom element)
-            >> Stack.fromList
-            >> Stack.flatten
+        \list_ ->
+            list_
+                |> List.map (broadenFrom element)
+                |> Stack.fromList
+                |> Stack.flatten
     , narrow =
         let
             loopNarrowStep :

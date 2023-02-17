@@ -25,6 +25,7 @@ module List.Morph exposing
 
 import Array
 import ArraySized
+import Dict exposing (Dict)
 import Emptiable exposing (Emptiable, filled)
 import Linear exposing (Direction(..))
 import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, MorphOrError, MorphRow, Translate, broad, broadenFrom, narrowTo, translate, translateOn)
@@ -81,9 +82,11 @@ This can get verbose, so create helpers with it where you see common patterns!
 
 -}
 forBroad :
-    (element -> MorphRow broadElement ())
+    (element
+     -> MorphRow () broadElement
+    )
     -> List element
-    -> MorphRow broadElement ()
+    -> MorphRow () broadElement
 forBroad morphRowByElement expectedConstantInputList =
     broad
         (List.repeat
@@ -122,9 +125,11 @@ making misuse a bit more obvious.
 
 -}
 for :
-    (element -> MorphRow broadElement narrow)
+    (element
+     -> MorphRow narrow broadElement
+    )
     -> List element
-    -> MorphRow broadElement (List narrow)
+    -> MorphRow (List narrow) broadElement
 for morphRowByElement elementsToTraverseInSequence =
     { description =
         case elementsToTraverseInSequence of
@@ -138,7 +143,7 @@ for morphRowByElement elementsToTraverseInSequence =
                 { custom = Emptiable.empty
                 , inner =
                     ArraySized.l2 element0 element1
-                        |> ArraySized.glueMin Up
+                        |> ArraySized.attachMin Up
                             (elements2Up |> ArraySized.fromList)
                         |> ArraySized.map
                             (morphRowByElement >> Morph.description)
@@ -205,14 +210,14 @@ value elementMorph =
                             Value.Array arrayElements ->
                                 arrayElements |> Array.toList |> Ok
 
-                            structureExceptList ->
-                                structureExceptList
-                                    |> Value.PackageInternal.structureKindToString
+                            composedExceptList ->
+                                composedExceptList
+                                    |> Value.PackageInternal.composedKindToString
                                     |> Err
                 , broaden = Value.List
                 }
             )
-        |> Morph.over Value.structure
+        |> Morph.over Value.composed
 
 
 {-| [`Morph`](Morph#Morph) all elements in sequence.
@@ -244,7 +249,7 @@ eachElement :
             (List beforeBroaden -> List broad)
 eachElement elementMorph =
     { description =
-        { custom = Stack.only "each"
+        { custom = Stack.one "each"
         , inner =
             Morph.Elements (elementMorph |> Morph.description)
                 |> filled

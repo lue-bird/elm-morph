@@ -19,8 +19,6 @@ Independent of output format
 1:1 port of [an `elm/json` example](https://dark.elm.dmy.fr/packages/elm/json/latest/) ↓
 
 ```elm
-module Cause exposing (Cause, value)
-
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Choice
 import Group
@@ -51,8 +49,7 @@ surprisingly easy!
 
 Another example with a `type` adapted from [elm guide on custom types](https://guide.elm-lang.org/types/custom_types.html)
 ```elm
-module User exposing (value)
-
+import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Unit
 import Choice
 import Group
@@ -78,7 +75,7 @@ value =
                 SignedIn signedIn ->
                     variantSignedIn signedIn
         )
-        |> Choice.variantValue ( \() -> Anonymous, "Anonymous" ) Unit.value
+        |> Choice.variantValue ( \() -> Anonymous, "Anonymous" ) Value.unit
         |> Choice.variantValue ( SignedIn, "SignedIn" ) signedInValue
         |> Choice.finishValue
 
@@ -96,11 +93,11 @@ clean
 
 ## [`MorphRow`](Morph#MorphRow)
 
-Know `Parser`s? [`MorphRow`](Morph#MorphRow) simply always create a builder alongside. Think
+Know `Parser`s? [`MorphRow`](Morph#MorphRow) simply always creates a builder alongside. Think
 
-  - `Email/Id/Time.fromString` ⇄ `Email/Id/Time.toString`
+  - `Email/Id/Time/Url.fromString` ⇄ `Email/Id/Time/Url.toString`
   - concrete syntax tree parser ⇄ pretty formatter
-  - language tree ⇄ simplified, partially evaluated language tree
+  - decompiler ⇄ compiler
   - ...
 
 Like [`Morph`](Morph#Morph), [`MorphRow`](Morph#MorphRow) makes the process simpler and more reliable
@@ -114,7 +111,7 @@ import Char.Morph
 import String.Morph
 import N exposing (n0)
 import ArraySized
-import ArraySized.Morph exposing (atLeast)
+import ArraySized.Morph
 
 type Boolean
     = True
@@ -129,44 +126,44 @@ type Boolean
         )
 --> Ok (BooleanOr { left = BooleanOr { left = BooleanTrue, right = BooleanFalse }, right = BooleanFalse })
 
-boolean : MorphRow Char Boolean
+boolean : MorphRow Boolean Char
 boolean =
     Choice.between
-        (\true false or booleanNarrow ->
-            case booleanNarrow of
+        (\variantTrue variantFalse variantOr booleanChoice ->
+            case booleanChoice of
                 BooleanTrue ->
-                    true ()
+                    variantTrue ()
 
                 BooleanFalse ->
-                    false ()
+                    variantFalse ()
 
                 BooleanOr arguments ->
-                    or arguments
+                    variantOr arguments
         )
         |> Choice.tryRow (\() -> True) (String.Morph.only "true")
         |> Choice.tryRow (\() -> False) (String.Morph.only "false")
         |> Choice.tryRow Or or
+        |> Choice.finishRow
 
-or : MorphRow Char { left : Boolean, right : Boolean }
+or : MorphRow { left : Boolean, right : Boolean } Char
 or =
     let 
-        spaces : MorphRow Char ()
         spaces =
-            broad ArraySized.empty
-                |> Morph.rowOver (atLeast n0 (String.Morph.only " "))
+            ArraySized.Morph.atLeast (String.Morph.only " ") n0
     in
     Morph.succeed
         (\left right -> { left = left, right = right })
         |> skip (String.Morph.only "(")
-        |> skip spaces
+        |> skip (broad ArraySized.empty |> Morph.rowOver spaces)
         |> grab .left boolean
-        |> skip spaces
+        |> skip (broad (ArraySized.one ()) |> Morph.rowOver spaces)
         |> skip (String.Morph.only "||")
-        |> skip spaces
+        |> skip (broad (ArraySized.one ()) |> Morph.rowOver spaces)
         |> grab .right boolean
-        |> skip spaces
+        |> skip (broad ArraySized.empty |> Morph.rowOver spaces)
         |> skip (String.Morph.only ")")
 ```
+
 What's different from writing a parser?
 
   - `broad ...` provides defaults for generated broad values

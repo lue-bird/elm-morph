@@ -1,5 +1,5 @@
 module Json exposing
-    ( Json, Literal(..), Structure(..)
+    ( Json, Atom(..), Composed(..)
     , value
     , tagMap, tagTranslate
     , JsValueMagic
@@ -8,7 +8,7 @@ module Json exposing
 
 {-| JSON
 
-@docs Json, Literal, Structure
+@docs Json, Atom, Composed
 
 
 ## morph
@@ -45,7 +45,7 @@ import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFuncti
 import Sign exposing (Sign)
 import Sign.Internal
 import Stack exposing (Stacked)
-import Value exposing (LiteralOrStructure(..))
+import Value exposing (AtomOrComposed(..))
 
 
 {-| A value from the javascript side:
@@ -94,21 +94,21 @@ Can't contain any [spooky impure stuff](#JsValueMagic)
 
 -}
 type alias Json tag =
-    LiteralOrStructure Literal (Structure tag)
+    AtomOrComposed Atom (Composed tag)
 
 
-{-| json literal. null, bool, number, string
+{-| json atom. null, bool, number, string
 -}
-type Literal
+type Atom
     = Null ()
     | Bool Bool
     | Number Decimal
     | String String
 
 
-{-| json structure. record/object/dict and array
+{-| json composed. record/object/dict and array
 -}
-type Structure tag
+type Composed tag
     = Array (Array.Array (Json tag))
     | Object (Emptiable (Stacked (Tagged tag)) Possibly)
 
@@ -148,7 +148,7 @@ decodeErrorToMorph =
                     |> Morph.errorToLines
                     |> Stack.fold Up (\line soFar -> soFar ++ "\n" ++ line)
                 , "\n\n"
-                , "`Morph` can't turn this into a more structured error"
+                , "`Morph` can't turn this into a more composedd error"
                 , " because it refers to field errors by their location in the dict/record/object."
                 , "\n"
                 , "When decoding elm-internal json however, the error only preserves names."
@@ -160,7 +160,7 @@ decodeErrorToMorph =
                 { index = arrayIndex
                 , error = error |> decodeErrorToMorph
                 }
-                    |> Stack.only
+                    |> Stack.one
                     |> Morph.Parts
 
             Json.Decode.OneOf possibilities ->
@@ -173,7 +173,7 @@ decodeErrorToMorph =
                         stacked
                             |> Emptiable.filled
                             |> Stack.map (\_ -> decodeErrorToMorph)
-                            |> Morph.Possibilities
+                            |> Morph.Tries
 
             Json.Decode.Failure custom jsValue ->
                 [ custom
@@ -222,37 +222,37 @@ jsValueMagicEncode : () -> (Json String -> JsValueMagic)
 jsValueMagicEncode () =
     \jsonAny ->
         case jsonAny of
-            Literal literal ->
-                literal |> literalJsValueMagicEncode
+            Atom atom ->
+                atom |> atomJsValueMagicEncode
 
-            Structure structure ->
-                structure |> structureJsValueMagicEncode ()
+            Composed composed ->
+                composed |> composedJsValueMagicEncode ()
 
 
-literalJsValueMagicEncode : Literal -> JsValueMagic
-literalJsValueMagicEncode =
-    \literal ->
-        case literal of
+atomJsValueMagicEncode : Atom -> JsValueMagic
+atomJsValueMagicEncode =
+    \atom ->
+        case atom of
             Null () ->
                 Json.Encode.null
 
-            Bool boolLiteral ->
-                boolLiteral |> Json.Encode.bool
+            Bool boolAtom ->
+                boolAtom |> Json.Encode.bool
 
-            Number floatLiteral ->
-                floatLiteral
+            Number floatAtom ->
+                floatAtom
                     |> Morph.broadenFrom
                         (Decimal.floatExplicit |> Morph.over FloatExplicit.float)
                     |> Json.Encode.float
 
-            String stringLiteral ->
-                stringLiteral |> Json.Encode.string
+            String stringAtom ->
+                stringAtom |> Json.Encode.string
 
 
-structureJsValueMagicEncode : () -> (Structure String -> JsValueMagic)
-structureJsValueMagicEncode () =
-    \structureAny ->
-        case structureAny of
+composedJsValueMagicEncode : () -> (Composed String -> JsValueMagic)
+composedJsValueMagicEncode () =
+    \composedAny ->
+        case composedAny of
             Array arrayAny ->
                 arrayAny
                     |> Json.Encode.array (jsValueMagicEncode ())
@@ -280,13 +280,13 @@ In general, try to use [`Json.jsValueMagic`](#jsValueMagic) instead wherever pos
 jsValueMagicDecoder : Json.Decode.Decoder (Json String)
 jsValueMagicDecoder =
     Json.Decode.oneOf
-        [ Json.Decode.map Literal jsonLiteralDecoder
-        , Json.Decode.map Structure jsonStructureDecoder
+        [ Json.Decode.map Atom jsonAtomDecoder
+        , Json.Decode.map Composed jsonComposedDecoder
         ]
 
 
-jsonLiteralDecoder : Json.Decode.Decoder Literal
-jsonLiteralDecoder =
+jsonAtomDecoder : Json.Decode.Decoder Atom
+jsonAtomDecoder =
     Json.Decode.oneOf
         [ Null () |> Json.Decode.null
         , Json.Decode.map Bool Json.Decode.bool
@@ -313,8 +313,8 @@ jsonLiteralDecoder =
         ]
 
 
-jsonStructureDecoder : Json.Decode.Decoder (Structure String)
-jsonStructureDecoder =
+jsonComposedDecoder : Json.Decode.Decoder (Composed String)
+jsonComposedDecoder =
     Json.Decode.lazy
         (\() ->
             Json.Decode.oneOf
@@ -352,28 +352,28 @@ toValue : Json Value.IndexAndName -> Value.Value Value.IndexAndName
 toValue =
     \json ->
         case json of
-            Literal literal ->
-                literal |> literalToValue
+            Atom atom ->
+                atom |> atomToValue
 
-            Structure structure ->
-                structure |> structureToValue |> Structure
+            Composed composed ->
+                composed |> composedToValue |> Composed
 
 
-literalToValue : Literal -> Value.Value Value.IndexAndName
-literalToValue =
-    \literal ->
-        case literal of
+atomToValue : Atom -> Value.Value Value.IndexAndName
+atomToValue =
+    \atom ->
+        case atom of
             Null unit ->
-                unit |> Value.Unit |> Literal
+                unit |> Value.Unit |> Atom
 
             Number decimal ->
-                decimal |> Morph.broadenFrom decimalInternal |> Value.Number |> Literal
+                decimal |> Morph.broadenFrom decimalInternal |> Value.Number |> Atom
 
             String string_ ->
-                string_ |> Value.String |> Literal
+                string_ |> Value.String |> Atom
 
             Bool bool ->
-                { value = () |> Value.Unit |> Literal
+                { value = () |> Value.Unit |> Atom
                 , tag =
                     case bool of
                         False ->
@@ -383,15 +383,15 @@ literalToValue =
                             { index = 1, name = "True" }
                 }
                     |> Value.Variant
-                    |> Structure
+                    |> Composed
 
 
-structureToValue :
-    Structure Value.IndexAndName
-    -> Value.Structure Value.IndexAndName
-structureToValue =
-    \structure ->
-        case structure of
+composedToValue :
+    Composed Value.IndexAndName
+    -> Value.Composed Value.IndexAndName
+composedToValue =
+    \composed ->
+        case composed of
             Array array ->
                 array |> Array.map toValue |> Value.Array
 
@@ -410,30 +410,30 @@ fromValueImplementation : Value.Value tag -> Json tag
 fromValueImplementation =
     \json ->
         case json of
-            Literal literal ->
-                literal |> literalFromValue |> Literal
+            Atom atom ->
+                atom |> atomFromValue |> Atom
 
-            Structure structure ->
-                structure |> structureFromValue |> Structure
+            Composed composed ->
+                composed |> composedFromValue |> Composed
 
 
-structureFromValue : Value.Structure tag -> Structure tag
-structureFromValue =
-    \structure ->
-        case structure of
+composedFromValue : Value.Composed tag -> Composed tag
+composedFromValue =
+    \composed ->
+        case composed of
             _ ->
                 Debug.todo ""
 
 
-literalFromValue : Value.Literal -> Literal
-literalFromValue =
-    \literal ->
-        case literal of
+atomFromValue : Value.Atom -> Atom
+atomFromValue =
+    \atom ->
+        case atom of
             Value.Unit () ->
                 Null ()
 
-            Value.String stringLiteral ->
-                stringLiteral |> String
+            Value.String stringAtom ->
+                stringAtom |> String
 
             Value.Number decimal ->
                 decimal |> Morph.mapTo decimalInternal |> Number
@@ -477,15 +477,15 @@ Used to make its representation [`compact`] or [`descriptive`](#descriptive)
 tagMap : (tag -> tagMapped) -> (Json tag -> Json tagMapped)
 tagMap tagChange =
     \json ->
-        json |> Value.structureMap (structureTagMap tagChange)
+        json |> Value.composedMap (composedTagMap tagChange)
 
 
-structureTagMap :
+composedTagMap :
     (tag -> tagMapped)
-    -> (Structure tag -> Structure tagMapped)
-structureTagMap tagChange =
-    \structure ->
-        case structure of
+    -> (Composed tag -> Composed tagMapped)
+composedTagMap tagChange =
+    \composed ->
+        case composed of
             Array array ->
                 array |> Array.map (tagMap tagChange) |> Array
 

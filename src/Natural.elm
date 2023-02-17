@@ -25,11 +25,13 @@ import ArraySized exposing (ArraySized)
 import Bit exposing (Bit)
 import Bits
 import Bitwise
+import Choice
 import Integer exposing (Integer)
 import Linear exposing (Direction(..))
 import Morph exposing (Morph, MorphIndependently)
-import N exposing (Add1, Down, Fixed, In, InfinityValue, Min, MinValue, N, N0, N1, To, Up, Up0, Up1, Value, n0, n1)
+import N exposing (Add1, Down, In, Min, N, N0, N1, On, To, Up, Up0, Up1, n0, n1)
 import N.Local exposing (Add31, N31, N32, n31)
+import Sign
 
 
 {-| Whole number (integer) >= 0 of arbitrary precision.
@@ -56,28 +58,56 @@ for arbitrary-precision arithmetic like addition, multiplication, ...
 -}
 type Natural
     = N0
-    | Positive { afterI : ArraySized (In (Value N0) InfinityValue) Bit }
+    | AtLeast1 { afterI : ArraySized Bit (Min N0) }
 
 
 
 -- Morph
 
 
-{-| TODO
+{-| [`Morph`](Morph#Morph) to a [`Natural`](#Natural)
+from an unsigned [`Integer`](Integer#Integer)
 -}
 integer : Morph Natural Integer
 integer =
-    Morph.value "natural"
-        { narrow = Debug.todo ""
-        , broaden =
-            \natural ->
-                case natural of
-                    Natural.N0 ->
-                        N0
+    Morph.to "natural"
+        (Choice.toFrom
+            ( \variantN0 variantSigned integerChoice ->
+                case integerChoice of
+                    Integer.N0 ->
+                        variantN0 ()
 
-                    Natural.Positive { afterI } ->
-                        Signed { sign = Sign.Positive, absoluteAfterI = afterI }
-        }
+                    Integer.Signed signedValue ->
+                        variantSigned signedValue
+            , \variantN0 variantAtLeast1 natural ->
+                case natural of
+                    N0 ->
+                        variantN0 ()
+
+                    AtLeast1 atLeast1Value ->
+                        variantAtLeast1 atLeast1Value
+            )
+            |> Choice.variant ( \() -> N0, \() -> Integer.N0 )
+                (Morph.broad ())
+            |> Choice.variant ( AtLeast1, Integer.Signed )
+                (Morph.value "positive"
+                    { narrow =
+                        \{ sign, absoluteAfterI } ->
+                            case sign of
+                                Sign.Negative ->
+                                    "negative" |> Err
+
+                                Sign.Positive ->
+                                    { afterI = absoluteAfterI } |> Ok
+                    , broaden =
+                        \{ afterI } ->
+                            { sign = Sign.Positive
+                            , absoluteAfterI = afterI
+                            }
+                    }
+                )
+            |> Choice.finishToFrom
+        )
 
 
 
@@ -89,11 +119,11 @@ to get a [`Natural`](#Natural)
 -}
 bits :
     MorphIndependently
-        (ArraySized (In (Fixed narrowMin_) (Fixed narrowMax_)) Bit
+        (ArraySized Bit (In (On narrowMin_) narrowMax_)
          -> Result error_ Natural
         )
         (Natural
-         -> ArraySized (Min (Up0 x_)) Bit
+         -> ArraySized Bit (Min (Up0 x_))
         )
 bits =
     Morph.translate fromBitsImplementation toBitsImplementation
@@ -105,36 +135,31 @@ Proceed from here over [`Bits`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bi
 toBits :
     MorphIndependently
         (Natural
-         -> Result error_ (ArraySized (Min (Up0 narrowX_)) Bit)
+         -> Result error_ (ArraySized Bit (Min (Up0 narrowX_)))
         )
-        (ArraySized (In (Fixed broadMin_) (Fixed broadMax_)) Bit
+        (ArraySized Bit (In (On broadMin_) broadMax_)
          -> Natural
         )
 toBits =
     Morph.translate toBitsImplementation fromBitsImplementation
 
 
-toBitsImplementation :
-    Natural
-    -> ArraySized (Min (Up0 x_)) Bit
+toBitsImplementation : Natural -> ArraySized Bit (Min (Up0 x_))
 toBitsImplementation =
     \natural ->
         case natural of
             N0 ->
                 ArraySized.empty |> ArraySized.maxToInfinity
 
-            Positive { afterI } ->
+            AtLeast1 { afterI } ->
                 afterI
-                    |> ArraySized.minFromValue
-                    |> ArraySized.maxFromValue
+                    |> ArraySized.inToOn
                     |> ArraySized.minTo n0
                     |> ArraySized.insertMin ( Up, n0 ) Bit.I
                     |> ArraySized.minTo n0
 
 
-fromBitsImplementation :
-    ArraySized (In (Fixed min_) (Fixed max_)) Bit
-    -> Natural
+fromBitsImplementation : ArraySized Bit (In (On min_) max_) -> Natural
 fromBitsImplementation =
     \arraySized ->
         case arraySized |> Bits.unpad |> ArraySized.hasAtLeast n1 of
@@ -142,12 +167,11 @@ fromBitsImplementation =
                 N0
 
             Ok unpaddedAtLeast1 ->
-                Positive
+                AtLeast1
                     { afterI =
                         unpaddedAtLeast1
-                            |> ArraySized.elementRemoveMin ( Up, n0 )
+                            |> ArraySized.removeMin ( Up, n0 )
                             |> ArraySized.minTo n0
                             |> ArraySized.maxToInfinity
-                            |> ArraySized.minToValue
-                            |> ArraySized.maxToValue
+                            |> ArraySized.minToNumber
                     }

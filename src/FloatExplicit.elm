@@ -21,17 +21,17 @@ module FloatExplicit exposing
 
 import Choice
 import Decimal.Internal
-import Digits
 import Emptiable exposing (Emptiable)
+import Linear exposing (Direction(..))
 import Morph exposing (MorphOrError)
-import N exposing (In, InFixed, N, N0, N1, N9, Up0, Up1, Up9, n0, n1, n9)
+import N exposing (Down, In, N, N0, N1, N9, Up0, Up1, Up9, n0, n1, n9)
 import Possibly exposing (Possibly)
 import Sign exposing (Sign)
 import Sign.Internal
-import Stack exposing (StackTopBelow, Stacked)
-import Unit
+import Stack exposing (Stacked)
 import Value exposing (MorphValue)
 import Value.PackageInternal
+import Whole
 
 
 {-| IEEE 754 floating point number
@@ -126,7 +126,7 @@ float =
 
                                 wholeAbsoluteExcept0 ->
                                     { whole =
-                                        wholeAbsoluteExcept0 |> Digits.fromIntPositive
+                                        wholeAbsoluteExcept0 |> Whole.fromIntPositive
                                     , fraction =
                                         let
                                             floatFraction =
@@ -202,7 +202,7 @@ since `Float` is fixed in bit size while [`FloatExplicit`](#FloatExplicit) is no
 -}
 toFloat : MorphOrError Float FloatExplicit error_
 toFloat =
-    Morph.reverse float
+    Morph.invert float
 
 
 floatNaN : Float
@@ -223,7 +223,7 @@ absoluteToFloat =
                 fraction |> fractionToFloat
 
             Decimal.Internal.AtLeast1 atLeast1 ->
-                (atLeast1.whole |> Digits.toIntPositive |> Basics.toFloat)
+                (atLeast1.whole |> Whole.toIntPositive |> Basics.toFloat)
                     + (case atLeast1.fraction of
                         Nothing ->
                             0
@@ -236,8 +236,8 @@ absoluteToFloat =
 fractionToFloat : Decimal.Internal.Fraction -> Float
 fractionToFloat =
     \fraction_ ->
-        Stack.only (fraction_.last |> N.minTo n0)
-            |> Stack.onTopStack fraction_.beforeLast
+        Stack.one (fraction_.last |> N.inToOn |> N.minTo n0 |> N.inToNumber)
+            |> Stack.attach Down fraction_.beforeLast
             |> Stack.map
                 (\decimal digit ->
                     (digit |> N.toFloat)
@@ -253,19 +253,19 @@ floatToFraction =
     \float_ ->
         case float_ |> floatFractionToDigits of
             Emptiable.Empty _ ->
-                { beforeLast = Emptiable.empty, last = n1 |> N.maxTo n9 }
+                { beforeLast = Emptiable.empty, last = n1 |> N.maxTo n9 |> N.inToNumber }
 
             Emptiable.Filled stacked ->
                 let
                     digitsReverse =
                         stacked |> Emptiable.filled |> Stack.reverse
                 in
-                { beforeLast = digitsReverse |> Stack.topRemove |> Stack.reverse
-                , last = digitsReverse |> Stack.top |> N.in_ ( n1, n9 )
+                { beforeLast = digitsReverse |> Stack.removeTop |> Stack.reverse
+                , last = digitsReverse |> Stack.top |> N.inToOn |> N.toIn ( n1, n9 ) |> N.inToNumber
                 }
 
 
-floatFractionToDigits : Float -> Emptiable (Stacked (N (InFixed N0 N9))) Possibly
+floatFractionToDigits : Float -> Emptiable (Stacked (N (In N0 N9))) Possibly
 floatFractionToDigits =
     \float_ ->
         let
@@ -280,7 +280,7 @@ floatFractionToDigits =
                 identity
 
             Ok decimal ->
-                Stack.onTopLay decimal
+                Stack.onTopLay (decimal |> N.inToNumber)
         )
             ((floatShifted1Decimal - (decimalInt |> Basics.toFloat))
                 |> floatFractionToDigits
@@ -309,18 +309,18 @@ decimalInternalValue : MorphValue Decimal.Internal.Decimal
 decimalInternalValue =
     Morph.value "Decimal"
         { narrow =
-            \literal ->
-                case literal of
+            \atom ->
+                case atom of
                     Value.Number decimal ->
                         decimal |> Ok
 
-                    literalExceptDecimal ->
-                        literalExceptDecimal
-                            |> Value.PackageInternal.literalKindToString
+                    atomExceptDecimal ->
+                        atomExceptDecimal
+                            |> Value.PackageInternal.atomKindToString
                             |> Err
         , broaden = Value.Number
         }
-        |> Morph.over Value.literal
+        |> Morph.over Value.atom
 
 
 {-| [`MorphValue`](Value#MorphValue) from an [`Exception`](#Exception)
@@ -336,7 +336,7 @@ exceptionValue =
                 Infinity sign ->
                     variantInfinity sign
         )
-        |> Choice.variantValue ( \() -> NaN, "NaN" ) Unit.value
+        |> Choice.variantValue ( \() -> NaN, "NaN" ) Value.unit
         |> Choice.variantValue ( Infinity, "NaN" ) signValue
         |> Choice.finishValue
 
@@ -352,6 +352,6 @@ signValue =
                 Sign.Positive ->
                     positive ()
         )
-        |> Choice.variantValue ( \() -> Sign.Negative, "Negative" ) Unit.value
-        |> Choice.variantValue ( \() -> Sign.Positive, "Positive" ) Unit.value
+        |> Choice.variantValue ( \() -> Sign.Negative, "Negative" ) Value.unit
+        |> Choice.variantValue ( \() -> Sign.Positive, "Positive" ) Value.unit
         |> Choice.finishValue

@@ -25,7 +25,7 @@ import List.Morph
 import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, MorphOrError, Translate, translate, translateOn)
 import Possibly exposing (Possibly(..))
 import Set exposing (Set)
-import Stack exposing (StackTopBelow, Stacked)
+import Stack exposing (Stacked)
 
 
 
@@ -74,7 +74,7 @@ eachElement :
             )
 eachElement elementMorph =
     { description =
-        { custom = Stack.only "each"
+        { custom = Stack.one "each"
         , inner =
             Morph.Elements (elementMorph |> Morph.description)
                 |> filled
@@ -95,18 +95,18 @@ eachElement elementMorph =
                             (reversed |> Stack.length) - 1
                     in
                     reversed
-                        |> Stack.topRemove
+                        |> Stack.removeTop
                         |> Stack.foldFrom
                             { collected =
                                 case reversed |> Stack.top |> Morph.narrowTo elementMorph of
                                     Err topError ->
                                         { index = lastIndex, error = topError }
-                                            |> Stack.only
+                                            |> Stack.one
                                             |> Err
 
                                     Ok topNarrow ->
                                         topNarrow
-                                            |> Stack.only
+                                            |> Stack.one
                                             |> Ok
                             , index = lastIndex
                             }
@@ -153,7 +153,7 @@ eachElement elementMorph =
 
     import Stack
 
-    Stack.topDown 0 [ 12, 3 ]
+    Stack.topBelow 0 [ 12, 3 ]
         |> Morph.map Stack.Morph.toList
     --> [ 0, 12, 3 ]
 
@@ -167,7 +167,7 @@ toList :
          -> Emptiable (Stacked narrowElement) Possibly
         )
 toList =
-    translate Stack.toList Stack.fromList
+    Morph.invert list
 
 
 {-| [`Translate`](Morph#Translate) from `List` to a stack.
@@ -176,7 +176,7 @@ toList =
 
     [ 0, 12, 3 ]
         |> Morph.mapTo Stack.Morph.list
-    --> Stack.topDown 0 [ 12, 3 ]
+    --> Stack.topBelow 0 [ 12, 3 ]
 
 -}
 list :
@@ -198,7 +198,7 @@ list =
 
     import Stack
 
-    Stack.topDown '0' [ '1', '2' ]
+    Stack.topBelow '0' [ '1', '2' ]
         |> Morph.map Stack.Morph.toString
     --> "012"
 
@@ -209,7 +209,7 @@ toString :
         (Emptiable (Stacked Char) Possibly)
         error_
 toString =
-    translate Stack.toText Stack.fromText
+    Morph.invert string
 
 
 {-| [`Translate`](Morph#Translate) from `String` to a stack of `Char`s.
@@ -226,4 +226,4 @@ string :
         String
         error_
 string =
-    translate Stack.fromText Stack.toText
+    translate Stack.fromString Stack.toString

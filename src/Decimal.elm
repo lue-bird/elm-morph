@@ -20,23 +20,25 @@ import ArraySized.Morph
 import Bit exposing (Bit)
 import Char.Morph
 import Choice
-import Decimal.Internal
-import Emptiable exposing (Emptiable, fill, fillMap, fillMapFlat, filled)
+import Decimal.Internal exposing (Whole)
+import Emptiable exposing (Emptiable, fill, filled)
 import FloatExplicit exposing (FloatExplicit)
 import Group exposing (grab, skip)
 import Linear exposing (Direction(..))
 import Maybe.Morph
 import Morph exposing (Morph, MorphIndependently, MorphOrError, MorphRow, Translate, broadenFrom, narrowTo, one, translate)
-import N exposing (Add1, In, InFixed, Min, N, N0, N1, N9, To, Up, Up0, Up1, Up9, n0, n1, n9)
+import N exposing (Add1, In, Min, N, N0, N1, N9, To, Up, Up0, Up1, Up9, n0, n1, n9)
 import N.Morph
 import Possibly exposing (Possibly)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Sign exposing (Sign(..))
 import Sign.Internal
-import Stack exposing (StackTopBelow, Stacked)
+import Stack exposing (Stacked)
+import Stack.Morph
 import String.Morph
 import Value exposing (MorphValue)
 import Value.PackageInternal
+import Whole
 
 
 
@@ -72,10 +74,7 @@ type alias Signed =
 type Absolute
     = Fraction Fraction
     | AtLeast1
-        { whole :
-            Emptiable
-                (StackTopBelow (N (InFixed N1 N9)) (N (InFixed N0 N9)))
-                Never
+        { whole : Whole
         , fraction : Maybe Fraction
         }
 
@@ -84,8 +83,8 @@ type Absolute
 -}
 type alias Fraction =
     RecordWithoutConstructorFunction
-        { beforeLast : Emptiable (Stacked (N (InFixed N0 N9))) Possibly
-        , last : N (InFixed N1 N9)
+        { beforeLast : Emptiable (Stacked (N (In N0 N9))) Possibly
+        , last : N (In N1 N9)
         }
 
 
@@ -167,7 +166,7 @@ using [`Decimal.rowChar`](#rowChar) implementation as a reference
   - TODO include? [`unnecessary0RowChar`](#fractionRowChar)
 
 -}
-rowChar : MorphRow Char Decimal
+rowChar : MorphRow Decimal Char
 rowChar =
     -- TODO: make decimal point obligatory
     Morph.to "decimal"
@@ -186,14 +185,15 @@ rowChar =
             |> skip
                 (Morph.broad (ArraySized.repeat () n0)
                     |> Morph.overRow
-                        (ArraySized.Morph.atLeast n0
+                        (ArraySized.Morph.atLeast
                             (String.Morph.only "0")
+                            n0
                         )
                 )
         )
 
 
-signed : MorphRow Char Signed
+signed : MorphRow Signed Char
 signed =
     Morph.to "signed"
         (Morph.succeed
@@ -207,7 +207,7 @@ signed =
         )
 
 
-absolute : MorphRow Char Absolute
+absolute : MorphRow Absolute Char
 absolute =
     Morph.to "absolute"
         (Choice.between
@@ -230,41 +230,13 @@ absolute =
                     |> grab (\fraction_ -> fraction_) fraction
                 )
             |> Choice.tryRow AtLeast1
-                (let
-                    whole :
-                        MorphRow
-                            Char
-                            (Emptiable
-                                (StackTopBelow (N (InFixed N1 N9)) (N (InFixed N0 N9)))
-                                Never
-                            )
-                    whole =
-                        Morph.to "whole"
-                            (Morph.succeed Stack.onTopLay
-                                |> grab Stack.top
-                                    (N.Morph.in_ ( n1, n9 )
-                                        |> Morph.over N.Morph.char
-                                        |> one
-                                    )
-                                |> grab Stack.topRemove
-                                    (ArraySized.Morph.toStackEmptiable
-                                        |> Morph.overRow
-                                            (ArraySized.Morph.atLeast n0
-                                                (N.Morph.in_ ( n0, n9 )
-                                                    |> Morph.over N.Morph.char
-                                                    |> one
-                                                )
-                                            )
-                                    )
-                            )
-                 in
-                 Morph.succeed
+                (Morph.succeed
                     (\wholePart fractionPart ->
                         { whole = wholePart
                         , fraction = fractionPart
                         }
                     )
-                    |> grab .whole whole
+                    |> grab .whole Whole.rowChar
                     |> skip (String.Morph.only ".")
                     |> grab .fraction (Maybe.Morph.row fraction)
                 )
@@ -272,7 +244,7 @@ absolute =
         )
 
 
-fraction : Morph.MorphRow Char Fraction
+fraction : MorphRow Fraction Char
 fraction =
     Morph.to "fraction"
         (Morph.succeed
@@ -280,17 +252,21 @@ fraction =
                 { beforeLast = beforeLast, last = last }
             )
             |> Group.grab .beforeLast
-                (ArraySized.Morph.toStackEmptiable
+                (Stack.Morph.list
+                    |> Morph.over ArraySized.Morph.toList
                     |> Morph.overRow
-                        (ArraySized.Morph.atLeast n0
-                            (N.Morph.in_ ( n0, n9 )
+                        (ArraySized.Morph.atLeast
+                            (N.Morph.inOn
+                                |> Morph.over (N.Morph.in_ ( n0, n9 ))
                                 |> Morph.over N.Morph.char
                                 |> one
                             )
+                            n0
                         )
                 )
             |> Group.grab .last
-                (N.Morph.in_ ( n1, n9 )
+                (N.Morph.inOn
+                    |> Morph.over (N.Morph.in_ ( n1, n9 ))
                     |> Morph.over N.Morph.char
                     |> one
                 )
@@ -309,17 +285,17 @@ value =
         |> Morph.over
             (Morph.value "Decimal"
                 { narrow =
-                    \literal ->
-                        case literal of
+                    \atom ->
+                        case atom of
                             Value.Number decimal ->
                                 decimal |> Ok
 
-                            literalExceptDecimal ->
-                                literalExceptDecimal |> Value.PackageInternal.literalKindToString |> Err
+                            atomExceptDecimal ->
+                                atomExceptDecimal |> Value.PackageInternal.atomKindToString |> Err
                 , broaden = Value.Number
                 }
             )
-        |> Morph.over Value.literal
+        |> Morph.over Value.atom
 
 
 internal :

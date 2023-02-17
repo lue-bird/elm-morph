@@ -1,13 +1,13 @@
-module Value.PackageInternal exposing (literalKindToString, string, structureKindToString)
+module Value.PackageInternal exposing (atomKindToString, composedKindToString, string)
 
 import Morph exposing (MorphIndependently)
 import Value exposing (MorphValue)
 
 
-literalKindToString : Value.Literal -> String
-literalKindToString =
-    \literal_ ->
-        case literal_ of
+atomKindToString : Value.Atom -> String
+atomKindToString =
+    \atom_ ->
+        case atom_ of
             Value.Unit _ ->
                 "Unit"
 
@@ -18,10 +18,10 @@ literalKindToString =
                 "String"
 
 
-structureKindToString : Value.Structure tag_ -> String
-structureKindToString =
-    \structure_ ->
-        case structure_ of
+composedKindToString : Value.Composed tag_ -> String
+composedKindToString =
+    \composed_ ->
+        case composed_ of
             Value.List _ ->
                 "List"
 
@@ -47,7 +47,7 @@ string =
                     Value.String stringNarrow ->
                         stringNarrow |> Ok
 
-                    literalExceptString ->
-                        literalExceptString |> literalKindToString |> Err
+                    atomExceptString ->
+                        atomExceptString |> atomKindToString |> Err
         }
-        |> Morph.over Value.literal
+        |> Morph.over Value.atom

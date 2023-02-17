@@ -1,6 +1,6 @@
 module N.Morph exposing
     ( in_
-    , value, toValue
+    , inOn, inNumber
     , int, char
     )
 
@@ -10,7 +10,7 @@ module N.Morph exposing
 ## alter
 
 @docs in_
-@docs value, toValue
+@docs inOn, inNumber
 
 
 ## transform
@@ -20,7 +20,7 @@ module N.Morph exposing
 -}
 
 import Morph exposing (Morph, MorphIndependently, translate)
-import N exposing (Add1, Fixed, In, InFixed, InValue, Min, N, N9, To, Up, Up0, Up9, n0, n1, n2, n3, n4, n5, n6, n7, n8, n9)
+import N exposing (Add1, In, Min, N, N9, On, To, Up, Up0, Up9, n0, n1, n2, n3, n4, n5, n6, n7, n8, n9)
 
 
 {-| [`Morph`](Morph#Morph) an `Int` to an `N`,
@@ -181,31 +181,31 @@ char =
         }
 
 
-{-| [`Morph`](Morph#Morph) from an `N` with an equatable range `InValue`
-to an `InFixed` to operate on it
+{-| [`Morph`](Morph#Morph) from an `N` with an equatable range `In (On ...) (On ...)`
+to an `In ... ...` to make it equatable
 -}
-value :
+inOn :
     MorphIndependently
-        (N (InValue narrowMin narrowMax)
-         -> Result error_ (N (InFixed narrowMin narrowMax))
+        (N (In (On narrowMin) (On narrowMax))
+         -> Result error_ (N (In narrowMin narrowMax))
         )
-        (N (InFixed broadMin broadMax)
-         -> N (InValue broadMin broadMax)
+        (N (In broadMin broadMax)
+         -> N (In (On broadMin) (On broadMax))
         )
-value =
-    translate N.fromValue N.toValue
+inOn =
+    translate N.inToNumber N.inToOn
 
 
-{-| [`Morph`](Morph#Morph) from an `N` with a range `InFixed`
-to an `InValue` to make it equatable
+{-| [`Morph`](Morph#Morph) from an `N` with a range `In`
+to an `In (On ...) (On ...)` to operate on it
 -}
-toValue :
+inNumber :
     MorphIndependently
-        (N (InFixed narrowMin narrowMax)
-         -> Result error_ (N (InValue narrowMin narrowMax))
+        (N (In narrowMin narrowMax)
+         -> Result error_ (N (In (On narrowMin) (On narrowMax)))
         )
-        (N (InValue broadMin broadMax)
-         -> N (InFixed broadMin broadMax)
+        (N (In (On broadMin) (On broadMax))
+         -> N (In broadMin broadMax)
         )
-toValue =
-    translate N.toValue N.fromValue
+inNumber =
+    translate N.inToOn N.inToNumber

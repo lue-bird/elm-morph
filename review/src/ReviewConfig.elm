@@ -32,7 +32,7 @@ Rules on radar
         |> Pipeline.andTryToFixThemBy PipelineFix.convertingToRightPizza
         |> Pipeline.andCallThem "parenthetical application of a semantically-infix function"
 
-because `aSemanticallyInfixFunction` covers `atLeast`/`atMost`/... which can be used here: `MorphRow.atLeast n3 AToZ.Morph.char`
+because `aSemanticallyInfixFunction` covers `atLeast`/`atMost`/... which can be used here: `MorphRow.atLeast n3 AToZ.char`
 
     Pipeline.rightCompositionPipelines
         |> Pipeline.forbid

@@ -84,14 +84,14 @@ value elementMorph =
                             Value.List listElements ->
                                 listElements |> Array.fromList |> Ok
 
-                            structureExceptArrayAndList ->
-                                structureExceptArrayAndList
-                                    |> Value.PackageInternal.structureKindToString
+                            composedExceptArrayAndList ->
+                                composedExceptArrayAndList
+                                    |> Value.PackageInternal.composedKindToString
                                     |> Err
                 , broaden = Value.Array
                 }
             )
-        |> Morph.over Value.structure
+        |> Morph.over Value.composed
 
 
 {-| [`Morph`](Morph#Morph) all elements in sequence.
@@ -123,7 +123,7 @@ eachElement :
             (Array beforeBroaden -> Array broad)
 eachElement elementMorph =
     { description =
-        { custom = Stack.only "each"
+        { custom = Stack.one "each"
         , inner =
             Morph.Elements (elementMorph |> Morph.description)
                 |> filled
