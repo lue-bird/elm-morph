@@ -20,7 +20,6 @@ Independent of output format
 
 ```elm
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
-import Choice
 import Value
 import FloatExplicit
 import String.Morph
@@ -49,9 +48,8 @@ surprisingly easy!
 Another example with a `type` adapted from [elm guide on custom types](https://guide.elm-lang.org/types/custom_types.html)
 ```elm
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
-import Unit
-import Choice
 import Value
+import Morph
 import String.Morph
 
 type User
@@ -64,7 +62,7 @@ type alias SignedIn =
 
 value : Value.Morph User
 value =
-    Choice.between
+    Morph.choice
         (\variantAnonymous variantSignedIn user ->
             case user of
                 Anonymous ->
@@ -73,9 +71,9 @@ value =
                 SignedIn signedIn ->
                     variantSignedIn signedIn
         )
-        |> Choice.variantValue ( \() -> Anonymous, "Anonymous" ) Value.unit
-        |> Choice.variantValue ( SignedIn, "SignedIn" ) signedInValue
-        |> Choice.finishValue
+        |> Value.variant ( \() -> Anonymous, "Anonymous" ) Value.unit
+        |> Value.variant ( SignedIn, "SignedIn" ) signedInValue
+        |> Value.choiceFinish
 
 signedInValue : Value.Morph SignedIn
 signedInValue =
@@ -102,7 +100,6 @@ Like [`Morph`](Morph#Morph), [`MorphRow`](Morph#MorphRow) makes the process simp
 
 Here a 1:1 port of [an example from `elm/parser`](https://dark.elm.dmy.fr/packages/elm/parser/latest/Parser#lazy):
 ```elm
-import Choice
 import Morph exposing (MorphRow, broad, narrowTo, one, skip, grab)
 import Char.Morph
 import String.Morph
@@ -125,7 +122,7 @@ type Boolean
 
 boolean : MorphRow Boolean Char
 boolean =
-    Choice.between
+    Morph.choice
         (\variantTrue variantFalse variantOr booleanChoice ->
             case booleanChoice of
                 BooleanTrue ->
@@ -137,10 +134,10 @@ boolean =
                 BooleanOr arguments ->
                     variantOr arguments
         )
-        |> Choice.tryRow (\() -> True) (String.Morph.only "true")
-        |> Choice.tryRow (\() -> False) (String.Morph.only "false")
-        |> Choice.tryRow Or or
-        |> Choice.finishRow
+        |> Morph.tryRow (\() -> True) (String.Morph.only "true")
+        |> Morph.tryRow (\() -> False) (String.Morph.only "false")
+        |> Morph.tryRow Or or
+        |> Morph.choiceRowFinish
 
 or : MorphRow { left : Boolean, right : Boolean } Char
 or =
@@ -164,7 +161,7 @@ or =
 What's different from writing a parser?
 
   - `broad ...` provides defaults for generated broad values
-  - `Choice.between (\... -> case ... of ...)` exhaustively matches possibilities with according broad values
+  - `Morph.choice (\... -> case ... of ...)` exhaustively matches possibilities with according broad values
   - `grab ... ...` also shows how to access the morphed positional part
 
 Confused? Hyped? Hit @lue up on anything on slack!

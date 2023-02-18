@@ -9,7 +9,6 @@ module Maybe.Morph exposing (row, value)
 
 -}
 
-import Choice
 import Morph exposing (MorphRow)
 import Value
 
@@ -18,7 +17,7 @@ import Value
 -}
 value : Value.Morph element -> Value.Morph (Maybe element)
 value contentMorph =
-    Choice.between
+    Morph.choice
         (\just nothing narrowMaybe ->
             case narrowMaybe of
                 Nothing ->
@@ -27,9 +26,9 @@ value contentMorph =
                 Just content ->
                     content |> just
         )
-        |> Choice.variantValue ( Just, "Just" ) contentMorph
-        |> Choice.variantValue ( \() -> Nothing, "Nothing" ) Value.unit
-        |> Choice.finishValue
+        |> Value.variant ( Just, "Just" ) contentMorph
+        |> Value.variant ( \() -> Nothing, "Nothing" ) Value.unit
+        |> Value.choiceFinish
 
 
 {-| [`Morph`](Morph#Morph) an optional value and return it as a `Maybe`
@@ -56,7 +55,7 @@ row :
     MorphRow contentNarrow broadElement
     -> MorphRow (Maybe contentNarrow) broadElement
 row contentMorphRow =
-    Choice.between
+    Morph.choice
         (\nothingVariant justVariant maybeNarrow ->
             case maybeNarrow of
                 Nothing ->
@@ -65,6 +64,6 @@ row contentMorphRow =
                 Just justValue ->
                     justVariant justValue
         )
-        |> Choice.tryRow (\() -> Nothing) (Morph.succeed ())
-        |> Choice.tryRow Just contentMorphRow
-        |> Choice.finishRow
+        |> Morph.tryRow (\() -> Nothing) (Morph.succeed ())
+        |> Morph.tryRow Just contentMorphRow
+        |> Morph.choiceRowFinish

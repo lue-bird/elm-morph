@@ -19,7 +19,6 @@ import ArraySized exposing (ArraySized)
 import ArraySized.Morph
 import Bit exposing (Bit)
 import Char.Morph
-import Choice
 import Decimal.Internal exposing (Whole)
 import Emptiable exposing (Emptiable, fill, filled)
 import FloatExplicit exposing (FloatExplicit)
@@ -151,7 +150,7 @@ floatExplicit =
     --> Err "1:1: I was expecting a digit [0-9]. I got stuck when I got the character 'a'."
 
 To allow integers to parse as decimals as well,
-build a [`Choice.between`](Choice#between)
+build a [`Morph.choice`](Choice#between)
 [`Decimal.rowChar`](#rowChar)
 and [`Integer.rowChar`](Integer#rowChar)
 
@@ -168,7 +167,7 @@ rowChar : MorphRow Decimal Char
 rowChar =
     -- TODO: make decimal point obligatory
     Morph.to "decimal"
-        (Choice.between
+        (Morph.choice
             (\signedVariant n0Variant numberNarrow ->
                 case numberNarrow of
                     N0 ->
@@ -177,9 +176,9 @@ rowChar =
                     Signed signedValue ->
                         signedVariant signedValue
             )
-            |> Choice.tryRow Signed signed
-            |> Choice.tryRow (\() -> N0) (String.Morph.only "0.")
-            |> Choice.finishRow
+            |> Morph.tryRow Signed signed
+            |> Morph.tryRow (\() -> N0) (String.Morph.only "0.")
+            |> Morph.choiceRowFinish
             |> skip
                 (Morph.broad (ArraySized.repeat () n0)
                     |> Morph.overRow
@@ -208,7 +207,7 @@ signed =
 absolute : MorphRow Absolute Char
 absolute =
     Morph.to "absolute"
-        (Choice.between
+        (Morph.choice
             (\fractionVariant atLeast1Variant absoluteUnion ->
                 case absoluteUnion of
                     Fraction fractionValue ->
@@ -217,7 +216,7 @@ absolute =
                     AtLeast1 atLeast1Value ->
                         atLeast1Variant atLeast1Value
             )
-            |> Choice.tryRow Fraction
+            |> Morph.tryRow Fraction
                 (Morph.succeed (\fraction_ -> fraction_)
                     |> skip
                         (Morph.broad (Just ())
@@ -227,7 +226,7 @@ absolute =
                     |> skip (String.Morph.only ".")
                     |> grab (\fraction_ -> fraction_) fraction
                 )
-            |> Choice.tryRow AtLeast1
+            |> Morph.tryRow AtLeast1
                 (Morph.succeed
                     (\wholePart fractionPart ->
                         { whole = wholePart
@@ -238,7 +237,7 @@ absolute =
                     |> skip (String.Morph.only ".")
                     |> grab .fraction (Maybe.Morph.row fraction)
                 )
-            |> Choice.finishRow
+            |> Morph.choiceRowFinish
         )
 
 
@@ -302,7 +301,7 @@ internal :
         Decimal.Internal.Decimal
         (Morph.ErrorWithDeadEnd deadEnd_)
 internal =
-    Choice.toFrom
+    Morph.choiceToFrom
         ( \variantN0 variantSigned decimal ->
             case decimal of
                 Decimal.Internal.N0 ->
@@ -318,9 +317,9 @@ internal =
                 Signed signedValue ->
                     variantSigned signedValue
         )
-        |> Choice.variant ( \() -> N0, \() -> Decimal.Internal.N0 ) Morph.keep
-        |> Choice.variant ( Signed, Decimal.Internal.Signed ) signedInternal
-        |> Choice.finishToFrom
+        |> Morph.variant ( \() -> N0, \() -> Decimal.Internal.N0 ) Morph.keep
+        |> Morph.variant ( Signed, Decimal.Internal.Signed ) signedInternal
+        |> Morph.choiceToFromFinish
 
 
 signedInternal :
@@ -340,7 +339,7 @@ signedInternal =
 
 absoluteInternal : MorphOrError Absolute Decimal.Internal.Absolute error_
 absoluteInternal =
-    Choice.toFrom
+    Morph.choiceToFrom
         ( \variantFraction variantAtLeast1 decimal ->
             case decimal of
                 Decimal.Internal.Fraction fractionValue ->
@@ -356,9 +355,9 @@ absoluteInternal =
                 AtLeast1 atLeast1Value ->
                     variantAtLeast1 atLeast1Value
         )
-        |> Choice.variant ( Fraction, Decimal.Internal.Fraction ) Morph.keep
-        |> Choice.variant ( AtLeast1, Decimal.Internal.AtLeast1 ) Morph.keep
-        |> Choice.finishToFrom
+        |> Morph.variant ( Fraction, Decimal.Internal.Fraction ) Morph.keep
+        |> Morph.variant ( AtLeast1, Decimal.Internal.AtLeast1 ) Morph.keep
+        |> Morph.choiceToFromFinish
 
 
 signInternal : MorphOrError Sign Sign.Internal.Sign error_

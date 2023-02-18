@@ -740,7 +740,7 @@ atMostLoop elementStepMorphRow upperLimit =
 
 {-| How are [`atLeast`](#atLeast), ... defined?
 
-    import Morph exposing (Choice.between, validate)
+    import Morph exposing (Morph.choice, validate)
     import Morph exposing (MorphRow, one, Morph.succeed, atLeast, take, drop, whileAccumulate)
     import Char.Morph
     import String.Morph

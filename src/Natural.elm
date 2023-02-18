@@ -25,7 +25,6 @@ import ArraySized exposing (ArraySized)
 import Bit exposing (Bit)
 import Bits
 import Bitwise
-import Choice
 import Integer exposing (Integer)
 import Linear exposing (Direction(..))
 import Morph exposing (Morph, MorphIndependently)
@@ -71,7 +70,7 @@ from an unsigned [`Integer`](Integer#Integer)
 integer : Morph Natural Integer
 integer =
     Morph.to "natural"
-        (Choice.toFrom
+        (Morph.choiceToFrom
             ( \variantN0 variantSigned integerChoice ->
                 case integerChoice of
                     Integer.N0 ->
@@ -87,9 +86,9 @@ integer =
                     AtLeast1 atLeast1Value ->
                         variantAtLeast1 atLeast1Value
             )
-            |> Choice.variant ( \() -> N0, \() -> Integer.N0 )
+            |> Morph.variant ( \() -> N0, \() -> Integer.N0 )
                 (Morph.broad ())
-            |> Choice.variant ( AtLeast1, Integer.Signed )
+            |> Morph.variant ( AtLeast1, Integer.Signed )
                 (Morph.value "positive"
                     { narrow =
                         \{ sign, absoluteAfterI } ->
@@ -106,7 +105,7 @@ integer =
                             }
                     }
                 )
-            |> Choice.finishToFrom
+            |> Morph.choiceToFromFinish
         )
 
 

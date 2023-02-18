@@ -2,7 +2,6 @@
   "root": "../src",
   "tests": [
     "Morph",
-    "Choice",
     "Char.Morph",
     "String.Morph",
     "N.Morph",

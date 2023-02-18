@@ -15,8 +15,14 @@ module Morph exposing
     , description
     , broadenFrom, narrowTo, mapTo
     , over, overRow
-    , MorphNoPart
+    , GroupMorphNoPart
     , groupToFrom, part, groupFinish
+    , choiceEquivalent
+    , choiceEquivalentRow
+    , ChoiceMorphNoVariant, choiceToFrom, variant, choiceToFromFinish
+    , choice
+    , ChoiceMorphNoTry, try, choiceFinish
+    , ChoiceMorphRowNoTry, tryRow, choiceRowFinish
     , MorphRow, MorphRowIndependently, rowFinish
     , before
     )
@@ -69,13 +75,28 @@ We call it
 
 ## group
 
-@docs MorphNoPart
+@docs GroupMorphNoPart
 @docs groupToFrom, part, groupFinish
 
 
 ## choice
 
-[`Choice.Morph`](Choice#Morph)
+[`Morph`](#Morph) a tagged union `type`
+
+@docs choiceEquivalent
+@docs choiceEquivalentRow
+
+
+### morph by variant
+
+@docs ChoiceMorphNoVariant, choiceToFrom, variant, choiceToFromFinish
+@docs choice
+@docs ChoiceMorphNoTry, try, choiceFinish
+
+
+## choice [`MorphRow`](#MorphRow)
+
+@docs ChoiceMorphRowNoTry, tryRow, choiceRowFinish
 
 
 ## row
@@ -232,7 +253,7 @@ This general form is helpful to describe a step in building an incomplete [`Morp
 TODO: add error as type parameter to allow translate
 
 TODO: dream:
-Choice by group/Choice.between/... associating errors and description
+Choice by group/Morph.choice/... associating errors and description
 
 -}
 type alias MorphIndependently narrow broaden =
@@ -273,7 +294,7 @@ type alias Description =
 
   - chained morphs
   - narrow group of multiple
-  - narrow Choice.between between multiple
+  - narrow Morph.choice between multiple
 
 -}
 type DescriptionInner
@@ -566,7 +587,7 @@ Narrowing gives you
 ```
 printable : Morph LocalSymbolPrintable Char (Morph.Error Char)
 printable =
-    Choice.between
+    Morph.choice
         (\exclamationMark numberSign dollarSign percentSign ampersand asterisk lowLine hyphenMinus backSlash printable ->
             case printable of
                 ExclamationMark ->
@@ -593,15 +614,15 @@ printable =
                 HyphenMinus ->
                     hyphenMinus ()
         )
-        |> Choice.try (\() -> ExclamationMark) (Char.Morph.only '!')
-        |> Choice.try (\() -> NumberSign) (Char.Morph.only '#')
-        |> Choice.try (\() -> DollarSign) (Char.Morph.only '$')
-        |> Choice.try (\() -> PercentSign) (Char.Morph.only '%')
-        |> Choice.try (\() -> Ampersand) (Char.Morph.only '&')
-        |> Choice.try (\() -> Asterisk) (Char.Morph.only '*')
-        |> Choice.try (\() -> LowLine) (Char.Morph.only '_')
-        |> Choice.try (\() -> HyphenMinus) (Char.Morph.only '-')
-        |> Choice.finish
+        |> Morph.try (\() -> ExclamationMark) (Char.Morph.only '!')
+        |> Morph.try (\() -> NumberSign) (Char.Morph.only '#')
+        |> Morph.try (\() -> DollarSign) (Char.Morph.only '$')
+        |> Morph.try (\() -> PercentSign) (Char.Morph.only '%')
+        |> Morph.try (\() -> Ampersand) (Char.Morph.only '&')
+        |> Morph.try (\() -> Asterisk) (Char.Morph.only '*')
+        |> Morph.try (\() -> LowLine) (Char.Morph.only '_')
+        |> Morph.try (\() -> HyphenMinus) (Char.Morph.only '-')
+        |> Morph.choiceFinish
 ```
 
 -}
@@ -858,7 +879,7 @@ value descriptionCustom morphTransformations =
 
     lazyList : MorphRow LazyList
     lazyList =
-        Choice.between
+        Morph.choice
             (\endVariant nextVariant lazyListNarrow ->
                 case lazyListNarrow of
                     End ->
@@ -866,9 +887,9 @@ value descriptionCustom morphTransformations =
                     Next next ->
                         nextVariant next
             )
-            |> Choice.try (\() -> End)
+            |> Morph.try (\() -> End)
                 (String.Morph.only "[]")
-            |> Choice.try Next
+            |> Morph.try Next
                 (Morph.succeed Tuple.pair
                     |> grab
                         (Integer.Morph.toInt
@@ -940,7 +961,7 @@ lazy morphLazy =
 {-| [`Morph`](#Morph) on groups in progress.
 Start with [`group`](#group), complete with [`part`](#part), finally [`groupFinish`](#groupFinish)
 -}
-type alias MorphNoPart noPartPossiblyOrNever narrow broaden =
+type alias GroupMorphNoPart noPartPossiblyOrNever narrow broaden =
     RecordWithoutConstructorFunction
         { description :
             -- parts
@@ -948,17 +969,6 @@ type alias MorphNoPart noPartPossiblyOrNever narrow broaden =
         , narrow : narrow
         , broaden : broaden
         }
-
-
-{-| Word in a [`GroupMorph`](#GroupMorph) in progress. For example
-
-    choiceFinish :
-        Value.GroupMorph (N (In N0 N9)) Char (N (In N0 N9) -> Char) NoPart Never
-        -> Morph (N (In N0 N9)) Char
-
--}
-type NoPart
-    = NoPartTag Never
 
 
 {-| Assemble a group from narrow and broad [`part`](#part)s
@@ -993,7 +1003,7 @@ groupToFrom :
     , broadAssemble
     )
     ->
-        MorphNoPart
+        GroupMorphNoPart
             Possibly
             (broad_
              -> Result error_ narrowAssemble
@@ -1026,7 +1036,7 @@ part :
     )
     -> MorphOrError partNarrow partBroad partError
     ->
-        (MorphNoPart
+        (GroupMorphNoPart
             noPartPossiblyOrNever_
             (groupBroad
              ->
@@ -1036,7 +1046,7 @@ part :
             )
             (groupNarrow -> (partBroad -> groupBroadenFurther))
          ->
-            MorphNoPart
+            GroupMorphNoPart
                 noPartNever_
                 (groupBroad
                  ->
@@ -1130,7 +1140,7 @@ narrowPart index broadPartAccess narrowPartMorph =
 {-| Conclude a [`Group.build`](#group) |> [`Group.part`](#part) chain
 -}
 groupFinish :
-    MorphNoPart
+    GroupMorphNoPart
         Never
         (beforeNarrow
          ->
@@ -1818,7 +1828,7 @@ skip ignoredNext =
      - one should try to know what to morph by tracking context,
        independent of what narrow result the last morph gave
          - for example, don't use [`next`](#next) for versioning etc.
-           Use [`Choice.between`](#Choice.between) where each [`possibility`](#try) expects a specific number
+           Use [`Morph.choice`](#Morph.choice) where each [`possibility`](#try) expects a specific number
 
 
 -}
@@ -1990,7 +2000,7 @@ until :
 until untilStep =
     let
         loopStep =
-            choiceBetween
+            choice
                 (\commit goOn loopStepNarrow ->
                     case loopStepNarrow of
                         Commit commitElement ->
@@ -1999,9 +2009,9 @@ until untilStep =
                         GoOn goOnELement ->
                             goOn goOnELement
                 )
-                |> choiceTryRow Commit untilStep.end
-                |> choiceTryRow GoOn untilStep.goOn
-                |> choiceFinishRow
+                |> tryRow Commit untilStep.end
+                |> tryRow GoOn untilStep.goOn
+                |> choiceRowFinish
     in
     { description =
         { custom = Emptiable.empty
@@ -2104,147 +2114,6 @@ until untilStep =
 
 
 
--- copied from module Choice to avoid cyclic import
-
-
-type alias MorphNoTry noTryPossiblyOrNever choiceNarrow choiceBroad choiceBroaden error =
-    RecordWithoutConstructorFunction
-        { description :
-            -- possibilities
-            Emptiable (Stacked Description) noTryPossiblyOrNever
-        , narrow :
-            choiceBroad
-            ->
-                Result
-                    (-- tries
-                     Emptiable (Stacked error) noTryPossiblyOrNever
-                    )
-                    choiceNarrow
-        , broaden : choiceBroaden
-        }
-
-
-choiceBetween :
-    choiceBroadenByPossibility
-    ->
-        MorphNoTry
-            Possibly
-            choiceNarrow_
-            choiceBroad_
-            choiceBroadenByPossibility
-            error_
-choiceBetween choiceBroadenDiscriminatedByPossibility =
-    { description = Emptiable.empty
-    , narrow =
-        \_ ->
-            Emptiable.empty |> Err
-    , broaden = choiceBroadenDiscriminatedByPossibility
-    }
-
-
-type alias MorphRowNoTry noTryPossiblyOrNever choiceNarrow choiceBroaden broadElement =
-    MorphNoTry
-        noTryPossiblyOrNever
-        { narrow : choiceNarrow
-        , broad : Emptiable (Stacked broadElement) Possibly
-        }
-        (Emptiable (Stacked broadElement) Possibly)
-        choiceBroaden
-        Error
-
-
-choiceTryRow :
-    (possibilityNarrow -> choiceNarrow)
-    -> MorphRow possibilityNarrow broadElement
-    ->
-        (MorphRowNoTry
-            noTryPossiblyOrNever_
-            choiceNarrow
-            ((possibilityNarrow -> Emptiable (Stacked broadElement) Possibly)
-             -> choiceBroadenFurther
-            )
-            broadElement
-         ->
-            MorphRowNoTry
-                never_
-                choiceNarrow
-                choiceBroadenFurther
-                broadElement
-        )
-choiceTryRow possibilityToChoice possibilityMorph =
-    \choiceMorphSoFar ->
-        { description =
-            choiceMorphSoFar.description
-                |> Stack.onTopLay (possibilityMorph |> description)
-        , narrow =
-            \choiceBroad ->
-                choiceBroad
-                    |> choiceMorphSoFar.narrow
-                    |> restoreTry
-                        (\soFarErrorPossibilities ->
-                            case choiceBroad |> narrowTo possibilityMorph of
-                                Ok possibilityParsed ->
-                                    { broad = possibilityParsed.broad
-                                    , narrow =
-                                        possibilityParsed.narrow
-                                            |> possibilityToChoice
-                                    }
-                                        |> Ok
-
-                                Err possibilityExpectation ->
-                                    soFarErrorPossibilities
-                                        |> Stack.onTopLay possibilityExpectation
-                                        |> Err
-                        )
-        , broaden =
-            choiceMorphSoFar.broaden
-                (broadenFrom possibilityMorph)
-        }
-
-
-{-| Always the last step in a [`Choice.between`](#Choice.between) `|>` [`Choice.tryRow`](#try) build process
--}
-choiceFinishRow :
-    MorphRowNoTry
-        Never
-        choiceNarrow
-        (choiceNarrow
-         -> Emptiable (Stacked broadElement) Possibly
-        )
-        broadElement
-    -> MorphRow choiceNarrow broadElement
-choiceFinishRow =
-    \choiceMorphRowComplete ->
-        { description =
-            case choiceMorphRowComplete.description |> Emptiable.fill of
-                Stack.TopBelow ( descriptionOnly, [] ) ->
-                    descriptionOnly
-
-                Stack.TopBelow ( description0, description1 :: description2Up ) ->
-                    { custom = Emptiable.empty
-                    , inner =
-                        ArraySized.l2 description0 description1
-                            |> ArraySized.attachMin Up
-                                (description2Up |> ArraySized.fromList)
-                            |> Group
-                            |> Emptiable.filled
-                    }
-        , narrow =
-            \broad_ ->
-                broad_
-                    |> choiceMorphRowComplete.narrow
-                    |> Result.mapError
-                        (\errorPossibilities ->
-                            { startDown = broad_ |> Stack.length
-                            , error = errorPossibilities |> Tries
-                            }
-                                |> Row
-                        )
-        , broaden = choiceMorphRowComplete.broaden
-        }
-
-
-
 --
 
 
@@ -2327,4 +2196,833 @@ rowFinish =
                         )
         , broaden =
             \narrow -> narrow |> broadenFrom morphRow
+        }
+
+
+
+--
+
+
+{-| Possibly incomplete [`Morph`](Morph#Morph) a choice from a [`Value`](Value#Value).
+See [`Morph.choice`](#Morph.choice), [`variantValue`](#variantValue), [`finishValue`](#finishValue)
+-}
+type alias ChoiceMorphNoTry noTryPossiblyOrNever choiceNarrow choiceBeforeNarrow choiceBroaden error =
+    ChoiceMorphNoVariant
+        noTryPossiblyOrNever
+        (choiceBeforeNarrow
+         ->
+            Result
+                (-- tries
+                 Emptiable (Stacked error) noTryPossiblyOrNever
+                )
+                choiceNarrow
+        )
+        choiceBroaden
+
+
+{-| Word in an incomplete morph in progress. For example
+
+    Morph.choiceFinish :
+        Choice.MorphNoTry
+            Never
+            (N (In N0 N9)))
+            Char
+            (N (In N0 N9)) -> Char)
+        -> Morph (N (In N0 N9)) Char
+
+-}
+type NoTry
+    = NoTryTag Never
+
+
+{-| Discriminate into possibilities
+
+    {-| Invisible spacing character
+    -}
+    type Blank
+        = Space
+        | Tab
+        | Return Line.Return
+        | FormFeed
+
+    blankChar : Morph Blank Char (Morph.Error Char)
+    blankChar =
+        Morph.to "blank"
+            (Morph.choice
+                (\spaceVariant tabVariant returnVariant formFeedVariant blankNarrow ->
+                    case blankNarrow of
+                        Space ->
+                            spaceVariant ()
+
+                        Tab ->
+                            tabVariant ()
+
+                        Return return_ ->
+                            returnVariant return_
+
+                        FormFeed ->
+                            formFeedVariant ()
+                )
+                |> Morph.try (\() -> Space) (Char.Morph.only ' ')
+                |> Morph.try (\() -> Tab) (Char.Morph.only '\t')
+                |> Morph.try Return Line.returnChar
+                |> Morph.try (\() -> FormFeed)
+                    -- \f
+                    (Char.Morph.only '\u{000C}')
+                |> Morph.choiceFinish
+            )
+
+    {-| Line break character
+    -}
+    type Return
+        = NewLine
+        | CarriageReturn
+
+    {-| Match a line break character: Either
+
+      - new line `'\n'`
+      - carriage return `'\r'`
+
+    > ℹ️ Equivalent regular expression: `[\n\r]`
+
+        import Morph.Error
+        import String.Morph as Text
+
+        -- match a blank
+        "\n\t abc" |> Text.narrowTo blank --> Ok '\n'
+
+        -- anything else makes it fail
+        "abc"
+            |> Text.narrowTo blank
+            |> Result.mapError Morph.Error.textMessage
+        --> Err "1:1: I was expecting a blank space or new line. I got stuck when I got 'a'."
+
+    -}
+    returnChar : Morph Return Char (Morph.Error Char)
+    returnChar =
+        Morph.choice
+            (\newLineVariant carriageReturnVariant returnNarrow ->
+                case returnNarrow of
+                    NewLine ->
+                        newLineVariant ()
+
+                    CarriageReturn ->
+                        carriageReturnVariant ()
+            )
+            |> Morph.try (\() -> NewLine)
+                (Char.Morph.only '\n')
+            |> Morph.try (\() -> CarriageReturn)
+                -- \r
+                (Char.Morph.only '\u{000D}')
+            |> Morph.choiceFinish
+
+    {-| The end of a text line:
+    either a [return character](Return#Return) or the end of the whole text.
+    -}
+    type LineEnd
+        = InputEnd
+        | Return Return
+
+    {-| Consume the end of the current line or Morph.succeed if there are
+    no more remaining characters in the input text.
+
+    > ℹ️ Equivalent regular expression: `$`
+
+    -}
+    endText : MorphRow Char LineEnd
+    endText =
+        Morph.choice
+            (\returnVariant inputEndVariant maybeChoice ->
+                case maybeChoice of
+                    Return returnValue ->
+                        returnVariant returnValue
+
+                    InputEnd ->
+                        inputEndVariant ()
+            )
+            |> Morph.tryRow Return
+                (returnChar |> Morph.one)
+            |> Morph.tryRow (\() -> InputEnd)
+                Morph.end
+            |> Morph.choiceRowFinish
+
+-}
+choice :
+    broadenByPossibility
+    ->
+        ChoiceMorphNoTry
+            Possibly
+            choiceNarrow_
+            choiceBroad_
+            broadenByPossibility
+            error_
+choice choiceBroadenDiscriminatedByPossibility =
+    { description = Emptiable.empty
+    , narrow =
+        \_ ->
+            Emptiable.empty |> Err
+    , broaden = choiceBroadenDiscriminatedByPossibility
+    }
+
+
+{-| Offer alternative [`Morph`](Morph#Morph) possibilities to a given preferred one.
+Functionally, it's the same as [`Choice.equivalent`](#equivalent) with an optimization
+as shown in ["Fast parsing of String Sets in Elm" by Marcelo Lazaroni](https://lazamar.github.io/fast-parsing-of-string-sets-in-elm/)
+published as [`dict-parser`](https://dark.elm.dmy.fr/packages/lazamar/dict-parser/latest/Parser-Dict)
+
+Usually, you'll be better off with a [`Morph.choice`](#between)
+an explicit custom tagged union
+because you'll have the option to preserve what was [narrowed](Morph#narrowTo).
+(Remember: you can always discard that info and set a preferred option with [`Morph.broad`](Morph#broad))
+
+Go [`Choice.equivalent`](Choice#equivalent) if you have a dynamic list of aliases/morphs to treat equally.
+An example is defined variable names
+
+    import Order
+
+    Choice.equivalentRow String.Morph.only
+        { broad = "∨"
+        , alternatives = [ "|", "or" ]
+        , order = Order.string { case_ = Order.lowerUpper }
+        }
+
+    Choice.equivalentRow String.Morph.only
+        { broad = "±"
+        , alternatives = [ "pm", "plusminus" ]
+        , order = Order.string { case_ = Order.lowerUpper }
+        }
+
+TODO: optimize
+
+-}
+choiceEquivalentRow :
+    (broadElement
+     ->
+        MorphIndependently
+            (beforeNarrow
+             -> Result (ErrorWithDeadEnd deadEnd) narrow
+            )
+            broaden
+    )
+    ->
+        { broad : Emptiable (Stacked broadElement) broadPossibilityEmptyPossiblyOrNever_
+        , alternatives :
+            List
+                (Emptiable (Stacked broadElement) alternativePossibilityEmptyPossiblyOrNever_)
+        , order : broadElement -> broadElement -> Order
+        }
+    ->
+        MorphIndependently
+            (beforeNarrow
+             -> Result (ErrorWithDeadEnd deadEnd) narrow
+            )
+            broaden
+choiceEquivalentRow possibilityMorph possibilitiesOrdered =
+    Debug.todo ""
+
+
+{-| Offer alternative [`Morph`](Morph#Morph) possibilities to a given preferred one.
+
+Usually, you'll be better off with a [`Morph.choice`](#between)
+an explicit custom tagged union
+because you'll have the option to preserve what was [narrowed](Morph#narrowTo).
+(Remember: you can always discard that info and set a preferred option with [`Morph.broad`](Morph#broad))
+
+Go [`Choice.equivalent`](Choice#equivalent) if you have a dynamic list of aliases/morphs to treat equally.
+An example is defined variable names
+
+    Choice.equivalent Char.Morph.only { broad = '∨', alternatives = [ '|' ] }
+
+Use [`Choice.equivalentRow`](#equivalentRow) for strings etc.
+
+-}
+choiceEquivalent :
+    (element
+     ->
+        MorphIndependently
+            (beforeNarrow
+             -> Result (ErrorWithDeadEnd deadEnd) narrow
+            )
+            broaden
+    )
+    ->
+        { broad : element
+        , alternatives : List element
+        }
+    ->
+        MorphIndependently
+            (beforeNarrow
+             -> Result (ErrorWithDeadEnd deadEnd) narrow
+            )
+            broaden
+choiceEquivalent traversePossibility possibilities =
+    case possibilities.alternatives of
+        [] ->
+            traversePossibility possibilities.broad
+
+        alternative0 :: alternatives1Up ->
+            { description =
+                { custom = Emptiable.empty
+                , inner =
+                    ArraySized.l2 possibilities.broad alternative0
+                        |> ArraySized.attachMin Up (alternatives1Up |> ArraySized.fromList)
+                        |> ArraySized.map traversePossibility
+                        |> ArraySized.map description
+                        |> Choice
+                        |> Emptiable.filled
+                }
+            , narrow =
+                \beforeNarrow ->
+                    beforeNarrow
+                        |> choiceEquivalentTryNarrow traversePossibility
+                            (Stack.topBelow possibilities.broad
+                                (alternative0 :: alternatives1Up)
+                            )
+            , broaden =
+                (traversePossibility possibilities.broad).broaden
+            }
+
+
+choiceEquivalentTryNarrow :
+    (element
+     ->
+        MorphIndependently
+            (beforeNarrow
+             -> Result (ErrorWithDeadEnd deadEnd) narrow
+            )
+            broaden
+    )
+    -> Emptiable (Stacked element) Never
+    ->
+        (beforeNarrow
+         -> Result (ErrorWithDeadEnd deadEnd) narrow
+        )
+choiceEquivalentTryNarrow traverseTry tries =
+    \beforeNarrow ->
+        tries
+            |> Stack.removeTop
+            |> Stack.foldFrom
+                (beforeNarrow
+                    |> narrowTo
+                        (traverseTry (tries |> Stack.top))
+                    |> Result.mapError Stack.one
+                )
+                Up
+                (\elementForMorph resultSoFar ->
+                    resultSoFar
+                        |> restoreTry
+                            (\errorsSoFar ->
+                                beforeNarrow
+                                    |> narrowTo (traverseTry elementForMorph)
+                                    |> Result.mapError
+                                        (\error -> errorsSoFar |> Stack.onTopLay error)
+                            )
+                )
+            |> Result.mapError Tries
+
+
+{-| Builder for a [`Morph`](#Morph) to a choice. Possibly incomplete
+
+Initialize with [`Morph.choiceToFrom`](#toFrom)
+
+-}
+type alias ChoiceMorphNoVariant noTryPossiblyOrNever narrow broaden =
+    RecordWithoutConstructorFunction
+        { description : Emptiable (Stacked Description) noTryPossiblyOrNever
+        , narrow : narrow
+        , broaden : broaden
+        }
+
+
+
+-- maybe variant
+
+
+{-| If the previous [`possibility`](#try) fails
+try this [`Morph`](#Morph).
+
+> ℹ️ Equivalent regular expression: `|`
+
+    import Char.Morph as Char
+    import Morph.Error
+    import AToZ exposing (AToZ)
+
+    type UnderscoreOrLetter
+        = Underscore
+        | Letter Char
+
+    underscoreOrLetter : Morph UnderscoreOrLetter Char
+    underscoreOrLetter =
+        Morph.choice
+            (\underscore letter underscoreOrLetter ->
+                case underscoreOrLetter of
+                    Underscore ->
+                        underscore ()
+
+                    Letter aToZ ->
+                        letter aToZ
+            )
+            |> try Underscore (Char.Morph.only '_')
+            |> try Letter AToZ.char
+
+    -- try the first possibility
+    "_" |> Text.narrowTo (underscoreOrLetter |> one)
+    --> Ok Underscore
+
+    -- if it fails, try the next
+    "a" |> Text.narrowTo (underscoreOrLetter |> one)
+    --> Ok 'a'
+
+    -- if none work, we get the error from all possible steps
+    "1"
+        |> Text.narrowTo (underscoreOrLetter |> one)
+        |> Result.mapError Morph.Error.textMessage
+    --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '1'."
+
+-}
+try :
+    (possibilityNarrow -> narrowChoice)
+    ->
+        MorphIndependently
+            (possibilityBeforeNarrow
+             -> Result error possibilityNarrow
+            )
+            (possibilityBeforeBroaden -> possibilityBroad)
+    ->
+        (ChoiceMorphNoTry
+            noTryPossiblyOrNever_
+            narrowChoice
+            possibilityBeforeNarrow
+            ((possibilityBeforeBroaden -> possibilityBroad)
+             -> choiceBroadenFurther
+            )
+            error
+         ->
+            ChoiceMorphNoTry
+                noTryNever_
+                narrowChoice
+                possibilityBeforeNarrow
+                choiceBroadenFurther
+                error
+        )
+try possibilityToChoice possibilityMorph =
+    \choiceMorphSoFar ->
+        { description =
+            choiceMorphSoFar.description
+                |> Stack.onTopLay possibilityMorph.description
+        , narrow =
+            \broadValue ->
+                broadValue
+                    |> choiceMorphSoFar.narrow
+                    |> restoreTry
+                        (\soFarTryErrors ->
+                            case broadValue |> narrowTo possibilityMorph of
+                                Ok possibilityNarrow ->
+                                    possibilityNarrow
+                                        |> possibilityToChoice
+                                        |> Ok
+
+                                Err tryError ->
+                                    soFarTryErrors
+                                        |> Stack.onTopLay tryError
+                                        |> Err
+                        )
+        , broaden =
+            choiceMorphSoFar.broaden
+                (broadenFrom possibilityMorph)
+        }
+
+
+
+-- each variant
+
+
+{-| Initialize a [choice morph](Choice#MorphNoTry)
+by discriminating `(` the broad`,` the narrow `)` choices,
+then `|>` [`Morph.try`](Choice#try)ing each possibility,
+concluding the builder with [`Morph.choiceFinish`](#finish)
+
+A use case is [morphing](Morph#Morph) from and to an internal type
+
+    absoluteInternal : MorphOrError Absolute Decimal.Internal.Absolute error_
+    absoluteInternal =
+        Morph.choiceToFrom
+            ( \variantFraction variantAtLeast1 decimal ->
+                case decimal of
+                    Decimal.Internal.Fraction fractionValue ->
+                        variantFraction fractionValue
+
+                    Decimal.Internal.AtLeast1 atLeast1Value ->
+                        variantAtLeast1 atLeast1Value
+            , \variantFraction variantAtLeast1 decimal ->
+                case decimal of
+                    Fraction fractionValue ->
+                        variantFraction fractionValue
+
+                    AtLeast1 atLeast1Value ->
+                        variantAtLeast1 atLeast1Value
+            )
+            |> Choice.tryToFrom ( Fraction, Decimal.Internal.Fraction ) fractionInternal
+            |> Choice.tryToFrom ( AtLeast1, Decimal.Internal.AtLeast1 ) atLeast1Internal
+            |> Morph.choiceFinish
+
+For morphing choices with simple variants without values (enums),
+a simple [`translate`](Morph#translate) also does the job
+
+    signInternal : MorphOrError Sign Sign.Internal.Sign error_
+    signInternal =
+        Morph.translate
+            (\signInternalBeforeNarrow ->
+                case signInternalBeforeNarrow of
+                    Sign.Internal.Negative ->
+                        Sign.Negative
+
+                    Sign.Internal.Positive ->
+                        Sign.Positive
+            )
+            (\signBeforeBroaden ->
+                case signBeforeBroaden of
+                    Sign.Negative ->
+                        Sign.Internal.Negative
+
+                    Sign.Positive ->
+                        Sign.Internal.Positive
+            )
+
+-}
+choiceToFrom :
+    ( narrowByPossibility
+    , broadenByPossibility
+    )
+    ->
+        ChoiceMorphNoVariant
+            Possibly
+            narrowByPossibility
+            broadenByPossibility
+choiceToFrom ( narrowByPossibility, broadenByPossibility ) =
+    { description = Emptiable.empty
+    , narrow = narrowByPossibility
+    , broaden = broadenByPossibility
+    }
+
+
+{-| [`Morph`](Morph#Morph) the next variant value.
+Finish with [`Morph.choiceToFromFinish`](#finishToFrom)
+-}
+variant :
+    ( narrowVariantValue -> narrowChoice
+    , possibilityBroad -> broadChoice
+    )
+    ->
+        MorphIndependently
+            (beforeNarrowVariantValue
+             -> Result error narrowVariantValue
+            )
+            (beforeBroadVariantValue -> possibilityBroad)
+    ->
+        (ChoiceMorphNoVariant
+            noTryPossiblyOrNever_
+            ((beforeNarrowVariantValue
+              -> Result error narrowChoice
+             )
+             -> narrowChoiceFurther
+            )
+            ((beforeBroadVariantValue -> broadChoice)
+             -> broadenChoiceFurther
+            )
+         ->
+            ChoiceMorphNoVariant
+                noTryNever_
+                narrowChoiceFurther
+                broadenChoiceFurther
+        )
+variant ( possibilityToChoice, possibilityFromChoice ) possibilityMorph =
+    \choiceMorphSoFar ->
+        { description =
+            choiceMorphSoFar.description
+                |> Stack.onTopLay possibilityMorph.description
+        , narrow =
+            choiceMorphSoFar.narrow
+                (\broad_ ->
+                    broad_
+                        |> narrowTo possibilityMorph
+                        |> Result.map possibilityToChoice
+                )
+        , broaden =
+            choiceMorphSoFar.broaden
+                (\narrow ->
+                    narrow
+                        |> broadenFrom possibilityMorph
+                        |> possibilityFromChoice
+                )
+        }
+
+
+{-| Conclude a [`Morph.choiceToFrom`](Choice#toFrom) `|>` [`Choice.tryToFrom`](Choice#tryToFrom) builder
+-}
+choiceToFromFinish :
+    ChoiceMorphNoVariant Never narrow broaden
+    -> MorphIndependently narrow broaden
+choiceToFromFinish =
+    \choiceMorphComplete ->
+        { description =
+            case choiceMorphComplete.description |> Emptiable.fill of
+                Stack.TopBelow ( variantOnly, [] ) ->
+                    variantOnly
+
+                Stack.TopBelow ( variant0, variant1 :: variants2Up ) ->
+                    { custom = Emptiable.empty
+                    , inner =
+                        ArraySized.l2 variant0 variant1
+                            |> ArraySized.attachMin Up
+                                (variants2Up |> ArraySized.fromList)
+                            |> Choice
+                            |> Emptiable.filled
+                    }
+        , narrow = choiceMorphComplete.narrow
+        , broaden = choiceMorphComplete.broaden
+        }
+
+
+
+-- MorphRow
+
+
+{-| Possibly incomplete [`MorphRow`](#MorphRow) to and from a Morph.choice.
+See [`Morph.choice`](#Morph.choice), [`Morph.tryRow`](#try), [`MorphRow.choiceFinish`](#choiceFinish)
+-}
+type alias ChoiceMorphRowNoTry noTryPossiblyOrNever choiceNarrow choiceBroaden broadElement =
+    ChoiceMorphNoVariant
+        noTryPossiblyOrNever
+        (Emptiable (Stacked broadElement) Possibly
+         ->
+            Result
+                (-- tries
+                 Emptiable (Stacked Error) noTryPossiblyOrNever
+                )
+                { narrow : choiceNarrow
+                , broad : Emptiable (Stacked broadElement) Possibly
+                }
+        )
+        choiceBroaden
+
+
+{-| If the previous [`possibility`](#try) fails
+try this [`MorphRow`](#MorphRow).
+
+> ℹ️ Equivalent regular expression: `|`
+
+    import Morph
+    import Char.Morph as Char
+    import Morph.Error
+
+    type UnderscoreOrLetter
+        = Underscore
+        | Letter Char
+
+    underscoreOrLetter : MorphRow Char UnderscoreOrLetter
+    underscoreOrLetter =
+        Morph.choice
+            (\underscoreVariant letterVariant underscoreOrLetterNarrow ->
+                case underscoreOrLetterNarrow of
+                    Underscore ->
+                        underscoreVariant ()
+
+                    Letter letter ->
+                        letterVariant letter
+            )
+            |> try (\() -> Underscore) (Char.Morph.only '_')
+            |> try Letter AToZ.caseAny
+            |> choiceFinish
+
+    -- try the first possibility
+    "_"
+        |> Text.narrowTo underscoreOrLetter
+    --> Ok Underscore
+
+    -- if it fails, try the next
+    "a"
+        |> Text.narrowTo underscoreOrLetter
+    --> Ok 'a'
+
+    -- if none work, we get the error from all possible steps
+    "1"
+        |> Text.narrowTo (onFailDown [ one '_', AToZ.char ])
+        |> Result.mapError Morph.Error.textMessage
+    --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '1'."
+
+
+### example: fallback step if the previous step fails
+
+    import Morph
+    import Char.Morph as Char
+    import Morph.Error
+
+    type AlphaNum
+        = Digits (List (N (In N0 N9)))
+        | Letters String
+
+    alphaNum : MorphRow Char AlphaNum
+    alphaNum =
+        Morph.choice
+            (\digit letter alphaNum ->
+                case alphaNum of
+                    Digits int ->
+                        digit int
+
+                    Letters char ->
+                        letter char
+            )
+            |> Morph.try Letter
+                (map String.Morph.fromList
+                    (atLeast n1 AToZ.char)
+                )
+            |> Morph.try Digit
+                (atLeast n1 Digit.n0To9)
+            |> MorphRow.choiceFinish
+
+    -- try letters, or else give me some digits
+    "abc"
+        |> Text.narrowTo alphaNum
+    --> Ok "abc"
+
+    -- we didn't get letters, but we still got digits
+    "123"
+        |> Text.narrowTo alphaNum
+    --> Ok "123"
+
+    -- but if we still fail, give the expectations of all steps
+    "_"
+        |> Text.narrowTo alphaNum
+        |> Result.mapError Morph.Error.textMessage
+    --> Err "1:1: I was expecting at least 1 digit [0-9]. I got stuck when I got the character '_'."
+
+-}
+tryRow :
+    (possibilityNarrow -> choiceNarrow)
+    -> MorphRow possibilityNarrow broadElement
+    ->
+        (ChoiceMorphRowNoTry
+            noTryPossiblyOrNever_
+            choiceNarrow
+            ((possibilityNarrow -> Emptiable (Stacked broadElement) Possibly)
+             -> choiceBroadenFurther
+            )
+            broadElement
+         ->
+            ChoiceMorphRowNoTry
+                never_
+                choiceNarrow
+                choiceBroadenFurther
+                broadElement
+        )
+tryRow possibilityToChoice possibilityMorph =
+    \choiceMorphSoFar ->
+        { description =
+            choiceMorphSoFar.description
+                |> Stack.onTopLay (possibilityMorph |> description)
+        , narrow =
+            \choiceBroad ->
+                choiceBroad
+                    |> choiceMorphSoFar.narrow
+                    |> restoreTry
+                        (\soFarErrorPossibilities ->
+                            case choiceBroad |> narrowTo possibilityMorph of
+                                Ok possibilityParsed ->
+                                    { broad = possibilityParsed.broad
+                                    , narrow =
+                                        possibilityParsed.narrow
+                                            |> possibilityToChoice
+                                    }
+                                        |> Ok
+
+                                Err possibilityExpectation ->
+                                    soFarErrorPossibilities
+                                        |> Stack.onTopLay possibilityExpectation
+                                        |> Err
+                        )
+        , broaden =
+            choiceMorphSoFar.broaden
+                (broadenFrom possibilityMorph)
+        }
+
+
+{-| Always the last step in a [`Morph.choice`](#choice) `|>` [`Morph.tryRow`](#tryRow) build process
+-}
+choiceRowFinish :
+    ChoiceMorphRowNoTry
+        Never
+        choiceNarrow
+        (choiceNarrow
+         -> Emptiable (Stacked broadElement) Possibly
+        )
+        broadElement
+    -> MorphRow choiceNarrow broadElement
+choiceRowFinish =
+    \choiceMorphRowComplete ->
+        { description =
+            case choiceMorphRowComplete.description |> Emptiable.fill of
+                Stack.TopBelow ( descriptionOnly, [] ) ->
+                    descriptionOnly
+
+                Stack.TopBelow ( description0, description1 :: description2Up ) ->
+                    { custom = Emptiable.empty
+                    , inner =
+                        ArraySized.l2 description0 description1
+                            |> ArraySized.attachMin Up
+                                (description2Up |> ArraySized.fromList)
+                            |> Group
+                            |> Emptiable.filled
+                    }
+        , narrow =
+            \broad_ ->
+                broad_
+                    |> choiceMorphRowComplete.narrow
+                    |> Result.mapError
+                        (\errorPossibilities ->
+                            { startDown = broad_ |> Stack.length
+                            , error = errorPossibilities |> Tries
+                            }
+                                |> Row
+                        )
+        , broaden = choiceMorphRowComplete.broaden
+        }
+
+
+{-| Conclude a [`Morph.choice`](Choice#between) `|>` [`Morph.try`](Choice#try) builder
+-}
+choiceFinish :
+    ChoiceMorphNoTry
+        Never
+        choiceNarrow
+        choiceBeforeNarrow
+        (choiceBeforeBroaden -> choiceBroad)
+        (ErrorWithDeadEnd deadEnd)
+    ->
+        MorphIndependently
+            (choiceBeforeNarrow
+             -> Result (ErrorWithDeadEnd deadEnd) choiceNarrow
+            )
+            (choiceBeforeBroaden -> choiceBroad)
+choiceFinish =
+    \choiceMorphComplete ->
+        { description =
+            case choiceMorphComplete.description |> Emptiable.fill of
+                Stack.TopBelow ( variantOnly, [] ) ->
+                    variantOnly
+
+                Stack.TopBelow ( variant0, variant1 :: variants2Up ) ->
+                    { custom = Emptiable.empty
+                    , inner =
+                        ArraySized.l2 variant0 variant1
+                            |> ArraySized.attachMin Up
+                                (variants2Up |> ArraySized.fromList)
+                            |> Choice
+                            |> Emptiable.filled
+                    }
+        , narrow =
+            choiceMorphComplete.narrow
+                >> Result.mapError Tries
+        , broaden =
+            choiceMorphComplete.broaden
         }

@@ -29,7 +29,6 @@ module Json exposing
 -}
 
 import Array
-import Choice
 import Decimal exposing (Decimal)
 import Decimal.Internal
 import Dict exposing (Dict)
@@ -507,7 +506,7 @@ decimalInternal :
         Decimal.Internal.Decimal
         (Morph.ErrorWithDeadEnd deadEnd_)
 decimalInternal =
-    Choice.toFrom
+    Morph.choiceToFrom
         ( \variantN0 variantSigned decimalInternalBeforeNarrow ->
             case decimalInternalBeforeNarrow of
                 Decimal.Internal.N0 ->
@@ -523,9 +522,9 @@ decimalInternal =
                 Decimal.Signed signedValue ->
                     variantSigned signedValue
         )
-        |> Choice.variant ( \() -> Decimal.N0, \() -> Decimal.Internal.N0 ) Morph.keep
-        |> Choice.variant ( Decimal.Signed, Decimal.Internal.Signed ) signedInternal
-        |> Choice.finishToFrom
+        |> Morph.variant ( \() -> Decimal.N0, \() -> Decimal.Internal.N0 ) Morph.keep
+        |> Morph.variant ( Decimal.Signed, Decimal.Internal.Signed ) signedInternal
+        |> Morph.choiceToFromFinish
 
 
 signedInternal :
@@ -545,7 +544,7 @@ signedInternal =
 
 absoluteInternal : MorphOrError Decimal.Absolute Decimal.Internal.Absolute error_
 absoluteInternal =
-    Choice.toFrom
+    Morph.choiceToFrom
         ( \variantFraction variantAtLeast1 decimal ->
             case decimal of
                 Decimal.Internal.Fraction fractionValue ->
@@ -561,9 +560,9 @@ absoluteInternal =
                 Decimal.AtLeast1 atLeast1Value ->
                     variantAtLeast1 atLeast1Value
         )
-        |> Choice.variant ( Decimal.Fraction, Decimal.Internal.Fraction ) Morph.keep
-        |> Choice.variant ( Decimal.AtLeast1, Decimal.Internal.AtLeast1 ) Morph.keep
-        |> Choice.finishToFrom
+        |> Morph.variant ( Decimal.Fraction, Decimal.Internal.Fraction ) Morph.keep
+        |> Morph.variant ( Decimal.AtLeast1, Decimal.Internal.AtLeast1 ) Morph.keep
+        |> Morph.choiceToFromFinish
 
 
 signInternal : MorphOrError Sign Sign.Internal.Sign error_

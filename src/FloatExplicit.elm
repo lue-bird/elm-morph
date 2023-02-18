@@ -19,7 +19,6 @@ module FloatExplicit exposing
 
 -}
 
-import Choice
 import Decimal.Internal
 import Emptiable exposing (Emptiable)
 import Linear exposing (Direction(..))
@@ -70,7 +69,7 @@ since `Float` is fixed in bit size while [`FloatExplicit`](#FloatExplicit) is no
 -}
 float : MorphOrError FloatExplicit Float error_
 float =
-    Choice.toFrom
+    Morph.choiceToFrom
         ( \variantDecimal variantNaN variantInfinity choiceFloat ->
             if choiceFloat |> Basics.isNaN then
                 variantNaN ()
@@ -97,7 +96,7 @@ float =
                 Exception (Infinity sign) ->
                     variantInfinity sign
         )
-        |> Choice.variant ( Decimal, identity )
+        |> Morph.variant ( Decimal, identity )
             (Morph.translate
                 (\float_ ->
                     if float_ == 0 then
@@ -163,8 +162,8 @@ float =
                             numberSigned.absolute |> absoluteToFloat |> toSigned
                 )
             )
-        |> Choice.variant ( \() -> Exception NaN, identity ) (Morph.broaden (\() -> floatNaN))
-        |> Choice.variant ( \sign -> Exception (Infinity sign), identity )
+        |> Morph.variant ( \() -> Exception NaN, identity ) (Morph.broaden (\() -> floatNaN))
+        |> Morph.variant ( \sign -> Exception (Infinity sign), identity )
             (Morph.broaden
                 (\sign ->
                     let
@@ -179,7 +178,7 @@ float =
                     floatInfinity |> toSigned
                 )
             )
-        |> Choice.finishToFrom
+        |> Morph.choiceToFromFinish
 
 
 {-| [`Morph`](Morph#Morph)
@@ -290,7 +289,7 @@ floatFractionToDigits =
 -}
 value : Value.Morph FloatExplicit
 value =
-    Choice.between
+    Morph.choice
         (\variantDecimal variantException choiceExplicit ->
             case choiceExplicit of
                 Decimal decimal ->
@@ -299,9 +298,9 @@ value =
                 Exception exception ->
                     variantException exception
         )
-        |> Choice.variantValue ( Decimal, "Decimal" ) decimalInternalValue
-        |> Choice.variantValue ( Exception, "Exception" ) exceptionValue
-        |> Choice.finishValue
+        |> Value.variant ( Decimal, "Decimal" ) decimalInternalValue
+        |> Value.variant ( Exception, "Exception" ) exceptionValue
+        |> Value.choiceFinish
 
 
 decimalInternalValue : Value.Morph Decimal.Internal.Decimal
@@ -326,7 +325,7 @@ decimalInternalValue =
 -}
 exceptionValue : Value.Morph Exception
 exceptionValue =
-    Choice.between
+    Morph.choice
         (\variantNaN variantInfinity choiceException ->
             case choiceException of
                 NaN ->
@@ -335,14 +334,14 @@ exceptionValue =
                 Infinity sign ->
                     variantInfinity sign
         )
-        |> Choice.variantValue ( \() -> NaN, "NaN" ) Value.unit
-        |> Choice.variantValue ( Infinity, "NaN" ) signValue
-        |> Choice.finishValue
+        |> Value.variant ( \() -> NaN, "NaN" ) Value.unit
+        |> Value.variant ( Infinity, "NaN" ) signValue
+        |> Value.choiceFinish
 
 
 signValue : Value.Morph Sign
 signValue =
-    Choice.between
+    Morph.choice
         (\negative positive sign ->
             case sign of
                 Sign.Negative ->
@@ -351,6 +350,6 @@ signValue =
                 Sign.Positive ->
                     positive ()
         )
-        |> Choice.variantValue ( \() -> Sign.Negative, "Negative" ) Value.unit
-        |> Choice.variantValue ( \() -> Sign.Positive, "Positive" ) Value.unit
-        |> Choice.finishValue
+        |> Value.variant ( \() -> Sign.Negative, "Negative" ) Value.unit
+        |> Value.variant ( \() -> Sign.Positive, "Positive" ) Value.unit
+        |> Value.choiceFinish

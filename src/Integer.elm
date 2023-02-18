@@ -24,7 +24,6 @@ import ArraySized exposing (ArraySized)
 import ArraySized.Morph
 import Bit exposing (Bit)
 import Bits
-import Choice
 import Decimal exposing (Decimal)
 import Decimal.Internal exposing (Whole)
 import Emptiable exposing (Emptiable)
@@ -64,7 +63,7 @@ without digits after the decimal point
 -}
 decimal : Morph Integer Decimal
 decimal =
-    Choice.toFrom
+    Morph.choiceToFrom
         ( \n0 variantSigned decimalChoice ->
             case decimalChoice of
                 Decimal.N0 ->
@@ -80,13 +79,13 @@ decimal =
                 Signed signedValue ->
                     variantSigned signedValue
         )
-        |> Choice.variant
+        |> Morph.variant
             ( \() -> N0, \() -> Decimal.N0 )
             (Morph.broad ())
-        |> Choice.variant
+        |> Morph.variant
             ( Signed, Decimal.Signed )
             decimalSigned
-        |> Choice.finishToFrom
+        |> Morph.choiceToFromFinish
 
 
 decimalSigned : Morph Signed Decimal.Signed
@@ -201,7 +200,7 @@ internalToInt =
 rowChar : MorphRow Integer Char
 rowChar =
     Morph.to "whole"
-        (Choice.between
+        (Morph.choice
             (\n0Variant signedVariant integerNarrow ->
                 case integerNarrow of
                     N0 ->
@@ -210,9 +209,9 @@ rowChar =
                     Signed signedValue ->
                         signedVariant signedValue
             )
-            |> Choice.tryRow (\() -> N0) (String.Morph.only "0")
-            |> Choice.tryRow Signed signed
-            |> Choice.finishRow
+            |> Morph.tryRow (\() -> N0) (String.Morph.only "0")
+            |> Morph.tryRow Signed signed
+            |> Morph.choiceRowFinish
         )
 
 

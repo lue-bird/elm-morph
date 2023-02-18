@@ -17,7 +17,6 @@ module AToZ exposing
 -}
 
 import Char.Morph
-import Choice
 import Morph exposing (Morph)
 
 
@@ -127,7 +126,7 @@ cased :
             { case_ : Case, letter : possibilityNarrow }
             broad
 cased casedLetters =
-    Choice.between
+    Morph.choice
         (\lowerVariant upperVariant caseValue ->
             case caseValue.case_ of
                 CaseLower ->
@@ -136,13 +135,13 @@ cased casedLetters =
                 CaseUpper ->
                     upperVariant caseValue.letter
         )
-        |> Choice.try
+        |> Morph.try
             (\letter -> { case_ = CaseLower, letter = letter })
             casedLetters.lower
-        |> Choice.try
+        |> Morph.try
             (\letter -> { case_ = CaseUpper, letter = letter })
             casedLetters.upper
-        |> Choice.finish
+        |> Morph.choiceFinish
 
 
 {-| Match exactly one lowercase letter character.
@@ -165,7 +164,7 @@ This is case sensitive.
 -}
 lowerChar : Morph AToZ Char
 lowerChar =
-    Choice.between
+    Morph.choice
         (\a b c d e f g h i j k l m n o p q r s t u v w x y z aToZNarrow ->
             case aToZNarrow of
                 A ->
@@ -246,33 +245,33 @@ lowerChar =
                 Z ->
                     z ()
         )
-        |> Choice.try (\() -> A) (Char.Morph.only 'a')
-        |> Choice.try (\() -> B) (Char.Morph.only 'b')
-        |> Choice.try (\() -> C) (Char.Morph.only 'c')
-        |> Choice.try (\() -> D) (Char.Morph.only 'd')
-        |> Choice.try (\() -> E) (Char.Morph.only 'e')
-        |> Choice.try (\() -> F) (Char.Morph.only 'f')
-        |> Choice.try (\() -> G) (Char.Morph.only 'g')
-        |> Choice.try (\() -> H) (Char.Morph.only 'h')
-        |> Choice.try (\() -> I) (Char.Morph.only 'i')
-        |> Choice.try (\() -> J) (Char.Morph.only 'j')
-        |> Choice.try (\() -> K) (Char.Morph.only 'k')
-        |> Choice.try (\() -> L) (Char.Morph.only 'l')
-        |> Choice.try (\() -> M) (Char.Morph.only 'm')
-        |> Choice.try (\() -> N) (Char.Morph.only 'n')
-        |> Choice.try (\() -> O) (Char.Morph.only 'o')
-        |> Choice.try (\() -> P) (Char.Morph.only 'p')
-        |> Choice.try (\() -> Q) (Char.Morph.only 'q')
-        |> Choice.try (\() -> R) (Char.Morph.only 'r')
-        |> Choice.try (\() -> S) (Char.Morph.only 's')
-        |> Choice.try (\() -> T) (Char.Morph.only 't')
-        |> Choice.try (\() -> U) (Char.Morph.only 'u')
-        |> Choice.try (\() -> V) (Char.Morph.only 'v')
-        |> Choice.try (\() -> W) (Char.Morph.only 'w')
-        |> Choice.try (\() -> X) (Char.Morph.only 'x')
-        |> Choice.try (\() -> Y) (Char.Morph.only 'y')
-        |> Choice.try (\() -> Z) (Char.Morph.only 'z')
-        |> Choice.finish
+        |> Morph.try (\() -> A) (Char.Morph.only 'a')
+        |> Morph.try (\() -> B) (Char.Morph.only 'b')
+        |> Morph.try (\() -> C) (Char.Morph.only 'c')
+        |> Morph.try (\() -> D) (Char.Morph.only 'd')
+        |> Morph.try (\() -> E) (Char.Morph.only 'e')
+        |> Morph.try (\() -> F) (Char.Morph.only 'f')
+        |> Morph.try (\() -> G) (Char.Morph.only 'g')
+        |> Morph.try (\() -> H) (Char.Morph.only 'h')
+        |> Morph.try (\() -> I) (Char.Morph.only 'i')
+        |> Morph.try (\() -> J) (Char.Morph.only 'j')
+        |> Morph.try (\() -> K) (Char.Morph.only 'k')
+        |> Morph.try (\() -> L) (Char.Morph.only 'l')
+        |> Morph.try (\() -> M) (Char.Morph.only 'm')
+        |> Morph.try (\() -> N) (Char.Morph.only 'n')
+        |> Morph.try (\() -> O) (Char.Morph.only 'o')
+        |> Morph.try (\() -> P) (Char.Morph.only 'p')
+        |> Morph.try (\() -> Q) (Char.Morph.only 'q')
+        |> Morph.try (\() -> R) (Char.Morph.only 'r')
+        |> Morph.try (\() -> S) (Char.Morph.only 's')
+        |> Morph.try (\() -> T) (Char.Morph.only 't')
+        |> Morph.try (\() -> U) (Char.Morph.only 'u')
+        |> Morph.try (\() -> V) (Char.Morph.only 'v')
+        |> Morph.try (\() -> W) (Char.Morph.only 'w')
+        |> Morph.try (\() -> X) (Char.Morph.only 'x')
+        |> Morph.try (\() -> Y) (Char.Morph.only 'y')
+        |> Morph.try (\() -> Z) (Char.Morph.only 'z')
+        |> Morph.choiceFinish
 
 
 {-| Match exactly one uppercase letter character.
@@ -296,7 +295,7 @@ This is case sensitive.
 -}
 upperChar : Morph AToZ Char
 upperChar =
-    Choice.between
+    Morph.choice
         (\a b c d e f g h i j k l m n o p q r s t u v w x y z aToZNarrow ->
             case aToZNarrow of
                 A ->
@@ -377,33 +376,33 @@ upperChar =
                 Z ->
                     z ()
         )
-        |> Choice.try (\() -> A) (Char.Morph.only 'A')
-        |> Choice.try (\() -> B) (Char.Morph.only 'B')
-        |> Choice.try (\() -> C) (Char.Morph.only 'C')
-        |> Choice.try (\() -> D) (Char.Morph.only 'D')
-        |> Choice.try (\() -> E) (Char.Morph.only 'E')
-        |> Choice.try (\() -> F) (Char.Morph.only 'F')
-        |> Choice.try (\() -> G) (Char.Morph.only 'G')
-        |> Choice.try (\() -> H) (Char.Morph.only 'H')
-        |> Choice.try (\() -> I) (Char.Morph.only 'I')
-        |> Choice.try (\() -> J) (Char.Morph.only 'J')
-        |> Choice.try (\() -> K) (Char.Morph.only 'K')
-        |> Choice.try (\() -> L) (Char.Morph.only 'L')
-        |> Choice.try (\() -> M) (Char.Morph.only 'M')
-        |> Choice.try (\() -> N) (Char.Morph.only 'N')
-        |> Choice.try (\() -> O) (Char.Morph.only 'O')
-        |> Choice.try (\() -> P) (Char.Morph.only 'P')
-        |> Choice.try (\() -> Q) (Char.Morph.only 'Q')
-        |> Choice.try (\() -> R) (Char.Morph.only 'R')
-        |> Choice.try (\() -> S) (Char.Morph.only 'S')
-        |> Choice.try (\() -> T) (Char.Morph.only 'T')
-        |> Choice.try (\() -> U) (Char.Morph.only 'U')
-        |> Choice.try (\() -> V) (Char.Morph.only 'V')
-        |> Choice.try (\() -> W) (Char.Morph.only 'W')
-        |> Choice.try (\() -> X) (Char.Morph.only 'X')
-        |> Choice.try (\() -> Y) (Char.Morph.only 'Y')
-        |> Choice.try (\() -> Z) (Char.Morph.only 'Z')
-        |> Choice.finish
+        |> Morph.try (\() -> A) (Char.Morph.only 'A')
+        |> Morph.try (\() -> B) (Char.Morph.only 'B')
+        |> Morph.try (\() -> C) (Char.Morph.only 'C')
+        |> Morph.try (\() -> D) (Char.Morph.only 'D')
+        |> Morph.try (\() -> E) (Char.Morph.only 'E')
+        |> Morph.try (\() -> F) (Char.Morph.only 'F')
+        |> Morph.try (\() -> G) (Char.Morph.only 'G')
+        |> Morph.try (\() -> H) (Char.Morph.only 'H')
+        |> Morph.try (\() -> I) (Char.Morph.only 'I')
+        |> Morph.try (\() -> J) (Char.Morph.only 'J')
+        |> Morph.try (\() -> K) (Char.Morph.only 'K')
+        |> Morph.try (\() -> L) (Char.Morph.only 'L')
+        |> Morph.try (\() -> M) (Char.Morph.only 'M')
+        |> Morph.try (\() -> N) (Char.Morph.only 'N')
+        |> Morph.try (\() -> O) (Char.Morph.only 'O')
+        |> Morph.try (\() -> P) (Char.Morph.only 'P')
+        |> Morph.try (\() -> Q) (Char.Morph.only 'Q')
+        |> Morph.try (\() -> R) (Char.Morph.only 'R')
+        |> Morph.try (\() -> S) (Char.Morph.only 'S')
+        |> Morph.try (\() -> T) (Char.Morph.only 'T')
+        |> Morph.try (\() -> U) (Char.Morph.only 'U')
+        |> Morph.try (\() -> V) (Char.Morph.only 'V')
+        |> Morph.try (\() -> W) (Char.Morph.only 'W')
+        |> Morph.try (\() -> X) (Char.Morph.only 'X')
+        |> Morph.try (\() -> Y) (Char.Morph.only 'Y')
+        |> Morph.try (\() -> Z) (Char.Morph.only 'Z')
+        |> Morph.choiceFinish
 
 
 {-| Match only the specific given broad input. See [`Morph.only`](Morph#only)

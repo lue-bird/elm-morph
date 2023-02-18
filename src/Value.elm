@@ -4,6 +4,7 @@ module Value exposing
     , unit
     , GroupMorphNoPart
     , field, group, groupFinish
+    , variant, choiceFinish
     , Name, Index, IndexOrName(..), IndexAndName
     , descriptive, compact, tagTranslate, tagMap
     , AtomOrComposed(..)
@@ -26,7 +27,7 @@ Plus it makes it harder to switch to a different format
 @docs Morph
 @docs unit
 
-Basically every `module` here has a [`Value.Morph`](#Morph),
+Basically every `module` here has a [`Morph`](#Morph),
 for example
 
   - [`Int.Morph`](Int-Morph)
@@ -40,19 +41,21 @@ for example
   - [`Array.Morph`](Array-Morph)
 
 
-### record
+### group
 
 @docs GroupMorphNoPart
 @docs field, group, groupFinish
 
 
-### Choice.between
+### choice
 
-variant union [`Value.Morph`](#Value.Morph)
+variant union [`Morph`](#Morph)
 
-  - starting from [`Choice.between`](Choice#between)
-  - over [`Choice.variantValue`](Choice#variantValue)
-  - and completed with [`Choice.finishValue`](Choice#finishValue)
+  - starting from [`Morph.choice`](Morph#choice)
+  - over [`Value.variant`](#variant)
+  - and completed with [`Value.choiceFinish`](#choiceFinish)
+
+@docs variant, choiceFinish
 
 
 ## tag
@@ -66,9 +69,9 @@ variant union [`Value.Morph`](#Value.Morph)
 
 build on existing ones
 
-    {-| `Posix` `Value.Morph`
+    {-| `Posix` `Morph`
     -}
-    posixValue : Value.Morph Posix
+    posixValue : Morph Posix
     posixValue =
         Morph.translate
             Time.posixToMillis
@@ -129,7 +132,7 @@ import ArraySized
 import Decimal.Internal exposing (Decimal)
 import Emptiable exposing (Emptiable, fill, filled)
 import Linear exposing (Direction(..))
-import Morph exposing (Morph, MorphIndependently, MorphOrError, broadenFrom, narrowTo, to, translate)
+import Morph exposing (ChoiceMorphNoTry, Morph, MorphIndependently, MorphOrError, broadenFrom, narrowTo, to, translate)
 import N exposing (Up)
 import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
@@ -162,11 +165,11 @@ that can't be converted in a small amount of runtime
 (for example treating tuples the same as records is just O(1))?
 → PR!
 
-Please use to the [`Value.Morph`](#Value.Morph)s present in most `module`s
+Please use to the [`Morph`](#Morph)s present in most `module`s
 to construct a [`Value`](#Value),
 as you can for example construct ↓ using the exposed(..) variants
 
-    Value.List [ Value.Unit (), Value.String "huh" ]
+    List [ Unit (), String "huh" ]
 
 which isn't a valid elm value
 
@@ -199,7 +202,7 @@ type alias Record tag =
 
 {-| EIther [`Index`](#Index) or [`Name`](#Name)
 
-Used as the narrow argument of a [`Value.Morph`](#Value.Morph)
+Used as the narrow argument of a [`Morph`](#Morph)
 
 -}
 type IndexOrName
@@ -223,7 +226,7 @@ type alias Name =
 
 {-| Both [`Index`](#Index) and [`Name`](#Name)
 
-Used as the broad result of a [`Value.Morph`](#Value.Morph)
+Used as the broad result of a [`Morph`](#Morph)
 
 -}
 type alias IndexAndName =
@@ -282,11 +285,11 @@ by reducing the amount of tag information in both directions
 For [`Value`](#Value), it's
 
     ...
-        |> Morph.over (Value.tagTranslate Value.compact)
+        |> Morph.over (tagTranslate compact)
 
     -- or
     ...
-        |> Morph.over (Value.tagTranslate Value.descriptive)
+        |> Morph.over (tagTranslate descriptive)
 
 but the same thing works for [`Json`](Json), ... as well
 
@@ -508,20 +511,20 @@ unit =
         |> Morph.over atom
 
 
-{-| Start a record assembly [`Value.Morph`](#Value.Morph)
+{-| Start a record assembly [`Morph`](#Morph)
 
 Continue with [`field`](#field)
 
-    {-| `( ..., ... )` `Value.Morph`
+    {-| `( ..., ... )` `Morph`
 
     Just use a record with descriptive names instead!
 
     -}
     tuple2 :
-        ( Value.Morph part0
-        , Value.Morph part1
+        ( Morph part0
+        , Morph part1
         )
-        -> Value.Morph ( part0, part1 )
+        -> Morph ( part0, part1 )
     tuple2 ( part0Morph, part1Morph ) =
         Morph.to "Tuple2"
             (record
@@ -531,17 +534,17 @@ Continue with [`field`](#field)
                 |> recordFinish
             )
 
-    {-| `( ..., ..., ... )` `Value.Morph`
+    {-| `( ..., ..., ... )` `Morph`
 
     Just use a record with descriptive names instead!
 
     -}
     tuple3 :
-        ( Value.Morph part0
-        , Value.Morph part1
-        , Value.Morph part2
+        ( Morph part0
+        , Morph part1
+        , Morph part2
         )
-        -> Value.Morph ( part0, part1, part2 )
+        -> Morph ( part0, part1, part2 )
     tuple3 ( part0Morph, part1Morph, part2Morph ) =
         Morph.to "Tuple3"
             (record
@@ -560,17 +563,17 @@ group groupNarrowAssemble =
     Morph.groupToFrom ( groupNarrowAssemble, Emptiable.empty )
 
 
-{-| possibly incomplete step from and to a [`Value.Record`](Value#Record)
+{-| possibly incomplete step from and to a [`Record`](Value#Record)
 
 building:
 
-  - start with [`Value.group`](#value)
-  - continue with [`Value.field`](#field)
-  - finish with [`Value.groupFinish`](#groupFinish)
+  - start with [`group`](#value)
+  - continue with [`field`](#field)
+  - finish with [`groupFinish`](#groupFinish)
 
 -}
 type alias GroupMorphNoPart noPartPossiblyOrNever groupNarrow groupNarrowFurther =
-    Morph.MorphNoPart
+    Morph.GroupMorphNoPart
         noPartPossiblyOrNever
         (Record IndexOrName
          ->
@@ -709,7 +712,7 @@ partValueNarrow tag fieldValueMorph groupSoFarNarrow =
                     |> Err
 
 
-{-| Conclude the [`Value.group`](#group) |> [`Value.field`](#field) chain
+{-| Conclude the [`group`](#group) |> [`field`](#field) chain
 -}
 groupFinish :
     GroupMorphNoPart Never record record
@@ -729,6 +732,138 @@ groupFinish =
 
                                 composedExceptRecord ->
                                     composedExceptRecord |> composedKindToString |> Err
+                    }
+                )
+            |> Morph.over composed
+
+
+{-| Describe another variant value [`Morph`](#Morph) to [`Value`](#Value)
+
+Done? → [`Value.choiceFinish`](#choiceFinish)
+
+If a variant doesn't have any value attached, use [`unit`](Value#unit)
+
+    {-| `Bool` `MorphValue`
+    -}
+    boolValue : MorphValue Bool
+    boolValue =
+        Morph.choice
+            (\true false bool ->
+                case bool of
+                    True ->
+                        true ()
+
+                    False ->
+                        false ()
+            )
+            |> Value.variant ( \() -> True, "True" ) unit
+            |> Value.variant ( \() -> False, "False" ) unit
+            |> Value.choiceFinish
+
+-}
+variant :
+    ( possibilityNarrow -> choiceNarrow
+    , String
+    )
+    -> Morph possibilityNarrow
+    ->
+        (ChoiceMorphNoTry
+            noTryPossiblyOrNever_
+            choiceNarrow
+            (Tagged IndexOrName)
+            ((possibilityNarrow
+              -> Tagged IndexAndName
+             )
+             -> choiceBroadenFurther
+            )
+            Morph.Error
+         ->
+            ChoiceMorphNoTry
+                noTryNever_
+                choiceNarrow
+                (Tagged IndexOrName)
+                choiceBroadenFurther
+                Morph.Error
+        )
+variant ( possibilityToChoice, possibilityTag ) possibilityMorph =
+    \choiceMorphSoFar ->
+        choiceMorphSoFar
+            |> Morph.try possibilityToChoice
+                (Morph.to possibilityTag
+                    { description = { custom = Emptiable.empty, inner = Emptiable.empty }
+                    , narrow =
+                        variantStepNarrow
+                            ( { name = possibilityTag
+                              , index = choiceMorphSoFar.description |> Stack.length
+                              }
+                            , Morph.narrowTo possibilityMorph
+                            )
+                    , broaden =
+                        \narrowValue ->
+                            { tag =
+                                { name = possibilityTag
+                                , index = choiceMorphSoFar.description |> Stack.length
+                                }
+                            , value = narrowValue |> Morph.broadenFrom possibilityMorph
+                            }
+                    }
+                )
+
+
+variantStepNarrow :
+    ( IndexAndName
+    , Value IndexOrName
+      -> Result Morph.Error possibilityNarrow
+    )
+    ->
+        (Tagged IndexOrName
+         -> Result Morph.Error possibilityNarrow
+        )
+variantStepNarrow ( variantTag, possibilityNarrow ) =
+    \variantBroad ->
+        case variantBroad.tag of
+            Index index ->
+                if index == variantTag.index then
+                    variantBroad.value |> possibilityNarrow
+
+                else
+                    "tag " ++ (index |> String.fromInt) |> Morph.DeadEnd |> Err
+
+            Name name ->
+                if name == variantTag.name then
+                    variantBroad.value |> possibilityNarrow
+
+                else
+                    "tag " ++ name |> Morph.DeadEnd |> Err
+
+
+{-| Conclude a [`Morph.choice`](Morph#Morph.choice) |> [`Value.variant`](#variant) chain
+-}
+choiceFinish :
+    ChoiceMorphNoTry
+        Never
+        choiceNarrow
+        (Tagged IndexOrName)
+        (choiceNarrow -> Tagged IndexAndName)
+        Morph.Error
+    -> Morph choiceNarrow
+choiceFinish =
+    \choiceMorphComplete ->
+        choiceMorphComplete
+            |> Morph.choiceFinish
+            |> Morph.over
+                (Morph.value "Variant"
+                    { narrow =
+                        \value ->
+                            case value of
+                                Variant variant_ ->
+                                    variant_ |> Ok
+
+                                composedExceptVariant ->
+                                    composedExceptVariant
+                                        |> composedKindToString
+                                        |> Err
+                    , broaden = Variant
                     }
                 )
             |> Morph.over composed

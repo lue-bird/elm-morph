@@ -12,7 +12,6 @@ module Sign exposing
 -}
 
 import Char.Morph
-import Choice
 import Emptiable
 import Maybe.Morph
 import Morph exposing (Morph, MorphRow, translate)
@@ -31,7 +30,7 @@ type Sign
 char : Morph Sign Char
 char =
     Morph.to "sign"
-        (Choice.between
+        (Morph.choice
             (\plus minus signNarrow ->
                 case signNarrow of
                     Positive ->
@@ -40,9 +39,9 @@ char =
                     Negative ->
                         minus ()
             )
-            |> Choice.try (\() -> Positive) (Char.Morph.only '+')
-            |> Choice.try (\() -> Negative) (Char.Morph.only '-')
-            |> Choice.finish
+            |> Morph.try (\() -> Positive) (Char.Morph.only '+')
+            |> Morph.try (\() -> Negative) (Char.Morph.only '-')
+            |> Morph.choiceFinish
         )
 
 
