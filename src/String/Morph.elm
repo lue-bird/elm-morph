@@ -32,8 +32,8 @@ Also available: [`toggle`](Morph#toggle) `String.reverse`
 import Char.Morph
 import List.Morph
 import Morph exposing (Morph, MorphOrError, MorphRow, Translate, broad, one, translate, translateOn)
-import Value exposing (MorphValue)
-import Value.PackageInternal
+import String.Morph.Internal
+import Value
 
 
 {-| [`Translate`](Morph#Translate) from a `String` to a `List Char`.
@@ -140,19 +140,8 @@ for charMorphRow expectedText =
 --
 
 
-{-| `String` [`MorphValue`](Value#MorphValue)
+{-| `String` [`Value.Morph`](Value#Morph)
 -}
-value : MorphValue String
+value : Value.Morph String
 value =
-    Morph.value "String"
-        { broaden = Value.String
-        , narrow =
-            \valueBroad ->
-                case valueBroad of
-                    Value.String stringNarrow ->
-                        stringNarrow |> Ok
-
-                    atomExceptString ->
-                        atomExceptString |> Value.PackageInternal.atomKindToString |> Err
-        }
-        |> Morph.over Value.atom
+    String.Morph.Internal.value

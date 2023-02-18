@@ -32,8 +32,7 @@ import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, MorphOrError
 import N exposing (Up)
 import Possibly exposing (Possibly(..))
 import Stack exposing (Stacked)
-import Value exposing (MorphValue)
-import Value.PackageInternal
+import Value
 
 
 
@@ -196,7 +195,7 @@ for morphRowByElement elementsToTraverseInSequence =
 
 {-| `List` [`Morph`](#Morph)
 -}
-value : MorphValue element -> MorphValue (List element)
+value : Value.Morph element -> Value.Morph (List element)
 value elementMorph =
     eachElement elementMorph
         |> Morph.over
@@ -212,7 +211,7 @@ value elementMorph =
 
                             composedExceptList ->
                                 composedExceptList
-                                    |> Value.PackageInternal.composedKindToString
+                                    |> Value.composedKindToString
                                     |> Err
                 , broaden = Value.List
                 }

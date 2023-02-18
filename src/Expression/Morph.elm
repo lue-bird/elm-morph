@@ -29,8 +29,7 @@ Adapted from
 
 import ArraySized.Morph exposing (atLeast)
 import Char.Morph
-import Group exposing (grab, skip)
-import Morph exposing (Morph, MorphRow, succeed)
+import Morph exposing (Morph, MorphRow, grab, skip, succeed)
 import N exposing (n0)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 

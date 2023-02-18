@@ -35,7 +35,6 @@ import Decimal.Internal
 import Dict exposing (Dict)
 import Emptiable exposing (Emptiable)
 import FloatExplicit exposing (FloatExplicit)
-import Group
 import Json.Decode
 import Json.Encode
 import Linear exposing (Direction(..))
@@ -535,13 +534,13 @@ signedInternal :
         Decimal.Internal.Signed
         (Morph.ErrorWithDeadEnd deadEnd_)
 signedInternal =
-    Group.toFrom
+    Morph.groupToFrom
         ( \sign absolutePart -> { sign = sign, absolute = absolutePart }
         , \sign absolutePart -> { sign = sign, absolute = absolutePart }
         )
-        |> Group.part ( .sign, .sign ) signInternal
-        |> Group.part ( .absolute, .absolute ) absoluteInternal
-        |> Group.finish
+        |> Morph.part ( .sign, .sign ) signInternal
+        |> Morph.part ( .absolute, .absolute ) absoluteInternal
+        |> Morph.groupFinish
 
 
 absoluteInternal : MorphOrError Decimal.Absolute Decimal.Internal.Absolute error_

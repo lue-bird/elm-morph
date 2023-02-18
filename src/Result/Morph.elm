@@ -11,16 +11,16 @@ module Result.Morph exposing (value)
 
 import Choice
 import Morph
-import Value exposing (MorphValue)
+import Value
 
 
-{-| `Result` [`MorphValue`](Value#MorphValue)
+{-| `Result` [`Value.Morph`](Value#Morph)
 -}
 value :
-    { ok : MorphValue okValue
-    , err : MorphValue error
+    { ok : Value.Morph okValue
+    , err : Value.Morph error
     }
-    -> MorphValue (Result error okValue)
+    -> Value.Morph (Result error okValue)
 value caseMorphs =
     Choice.between
         (\ok err narrowResult ->

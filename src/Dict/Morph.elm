@@ -20,10 +20,9 @@ module Dict.Morph exposing
 -}
 
 import Dict exposing (Dict)
-import Group
 import List.Morph
 import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, Translate, translate, translateOn)
-import Value exposing (MorphValue)
+import Value
 
 
 fromListImplementation :
@@ -127,13 +126,13 @@ valuesMap valueMap =
 --
 
 
-{-| `Dict` [`MorphValue`](Value#MorphValue)
+{-| `Dict` [`Value.Morph`](Value#Morph)
 -}
 value :
-    { key : MorphValue comparableKey
-    , value : MorphValue value
+    { key : Value.Morph comparableKey
+    , value : Value.Morph value
     }
-    -> MorphValue (Dict comparableKey value)
+    -> Value.Morph (Dict comparableKey value)
 value entryMorphs =
     list
         |> Morph.over
@@ -141,13 +140,13 @@ value entryMorphs =
 
 
 keyValueValue :
-    { key : MorphValue key
-    , value : MorphValue value
+    { key : Value.Morph key
+    , value : Value.Morph value
     }
-    -> MorphValue { key : key, value : value }
+    -> Value.Morph { key : key, value : value }
 keyValueValue entryMorph =
-    Group.value
+    Value.group
         (\key value_ -> { key = key, value = value_ })
-        |> Group.fieldValue ( .key, "key" ) entryMorph.key
-        |> Group.fieldValue ( .value, "value" ) entryMorph.value
-        |> Group.finishValue
+        |> Value.field ( .key, "key" ) entryMorph.key
+        |> Value.field ( .value, "value" ) entryMorph.value
+        |> Value.groupFinish

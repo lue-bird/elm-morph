@@ -6,7 +6,7 @@ module Morph exposing
     , value, only, validate
     , translate, broad, toggle, keep, translateOn
     , lazy
-    , end, one, succeed
+    , end, one, succeed, grab, skip
     , to
     , invert
     , deadEndMap
@@ -15,6 +15,8 @@ module Morph exposing
     , description
     , broadenFrom, narrowTo, mapTo
     , over, overRow
+    , MorphNoPart
+    , groupToFrom, part, groupFinish
     , MorphRow, MorphRowIndependently, rowFinish
     , before
     )
@@ -38,7 +40,7 @@ We call it
 
 ### create row
 
-@docs end, one, succeed
+@docs end, one, succeed, grab, skip
 
 
 ## alter
@@ -67,7 +69,8 @@ We call it
 
 ## group
 
-[`Group.Morph`](Group#Morph)
+@docs MorphNoPart
+@docs groupToFrom, part, groupFinish
 
 
 ## choice
@@ -380,12 +383,12 @@ errorToLines =
                     (parts
                         |> Emptiable.emptyAdapt never
                         |> Stack.map
-                            (\_ part ->
+                            (\_ part_ ->
                                 Stack.onTopLay
-                                    ([ "part ", part.index |> String.fromInt ]
+                                    ([ "part ", part_.index |> String.fromInt ]
                                         |> String.concat
                                     )
-                                    (Stack.onTopLay "" (part.error |> errorToLines))
+                                    (Stack.onTopLay "" (part_.error |> errorToLines))
                                     |> markdownElement
                             )
                         |> Stack.flatten
@@ -934,6 +937,239 @@ lazy morphLazy =
     }
 
 
+{-| [`Morph`](#Morph) on groups in progress.
+Start with [`group`](#group), complete with [`part`](#part), finally [`groupFinish`](#groupFinish)
+-}
+type alias MorphNoPart noPartPossiblyOrNever narrow broaden =
+    RecordWithoutConstructorFunction
+        { description :
+            -- parts
+            Emptiable (Stacked Description) noPartPossiblyOrNever
+        , narrow : narrow
+        , broaden : broaden
+        }
+
+
+{-| Word in a [`GroupMorph`](#GroupMorph) in progress. For example
+
+    choiceFinish :
+        Value.GroupMorph (N (In N0 N9)) Char (N (In N0 N9) -> Char) NoPart Never
+        -> Morph (N (In N0 N9)) Char
+
+-}
+type NoPart
+    = NoPartTag Never
+
+
+{-| Assemble a group from narrow and broad [`part`](#part)s
+
+Use [`groupToFrom`](#groupToFrom)
+when each broad, narrow [`part`](#part) always has their respective counterpart
+
+    ( "4", "5" )
+        |> Morph.narrowTo
+            (Morph.groupToFrom
+                ( \x y -> { x = x, y = y }
+                , \x y -> ( x, y )
+                )
+                |> Group.part ( .x, Tuple.first )
+                    (Integer.Morph.toInt
+                        |> Morph.overRow Integer.Morph.rowChar
+                        |> Morph.rowFinish
+                    )
+                |> Group.part ( .y, Tuple.second )
+                    (Integer.Morph.toInt
+                        |> Morph.over (Integer.Morph.bitSizeAtMost n32)
+                        |> Morph.overRow Integer.Morph.rowChar
+                        |> Morph.rowFinish
+                    )
+                |> Group.finish
+            )
+    --> Ok { x = 4, y = 5 }
+
+-}
+groupToFrom :
+    ( narrowAssemble
+    , broadAssemble
+    )
+    ->
+        MorphNoPart
+            Possibly
+            (broad_
+             -> Result error_ narrowAssemble
+            )
+            (groupNarrow_ -> broadAssemble)
+groupToFrom ( narrowAssemble, broadAssemble ) =
+    { description = Emptiable.empty
+    , narrow = \_ -> narrowAssemble |> Ok
+    , broaden = \_ -> broadAssemble
+    }
+
+
+{-| The [`Morph`](#Morph) of the next part in a [`group`](#group).
+
+    Group.build
+        ( \nameFirst nameLast email ->
+            { nameFirst = nameFirst, nameLast = nameLast, email = email }
+        , \nameFirst nameLast email ->
+            { nameFirst = nameFirst, nameLast = nameLast, email = email }
+        )
+        |> Group.part ( .nameFirst, .nameFirst ) remain
+        |> Group.part ( .nameLast, .nameLast ) remain
+        |> Group.part ( .email, .email ) emailMorph
+        |> Group.finish
+
+-}
+part :
+    ( groupNarrow -> partNarrow
+    , groupBroad -> partBroad
+    )
+    -> MorphOrError partNarrow partBroad partError
+    ->
+        (MorphNoPart
+            noPartPossiblyOrNever_
+            (groupBroad
+             ->
+                Result
+                    (PartsError partError)
+                    (partNarrow -> groupNarrowFurther)
+            )
+            (groupNarrow -> (partBroad -> groupBroadenFurther))
+         ->
+            MorphNoPart
+                noPartNever_
+                (groupBroad
+                 ->
+                    Result
+                        (PartsError partError)
+                        groupNarrowFurther
+                )
+                (groupNarrow -> groupBroadenFurther)
+        )
+part ( narrowPartAccess, broadPartAccess ) partMorph =
+    \groupMorphSoFar ->
+        { description =
+            groupMorphSoFar.description
+                |> Stack.onTopLay partMorph.description
+        , narrow =
+            groupMorphSoFar.narrow
+                |> narrowPart
+                    (groupMorphSoFar.description |> Stack.length)
+                    broadPartAccess
+                    (narrowTo partMorph)
+        , broaden =
+            groupMorphSoFar.broaden
+                |> broadenPart narrowPartAccess (broadenFrom partMorph)
+        }
+
+
+broadenPart :
+    (groupNarrow -> partNarrow)
+    -> (partNarrow -> partBroad)
+    ->
+        ((groupNarrow -> (partBroad -> groupBroadenFurther))
+         -> (groupNarrow -> groupBroadenFurther)
+        )
+broadenPart narrowPartAccess broadenPartMorph =
+    \groupMorphSoFarBroaden ->
+        \groupNarrow ->
+            (groupNarrow |> groupMorphSoFarBroaden)
+                (groupNarrow
+                    |> narrowPartAccess
+                    |> broadenPartMorph
+                )
+
+
+narrowPart :
+    Int
+    -> (groupBroad -> partBroad)
+    -> (partBroad -> Result partError partNarrow)
+    ->
+        ((groupBroad
+          ->
+            Result
+                (PartsError partError)
+                (partNarrow -> groupNarrowFurther)
+         )
+         ->
+            (groupBroad
+             ->
+                Result
+                    (PartsError partError)
+                    groupNarrowFurther
+            )
+        )
+narrowPart index broadPartAccess narrowPartMorph =
+    \groupMorphSoFarNarrow ->
+        \groupBroad ->
+            let
+                narrowPartOrError : Result partError partNarrow
+                narrowPartOrError =
+                    groupBroad
+                        |> broadPartAccess
+                        |> narrowPartMorph
+            in
+            case ( groupBroad |> groupMorphSoFarNarrow, narrowPartOrError ) of
+                ( Ok groupMorphSoFarEat, Ok partNarrow ) ->
+                    groupMorphSoFarEat partNarrow |> Ok
+
+                ( Ok _, Err partError ) ->
+                    { index = index, error = partError }
+                        |> Stack.one
+                        |> Err
+
+                ( Err partsSoFarErrors, Ok _ ) ->
+                    partsSoFarErrors |> Err
+
+                ( Err partsSoFarErrors, Err partError ) ->
+                    partsSoFarErrors
+                        |> Stack.onTopLay { index = index, error = partError }
+                        |> Err
+
+
+{-| Conclude a [`Group.build`](#group) |> [`Group.part`](#part) chain
+-}
+groupFinish :
+    MorphNoPart
+        Never
+        (beforeNarrow
+         ->
+            Result
+                (PartsError (ErrorWithDeadEnd deadEnd))
+                narrowed
+        )
+        (beforeBroaden -> broadened)
+    ->
+        MorphIndependently
+            (beforeNarrow
+             -> Result (ErrorWithDeadEnd deadEnd) narrowed
+            )
+            (beforeBroaden -> broadened)
+groupFinish =
+    \groupMorphInProgress ->
+        { description =
+            case groupMorphInProgress.description |> Emptiable.fill of
+                Stack.TopBelow ( part0, part1 :: parts2Up ) ->
+                    { inner =
+                        ArraySized.l2 part0 part1
+                            |> ArraySized.attachMin Up
+                                (parts2Up |> ArraySized.fromList)
+                            |> Group
+                            |> Emptiable.filled
+                    , custom = Emptiable.empty
+                    }
+
+                Stack.TopBelow ( partOnly, [] ) ->
+                    partOnly
+        , narrow =
+            \broad_ ->
+                broad_
+                    |> groupMorphInProgress.narrow
+                    |> Result.mapError Parts
+        , broaden = groupMorphInProgress.broaden
+        }
+
+
 {-| Go over an additional step of [`Morph`](#Morph) on its broad type
 
 Chaining
@@ -1450,6 +1686,110 @@ succeed narrowConstant =
     , broaden =
         \_ -> Emptiable.empty
     }
+
+
+{-| Take what we get from [converting](#MorphRow) the next section
+and channel it back up to the [`Morph.succeed`](#Morph.succeed) grouping
+-}
+grab :
+    (groupNarrow -> partNextNarrow)
+    -> MorphRow partNextNarrow broadElement
+    ->
+        (MorphRowIndependently
+            groupNarrow
+            (partNextNarrow -> groupNarrowFurther)
+            broadElement
+         ->
+            MorphRowIndependently
+                groupNarrow
+                groupNarrowFurther
+                broadElement
+        )
+grab partAccess grabbedNextMorphRow =
+    \groupMorphRowSoFar ->
+        { description = groupMorphRowSoFar |> description
+        , narrow =
+            \broad_ ->
+                broad_
+                    |> narrowTo groupMorphRowSoFar
+                    |> Result.andThen
+                        (\result ->
+                            result.broad
+                                |> narrowTo grabbedNextMorphRow
+                                |> Result.map
+                                    (\nextParsed ->
+                                        { narrow = result.narrow nextParsed.narrow
+                                        , broad = nextParsed.broad
+                                        }
+                                    )
+                        )
+        , broaden =
+            \groupNarrow ->
+                groupNarrow
+                    |> partAccess
+                    |> grabbedNextMorphRow.broaden
+                    |> Stack.attach Down
+                        (groupNarrow
+                            |> groupMorphRowSoFar.broaden
+                        )
+        }
+
+
+{-| Require values to be matched next to continue but ignore the result.
+
+    import String.Morph exposing (text)
+    import Morph exposing (Morph.succeed, atLeast, take, drop)
+
+    -- parse a simple email, but we're only interested in the username
+    "user@example.com"
+        |> Text.narrowTo
+            (Morph.succeed (\userName -> { username = userName })
+                |> grab .username (atLeast n1 aToZ)
+                |> skip (one '@')
+                |> skip
+                    (Text.fromList
+                        |> Morph.overRow (atLeast n1 aToZ)
+                        |> broad "example"
+                    )
+                |> skip (text ".com")
+            )
+    --> Ok { username = "user" }
+
+[`broad`](#broad) `... |>` [`Morph.overRow`](MorphRow#over) is cool:
+when multiple kinds of input can be dropped,
+it allows choosing a default possibility for building.
+
+-}
+skip :
+    MorphRow () broadElement
+    ->
+        (MorphRowIndependently groupNarrow narrow broadElement
+         -> MorphRowIndependently groupNarrow narrow broadElement
+        )
+skip ignoredNext =
+    \groupMorphRowSoFar ->
+        { description = groupMorphRowSoFar |> description
+        , narrow =
+            \broad_ ->
+                broad_
+                    |> narrowTo groupMorphRowSoFar
+                    |> Result.andThen
+                        (\result ->
+                            result.broad
+                                |> narrowTo ignoredNext
+                                |> Result.map
+                                    (\nextParsed ->
+                                        { narrow = result.narrow
+                                        , broad = nextParsed.broad
+                                        }
+                                    )
+                        )
+        , broaden =
+            \groupNarrow ->
+                (() |> ignoredNext.broaden)
+                    |> Stack.attach Down
+                        (groupNarrow |> groupMorphRowSoFar.broaden)
+        }
 
 
 

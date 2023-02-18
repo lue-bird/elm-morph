@@ -23,10 +23,9 @@ import Choice
 import Decimal.Internal exposing (Whole)
 import Emptiable exposing (Emptiable, fill, filled)
 import FloatExplicit exposing (FloatExplicit)
-import Group exposing (grab, skip)
 import Linear exposing (Direction(..))
 import Maybe.Morph
-import Morph exposing (Morph, MorphIndependently, MorphOrError, MorphRow, Translate, broadenFrom, narrowTo, one, translate)
+import Morph exposing (Morph, MorphIndependently, MorphOrError, MorphRow, Translate, broadenFrom, grab, narrowTo, one, skip, translate)
 import N exposing (Add1, In, Min, N, N0, N1, N9, To, Up, Up0, Up1, Up9, n0, n1, n9)
 import N.Morph
 import Possibly exposing (Possibly)
@@ -36,8 +35,7 @@ import Sign.Internal
 import Stack exposing (Stacked)
 import Stack.Morph
 import String.Morph
-import Value exposing (MorphValue)
-import Value.PackageInternal
+import Value
 import Whole
 
 
@@ -251,7 +249,7 @@ fraction =
             (\beforeLast last ->
                 { beforeLast = beforeLast, last = last }
             )
-            |> Group.grab .beforeLast
+            |> Morph.grab .beforeLast
                 (Stack.Morph.list
                     |> Morph.over ArraySized.Morph.toList
                     |> Morph.overRow
@@ -264,7 +262,7 @@ fraction =
                             n0
                         )
                 )
-            |> Group.grab .last
+            |> Morph.grab .last
                 (N.Morph.inOn
                     |> Morph.over (N.Morph.in_ ( n1, n9 ))
                     |> Morph.over N.Morph.char
@@ -273,13 +271,13 @@ fraction =
         )
 
 
-{-| [`MorphValue`](Value#MorphValue) from a [`Decimal`](#Decimal)
+{-| [`Value.Morph`](Value#Morph) from a [`Decimal`](#Decimal)
 
-To get a [`MorphValue`](Value#MorphValue) from a `Float`,
+To get a [`Value.Morph`](Value#Morph) from a `Float`,
 see [`FloatExplicit.value`](FloatExplicit#value)
 
 -}
-value : MorphValue Decimal
+value : Value.Morph Decimal
 value =
     internal
         |> Morph.over
@@ -291,7 +289,7 @@ value =
                                 decimal |> Ok
 
                             atomExceptDecimal ->
-                                atomExceptDecimal |> Value.PackageInternal.atomKindToString |> Err
+                                atomExceptDecimal |> Value.atomKindToString |> Err
                 , broaden = Value.Number
                 }
             )
@@ -331,13 +329,13 @@ signedInternal :
         Decimal.Internal.Signed
         (Morph.ErrorWithDeadEnd deadEnd_)
 signedInternal =
-    Group.toFrom
+    Morph.groupToFrom
         ( \sign absolutePart -> { sign = sign, absolute = absolutePart }
         , \sign absolutePart -> { sign = sign, absolute = absolutePart }
         )
-        |> Group.part ( .sign, .sign ) signInternal
-        |> Group.part ( .absolute, .absolute ) absoluteInternal
-        |> Group.finish
+        |> Morph.part ( .sign, .sign ) signInternal
+        |> Morph.part ( .absolute, .absolute ) absoluteInternal
+        |> Morph.groupFinish
 
 
 absoluteInternal : MorphOrError Absolute Decimal.Internal.Absolute error_

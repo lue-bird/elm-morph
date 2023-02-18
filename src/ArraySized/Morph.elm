@@ -41,9 +41,8 @@ Also available: [`toggle`](Morph#toggle) [`Array.Extra.reverse`](https://dark.el
 
 import ArraySized exposing (ArraySized)
 import Emptiable exposing (Emptiable)
-import Group exposing (grab)
 import Linear exposing (Direction(..))
-import Morph exposing (Error, ErrorWithDeadEnd, Morph, MorphIndependently, MorphOrError, MorphRow, MorphRowIndependently, Translate, broad, broadenFrom, narrowTo, translate, translateOn)
+import Morph exposing (Error, ErrorWithDeadEnd, Morph, MorphIndependently, MorphOrError, MorphRow, MorphRowIndependently, Translate, broad, broadenFrom, grab, narrowTo, translate, translateOn)
 import N exposing (Add1, Exactly, In, Min, N, N0, N0OrAdd1, N1, On, To, Up, Up0, Up1, n0, n1, n2)
 import Possibly exposing (Possibly)
 import Stack exposing (Stacked)
@@ -399,87 +398,18 @@ and return them as a [`ArraySized`](https://package.elm-lang.org/packages/lue-bi
 
 -}
 exactly :
-    N (Exactly (On howMany))
+    N (In min max)
     -> MorphRow element broadElement
     ->
         MorphRow
-            (ArraySized element (Exactly (On howMany)))
+            (ArraySized element (In min max))
             broadElement
 exactly repeatCount repeatedMorphRow =
-    { description =
-        case repeatCount |> N.is n1 of
-            Err (N.Below _) ->
-                { custom = Emptiable.empty
-                , inner = Emptiable.empty
-                }
-
-            Ok _ ->
-                repeatedMorphRow |> Morph.description
-
-            Err (N.Above repeatCountAtLeast2) ->
-                { custom =
-                    Stack.one
-                        ([ "exactly "
-                         , repeatCountAtLeast2 |> N.toInt |> String.fromInt
-                         ]
-                            |> String.concat
-                        )
-                , inner =
-                    ArraySized.repeat
-                        (repeatedMorphRow |> Morph.description)
-                        repeatCountAtLeast2
-                        |> ArraySized.maxToInfinity
-                        |> ArraySized.minTo n2
-                        |> Morph.Group
-                        |> Emptiable.filled
-                }
-    , narrow =
-        let
-            narrowRepeatStep :
-                { soFar : ArraySized element (Min (On N0)) }
-                ->
-                    (Emptiable (Stacked broadElement) Possibly
-                     ->
-                        Result
-                            Error
-                            { narrow : ArraySized element (Exactly (On howMany))
-                            , broad : Emptiable (Stacked broadElement) Possibly
-                            }
-                    )
-            narrowRepeatStep { soFar } =
-                \broad_ ->
-                    case soFar |> ArraySized.hasAtLeast (repeatCount |> N.maxAdd n1) of
-                        Ok arraySizedAtLeastHowOften ->
-                            { narrow =
-                                arraySizedAtLeastHowOften
-                                    |> ArraySized.take Up { atLeast = repeatCount } repeatCount
-                            , broad = broad_
-                            }
-                                |> Ok
-
-                        Err _ ->
-                            case broad_ |> narrowTo repeatedMorphRow of
-                                Err error ->
-                                    error |> Err
-
-                                Ok parsed ->
-                                    -- does this blow the stack?
-                                    narrowRepeatStep
-                                        { soFar =
-                                            ArraySized.minSubtract n1
-                                                (ArraySized.pushMin parsed.narrow (soFar |> ArraySized.maxToOn))
-                                        }
-                                        parsed.broad
-        in
-        narrowRepeatStep { soFar = ArraySized.empty |> ArraySized.maxToInfinity }
-    , broaden =
-        \repeated ->
-            repeated
-                |> ArraySized.toList
-                |> Stack.fromList
-                |> Stack.map (\_ -> broadenFrom repeatedMorphRow)
-                |> Stack.flatten
-    }
+    Morph.to
+        ([ "exactly ", repeatCount |> N.toString ]
+            |> String.concat
+        )
+        (for (\() -> repeatedMorphRow) (ArraySized.repeat () repeatCount))
 
 
 {-| Match a value at least a number of times and returns them as a `List`.
@@ -620,21 +550,17 @@ atLeast :
 atLeast elementStepMorphRow minimum =
     Morph.broaden ArraySized.maxToInfinity
         |> Morph.overRow
-            (let
-                minimumExactly =
-                    minimum
-             in
-             Morph.succeed
+            (Morph.succeed
                 (\minimumArraySized overMinimum ->
                     minimumArraySized
                         |> ArraySized.attachMin Up
                             (overMinimum |> ArraySized.minTo n0)
                 )
                 |> grab
-                    (ArraySized.take Up { atLeast = minimumExactly } minimumExactly)
-                    (exactly minimumExactly elementStepMorphRow)
+                    (ArraySized.take Up { atLeast = minimum } minimum)
+                    (exactly minimum elementStepMorphRow)
                 |> grab
-                    (ArraySized.dropMin Up minimumExactly)
+                    (ArraySized.dropMin Up minimum)
                     (list
                         |> Morph.overRow (untilFail elementStepMorphRow)
                     )

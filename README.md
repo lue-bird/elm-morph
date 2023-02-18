@@ -21,8 +21,7 @@ Independent of output format
 ```elm
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Choice
-import Group
-import Value exposing (MorphValue)
+import Value
 import FloatExplicit
 import String.Morph
 
@@ -34,16 +33,16 @@ type alias Cause =
         }
 
 
-value : MorphValue Cause
+value : Value.Morph Cause
 value =
-    Group.value
+    Value.group
         (\name percent per100k ->
             { name = name, percent = percent, per100k = per100k }
         )
-        |> Group.fieldValue ( .name, "name" ) String.Morph.value
-        |> Group.fieldValue ( .percent, "percent" ) FloatExplicit.value
-        |> Group.fieldValue ( .per100k, "per100k" ) FloatExplicit.value
-        |> Group.finishValue
+        |> Value.field ( .name, "name" ) String.Morph.value
+        |> Value.field ( .percent, "percent" ) FloatExplicit.value
+        |> Value.field ( .per100k, "per100k" ) FloatExplicit.value
+        |> Value.groupFinish
 ```
 surprisingly easy!
 
@@ -52,8 +51,7 @@ Another example with a `type` adapted from [elm guide on custom types](https://g
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Unit
 import Choice
-import Group
-import Value exposing (MorphValue)
+import Value
 import String.Morph
 
 type User
@@ -64,7 +62,7 @@ type alias SignedIn =
     RecordWithoutConstructorFunction
         { name : String, status : String }
 
-value : MorphValue User
+value : Value.Morph User
 value =
     Choice.between
         (\variantAnonymous variantSignedIn user ->
@@ -79,15 +77,15 @@ value =
         |> Choice.variantValue ( SignedIn, "SignedIn" ) signedInValue
         |> Choice.finishValue
 
-signedInValue : MorphValue SignedIn
+signedInValue : Value.Morph SignedIn
 signedInValue =
-    Group.value
+    Value.group
         (\name status ->
             { name = name, status = status }
         )
-        |> Group.fieldValue ( .name, "name" ) String.Morph.value
-        |> Group.fieldValue ( .statue, "status" ) String.Morph.value
-        |> Group.finishValue
+        |> Value.field ( .name, "name" ) String.Morph.value
+        |> Value.field ( .statue, "status" ) String.Morph.value
+        |> Value.groupFinish
 ```
 clean
 
@@ -105,8 +103,7 @@ Like [`Morph`](Morph#Morph), [`MorphRow`](Morph#MorphRow) makes the process simp
 Here a 1:1 port of [an example from `elm/parser`](https://dark.elm.dmy.fr/packages/elm/parser/latest/Parser#lazy):
 ```elm
 import Choice
-import Group exposing (skip, grab)
-import Morph exposing (MorphRow, broad, narrowTo, one)
+import Morph exposing (MorphRow, broad, narrowTo, one, skip, grab)
 import Char.Morph
 import String.Morph
 import N exposing (n0)

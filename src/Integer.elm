@@ -28,7 +28,6 @@ import Choice
 import Decimal exposing (Decimal)
 import Decimal.Internal exposing (Whole)
 import Emptiable exposing (Emptiable)
-import Group
 import Linear exposing (Direction(..))
 import Morph exposing (Morph, MorphRow, Translate)
 import N exposing (Add1, In, Infinity, Min, N, N0, N1, N9, On, To, Up, Up0, Up1, Up9, n0, n1, n2, n9)
@@ -39,7 +38,7 @@ import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFuncti
 import Sign exposing (Sign)
 import Stack exposing (Stacked)
 import String.Morph
-import Value exposing (MorphValue)
+import Value
 import Whole
 
 
@@ -95,9 +94,9 @@ decimalSigned =
     Debug.todo ""
 
 
-{-| [`MorphValue`](Value#MorphValue) from an [`Integer`](#Integer)
+{-| [`Value.Morph`](Value#Morph) from an [`Integer`](#Integer)
 -}
-value : MorphValue Integer
+value : Value.Morph Integer
 value =
     decimal
         |> Morph.over Decimal.value
@@ -225,8 +224,8 @@ signed =
             , absoluteAfterI = absoluteAfterIPart
             }
         )
-        |> Group.grab .sign Sign.maybeMinusChar
-        |> Group.grab .absoluteAfterI absoluteAfterI
+        |> Morph.grab .sign Sign.maybeMinusChar
+        |> Morph.grab .absoluteAfterI absoluteAfterI
 
 
 absoluteAfterI :

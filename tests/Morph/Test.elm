@@ -10,9 +10,8 @@ import Decimal exposing (Decimal)
 import Expect
 import FloatExplicit
 import Fuzz
-import Group exposing (grab, skip)
 import Linear exposing (Direction(..))
-import Morph exposing (Morph, MorphRow, MorphRowIndependently, broad, broadenFrom, narrowTo, one, translate)
+import Morph exposing (Morph, MorphRow, MorphRowIndependently, broad, broadenFrom, grab, narrowTo, one, skip, translate)
 import N exposing (In, Min, N, N0, N1, N2, N9, On, n0, n1, n9)
 import N.Morph
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
@@ -89,7 +88,7 @@ point =
     Morph.succeed (\x y -> { x = x, y = y })
         |> skip (String.Morph.only "(")
         |> skip
-            (broad (ArraySized.one ())
+            (broad (ArraySized.one () |> ArraySized.minTo n0)
                 |> Morph.overRow (atLeast (String.Morph.only " ") n0)
             )
         |> grab .x Decimal.rowChar
@@ -99,12 +98,12 @@ point =
             )
         |> skip (String.Morph.only ",")
         |> skip
-            (broad (ArraySized.one ())
+            (broad (ArraySized.one () |> ArraySized.minTo n0)
                 |> Morph.overRow (atLeast (String.Morph.only " ") n0)
             )
         |> grab .y Decimal.rowChar
         |> skip
-            (broad (ArraySized.one ())
+            (broad (ArraySized.one () |> ArraySized.minTo n0)
                 |> Morph.overRow (atLeast (String.Morph.only " ") n0)
             )
         |> skip (String.Morph.only ")")
@@ -329,17 +328,17 @@ domain =
         (\first hostLabels topLevel ->
             { first = first, hostLabels = hostLabels, topLevel = topLevel }
         )
-        |> Group.grab .first hostLabel
-        |> Group.skip (String.Morph.only ".")
-        |> Group.grab .hostLabels
+        |> Morph.grab .first hostLabel
+        |> Morph.skip (String.Morph.only ".")
+        |> Morph.grab .hostLabels
             (atLeast
                 (Morph.succeed (\label -> label)
-                    |> Group.grab (\label -> label) hostLabel
-                    |> Group.skip (String.Morph.only ".")
+                    |> Morph.grab (\label -> label) hostLabel
+                    |> Morph.skip (String.Morph.only ".")
                 )
                 n0
             )
-        |> Group.grab .topLevel domainTopLevel
+        |> Morph.grab .topLevel domainTopLevel
 
 
 hostLabel : MorphRow HostLabel Char
@@ -475,7 +474,7 @@ type alias LocalPart =
 type LocalSymbol
     = LocalSymbolPrintable LocalSymbolPrintable
     | LocalSymbolAToZ AToZ
-    | LocalSymbol0To9 (N (In N0 N9))
+    | LocalSymbol0To9 (N (In (On N0) (On N9)))
 
 
 type LocalSymbolPrintable
@@ -515,13 +514,13 @@ type alias HostLabel =
 
 type HostLabelSideSymbol
     = HostLabelSideSymbolAToZ { case_ : AToZ.Case, letter : AToZ }
-    | HostLabelSideSymbol0To9 (N (In N0 N9))
+    | HostLabelSideSymbol0To9 (N (In (On N0) (On N9)))
 
 
 type HostLabelSymbol
     = HostLabelHyphenMinus
     | HostLabelSymbolAToZ { case_ : AToZ.Case, letter : AToZ }
-    | HostLabelSymbol0To9 (N (In N0 N9))
+    | HostLabelSymbol0To9 (N (In (On N0) (On N9)))
 
 
 {-| <https://data.iana.org/TLD/tlds-alpha-by-domain.txt>
@@ -529,7 +528,7 @@ type HostLabelSymbol
 type alias DomainTopLevel =
     RecordWithoutConstructorFunction
         { startDigits :
-            ArraySized (N (In N0 N9)) (Min (On N0))
+            ArraySized (N (In (On N0) (On N9))) (Min (On N0))
         , firstAToZ : { case_ : AToZ.Case, letter : AToZ }
         , afterFirstAToZ :
             ArraySized DomainTopLevelAfterFirstAToZSymbol (Min (On N0))
@@ -538,4 +537,4 @@ type alias DomainTopLevel =
 
 type DomainTopLevelAfterFirstAToZSymbol
     = DomainTopLevelSymbolAToZ { case_ : AToZ.Case, letter : AToZ }
-    | DomainTopLevelSymbol0To9 (N (In N0 N9))
+    | DomainTopLevelSymbol0To9 (N (In (On N0) (On N9)))

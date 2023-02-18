@@ -10,14 +10,13 @@ module Maybe.Morph exposing (row, value)
 -}
 
 import Choice
-import Group
 import Morph exposing (MorphRow)
-import Value exposing (MorphValue)
+import Value
 
 
-{-| `Maybe` [`MorphValue`](Value#MorphValue)
+{-| `Maybe` [`Value.Morph`](Value#Morph)
 -}
-value : MorphValue element -> MorphValue (Maybe element)
+value : Value.Morph element -> Value.Morph (Maybe element)
 value contentMorph =
     Choice.between
         (\just nothing narrowMaybe ->

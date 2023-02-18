@@ -3,7 +3,6 @@
   "tests": [
     "Morph",
     "Choice",
-    "Group",
     "Char.Morph",
     "String.Morph",
     "N.Morph",

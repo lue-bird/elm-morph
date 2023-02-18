@@ -1,11 +1,14 @@
 module Value exposing
     ( Value, Atom(..), Composed(..), Record, Tagged
-    , MorphValue
+    , Morph
     , unit
+    , GroupMorphNoPart
+    , field, group, groupFinish
     , Name, Index, IndexOrName(..), IndexAndName
     , descriptive, compact, tagTranslate, tagMap
     , AtomOrComposed(..)
     , atom, composed, composedMap
+    , atomKindToString, composedKindToString
     )
 
 {-| Generic, `case`-able elm value
@@ -20,10 +23,10 @@ Plus it makes it harder to switch to a different format
 
 ## morph
 
-@docs MorphValue
+@docs Morph
 @docs unit
 
-Basically every `module` here has a [`MorphValue`](#MorphValue),
+Basically every `module` here has a [`Value.Morph`](#Morph),
 for example
 
   - [`Int.Morph`](Int-Morph)
@@ -39,12 +42,13 @@ for example
 
 ### record
 
-[`Group.MorphValue`](Group#MorphValue)
+@docs GroupMorphNoPart
+@docs field, group, groupFinish
 
 
 ### Choice.between
 
-variant union [`MorphValue`](#MorphValue)
+variant union [`Value.Morph`](#Value.Morph)
 
   - starting from [`Choice.between`](Choice#between)
   - over [`Choice.variantValue`](Choice#variantValue)
@@ -62,9 +66,9 @@ variant union [`MorphValue`](#MorphValue)
 
 build on existing ones
 
-    {-| `Posix` `MorphValue`
+    {-| `Posix` `Value.Morph`
     -}
-    posixValue : MorphValue Posix
+    posixValue : Value.Morph Posix
     posixValue =
         Morph.translate
             Time.posixToMillis
@@ -75,6 +79,7 @@ or define new atoms, composed structures, ... (↓ are used by [`Json`](Json) fo
 
 @docs AtomOrComposed
 @docs atom, composed, composedMap
+@docs atomKindToString, composedKindToString
 
 
 ## broad formats
@@ -157,7 +162,7 @@ that can't be converted in a small amount of runtime
 (for example treating tuples the same as records is just O(1))?
 → PR!
 
-Please use to the [`MorphValue`](#MorphValue)s present in most `module`s
+Please use to the [`Value.Morph`](#Value.Morph)s present in most `module`s
 to construct a [`Value`](#Value),
 as you can for example construct ↓ using the exposed(..) variants
 
@@ -194,7 +199,7 @@ type alias Record tag =
 
 {-| EIther [`Index`](#Index) or [`Name`](#Name)
 
-Used as the narrow argument of a [`MorphValue`](#MorphValue)
+Used as the narrow argument of a [`Value.Morph`](#Value.Morph)
 
 -}
 type IndexOrName
@@ -218,7 +223,7 @@ type alias Name =
 
 {-| Both [`Index`](#Index) and [`Name`](#Name)
 
-Used as the broad result of a [`MorphValue`](#MorphValue)
+Used as the broad result of a [`Value.Morph`](#Value.Morph)
 
 -}
 type alias IndexAndName =
@@ -386,7 +391,7 @@ The way it's set up, it allows tags that are either
   - [`compact`](#compact)
 
 -}
-type alias MorphValue narrow =
+type alias Morph narrow =
     Morph.MorphIndependently
         (Value IndexOrName
          -> Result Morph.Error narrow
@@ -446,13 +451,48 @@ composed =
         }
 
 
+{-| Describe the type of [`Atom`](#Atom)
+-}
+atomKindToString : Atom -> String
+atomKindToString =
+    \atom_ ->
+        case atom_ of
+            Unit _ ->
+                "Unit"
+
+            Number _ ->
+                "Decimal"
+
+            String _ ->
+                "String"
+
+
+{-| Describe the type of [`Composed`](#Composed)
+-}
+composedKindToString : Composed tag_ -> String
+composedKindToString =
+    \composed_ ->
+        case composed_ of
+            List _ ->
+                "List"
+
+            Array _ ->
+                "Array"
+
+            Record _ ->
+                "Record"
+
+            Variant _ ->
+                "Variant"
+
+
 {-| `()` [`Morph`](#Morph)
 
-Often used in when [morphing](Value#MorphValue) a [variants](Choice#variantValue)
+Often used in when [morphing](Value#Morph) a [variants](Choice#variantValue)
 with 0 attached values
 
 -}
-unit : MorphValue ()
+unit : Morph ()
 unit =
     Morph.value "Unit"
         { broaden = Unit
@@ -463,6 +503,232 @@ unit =
                         unitValue |> Ok
 
                     atomExceptUnit ->
-                        "Unit" |> Err
+                        atomExceptUnit |> atomKindToString |> Err
         }
         |> Morph.over atom
+
+
+{-| Start a record assembly [`Value.Morph`](#Value.Morph)
+
+Continue with [`field`](#field)
+
+    {-| `( ..., ... )` `Value.Morph`
+
+    Just use a record with descriptive names instead!
+
+    -}
+    tuple2 :
+        ( Value.Morph part0
+        , Value.Morph part1
+        )
+        -> Value.Morph ( part0, part1 )
+    tuple2 ( part0Morph, part1Morph ) =
+        Morph.to "Tuple2"
+            (record
+                (\part0 part1 -> ( part0, part1 ))
+                |> field ( Tuple.first, "part0" ) part0Morph
+                |> field ( Tuple.second, "part1" ) part1Morph
+                |> recordFinish
+            )
+
+    {-| `( ..., ..., ... )` `Value.Morph`
+
+    Just use a record with descriptive names instead!
+
+    -}
+    tuple3 :
+        ( Value.Morph part0
+        , Value.Morph part1
+        , Value.Morph part2
+        )
+        -> Value.Morph ( part0, part1, part2 )
+    tuple3 ( part0Morph, part1Morph, part2Morph ) =
+        Morph.to "Tuple3"
+            (record
+                (\part0 part1 part2 -> ( part0, part1, part2 ))
+                |> field ( \( part0, _, _ ) -> part0, "part0" ) part0Morph
+                |> field ( \( _, part1, _ ) -> part1, "part1" ) part1Morph
+                |> field ( \( _, _, part2 ) -> part2, "part2" ) part2Morph
+                |> recordFinish
+            )
+
+-}
+group :
+    groupNarrowAssemble
+    -> GroupMorphNoPart Possibly groupNarrow_ groupNarrowAssemble
+group groupNarrowAssemble =
+    Morph.groupToFrom ( groupNarrowAssemble, Emptiable.empty )
+
+
+{-| possibly incomplete step from and to a [`Value.Record`](Value#Record)
+
+building:
+
+  - start with [`Value.group`](#value)
+  - continue with [`Value.field`](#field)
+  - finish with [`Value.groupFinish`](#groupFinish)
+
+-}
+type alias GroupMorphNoPart noPartPossiblyOrNever groupNarrow groupNarrowFurther =
+    Morph.MorphNoPart
+        noPartPossiblyOrNever
+        (Record IndexOrName
+         ->
+            Result
+                (Morph.PartsError Morph.Error)
+                groupNarrowFurther
+        )
+        (groupNarrow -> Record IndexAndName)
+
+
+{-| Continue a group assembly [`Morph`](#Morph) to [`Value`](#Value).
+
+  - finish with [`groupFinish`](#groupFinish)
+
+-}
+field :
+    ( group -> fieldValueNarrow
+    , String
+    )
+    -> Morph fieldValueNarrow
+    ->
+        (GroupMorphNoPart
+            noPartPossiblyOrNever_
+            group
+            (fieldValueNarrow -> groupNarrowFurther)
+         ->
+            GroupMorphNoPart
+                noPartNever_
+                group
+                groupNarrowFurther
+        )
+field ( accessFieldValue, fieldName ) fieldValueMorph =
+    \groupMorphSoFar ->
+        let
+            tag : IndexAndName
+            tag =
+                { index = groupMorphSoFar.description |> Stack.length
+                , name = fieldName
+                }
+        in
+        { description =
+            groupMorphSoFar.description
+                |> Stack.onTopLay
+                    (Morph.to tag.name fieldValueMorph
+                        |> Morph.description
+                    )
+        , narrow =
+            \groupBroad ->
+                partValueNarrow tag fieldValueMorph groupMorphSoFar.narrow groupBroad
+        , broaden =
+            \wholeNarrow ->
+                let
+                    fieldValueBroad : Value IndexAndName
+                    fieldValueBroad =
+                        wholeNarrow
+                            |> accessFieldValue
+                            |> Morph.broadenFrom fieldValueMorph
+
+                    fieldBroad : Tagged IndexAndName
+                    fieldBroad =
+                        { tag = tag
+                        , value = fieldValueBroad
+                        }
+                in
+                wholeNarrow
+                    |> groupMorphSoFar.broaden
+                    |> Stack.onTopLay fieldBroad
+        }
+
+
+partValueNarrow :
+    IndexAndName
+    -> Morph fieldValueNarrow
+    ->
+        (Emptiable (Stacked (Tagged IndexOrName)) possiblyOrNever_
+         ->
+            Result
+                (Morph.PartsError Morph.Error)
+                (fieldValueNarrow -> groupNarrowFurther)
+        )
+    ->
+        (Emptiable (Stacked (Tagged IndexOrName)) possiblyOrNever_
+         -> Result (Morph.PartsError Morph.Error) groupNarrowFurther
+        )
+partValueNarrow tag fieldValueMorph groupSoFarNarrow =
+    let
+        matches : IndexOrName -> Bool
+        matches =
+            \tagIndexOrName ->
+                case tagIndexOrName of
+                    Index index ->
+                        index == tag.index
+
+                    Name name ->
+                        name == tag.name
+    in
+    \groupBroad ->
+        let
+            wholeAssemblyResult :
+                Result
+                    (Morph.PartsError Morph.Error)
+                    (fieldValueNarrow -> groupNarrowFurther)
+            wholeAssemblyResult =
+                groupBroad |> groupSoFarNarrow
+
+            errorsSoFar : () -> Emptiable (Stacked { index : Int, error : Morph.Error }) Possibly
+            errorsSoFar () =
+                case wholeAssemblyResult of
+                    Ok _ ->
+                        Emptiable.empty
+
+                    Err expectations ->
+                        expectations |> Emptiable.emptyAdapt never
+        in
+        case groupBroad |> Stack.toList |> List.filter (.tag >> matches) of
+            partBroad :: _ ->
+                case partBroad.value |> Morph.narrowTo fieldValueMorph of
+                    Ok partNarrow ->
+                        wholeAssemblyResult
+                            |> Result.map (\eat -> eat partNarrow)
+
+                    Err innerError ->
+                        errorsSoFar ()
+                            |> Stack.onTopLay
+                                { index = tag.index
+                                , error = innerError
+                                }
+                            |> Err
+
+            [] ->
+                errorsSoFar ()
+                    |> Stack.onTopLay
+                        { index = tag.index
+                        , error = (tag.name ++ " missing") |> Morph.DeadEnd
+                        }
+                    |> Err
+
+
+{-| Conclude the [`Value.group`](#group) |> [`Value.field`](#field) chain
+-}
+groupFinish :
+    GroupMorphNoPart Never record record
+    -> Morph record
+groupFinish =
+    \groupMorphComplete ->
+        groupMorphComplete
+            |> Morph.groupFinish
+            |> Morph.over
+                (Morph.value "Record"
+                    { broaden = Record
+                    , narrow =
+                        \composedBroad ->
+                            case composedBroad of
+                                Record recordNarrow ->
+                                    recordNarrow |> Ok
+
+                                composedExceptRecord ->
+                                    composedExceptRecord |> composedKindToString |> Err
+                    }
+                )
+            |> Morph.over composed

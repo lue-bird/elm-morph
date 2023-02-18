@@ -26,8 +26,7 @@ import Emptiable exposing (filled)
 import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, Translate, translate, translateOn)
 import Possibly exposing (Possibly(..))
 import Stack
-import Value exposing (MorphValue)
-import Value.PackageInternal
+import Value
 
 
 {-| [`Translate`](Morph#Translate) from `List` to `Array`
@@ -68,9 +67,9 @@ toList =
 --
 
 
-{-| `Array` [`MorphValue`](Value#MorphValue)
+{-| `Array` [`Value.Morph`](Value#Morph)
 -}
-value : MorphValue element -> MorphValue (Array element)
+value : Value.Morph element -> Value.Morph (Array element)
 value elementMorph =
     eachElement elementMorph
         |> Morph.over
@@ -84,10 +83,8 @@ value elementMorph =
                             Value.List listElements ->
                                 listElements |> Array.fromList |> Ok
 
-                            composedExceptArrayAndList ->
-                                composedExceptArrayAndList
-                                    |> Value.PackageInternal.composedKindToString
-                                    |> Err
+                            composedOther ->
+                                composedOther |> Value.composedKindToString |> Err
                 , broaden = Value.Array
                 }
             )

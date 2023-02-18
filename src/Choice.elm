@@ -44,7 +44,6 @@ import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFuncti
 import Stack exposing (Stacked)
 import Util exposing (restoreTry)
 import Value
-import Value.PackageInternal
 
 
 
@@ -873,7 +872,7 @@ variantValue :
     ( possibilityNarrow -> choiceNarrow
     , String
     )
-    -> Value.MorphValue possibilityNarrow
+    -> Value.Morph possibilityNarrow
     ->
         (MorphNoTry
             noTryPossiblyOrNever_
@@ -993,7 +992,7 @@ finishValue :
         (Value.Tagged Value.IndexOrName)
         (choiceNarrow -> Value.Tagged Value.IndexAndName)
         Morph.Error
-    -> Value.MorphValue choiceNarrow
+    -> Value.Morph choiceNarrow
 finishValue =
     \choiceMorphComplete ->
         choiceMorphComplete
@@ -1008,7 +1007,7 @@ finishValue =
 
                                 composedExceptVariant ->
                                     composedExceptVariant
-                                        |> Value.PackageInternal.composedKindToString
+                                        |> Value.composedKindToString
                                         |> Err
                     , broaden = Value.Variant
                     }

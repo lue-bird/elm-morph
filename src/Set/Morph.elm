@@ -25,7 +25,7 @@ import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, Translate, t
 import Possibly exposing (Possibly(..))
 import Set exposing (Set)
 import Stack
-import Value exposing (MorphValue)
+import Value
 
 
 {-| [`Translate`](Morph#Translate) from `List` to `Set`.
@@ -151,10 +151,10 @@ eachElement elementMorph =
 --
 
 
-{-| `Set` [`MorphValue`](Value#MorphValue)
+{-| `Set` [`Value.Morph`](Value#Morph)
 -}
 value :
-    MorphValue comparableElement
-    -> MorphValue (Set comparableElement)
+    Value.Morph comparableElement
+    -> Value.Morph (Set comparableElement)
 value elementMorph =
     list |> Morph.over (List.Morph.value elementMorph)

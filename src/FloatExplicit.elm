@@ -29,8 +29,7 @@ import Possibly exposing (Possibly)
 import Sign exposing (Sign)
 import Sign.Internal
 import Stack exposing (Stacked)
-import Value exposing (MorphValue)
-import Value.PackageInternal
+import Value
 import Whole
 
 
@@ -287,9 +286,9 @@ floatFractionToDigits =
             )
 
 
-{-| `Float` [`MorphValue`](Value#MorphValue)
+{-| `Float` [`Value.Morph`](Value#Morph)
 -}
-value : MorphValue FloatExplicit
+value : Value.Morph FloatExplicit
 value =
     Choice.between
         (\variantDecimal variantException choiceExplicit ->
@@ -305,7 +304,7 @@ value =
         |> Choice.finishValue
 
 
-decimalInternalValue : MorphValue Decimal.Internal.Decimal
+decimalInternalValue : Value.Morph Decimal.Internal.Decimal
 decimalInternalValue =
     Morph.value "Decimal"
         { narrow =
@@ -316,16 +315,16 @@ decimalInternalValue =
 
                     atomExceptDecimal ->
                         atomExceptDecimal
-                            |> Value.PackageInternal.atomKindToString
+                            |> Value.atomKindToString
                             |> Err
         , broaden = Value.Number
         }
         |> Morph.over Value.atom
 
 
-{-| [`MorphValue`](Value#MorphValue) from an [`Exception`](#Exception)
+{-| [`Value.Morph`](Value#Morph) from an [`Exception`](#Exception)
 -}
-exceptionValue : MorphValue Exception
+exceptionValue : Value.Morph Exception
 exceptionValue =
     Choice.between
         (\variantNaN variantInfinity choiceException ->
@@ -341,7 +340,7 @@ exceptionValue =
         |> Choice.finishValue
 
 
-signValue : MorphValue Sign
+signValue : Value.Morph Sign
 signValue =
     Choice.between
         (\negative positive sign ->

@@ -6,8 +6,7 @@ module Whole exposing (fromIntPositive, rowChar, toIntPositive)
 import ArraySized.Morph
 import Decimal.Internal exposing (Whole)
 import Emptiable exposing (Emptiable)
-import Group exposing (grab)
-import Morph exposing (MorphRow, one)
+import Morph exposing (MorphRow, grab, one)
 import N exposing (In, N, N0, N9, Up0, Up1, Up9, n0, n1, n10, n9)
 import N.Morph
 import Stack exposing (Stacked)

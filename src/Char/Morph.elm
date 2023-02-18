@@ -7,21 +7,20 @@ module Char.Morph exposing (only, string, value)
 -}
 
 import Morph exposing (Morph)
-import Value exposing (MorphValue)
-import Value.PackageInternal
+import String.Morph.Internal
+import Value
 
 
-{-| `Char` [`MorphValue`](Value#MorphValue)
+{-| `Char` [`Value.Morph`](Value#Morph)
 
 Be aware, that [special-cased characters as the result of `Char.toUpper`](https://github.com/elm/core/issues/1001)
 are [encoded](Morph#broadenFrom) as 2 `Char`s in a `String`
 and therefore can't be [decoded](Morph#narrowTo) again
 
 -}
-value : MorphValue Char
+value : Value.Morph Char
 value =
-    string
-        |> Morph.over Value.PackageInternal.string
+    string |> Morph.over String.Morph.Internal.value
 
 
 {-| [`Morph`](Morph#Morph) a `String` of length 1 to a `Char`
