@@ -165,7 +165,6 @@ using [`Decimal.rowChar`](#rowChar) implementation as a reference
 -}
 rowChar : MorphRow Decimal Char
 rowChar =
-    -- TODO: make decimal point obligatory
     Morph.to "decimal"
         (Morph.choice
             (\signedVariant n0Variant numberNarrow ->
