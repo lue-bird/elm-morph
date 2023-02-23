@@ -522,7 +522,7 @@ decimalInternal :
         Decimal.Internal.Decimal
         (Morph.ErrorWithDeadEnd deadEnd_)
 decimalInternal =
-    Morph.choiceToFrom
+    Morph.variants
         ( \variantN0 variantSigned decimalInternalBeforeNarrow ->
             case decimalInternalBeforeNarrow of
                 Decimal.Internal.N0 ->
@@ -540,7 +540,7 @@ decimalInternal =
         )
         |> Morph.variant ( \() -> Decimal.N0, \() -> Decimal.Internal.N0 ) Morph.keep
         |> Morph.variant ( Decimal.Signed, Decimal.Internal.Signed ) signedInternal
-        |> Morph.choiceToFromFinish
+        |> Morph.variantsFinish
 
 
 signedInternal :
@@ -549,18 +549,18 @@ signedInternal :
         Decimal.Internal.Signed
         (Morph.ErrorWithDeadEnd deadEnd_)
 signedInternal =
-    Morph.groupToFrom
+    Morph.parts
         ( \sign absolutePart -> { sign = sign, absolute = absolutePart }
         , \sign absolutePart -> { sign = sign, absolute = absolutePart }
         )
         |> Morph.part ( .sign, .sign ) signInternal
         |> Morph.part ( .absolute, .absolute ) absoluteInternal
-        |> Morph.groupFinish
+        |> Morph.partsFinish
 
 
 absoluteInternal : MorphOrError Decimal.Absolute Decimal.Internal.Absolute error_
 absoluteInternal =
-    Morph.choiceToFrom
+    Morph.variants
         ( \variantFraction variantAtLeast1 decimal ->
             case decimal of
                 Decimal.Internal.Fraction fractionValue ->
@@ -578,7 +578,7 @@ absoluteInternal =
         )
         |> Morph.variant ( Decimal.Fraction, Decimal.Internal.Fraction ) Morph.keep
         |> Morph.variant ( Decimal.AtLeast1, Decimal.Internal.AtLeast1 ) Morph.keep
-        |> Morph.choiceToFromFinish
+        |> Morph.variantsFinish
 
 
 signInternal : MorphOrError Sign Sign.Internal.Sign error_

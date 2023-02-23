@@ -2,7 +2,7 @@ module Value exposing
     ( Value, Atom(..), Composed(..), Record, Tagged
     , Morph
     , unit
-    , GroupMorphNoPart
+    , GroupMorphEmpty
     , field, group, groupFinish
     , variant, choiceFinish
     , Name, Index, IndexOrName(..), IndexAndName
@@ -43,7 +43,7 @@ for example
 
 ### group
 
-@docs GroupMorphNoPart
+@docs GroupMorphEmpty
 @docs field, group, groupFinish
 
 
@@ -71,7 +71,7 @@ build on existing ones
 
     {-| `Posix` `Morph`
     -}
-    posixValue : Morph Posix
+    posixValue : Value.Morph Posix
     posixValue =
         Morph.translate
             Time.posixToMillis
@@ -94,7 +94,7 @@ or define new atoms, composed structures, ... (↓ are used by [`Json`](Json) fo
 Motivated? Explore, PR ↓
 
   - `Yaml`
-      - after [`MaybeJustJames/yaml`](https://github.com/MaybeJustJames/yaml/blob/2.1.1/src/Yaml/Parser.elm)
+      - following [`MaybeJustJames/yaml`](https://github.com/MaybeJustJames/yaml/blob/2.1.1/src/Yaml/Parser.elm)
   - `Xml`
   - `Url`
   - `Bytes`
@@ -132,7 +132,7 @@ import ArraySized
 import Decimal.Internal exposing (Decimal)
 import Emptiable exposing (Emptiable, fill, filled)
 import Linear exposing (Direction(..))
-import Morph exposing (ChoiceMorphNoTry, Morph, MorphIndependently, MorphOrError, broadenFrom, narrowTo, to, translate)
+import Morph exposing (ChoiceMorphEmpty, Morph, MorphIndependently, MorphOrError, broadenFrom, narrowTo, to, translate)
 import N exposing (Up)
 import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
@@ -158,20 +158,20 @@ type AtomOrComposed atom composed
     | Composed composed
 
 
-{-| Any value representable in elm
+{-| Generic representation of any value representable in elm
 
-Like to see a composed or atom
-that can't be converted in a small amount of runtime
-(for example treating tuples the same as records is just O(1))?
-→ PR!
+Use to the [`Morph`](#Morph)s present in most `module`s of this package
+to construct a [`Value`](#Value).
 
-Please use to the [`Morph`](#Morph)s present in most `module`s
-to construct a [`Value`](#Value),
-as you can for example construct ↓ using the exposed(..) variants
+PR if you'd like to see a structure or atom (like `Dict String ...` or `Random.Seed`)
+that can't be converted in constant time
+(turning tuples into records would only take O(1) time for example)
+
+Note: To not have overly complex recursive types,
+a [`Value`](#Value) can possibly describe an invalid elm value,
+for example
 
     List [ Unit (), String "huh" ]
-
-which isn't a valid elm value
 
 -}
 type alias Value tag =
@@ -558,9 +558,9 @@ Continue with [`field`](#field)
 -}
 group :
     groupNarrowAssemble
-    -> GroupMorphNoPart Possibly groupNarrow_ groupNarrowAssemble
+    -> GroupMorphEmpty Possibly groupNarrow_ groupNarrowAssemble
 group groupNarrowAssemble =
-    Morph.groupToFrom ( groupNarrowAssemble, Emptiable.empty )
+    Morph.parts ( groupNarrowAssemble, Emptiable.empty )
 
 
 {-| possibly incomplete step from and to a [`Record`](Value#Record)
@@ -572,8 +572,8 @@ building:
   - finish with [`groupFinish`](#groupFinish)
 
 -}
-type alias GroupMorphNoPart noPartPossiblyOrNever groupNarrow groupNarrowFurther =
-    Morph.GroupMorphNoPart
+type alias GroupMorphEmpty noPartPossiblyOrNever groupNarrow groupNarrowFurther =
+    Morph.PartsMorphEmpty
         noPartPossiblyOrNever
         (Record IndexOrName
          ->
@@ -595,12 +595,12 @@ field :
     )
     -> Morph fieldValueNarrow
     ->
-        (GroupMorphNoPart
+        (GroupMorphEmpty
             noPartPossiblyOrNever_
             group
             (fieldValueNarrow -> groupNarrowFurther)
          ->
-            GroupMorphNoPart
+            GroupMorphEmpty
                 noPartNever_
                 group
                 groupNarrowFurther
@@ -715,12 +715,12 @@ partValueNarrow tag fieldValueMorph groupSoFarNarrow =
 {-| Conclude the [`group`](#group) |> [`field`](#field) chain
 -}
 groupFinish :
-    GroupMorphNoPart Never record record
+    GroupMorphEmpty Never record record
     -> Morph record
 groupFinish =
     \groupMorphComplete ->
         groupMorphComplete
-            |> Morph.groupFinish
+            |> Morph.partsFinish
             |> Morph.over
                 (Morph.value "Record"
                     { broaden = Record
@@ -767,7 +767,7 @@ variant :
     )
     -> Morph possibilityNarrow
     ->
-        (ChoiceMorphNoTry
+        (ChoiceMorphEmpty
             noTryPossiblyOrNever_
             choiceNarrow
             (Tagged IndexOrName)
@@ -778,7 +778,7 @@ variant :
             )
             Morph.Error
          ->
-            ChoiceMorphNoTry
+            ChoiceMorphEmpty
                 noTryNever_
                 choiceNarrow
                 (Tagged IndexOrName)
@@ -840,7 +840,7 @@ variantStepNarrow ( variantTag, possibilityNarrow ) =
 {-| Conclude a [`Morph.choice`](Morph#Morph.choice) |> [`Value.variant`](#variant) chain
 -}
 choiceFinish :
-    ChoiceMorphNoTry
+    ChoiceMorphEmpty
         Never
         choiceNarrow
         (Tagged IndexOrName)

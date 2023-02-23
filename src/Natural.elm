@@ -70,7 +70,7 @@ from an unsigned [`Integer`](Integer#Integer)
 integer : Morph Natural Integer
 integer =
     Morph.to "natural"
-        (Morph.choiceToFrom
+        (Morph.variants
             ( \variantN0 variantSigned integerChoice ->
                 case integerChoice of
                     Integer.N0 ->
@@ -105,7 +105,7 @@ integer =
                             }
                     }
                 )
-            |> Morph.choiceToFromFinish
+            |> Morph.variantsFinish
         )
 
 

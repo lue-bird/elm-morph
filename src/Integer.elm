@@ -63,7 +63,7 @@ without digits after the decimal point
 -}
 decimal : Morph Integer Decimal
 decimal =
-    Morph.choiceToFrom
+    Morph.variants
         ( \n0 variantSigned decimalChoice ->
             case decimalChoice of
                 Decimal.N0 ->
@@ -85,7 +85,7 @@ decimal =
         |> Morph.variant
             ( Signed, Decimal.Signed )
             decimalSigned
-        |> Morph.choiceToFromFinish
+        |> Morph.variantsFinish
 
 
 decimalSigned : Morph Signed Decimal.Signed

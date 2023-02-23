@@ -69,7 +69,7 @@ since `Float` is fixed in bit size while [`FloatExplicit`](#FloatExplicit) is no
 -}
 float : MorphOrError FloatExplicit Float error_
 float =
-    Morph.choiceToFrom
+    Morph.variants
         ( \variantDecimal variantNaN variantInfinity choiceFloat ->
             if choiceFloat |> Basics.isNaN then
                 variantNaN ()
@@ -178,7 +178,7 @@ float =
                     floatInfinity |> toSigned
                 )
             )
-        |> Morph.choiceToFromFinish
+        |> Morph.variantsFinish
 
 
 {-| [`Morph`](Morph#Morph)
