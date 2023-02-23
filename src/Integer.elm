@@ -162,16 +162,22 @@ internalToInt =
                 0
 
             Signed signedValue ->
-                (case signedValue.sign of
-                    Sign.Negative ->
-                        negate
+                let
+                    intSign =
+                        case signedValue.sign of
+                            Sign.Negative ->
+                                negate
 
-                    Sign.Positive ->
-                        identity
-                )
-                    (signedValue.absoluteAfterI
-                        |> Debug.todo ""
-                    )
+                            Sign.Positive ->
+                                identity
+                in
+                signedValue.absoluteAfterI
+                    |> ArraySized.minToOn
+                    |> ArraySized.insertMin ( Up, n0 ) Bit.I
+                    |> Bits.takeAtMost n32
+                    |> Bits.toN
+                    |> N.toInt
+                    |> intSign
 
 
 {-| Match an integer value as an `Int`.
@@ -199,7 +205,7 @@ internalToInt =
 -}
 rowChar : MorphRow Integer Char
 rowChar =
-    Morph.to "whole"
+    Morph.to "integer"
         (Morph.choice
             (\n0Variant signedVariant integerNarrow ->
                 case integerNarrow of
@@ -242,24 +248,10 @@ bitsAfterIToDigits =
     \bitsAfterI ->
         bitsAfterI
             |> Debug.todo ""
-            |> intToDigits
-
-
-intToDigits : Int -> Whole
-intToDigits =
-    \int_ ->
-        int_
-            |> Debug.todo ""
 
 
 digitsToBitsAfterI : Whole -> ArraySized Bit (Min N0)
 digitsToBitsAfterI =
     \digits ->
         digits
-            |> digitsToInt
             |> Debug.todo ""
-
-
-digitsToInt : Whole -> Int
-digitsToInt =
-    Debug.todo ""

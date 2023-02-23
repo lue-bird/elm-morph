@@ -1,7 +1,7 @@
 module Json exposing
     ( Json, Atom(..), Composed(..)
     , value
-    , tagMap, tagTranslate
+    , tagMap, eachTag
     , JsValueMagic
     , jsValueMagic, jsValueMagicDecoder
     )
@@ -18,7 +18,7 @@ module Json exposing
 
 ## tag
 
-@docs tagMap, tagTranslate
+@docs tagMap, eachTag
 
 
 ## js value magic
@@ -416,8 +416,26 @@ composedFromValue : Value.Composed tag -> Composed tag
 composedFromValue =
     \composed ->
         case composed of
-            _ ->
-                Debug.todo ""
+            Value.List list ->
+                list |> List.map fromValueImplementation |> Array.fromList |> Array
+
+            Value.Array array ->
+                array |> Array.map fromValueImplementation |> Array
+
+            Value.Record record ->
+                record
+                    |> Stack.map
+                        (\_ field ->
+                            { tag = field.tag
+                            , value = field.value |> fromValueImplementation
+                            }
+                        )
+                    |> Object
+
+            Value.Variant variant ->
+                { tag = variant.tag, value = variant.value |> fromValueImplementation }
+                    |> Stack.one
+                    |> Object
 
 
 atomFromValue : Value.Atom -> Atom
@@ -440,17 +458,15 @@ atomFromValue =
 
 {-| [`Translate`](Morph#Translate) [`Json`](#Json) by calling [`tagMap`](#tagMap) in both directions
 
-For [`Value`](#Value), it's
-
     ...
-        |> Morph.over (Json.tagTranslate Value.compact)
+        |> Morph.over (Json.eachTag Value.compact)
 
     -- or
     ...
-        |> Morph.over (Json.tagTranslate Value.descriptive)
+        |> Morph.over (Json.eachTag Value.descriptive)
 
 -}
-tagTranslate :
+eachTag :
     MorphIndependently
         (tagBeforeMap -> Result (Morph.ErrorWithDeadEnd Never) tagMapped)
         (tagBeforeUnmap -> tagUnmapped)
@@ -460,14 +476,14 @@ tagTranslate :
              -> Result (Morph.ErrorWithDeadEnd never_) (Json tagMapped)
             )
             (Json tagBeforeUnmap -> Json tagUnmapped)
-tagTranslate tagTranslate_ =
+eachTag tagTranslate_ =
     translate
         (tagMap (Morph.mapTo tagTranslate_))
         (tagMap (Morph.broadenFrom tagTranslate_))
 
 
 {-| Reduce the amount of tag information.
-Used to make its representation [`compact`] or [`descriptive`](#descriptive)
+Used to make its representation [`compact`](Value#compact) or [`descriptive`](Value#descriptive)
 -}
 tagMap : (tag -> tagMapped) -> (Json tag -> Json tagMapped)
 tagMap tagChange =
