@@ -6,7 +6,7 @@ module Value exposing
     , field, group, groupFinish
     , variant, choiceFinish
     , Name, Index, IndexOrName(..), IndexAndName
-    , descriptive, compact, tagTranslate, tagMap
+    , descriptive, compact, eachTag, tagMap
     , AtomOrComposed(..)
     , atom, composed, composedMap
     , atomKindToString, composedKindToString
@@ -62,7 +62,7 @@ variant union [`Morph`](#Morph)
 
 @docs Name, Index, IndexOrName, IndexAndName
 
-@docs descriptive, compact, tagTranslate, tagMap
+@docs descriptive, compact, eachTag, tagMap
 
 
 ## spin your own
@@ -285,16 +285,16 @@ by reducing the amount of tag information in both directions
 For [`Value`](#Value), it's
 
     ...
-        |> Morph.over (tagTranslate compact)
+        |> Morph.over (eachTag compact)
 
     -- or
     ...
-        |> Morph.over (tagTranslate descriptive)
+        |> Morph.over (eachTag descriptive)
 
 but the same thing works for [`Json`](Json), ... as well
 
 -}
-tagTranslate :
+eachTag :
     MorphIndependently
         (tagBeforeMap -> Result (Morph.ErrorWithDeadEnd Never) tagMapped)
         (tagBeforeUnmap -> tagUnmapped)
@@ -304,7 +304,7 @@ tagTranslate :
              -> Result (Morph.ErrorWithDeadEnd never_) (Value tagMapped)
             )
             (Value tagBeforeUnmap -> Value tagUnmapped)
-tagTranslate tagTranslate_ =
+eachTag tagTranslate_ =
     translate
         (tagMap (Morph.mapTo tagTranslate_))
         (tagMap (Morph.broadenFrom tagTranslate_))
