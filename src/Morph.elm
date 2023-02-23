@@ -1917,7 +1917,7 @@ overRow morphRowBeforeMorph =
             |> Morph.overRow
                 (MorphRow.before
                     { end =
-                        MorphRow.Morph.succeed ()
+                        Morph.succeed ()
                             |> skip (String.Morph.only "Decoder")
                             |> skip Morph.end
                     , goOn = Morph.keep |> Morph.one
@@ -1928,7 +1928,7 @@ You might think: Why not use
 
     decoderNameSubject : MorphRow String Char expectationCustom
     decoderNameSubject =
-        MorphRow.Morph.succeed (\subject -> subject)
+        Morph.succeed (\subject -> subject)
             |> grab (\subject -> subject)
                 (atLeast (Morph.keep |> Morph.one) n0)
             |> skip (String.Morph.only "Decoder")
@@ -1973,7 +1973,7 @@ type LoopStep partial complete
                         translate .before
                             (\before -> { before = before, end = () })
                     , end =
-                        MorphRow.Morph.succeed ()
+                        Morph.succeed ()
                             |> skip (String.Morph.only "Decoder")
                             |> skip Morph.end
                     , goOn = Morph.keep |> Morph.one
@@ -2132,7 +2132,7 @@ It can, however simplify checking for specific endings:
                         translate .before
                             (\before -> { before = before, end = () })
                     , end =
-                        MorphRow.Morph.succeed ()
+                        Morph.succeed ()
                             |> skip (String.Morph.only "Decoder")
                             |> skip Morph.end
                     , goOn = Morph.keep |> Morph.one
