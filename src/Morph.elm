@@ -2989,7 +2989,7 @@ choiceRowFinish =
         }
 
 
-{-| Conclude a [`Morph.choice`](Choice#between) `|>` [`Morph.try`](Choice#try) builder
+{-| Conclude a [`Morph.choice`](Morph#choice) `|>` [`Morph.try`](Choice#try) builder
 -}
 choiceFinish :
     ChoiceMorphEmptiable

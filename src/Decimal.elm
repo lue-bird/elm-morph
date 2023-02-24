@@ -15,21 +15,18 @@ without the possibility of [exceptions](FloatExplicit#Exception)
 
 -}
 
-import ArraySized exposing (ArraySized)
+import ArraySized
 import ArraySized.Morph
-import Bit exposing (Bit)
-import Char.Morph
 import Decimal.Internal exposing (Whole)
-import Emptiable exposing (Emptiable, fill, filled)
+import Emptiable exposing (Emptiable)
 import FloatExplicit exposing (FloatExplicit)
-import Linear exposing (Direction(..))
 import Maybe.Morph
-import Morph exposing (Morph, MorphIndependently, MorphOrError, MorphRow, Translate, broadenFrom, grab, narrowTo, one, skip, translate)
-import N exposing (Add1, In, Min, N, N0, N1, N9, To, Up, Up0, Up1, Up9, n0, n1, n9)
+import Morph exposing (Morph, MorphOrError, MorphRow, grab, one, skip)
+import N exposing (In, N, N0, N1, N9, n0, n1, n9)
 import N.Morph
 import Possibly exposing (Possibly)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
-import Sign exposing (Sign(..))
+import Sign exposing (Sign)
 import Sign.Internal
 import Stack exposing (Stacked)
 import Stack.Morph
@@ -85,6 +82,96 @@ type alias Fraction =
         }
 
 
+internal :
+    MorphOrError
+        Decimal
+        Decimal.Internal.Decimal
+        (Morph.ErrorWithDeadEnd deadEnd_)
+internal =
+    Morph.variants
+        ( \variantN0 variantSigned decimal ->
+            case decimal of
+                Decimal.Internal.N0 ->
+                    variantN0 ()
+
+                Decimal.Internal.Signed signedValue ->
+                    variantSigned signedValue
+        , \variantN0 variantSigned decimal ->
+            case decimal of
+                N0 ->
+                    variantN0 ()
+
+                Signed signedValue ->
+                    variantSigned signedValue
+        )
+        |> Morph.variant ( \() -> N0, \() -> Decimal.Internal.N0 ) Morph.keep
+        |> Morph.variant ( Signed, Decimal.Internal.Signed ) signedInternal
+        |> Morph.variantsFinish
+
+
+
+--
+
+
+signedInternal :
+    MorphOrError
+        Signed
+        Decimal.Internal.Signed
+        (Morph.ErrorWithDeadEnd deadEnd_)
+signedInternal =
+    Morph.parts
+        ( \sign absolutePart -> { sign = sign, absolute = absolutePart }
+        , \sign absolutePart -> { sign = sign, absolute = absolutePart }
+        )
+        |> Morph.part ( .sign, .sign ) signInternal
+        |> Morph.part ( .absolute, .absolute ) absoluteInternal
+        |> Morph.partsFinish
+
+
+absoluteInternal : MorphOrError Absolute Decimal.Internal.Absolute error_
+absoluteInternal =
+    Morph.variants
+        ( \variantFraction variantAtLeast1 decimal ->
+            case decimal of
+                Decimal.Internal.Fraction fractionValue ->
+                    variantFraction fractionValue
+
+                Decimal.Internal.AtLeast1 atLeast1Value ->
+                    variantAtLeast1 atLeast1Value
+        , \variantFraction variantAtLeast1 decimal ->
+            case decimal of
+                Fraction fractionValue ->
+                    variantFraction fractionValue
+
+                AtLeast1 atLeast1Value ->
+                    variantAtLeast1 atLeast1Value
+        )
+        |> Morph.variant ( Fraction, Decimal.Internal.Fraction ) Morph.keep
+        |> Morph.variant ( AtLeast1, Decimal.Internal.AtLeast1 ) Morph.keep
+        |> Morph.variantsFinish
+
+
+signInternal : MorphOrError Sign Sign.Internal.Sign error_
+signInternal =
+    Morph.translate
+        (\signInternalBeforeNarrow ->
+            case signInternalBeforeNarrow of
+                Sign.Internal.Negative ->
+                    Sign.Negative
+
+                Sign.Internal.Positive ->
+                    Sign.Positive
+        )
+        (\signBeforeBroaden ->
+            case signBeforeBroaden of
+                Sign.Negative ->
+                    Sign.Internal.Negative
+
+                Sign.Positive ->
+                    Sign.Internal.Positive
+        )
+
+
 {-| [`Morph`](Morph#Morph)
 a [`Decimal`](#Decimal)
 to a [`FloatExplicit`](FloatExplicit#FloatExplicit)
@@ -105,10 +192,6 @@ floatExplicit =
                 , broaden = FloatExplicit.Decimal
                 }
             )
-
-
-
---
 
 
 {-| Match a decimal number
@@ -150,17 +233,12 @@ floatExplicit =
     --> Err "1:1: I was expecting a digit [0-9]. I got stuck when I got the character 'a'."
 
 To allow integers to parse as decimals as well,
-build a [`Morph.choice`](Choice#between)
+build a [`Morph.choice`](Morph#choice)
 [`Decimal.rowChar`](#rowChar)
 and [`Integer.rowChar`](Integer#rowChar)
 
 For different parsing behavior, spin your own
 using [`Decimal.rowChar`](#rowChar) implementation as a reference
-
-  - [`fractionRowChar`](#fractionRowChar)
-  - [`Sign.rowChar`](Sign#rowChar)
-  - TODO include? [`atLeast1WholeRowChar`](#fractionRowChar)
-  - TODO include? [`unnecessary0RowChar`](#fractionRowChar)
 
 -}
 rowChar : MorphRow Decimal Char
@@ -292,89 +370,3 @@ value =
                 }
             )
         |> Morph.over Value.atom
-
-
-internal :
-    MorphOrError
-        Decimal
-        Decimal.Internal.Decimal
-        (Morph.ErrorWithDeadEnd deadEnd_)
-internal =
-    Morph.variants
-        ( \variantN0 variantSigned decimal ->
-            case decimal of
-                Decimal.Internal.N0 ->
-                    variantN0 ()
-
-                Decimal.Internal.Signed signedValue ->
-                    variantSigned signedValue
-        , \variantN0 variantSigned decimal ->
-            case decimal of
-                N0 ->
-                    variantN0 ()
-
-                Signed signedValue ->
-                    variantSigned signedValue
-        )
-        |> Morph.variant ( \() -> N0, \() -> Decimal.Internal.N0 ) Morph.keep
-        |> Morph.variant ( Signed, Decimal.Internal.Signed ) signedInternal
-        |> Morph.variantsFinish
-
-
-signedInternal :
-    MorphOrError
-        Signed
-        Decimal.Internal.Signed
-        (Morph.ErrorWithDeadEnd deadEnd_)
-signedInternal =
-    Morph.parts
-        ( \sign absolutePart -> { sign = sign, absolute = absolutePart }
-        , \sign absolutePart -> { sign = sign, absolute = absolutePart }
-        )
-        |> Morph.part ( .sign, .sign ) signInternal
-        |> Morph.part ( .absolute, .absolute ) absoluteInternal
-        |> Morph.partsFinish
-
-
-absoluteInternal : MorphOrError Absolute Decimal.Internal.Absolute error_
-absoluteInternal =
-    Morph.variants
-        ( \variantFraction variantAtLeast1 decimal ->
-            case decimal of
-                Decimal.Internal.Fraction fractionValue ->
-                    variantFraction fractionValue
-
-                Decimal.Internal.AtLeast1 atLeast1Value ->
-                    variantAtLeast1 atLeast1Value
-        , \variantFraction variantAtLeast1 decimal ->
-            case decimal of
-                Fraction fractionValue ->
-                    variantFraction fractionValue
-
-                AtLeast1 atLeast1Value ->
-                    variantAtLeast1 atLeast1Value
-        )
-        |> Morph.variant ( Fraction, Decimal.Internal.Fraction ) Morph.keep
-        |> Morph.variant ( AtLeast1, Decimal.Internal.AtLeast1 ) Morph.keep
-        |> Morph.variantsFinish
-
-
-signInternal : MorphOrError Sign Sign.Internal.Sign error_
-signInternal =
-    Morph.translate
-        (\signInternalBeforeNarrow ->
-            case signInternalBeforeNarrow of
-                Sign.Internal.Negative ->
-                    Sign.Negative
-
-                Sign.Internal.Positive ->
-                    Sign.Positive
-        )
-        (\signBeforeBroaden ->
-            case signBeforeBroaden of
-                Sign.Negative ->
-                    Sign.Internal.Negative
-
-                Sign.Positive ->
-                    Sign.Internal.Positive
-        )
