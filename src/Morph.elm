@@ -1548,7 +1548,7 @@ type alias MorphRow narrow broadElement =
 
 
 {-| Incomplete [`MorphRow`](#MorphRow) for a thing composed of multiple parts = group.
-It's what you supply during a [`Morph.succeed`](#Morph.succeed)`|>`[`grab`](#grab)/[`skip`](#skip) build
+It's what you supply during a [`Morph.succeed`](Morph#succeed)`|>`[`grab`](#grab)/[`skip`](#skip) build
 -}
 type alias MorphRowIndependently beforeBroaden narrowed broadElement =
     MorphIndependently
@@ -1699,7 +1699,7 @@ succeed narrowConstant =
 
 
 {-| Take what we get from [converting](#MorphRow) the next section
-and channel it back up to the [`Morph.succeed`](#Morph.succeed) grouping
+and channel it back up to the [`Morph.succeed`](Morph#succeed) grouping
 -}
 grab :
     (groupNarrow -> partNextNarrow)
@@ -1828,7 +1828,7 @@ skip ignoredNext =
      - one should try to know what to morph by tracking context,
        independent of what narrow result the last morph gave
          - for example, don't use [`next`](#next) for versioning etc.
-           Use [`Morph.choice`](#Morph.choice) where each [`possibility`](#try) expects a specific number
+           Use [`Morph.choice`](Morph#choice) where each [`possibility`](#try) expects a specific number
 
 
 -}
@@ -2204,7 +2204,7 @@ rowFinish =
 
 
 {-| Possibly incomplete [`Morph`](Morph#Morph) a choice from a [`Value`](Value#Value).
-See [`Morph.choice`](#Morph.choice), [`variantValue`](#variantValue), [`finishValue`](#finishValue)
+See [`Morph.choice`](Morph#choice), [`variantValue`](#variantValue), [`finishValue`](#finishValue)
 -}
 type alias ChoiceMorphEmptiable noTryPossiblyOrNever choiceNarrow choiceBeforeNarrow choiceBroaden error =
     VariantsMorphEmptiable
@@ -2789,7 +2789,7 @@ variantsFinish =
 
 
 {-| Possibly incomplete [`MorphRow`](#MorphRow) to and from a Morph.choice.
-See [`Morph.choice`](#Morph.choice), [`Morph.tryRow`](#try), [`Morph.choiceRowFinish`](#choiceFinish)
+See [`Morph.choice`](Morph#choice), [`Morph.tryRow`](#try), [`Morph.choiceRowFinish`](#choiceFinish)
 -}
 type alias ChoiceMorphRowEmpty noTryPossiblyOrNever choiceNarrow choiceBroaden broadElement =
     VariantsMorphEmptiable

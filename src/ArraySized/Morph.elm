@@ -42,8 +42,8 @@ Also available: [`toggle`](Morph#toggle) [`Array.Extra.reverse`](https://dark.el
 import ArraySized exposing (ArraySized)
 import Emptiable exposing (Emptiable)
 import Linear exposing (Direction(..))
-import Morph exposing (Error, ErrorWithDeadEnd, Morph, MorphIndependently, MorphOrError, MorphRow, MorphRowIndependently, Translate, broad, broadenFrom, grab, narrowTo, translate, translateOn)
-import N exposing (Add1, Exactly, In, Min, N, N0, N0OrAdd1, N1, On, To, Up, Up0, Up1, n0, n1, n2)
+import Morph exposing (Error, ErrorWithDeadEnd, MorphIndependently, MorphRow, MorphRowIndependently, broad, broadenFrom, grab, narrowTo, translate, translateOn)
+import N exposing (Exactly, In, Min, N, N0, N0OrAdd1, On, To, Up, Up0, n0, n1)
 import Possibly exposing (Possibly)
 import Stack exposing (Stacked)
 
@@ -214,8 +214,8 @@ elementTranslate elementTranslate_ =
 -- sequence
 
 
-{-| Match broad [`MorphRow`](#MorphRow)s
-(those that can always [produce its broad value](#broadenFrom))
+{-| Match broad [`MorphRow`](Morph#MorphRow)s
+(those that can always [produce its broad value](Morph#broadenFrom))
 based given input elements in sequence
 
 This can get verbose, so create helpers with it where you see common patterns!
@@ -256,12 +256,7 @@ forBroad morphRowByElement expectedConstantInputArraySized =
             )
 
 
-type ResultOrSoFar result soFar
-    = Result result
-    | Partial soFar
-
-
-{-| [`grab`](#grab) the elements of a given `List` of [`MorphRow`](#MorphRow)s in order
+{-| [`grab`](Morph#grab) the elements of a given `List` of [`MorphRow`](Morph#MorphRow)s in order
 
 Some also call this "traverse"
 
@@ -279,7 +274,7 @@ Don't try to be clever with this.
             )
     --> Ok [ 'a', 'b' ]
 
-The usual [`Morph.succeed`](#Morph.succeed)`(\... -> ...) |>`[`grab`](#grab)-[`skip`](#skip) chain
+The usual [`Morph.succeed`](Morph#succeed)`(\... -> ...) |>`[`grab`](Morph#grab)-[`skip`](Morph#skip) chain
 is often more explicit, descriptive and type-safe.
 
 Because of this, `MorphRow` only exposes `for`, not `sequence`,
@@ -535,7 +530,7 @@ exactly repeatCount repeatedMorphRow =
         |> grab ...
 
 would only parse the first part until the end
-because it always [`Morph.succeed`](#Morph.succeed)s.
+because it always [`Morph.succeed`](Morph#succeed)s.
 Nothing after would ever be parsed, making the whole thing fail.
 
 -}
@@ -565,6 +560,115 @@ atLeast elementStepMorphRow minimum =
                         |> Morph.overRow (untilFail elementStepMorphRow)
                     )
             )
+
+
+{-| How are [`atLeast`](#atLeast), ... defined?
+
+    import Morph exposing (Morph.choice, validate)
+    import Morph exposing (MorphRow, one, Morph.succeed, atLeast, take, drop, whileAccumulate)
+    import Char.Morph
+    import String.Morph
+    import Number.Morph
+
+    sumWhileLessThan : Float -> MorphRow Char (List Number)
+    sumWhileLessThan max =
+        whileAccumulate
+            { initial = 0
+            , step =
+                \element stepped ->
+                    let
+                        floats =
+                            stepped + (element |> Morph.map Number.Morph.toFloat)
+                    in
+                    if floats >= max then
+                        Err ()
+                    else
+                        floats |> Ok
+            , element =
+                Morph.succeed (\n -> n)
+                    |> grab (\n -> n) Number.Morph.text
+                    |> skip (atLeast (String.Morph.only " ") n0)
+            }
+
+    -- stops before we reach a maximum of 6 in the sum
+    "2 3 4"
+        |> narrow
+            (String.Morph.fromList
+                |> Morph.overRow
+                    (Morph.succeed (\numbers -> numbers)
+                        |> grab (\numbers -> numbers) (sumWhileLessThan 6)
+                        |> skip (String.Morph.only "4")
+                    )
+            )
+    --> Ok 5
+
+-}
+whileAccumulate :
+    { initial : accumulationValue
+    , step :
+        goOnElement
+        ->
+            (accumulationValue
+             -> Result () accumulationValue
+            )
+    , element : MorphRow goOnElement broadElement
+    }
+    -> MorphRow (List goOnElement) broadElement
+whileAccumulate { initial, step, element } =
+    { description =
+        { custom = Emptiable.empty
+        , inner =
+            Morph.While (element |> Morph.description)
+                |> Emptiable.filled
+        }
+    , broaden =
+        \list_ ->
+            list_
+                |> List.map (broadenFrom element)
+                |> Stack.fromList
+                |> Stack.flatten
+    , narrow =
+        let
+            loopNarrowStep :
+                { accumulationValue : accumulationValue }
+                ->
+                    (Emptiable (Stacked broadElement) Possibly
+                     ->
+                        Result
+                            Error
+                            { narrow : List goOnElement
+                            , broad : Emptiable (Stacked broadElement) Possibly
+                            }
+                    )
+            loopNarrowStep { accumulationValue } =
+                \broad_ ->
+                    broad_
+                        |> narrowTo element
+                        |> Result.andThen
+                            (\stepped ->
+                                case accumulationValue |> step stepped.narrow of
+                                    Err () ->
+                                        { broad = broad_
+                                        , narrow = []
+                                        }
+                                            |> Ok
+
+                                    Ok accumulationValueAltered ->
+                                        stepped.broad
+                                            |> loopNarrowStep
+                                                { accumulationValue = accumulationValueAltered }
+                                            |> Result.map
+                                                (\tail ->
+                                                    { broad = tail.broad
+                                                    , narrow =
+                                                        tail.narrow
+                                                            |> (::) stepped.narrow
+                                                    }
+                                                )
+                            )
+        in
+        loopNarrowStep { accumulationValue = initial }
+    }
 
 
 untilFail :
@@ -606,7 +710,7 @@ untilFail elementStepMorphRow =
 
 ### example: `in_ ... ( n0, n1 )`
 
-Alternative to [`maybe`](#maybe) which instead returns a `List`.
+Alternative to [`Maybe.Morph.row`](Maybe-Morph#row) which instead returns a `List`.
 
 > ℹ️ Equivalent regular expression: `?`
 
@@ -736,112 +840,3 @@ atMostLoop elementStepMorphRow upperLimit =
                     }
                 )
         )
-
-
-{-| How are [`atLeast`](#atLeast), ... defined?
-
-    import Morph exposing (Morph.choice, validate)
-    import Morph exposing (MorphRow, one, Morph.succeed, atLeast, take, drop, whileAccumulate)
-    import Char.Morph
-    import String.Morph
-    import Number.Morph
-
-    sumWhileLessThan : Float -> MorphRow Char (List Number)
-    sumWhileLessThan max =
-        whileAccumulate
-            { initial = 0
-            , step =
-                \element stepped ->
-                    let
-                        floats =
-                            stepped + (element |> Morph.map Number.Morph.toFloat)
-                    in
-                    if floats >= max then
-                        Err ()
-                    else
-                        floats |> Ok
-            , element =
-                Morph.succeed (\n -> n)
-                    |> grab (\n -> n) Number.Morph.text
-                    |> skip (atLeast (String.Morph.only " ") n0)
-            }
-
-    -- stops before we reach a maximum of 6 in the sum
-    "2 3 4"
-        |> narrow
-            (String.Morph.fromList
-                |> Morph.overRow
-                    (Morph.succeed (\numbers -> numbers)
-                        |> grab (\numbers -> numbers) (sumWhileLessThan 6)
-                        |> skip (String.Morph.only "4")
-                    )
-            )
-    --> Ok 5
-
--}
-whileAccumulate :
-    { initial : accumulationValue
-    , step :
-        goOnElement
-        ->
-            (accumulationValue
-             -> Result () accumulationValue
-            )
-    , element : MorphRow goOnElement broadElement
-    }
-    -> MorphRow (List goOnElement) broadElement
-whileAccumulate { initial, step, element } =
-    { description =
-        { custom = Emptiable.empty
-        , inner =
-            Morph.While (element |> Morph.description)
-                |> Emptiable.filled
-        }
-    , broaden =
-        \list_ ->
-            list_
-                |> List.map (broadenFrom element)
-                |> Stack.fromList
-                |> Stack.flatten
-    , narrow =
-        let
-            loopNarrowStep :
-                { accumulationValue : accumulationValue }
-                ->
-                    (Emptiable (Stacked broadElement) Possibly
-                     ->
-                        Result
-                            Error
-                            { narrow : List goOnElement
-                            , broad : Emptiable (Stacked broadElement) Possibly
-                            }
-                    )
-            loopNarrowStep { accumulationValue } =
-                \broad_ ->
-                    broad_
-                        |> narrowTo element
-                        |> Result.andThen
-                            (\stepped ->
-                                case accumulationValue |> step stepped.narrow of
-                                    Err () ->
-                                        { broad = broad_
-                                        , narrow = []
-                                        }
-                                            |> Ok
-
-                                    Ok accumulationValueAltered ->
-                                        stepped.broad
-                                            |> loopNarrowStep
-                                                { accumulationValue = accumulationValueAltered }
-                                            |> Result.map
-                                                (\tail ->
-                                                    { broad = tail.broad
-                                                    , narrow =
-                                                        tail.narrow
-                                                            |> (::) stepped.narrow
-                                                    }
-                                                )
-                            )
-        in
-        loopNarrowStep { accumulationValue = initial }
-    }
