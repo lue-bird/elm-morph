@@ -10,7 +10,6 @@ module Decimal.Internal exposing (Decimal(..), Absolute(..), Fraction, Signed, W
 -}
 
 import Emptiable exposing (Emptiable)
-import Morph
 import N exposing (In, N, N0, N1, N9)
 import Possibly exposing (Possibly)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
