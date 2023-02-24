@@ -1,6 +1,7 @@
 module Json exposing
-    ( Json, Atom(..), Composed(..)
+    ( Json, Atom(..), Composed(..), Tagged
     , value
+    , string, stringBroadWith
     , tagMap, eachTag
     , JsValueMagic
     , jsValueMagic, jsValueMagicDecoder
@@ -8,12 +9,13 @@ module Json exposing
 
 {-| JSON
 
-@docs Json, Atom, Composed
+@docs Json, Atom, Composed, Tagged
 
 
 ## morph
 
 @docs value
+@docs string, stringBroadWith
 
 
 ## tag
@@ -31,13 +33,12 @@ module Json exposing
 import Array
 import Decimal exposing (Decimal)
 import Decimal.Internal
-import Dict exposing (Dict)
 import Emptiable exposing (Emptiable)
-import FloatExplicit exposing (FloatExplicit)
+import FloatExplicit
 import Json.Decode
 import Json.Encode
 import Linear exposing (Direction(..))
-import Morph exposing (Morph, MorphIndependently, MorphOrError, Translate, translate)
+import Morph exposing (Morph, MorphIndependently, MorphOrError, translate)
 import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Sign exposing (Sign)
@@ -93,39 +94,11 @@ type Composed tag
     | Object (Emptiable (Stacked (Tagged tag)) Possibly)
 
 
+{-| tag-[value](#Json) pair used to represent a field
+-}
 type alias Tagged tag =
     RecordWithoutConstructorFunction
         { tag : tag, value : Json tag }
-
-
-{-| [Morph](#Morph) to valid [`Json` value](#Json) format from [`JsValueMagic`](#JsValueMagic)
-
-About json numbers...
-
-  - json numbers don't strictly adhere to a `Float`
-    as defined in the [IEEE 754 standard][ieee]
-    which is hardcoded into almost all CPUs.
-    This standard allows `Infinity` and `NaN` which the [json.org spec][json] does not include.
-  - [`elm/json` silently encodes both as `null`](https://github.com/elm/json/blob/0206c00884af953f2cba8823fee111ee71a0330e/src/Json/Encode.elm#L106).
-    This behavior matches `JSON.stringify` behavior in plain JS
-  - our json representation doesn't have this footgun since it uses [`Decimal`](Decimal#Decimal)
-  - elm `Decoder`s/`Encoder`s can only handle `Float` range which dictates the range we can use for [`Decimal`](Decimal#Decimal)s
-
-[ieee]: https://en.wikipedia.org/wiki/IEEE_754
-[json]: https://www.json.org/
-
--}
-jsValueMagic : Morph (Json String) JsValueMagic
-jsValueMagic =
-    Morph.to "JSON"
-        { description = { custom = Emptiable.empty, inner = Emptiable.empty }
-        , narrow =
-            \jsValueMagicBeforeNarrow ->
-                jsValueMagicBeforeNarrow
-                    |> Json.Decode.decodeValue jsValueMagicDecoder
-                    |> Result.mapError decodeErrorToMorph
-        , broaden = jsValueMagicEncode ()
-        }
 
 
 {-| Should be redundant if `anyDecoder` catches all cases
@@ -183,36 +156,6 @@ decodeErrorToMorph =
                     |> Morph.DeadEnd
 
 
-{-| [Morph](#Morph) to valid [`Json.Any` value](#Any) format from a `String`
-
-[Broadens](Morph#broadenFrom) to a compact `String`.
-To adjust format readability → [`stringBroadWith`](#stringBroadWith)
-
--}
-string : Morph (Json String) String
-string =
-    stringBroadWith { indentation = 0 }
-
-
-{-| [`Json.string`](#string) [Morph](#Morph) with adjustable readability configuration
--}
-stringBroadWith : { indentation : Int } -> Morph (Json String) String
-stringBroadWith { indentation } =
-    Morph.to "JSON"
-        { description = { custom = Emptiable.empty, inner = Emptiable.empty }
-        , narrow =
-            \jsValueMagicBroad ->
-                jsValueMagicBroad
-                    |> Json.Decode.decodeString jsValueMagicDecoder
-                    |> Result.mapError decodeErrorToMorph
-        , broaden =
-            \json ->
-                json
-                    |> jsValueMagicEncode ()
-                    |> Json.Encode.encode indentation
-        }
-
-
 jsValueMagicEncode : () -> (Json String -> JsValueMagic)
 jsValueMagicEncode () =
     \jsonAny ->
@@ -242,6 +185,66 @@ atomJsValueMagicEncode =
 
             String stringAtom ->
                 stringAtom |> Json.Encode.string
+
+
+{-| [Morph](Morph#Morph) to valid [`Json` value](#Json) format from [`JsValueMagic`](#JsValueMagic)
+
+About json numbers...
+
+  - json numbers don't strictly adhere to a `Float`
+    as defined in the [IEEE 754 standard][ieee]
+    which is hardcoded into almost all CPUs.
+    This standard allows `Infinity` and `NaN` which the [json.org spec][json] does not include.
+  - [`elm/json` silently encodes both as `null`](https://github.com/elm/json/blob/0206c00884af953f2cba8823fee111ee71a0330e/src/Json/Encode.elm#L106).
+    This behavior matches `JSON.stringify` behavior in plain JS
+  - our json representation doesn't have this footgun since it uses [`Decimal`](Decimal#Decimal)
+  - elm `Decoder`s/`Encoder`s can only handle `Float` range which dictates the range we can use for [`Decimal`](Decimal#Decimal)s
+
+[ieee]: https://en.wikipedia.org/wiki/IEEE_754
+[json]: https://www.json.org/
+
+-}
+jsValueMagic : Morph (Json String) JsValueMagic
+jsValueMagic =
+    Morph.to "JSON"
+        { description = { custom = Emptiable.empty, inner = Emptiable.empty }
+        , narrow =
+            \jsValueMagicBeforeNarrow ->
+                jsValueMagicBeforeNarrow
+                    |> Json.Decode.decodeValue jsValueMagicDecoder
+                    |> Result.mapError decodeErrorToMorph
+        , broaden = jsValueMagicEncode ()
+        }
+
+
+{-| [Morph](Morph#Morph) to valid [`Json` value](#Json) format from a `String`
+
+[Broadens](Morph#broadenFrom) to a compact `String`.
+To adjust format readability → [`stringBroadWith`](#stringBroadWith)
+
+-}
+string : Morph (Json String) String
+string =
+    stringBroadWith { indentation = 0 }
+
+
+{-| [`Json.string`](#string) [Morph](Morph#Morph) with adjustable readability configuration
+-}
+stringBroadWith : { indentation : Int } -> Morph (Json String) String
+stringBroadWith { indentation } =
+    Morph.to "JSON"
+        { description = { custom = Emptiable.empty, inner = Emptiable.empty }
+        , narrow =
+            \jsValueMagicBroad ->
+                jsValueMagicBroad
+                    |> Json.Decode.decodeString jsValueMagicDecoder
+                    |> Result.mapError decodeErrorToMorph
+        , broaden =
+            \json ->
+                json
+                    |> jsValueMagicEncode ()
+                    |> Json.Encode.encode indentation
+        }
 
 
 composedJsValueMagicEncode : () -> (Composed String -> JsValueMagic)
@@ -329,20 +332,6 @@ jsonComposedDecoder =
         )
 
 
-{-| Convert a [representation of an elm value](Value#Value) to a [valid `Json` value](#Json)
--}
-value :
-    MorphIndependently
-        (Value.Value narrowTag
-         -> Result error_ (Json narrowTag)
-        )
-        (Json Value.IndexAndName
-         -> Value.Value Value.IndexAndName
-        )
-value =
-    translate fromValueImplementation toValue
-
-
 toValue : Json Value.IndexAndName -> Value.Value Value.IndexAndName
 toValue =
     \json ->
@@ -352,168 +341,6 @@ toValue =
 
             Composed composed ->
                 composed |> composedToValue |> Composed
-
-
-atomToValue : Atom -> Value.Value Value.IndexAndName
-atomToValue =
-    \atom ->
-        case atom of
-            Null unit ->
-                unit |> Value.Unit |> Atom
-
-            Number decimal ->
-                decimal |> Morph.broadenFrom decimalInternal |> Value.Number |> Atom
-
-            String string_ ->
-                string_ |> Value.String |> Atom
-
-            Bool bool ->
-                { value = () |> Value.Unit |> Atom
-                , tag =
-                    case bool of
-                        False ->
-                            { index = 0, name = "False" }
-
-                        True ->
-                            { index = 1, name = "True" }
-                }
-                    |> Value.Variant
-                    |> Composed
-
-
-composedToValue :
-    Composed Value.IndexAndName
-    -> Value.Composed Value.IndexAndName
-composedToValue =
-    \composed ->
-        case composed of
-            Array array ->
-                array |> Array.map toValue |> Value.Array
-
-            Object object ->
-                object
-                    |> Stack.map
-                        (\_ tagged ->
-                            { tag = tagged.tag
-                            , value = tagged.value |> toValue
-                            }
-                        )
-                    |> Value.Record
-
-
-fromValueImplementation : Value.Value tag -> Json tag
-fromValueImplementation =
-    \json ->
-        case json of
-            Atom atom ->
-                atom |> atomFromValue |> Atom
-
-            Composed composed ->
-                composed |> composedFromValue |> Composed
-
-
-composedFromValue : Value.Composed tag -> Composed tag
-composedFromValue =
-    \composed ->
-        case composed of
-            Value.List list ->
-                list |> List.map fromValueImplementation |> Array.fromList |> Array
-
-            Value.Array array ->
-                array |> Array.map fromValueImplementation |> Array
-
-            Value.Record record ->
-                record
-                    |> Stack.map
-                        (\_ field ->
-                            { tag = field.tag
-                            , value = field.value |> fromValueImplementation
-                            }
-                        )
-                    |> Object
-
-            Value.Variant variant ->
-                { tag = variant.tag, value = variant.value |> fromValueImplementation }
-                    |> Stack.one
-                    |> Object
-
-
-atomFromValue : Value.Atom -> Atom
-atomFromValue =
-    \atom ->
-        case atom of
-            Value.Unit () ->
-                Null ()
-
-            Value.String stringAtom ->
-                stringAtom |> String
-
-            Value.Number decimal ->
-                decimal |> Morph.mapTo decimalInternal |> Number
-
-
-
--- tag
-
-
-{-| [`Translate`](Morph#Translate) [`Json`](#Json) by calling [`tagMap`](#tagMap) in both directions
-
-    ...
-        |> Morph.over (Json.eachTag Value.compact)
-
-    -- or
-    ...
-        |> Morph.over (Json.eachTag Value.descriptive)
-
--}
-eachTag :
-    MorphIndependently
-        (tagBeforeMap -> Result (Morph.ErrorWithDeadEnd Never) tagMapped)
-        (tagBeforeUnmap -> tagUnmapped)
-    ->
-        MorphIndependently
-            (Json tagBeforeMap
-             -> Result (Morph.ErrorWithDeadEnd never_) (Json tagMapped)
-            )
-            (Json tagBeforeUnmap -> Json tagUnmapped)
-eachTag tagTranslate_ =
-    translate
-        (tagMap (Morph.mapTo tagTranslate_))
-        (tagMap (Morph.broadenFrom tagTranslate_))
-
-
-{-| Reduce the amount of tag information.
-Used to make its representation [`compact`](Value#compact) or [`descriptive`](Value#descriptive)
--}
-tagMap : (tag -> tagMapped) -> (Json tag -> Json tagMapped)
-tagMap tagChange =
-    \json ->
-        json |> Value.composedMap (composedTagMap tagChange)
-
-
-composedTagMap :
-    (tag -> tagMapped)
-    -> (Composed tag -> Composed tagMapped)
-composedTagMap tagChange =
-    \composed ->
-        case composed of
-            Array array ->
-                array |> Array.map (tagMap tagChange) |> Array
-
-            Object object ->
-                object |> Stack.map (\_ -> taggedTagMap tagChange) |> Object
-
-
-taggedTagMap : (tag -> tagMapped) -> (Tagged tag -> Tagged tagMapped)
-taggedTagMap tagChange =
-    \tagged ->
-        { tag = tagged.tag |> tagChange
-        , value = tagged.value |> tagMap tagChange
-        }
-
-
-
--- Decimal
 
 
 decimalInternal :
@@ -600,3 +427,178 @@ signInternal =
                 Sign.Positive ->
                     Sign.Internal.Positive
         )
+
+
+atomToValue : Atom -> Value.Value Value.IndexAndName
+atomToValue =
+    \atom ->
+        case atom of
+            Null unit ->
+                unit |> Value.Unit |> Atom
+
+            Number decimal ->
+                decimal |> Morph.broadenFrom decimalInternal |> Value.Number |> Atom
+
+            String string_ ->
+                string_ |> Value.String |> Atom
+
+            Bool bool ->
+                { value = () |> Value.Unit |> Atom
+                , tag =
+                    if bool then
+                        { index = 0, name = "False" }
+
+                    else
+                        { index = 1, name = "True" }
+                }
+                    |> Value.Variant
+                    |> Composed
+
+
+fromValueImplementation : Value.Value tag -> Json tag
+fromValueImplementation =
+    \json ->
+        case json of
+            Atom atom ->
+                atom |> atomFromValue |> Atom
+
+            Composed composed ->
+                composed |> composedFromValue |> Composed
+
+
+
+-- tag
+
+
+atomFromValue : Value.Atom -> Atom
+atomFromValue =
+    \atom ->
+        case atom of
+            Value.Unit () ->
+                Null ()
+
+            Value.String stringAtom ->
+                stringAtom |> String
+
+            Value.Number decimal ->
+                decimal |> Morph.mapTo decimalInternal |> Number
+
+
+{-| Convert a [representation of an elm value](Value#Value) to a [valid `Json` value](#Json)
+-}
+value :
+    MorphIndependently
+        (Value.Value narrowTag
+         -> Result error_ (Json narrowTag)
+        )
+        (Json Value.IndexAndName
+         -> Value.Value Value.IndexAndName
+        )
+value =
+    translate fromValueImplementation toValue
+
+
+composedToValue :
+    Composed Value.IndexAndName
+    -> Value.Composed Value.IndexAndName
+composedToValue =
+    \composed ->
+        case composed of
+            Array array ->
+                array |> Array.map toValue |> Value.Array
+
+            Object object ->
+                object
+                    |> Stack.map
+                        (\_ tagged ->
+                            { tag = tagged.tag
+                            , value = tagged.value |> toValue
+                            }
+                        )
+                    |> Value.Record
+
+
+composedFromValue : Value.Composed tag -> Composed tag
+composedFromValue =
+    \composed ->
+        case composed of
+            Value.List list ->
+                list |> List.map fromValueImplementation |> Array.fromList |> Array
+
+            Value.Array array ->
+                array |> Array.map fromValueImplementation |> Array
+
+            Value.Record record ->
+                record
+                    |> Stack.map
+                        (\_ field ->
+                            { tag = field.tag
+                            , value = field.value |> fromValueImplementation
+                            }
+                        )
+                    |> Object
+
+            Value.Variant variant ->
+                { tag = variant.tag, value = variant.value |> fromValueImplementation }
+                    |> Stack.one
+                    |> Object
+
+
+
+-- Decimal
+
+
+{-| [`Translate`](Morph#Translate) [`Json`](#Json) by calling [`tagMap`](#tagMap) in both directions
+
+    ...
+        |> Morph.over (Json.eachTag Value.compact)
+
+    -- or
+    ...
+        |> Morph.over (Json.eachTag Value.descriptive)
+
+-}
+eachTag :
+    MorphIndependently
+        (tagBeforeMap -> Result (Morph.ErrorWithDeadEnd Never) tagMapped)
+        (tagBeforeUnmap -> tagUnmapped)
+    ->
+        MorphIndependently
+            (Json tagBeforeMap
+             -> Result (Morph.ErrorWithDeadEnd never_) (Json tagMapped)
+            )
+            (Json tagBeforeUnmap -> Json tagUnmapped)
+eachTag tagTranslate_ =
+    translate
+        (tagMap (Morph.mapTo tagTranslate_))
+        (tagMap (Morph.broadenFrom tagTranslate_))
+
+
+{-| Reduce the amount of tag information.
+Used to make its representation [`compact`](Value#compact) or [`descriptive`](Value#descriptive)
+-}
+tagMap : (tag -> tagMapped) -> (Json tag -> Json tagMapped)
+tagMap tagChange =
+    \json ->
+        json |> Value.composedMap (composedTagMap tagChange)
+
+
+composedTagMap :
+    (tag -> tagMapped)
+    -> (Composed tag -> Composed tagMapped)
+composedTagMap tagChange =
+    \composed ->
+        case composed of
+            Array array ->
+                array |> Array.map (tagMap tagChange) |> Array
+
+            Object object ->
+                object |> Stack.map (\_ -> taggedTagMap tagChange) |> Object
+
+
+taggedTagMap : (tag -> tagMapped) -> (Tagged tag -> Tagged tagMapped)
+taggedTagMap tagChange =
+    \tagged ->
+        { tag = tagged.tag |> tagChange
+        , value = tagged.value |> tagMap tagChange
+        }

@@ -30,8 +30,8 @@ Plus it makes it harder to switch to a different format
 Basically every `module` here has a [`Morph`](#Morph),
 for example
 
-  - [`Int.Morph`](Int-Morph)
-  - [`FloatExplicit`](Float-Morph)
+  - [`Integer`](Integer)
+  - [`FloatExplicit`](FloatExplicit)
   - [`String.Morph`](String-Morph)
   - [`Maybe.Morph`](Maybe-Morph)
   - [`Result.Morph`](Result-Morph)
@@ -41,7 +41,7 @@ for example
   - [`Array.Morph`](Array-Morph)
 
 
-### group
+### grouping
 
 @docs GroupMorphEmpty
 @docs field, group, groupFinish
@@ -133,13 +133,12 @@ import Decimal.Internal exposing (Decimal)
 import Emptiable exposing (Emptiable, fill, filled)
 import Linear exposing (Direction(..))
 import Morph exposing (ChoiceMorphEmpty, Morph, MorphIndependently, MorphOrError, broadenFrom, narrowTo, to, translate)
-import N exposing (Up)
-import Possibly exposing (Possibly(..))
+import Possibly exposing (Possibly)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Stack exposing (Stacked)
 
 
-{-| A supported elm atom (that don't contain other [values](#Value))
+{-| An elm literal (that doesn't itself contain other [values](#Value))
 -}
 type Atom
     = Unit ()
@@ -167,18 +166,19 @@ PR if you'd like to see a structure or atom (like `Dict String ...` or `Random.S
 that can't be converted in constant time
 (turning tuples into records would only take O(1) time for example)
 
-Note: To not have overly complex recursive types,
-a [`Value`](#Value) can possibly describe an invalid elm value,
-for example
-
-    List [ Unit (), String "huh" ]
-
 -}
 type alias Value tag =
     AtomOrComposed Atom (Composed tag)
 
 
-{-| elm composed that can itself contain values
+{-| elm structure that can itself contain values
+
+Note: To not have overly complex recursive types,
+a [`Value.Composed`](#Composed) _can_ describe an invalid elm value,
+for example
+
+    List [ Unit (), String "huh" ]
+
 -}
 type Composed tag
     = List (List (Value tag))
