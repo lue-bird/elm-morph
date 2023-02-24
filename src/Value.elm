@@ -4,7 +4,7 @@ module Value exposing
     , unit
     , GroupMorphEmptiable
     , group, part, groupFinish
-    , try, choiceFinish
+    , variant, choiceFinish
     , Name, Index, IndexOrName(..), IndexAndName
     , descriptive, compact, eachTag, tagMap
     , AtomOrComposed(..)
@@ -52,10 +52,10 @@ for example
 variant union [`Morph`](#Morph)
 
   - starting from [`Morph.choice`](Morph#choice)
-  - over [`Value.try`](#try)
+  - over [`Value.variant`](#variant)
   - and completed with [`Value.choiceFinish`](#choiceFinish)
 
-@docs try, choiceFinish
+@docs variant, choiceFinish
 
 
 ## tag
@@ -239,7 +239,7 @@ type alias IndexAndName =
 {-| with readable names
 
   - field tag = name given to the [`part` `Morph`](#part)
-  - variant tag = name given to the [`try` `Morph`](#try)
+  - variant tag = name given to the [`variant` `Morph`](#variant)
   - →
       - readable by humans
       - readable by other tools
@@ -262,7 +262,7 @@ descriptive =
 {-| With compact indexes
 
   - field tag = [`field` `Morph`](#part) index index in the builder
-  - variant tag = [`try` `Morph`](#try) index in the builder
+  - variant tag = [`variant` `Morph`](#variant) index in the builder
   - →
       - not [`descriptive`](#descriptive)
 
@@ -489,7 +489,7 @@ composedKindToString =
 
 {-| `()` [`Morph`](#Morph)
 
-Often used in when [morphing](Value#Morph) a [variant](Value#try)
+Often used in when [morphing](Value#Morph) a [variant](Value#variant)
 with 0 attached values
 
 -}
@@ -754,12 +754,12 @@ If a variant doesn't have any value attached, use [`unit`](Value#unit)
                     False ->
                         false ()
             )
-            |> Value.try ( \() -> True, "True" ) unit
-            |> Value.try ( \() -> False, "False" ) unit
+            |> Value.variant ( \() -> True, "True" ) unit
+            |> Value.variant ( \() -> False, "False" ) unit
             |> Value.choiceFinish
 
 -}
-try :
+variant :
     ( possibilityNarrow -> choiceNarrow
     , String
     )
@@ -783,7 +783,7 @@ try :
                 choiceBroadenFurther
                 Morph.Error
         )
-try ( possibilityToChoice, possibilityTag ) possibilityMorph =
+variant ( possibilityToChoice, possibilityTag ) possibilityMorph =
     \choiceMorphSoFar ->
         choiceMorphSoFar
             |> Morph.try possibilityToChoice
@@ -835,7 +835,7 @@ variantStepNarrow ( variantTag, possibilityNarrow ) =
                     "tag " ++ name |> Morph.DeadEnd |> Err
 
 
-{-| Conclude a [`Morph.choice`](Morph#choice) |> [`Value.try`](#try) chain
+{-| Conclude a [`Morph.choice`](Morph#choice) |> [`Value.variant`](#variant) chain
 -}
 choiceFinish :
     ChoiceMorphEmptiable

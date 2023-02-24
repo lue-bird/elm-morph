@@ -21,7 +21,7 @@ module Set.Morph exposing
 
 import Emptiable exposing (filled)
 import List.Morph
-import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, Translate, translate, translateOn)
+import Morph exposing (MorphIndependently, translate)
 import Possibly exposing (Possibly(..))
 import Set exposing (Set)
 import Stack

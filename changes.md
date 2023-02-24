@@ -117,7 +117,7 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
           - in favor of `grab`, `skip`
       - `andThen2` remove
       - `textOf` remove
-          - in favor of `String.Morph.fromList |> Morph.rowOver ...`
+          - in favor of `String.Morph.list |> Morph.rowOver ...`
       - `oneAny` add
       - `one` add
       - `before` add

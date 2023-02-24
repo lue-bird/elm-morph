@@ -593,7 +593,7 @@ atLeast elementStepMorphRow minimum =
     -- stops before we reach a maximum of 6 in the sum
     "2 3 4"
         |> narrow
-            (String.Morph.fromList
+            (String.Morph.list
                 |> Morph.overRow
                     (Morph.succeed (\numbers -> numbers)
                         |> grab (\numbers -> numbers) (sumWhileLessThan 6)

@@ -1,14 +1,11 @@
 module Morph.Test exposing (tests)
 
 import AToZ exposing (AToZ)
-import Array
 import ArraySized exposing (ArraySized)
 import ArraySized.Morph exposing (atLeast)
 import Char.Morph
 import Decimal exposing (Decimal)
 import Expect
-import FloatExplicit
-import Fuzz
 import Linear exposing (Direction(..))
 import Morph exposing (Morph, MorphRow, MorphRowIndependently, broad, broadenFrom, grab, narrowTo, one, skip, translate)
 import N exposing (In, Min, N, N0, N1, N2, N9, On, n0, n1, n9)
@@ -18,7 +15,6 @@ import Stack
 import Stack.Morph
 import String.Morph
 import Test exposing (Test, test)
-import Util exposing (restore)
 
 
 tests : Test
@@ -40,16 +36,13 @@ pointTest =
         [ test "fail"
             (\() ->
                 Expect.fail """
-Ok, so here's an elaborate explanation of what has gone wrong.
+What could have gone wrong in case of an overflow?
 
-First of all, such an overflow might mean that the lossy conversion
+Maybe the lossy conversion
 hasn't been set up properly (see FloatExplicit.float).
 
 Another option is a potentially missed chance to do TCO.
-This could have happened in many places, maybe because `|>` was introduced.
-
-It's crucial to know which of the 2 it is, so to check,
-we must do a manual check in the context of the file linked in the README
+This could have happened in many places, maybe because `|>` is used.
 """
             )
         , test "narrowTo |> broadenFrom"

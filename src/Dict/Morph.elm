@@ -21,7 +21,7 @@ module Dict.Morph exposing
 
 import Dict exposing (Dict)
 import List.Morph
-import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, Translate, translate, translateOn)
+import Morph exposing (ErrorWithDeadEnd, MorphIndependently, translate, translateOn)
 import Value
 
 

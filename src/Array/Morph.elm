@@ -23,7 +23,7 @@ Also try [`toggle`](Morph#toggle) [`Array.Extra.reverse`](https://dark.elm.dmy.f
 
 import Array exposing (Array)
 import Emptiable exposing (filled)
-import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, Translate, translate, translateOn)
+import Morph exposing (MorphIndependently, translate)
 import Possibly exposing (Possibly(..))
 import Stack
 import Value

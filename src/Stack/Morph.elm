@@ -21,10 +21,8 @@ module Stack.Morph exposing
 
 import Emptiable exposing (Emptiable, filled)
 import Linear exposing (Direction(..))
-import List.Morph
-import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, MorphOrError, Translate, translate, translateOn)
+import Morph exposing (MorphIndependently, MorphOrError, translate)
 import Possibly exposing (Possibly(..))
-import Set exposing (Set)
 import Stack exposing (Stacked)
 
 
@@ -47,12 +45,7 @@ reverse =
 {-| [`Morph`](Morph#Morph) each stacked element
 
 If the given [`Morph`](Morph#Morph) is a [`Translate`](Morph#Translate),
-[`eachBelowTop`](#eachBelowTop) is equivalent to
-
-    Morph.translateOn
-        ( Stack.belowTopMap (\_ -> elementMap)
-        , Stack.belowTopMap (\_ -> elementMap)
-        )
+[`eachElement`](#eachElement) will also be a [`Translate`](Morph#Translate)
 
 -}
 eachElement :

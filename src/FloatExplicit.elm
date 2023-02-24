@@ -23,7 +23,7 @@ import Decimal.Internal
 import Emptiable exposing (Emptiable)
 import Linear exposing (Direction(..))
 import Morph exposing (MorphOrError)
-import N exposing (Down, In, N, N0, N1, N9, Up0, Up1, Up9, n0, n1, n9)
+import N exposing (In, N, N0, N9, n0, n1, n9)
 import Possibly exposing (Possibly)
 import Sign exposing (Sign)
 import Sign.Internal
@@ -181,28 +181,6 @@ float =
         |> Morph.variantsFinish
 
 
-{-| [`Morph`](Morph#Morph)
-a [`FloatExplicit`](#FloatExplicit)
-to an [`elm/core` `Float`](https://dark.elm.dmy.fr/packages/elm/core/latest/Basics#Float)
-
-Keep in mind that `FloatExplicit -> Float` can be lossy
-since `Float` is fixed in bit size while [`FloatExplicit`](#FloatExplicit) is not
-
-    -9999.124
-        |> broaden
-            (Decimal.rowChar
-                |> Morph.overRow Decimal.floatExplicit
-                |> Morph.overRow FloatExplicit.toFloat
-                |> Morph.rowFinish
-            )
-    --> "-999.1239999999997962731868028640747070312"
-
--}
-toFloat : MorphOrError Float FloatExplicit error_
-toFloat =
-    Morph.invert float
-
-
 floatNaN : Float
 floatNaN =
     0.0 / 0.0
@@ -285,6 +263,28 @@ floatFractionToDigits =
             )
 
 
+{-| [`Morph`](Morph#Morph)
+a [`FloatExplicit`](#FloatExplicit)
+to an [`elm/core` `Float`](https://dark.elm.dmy.fr/packages/elm/core/latest/Basics#Float)
+
+Keep in mind that `FloatExplicit -> Float` can be lossy
+since `Float` is fixed in bit size while [`FloatExplicit`](#FloatExplicit) is not
+
+    -9999.124
+        |> broaden
+            (Decimal.rowChar
+                |> Morph.overRow Decimal.floatExplicit
+                |> Morph.overRow FloatExplicit.toFloat
+                |> Morph.rowFinish
+            )
+    --> "-999.1239999999997962731868028640747070312"
+
+-}
+toFloat : MorphOrError Float FloatExplicit error_
+toFloat =
+    Morph.invert float
+
+
 {-| `Float` [`Value.Morph`](Value#Morph)
 -}
 value : Value.Morph FloatExplicit
@@ -298,8 +298,8 @@ value =
                 Exception exception ->
                     variantException exception
         )
-        |> Value.try ( Decimal, "Decimal" ) decimalInternalValue
-        |> Value.try ( Exception, "Exception" ) exceptionValue
+        |> Value.variant ( Decimal, "Decimal" ) decimalInternalValue
+        |> Value.variant ( Exception, "Exception" ) exceptionValue
         |> Value.choiceFinish
 
 
@@ -334,8 +334,8 @@ exceptionValue =
                 Infinity sign ->
                     variantInfinity sign
         )
-        |> Value.try ( \() -> NaN, "NaN" ) Value.unit
-        |> Value.try ( Infinity, "NaN" ) signValue
+        |> Value.variant ( \() -> NaN, "NaN" ) Value.unit
+        |> Value.variant ( Infinity, "NaN" ) signValue
         |> Value.choiceFinish
 
 
@@ -350,6 +350,6 @@ signValue =
                 Sign.Positive ->
                     positive ()
         )
-        |> Value.try ( \() -> Sign.Negative, "Negative" ) Value.unit
-        |> Value.try ( \() -> Sign.Positive, "Positive" ) Value.unit
+        |> Value.variant ( \() -> Sign.Negative, "Negative" ) Value.unit
+        |> Value.variant ( \() -> Sign.Positive, "Positive" ) Value.unit
         |> Value.choiceFinish

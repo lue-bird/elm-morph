@@ -22,17 +22,6 @@ whole =
     Morph.translate fromWholeImplementation toWholeImplementation
 
 
-toWhole : MorphOrError Whole NaturalPositive never_
-toWhole =
-    Morph.invert whole
-
-
-rowChar : MorphRow NaturalPositive Char
-rowChar =
-    whole
-        |> Morph.overRow Whole.rowChar
-
-
 toWholeImplementation : NaturalPositive -> Whole
 toWholeImplementation =
     \bitsAfterI ->
@@ -45,3 +34,14 @@ fromWholeImplementation =
     \digits ->
         digits
             |> Debug.todo ""
+
+
+toWhole : MorphOrError Whole NaturalPositive never_
+toWhole =
+    Morph.invert whole
+
+
+rowChar : MorphRow NaturalPositive Char
+rowChar =
+    whole
+        |> Morph.overRow Whole.rowChar

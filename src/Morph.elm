@@ -79,7 +79,7 @@ We call it
 @docs parts, part, partsFinish
 
 
-## choice
+## choice [`Morph`](Morph#Morph)
 
 [`Morph`](#Morph) a tagged union `type`
 
@@ -107,9 +107,9 @@ We call it
 ### sequence row
 
   - optional → [`Maybe.Morph.row`](Maybe-Morph#row)
-  - [`atLeast`](ArraySized-Morph-atLeast)
-  - [`exactly`](ArraySized-Morph-exactly)
-  - between → [`ArraySized.Morph.in_`](ArraySized-Morph-exactly)
+  - [`atLeast`](ArraySized-Morph#atLeast)
+  - [`exactly`](ArraySized-Morph#exactly)
+  - between → [`ArraySized.Morph.in_`](ArraySized-Morph#exactly)
 
 @docs before
 
@@ -130,8 +130,8 @@ Up for a challenge? implement & PR
 import ArraySized exposing (ArraySized)
 import Emptiable exposing (Emptiable, filled)
 import Linear exposing (Direction(..))
-import N exposing (Add1, Exactly, In, Min, N, N0, N2, On, To, Up, n0, n1, n2)
-import Possibly exposing (Possibly(..))
+import N exposing (Min, N2, On)
+import Possibly exposing (Possibly)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Stack exposing (Stacked)
 import Util exposing (restoreTry)
@@ -164,7 +164,7 @@ import Util exposing (restoreTry)
 a more specific format and back.
 
 There's no use-case implied.
-You can always chain, [group](#groups), [choose](#choices), ...
+You can always chain, [group](#group), [choose](#choice), ...
 
 👀 Each type `Morph narrow broad`,
 for example `Morph Email String`, can
@@ -194,7 +194,7 @@ for example `Morph Email String`, can
             you won't have to fix a bug from months ago
             that interrupts the work when you're swamped with today
       - opaque types don't save complexity in validation, tests, documentation anyway
-          - doesn't communicate business rules (requirements, TODO)
+          - doesn't communicate business rules (requirements, ...)
               - including for other developers,
                 "allowing for improved reasoning across the codebase"
   - 🎙️ [podcast "Parse, don't validate"](https://elm-radio.com/episode/parse-dont-validate/)
@@ -245,12 +245,10 @@ type alias Morph narrow broad =
 
 where
 
-  - [`narrow`](#narrow)ed value types can't necessarily be [`broaden`](#broaden)ed
-  - [`broaden`](#broaden)ed value types can't necessarily be [`narrow`](#narrow)ed
+  - [`narrow`](#narrowTo)ed value types can't necessarily be [`broadenFrom`](#broadenFrom)ed
+  - [`broadenFrom`](#broadenFrom)ed value types can't necessarily be [`narrow`](#narrowTo)ed
 
 This general form is helpful to describe a step in building an incomplete [`Morph`](#Morph).
-
-TODO: add error as type parameter to allow translate
 
 TODO: dream:
 Choice by group/Morph.choice/... associating errors and description
@@ -311,7 +309,7 @@ type DescriptionInner
 {-| Where [narrowing](#narrowTo) has failed.
 
 `String` is not enough for display?
-→ use [`MorphOrError`](#MorphOrError) [`ErrorWithDeadEnd`](#ErrorWithDeadEnd) doing [`mapDeadEnd`](#mapDeadEnd)
+→ use [`MorphOrError`](#MorphOrError) [`ErrorWithDeadEnd`](#ErrorWithDeadEnd) doing [`deadEndMap`](#deadEndMap)
 on [`Morph`](#Morph) that are returned
 
 Have trouble doing so because some API is too strict on errors? → issue
@@ -327,7 +325,7 @@ type alias Error =
         MorphOrError mapped unmapped (ErrorWithDeadEnd Never)
 
 `deadEnd` could also be formatted text for display.
-For that, use [`MorphOrError`](#MorphOrError) [`ErrorWithDeadEnd`](#ErrorWithDeadEnd) doing [`mapDeadEnd`](#mapDeadEnd)
+For that, use [`MorphOrError`](#MorphOrError) [`ErrorWithDeadEnd`](#ErrorWithDeadEnd) doing [`deadEndMap`](#deadEndMap)
 on [`Morph`](#Morph) that are returned.
 
 Have trouble doing so because some API is too strict on errors? → issue
@@ -344,7 +342,7 @@ Then again: They don't have to be.
 type ErrorWithDeadEnd deadEnd
     = DeadEnd deadEnd
     | Row { startDown : Int, error : ErrorWithDeadEnd deadEnd }
-      --? TODO | Variant { index : Int, error : ErrorWithDeadEnd deadEnd }
+      -- TODO | Variant { index : Int, error : ErrorWithDeadEnd deadEnd }
     | Parts (PartsError (ErrorWithDeadEnd deadEnd))
     | Tries
         (Emptiable
@@ -431,10 +429,6 @@ errorToLines =
                     )
 
 
-indent =
-    \line -> "    " ++ line
-
-
 markdownElement :
     Emptiable (Stacked String) Never
     -> Emptiable (Stacked String) never_
@@ -446,6 +440,11 @@ markdownElement =
                 |> Stack.removeTop
                 |> Stack.map (\_ -> indent)
             )
+
+
+indent : String -> String
+indent =
+    \line -> "    " ++ line
 
 
 {-| Describe the context to improve error messages.
@@ -653,8 +652,8 @@ Examples:
             |> Morph.over
                 (Value.list elementMorph)
 
-      - [`Array.Morph.toList`](Array-#toList), [`Array.Morph.fromList`](Array-#fromList)
-      - [`Stack.Morph.toString`](Stack-#toString), [`Stack.Morph.fromString`](Stack-#fromString)
+      - [`Array.Morph.toList`](Array-Morph#toList), [`Array.Morph.list`](Array-Morph#list)
+      - [`Stack.Morph.toString`](Stack-Morph#toString), [`Stack.Morph.string`](Stack-Morph#string)
 
   - strip unnecessary information
     ~`{ end : (), before :`~`List element`~`}`~
@@ -716,8 +715,8 @@ Any possible input stays, remains the same. A no-op.
 
 Same as writing:
 
-  - [`map`](#map)`identity`
-  - [`unmap`](#unmap)`identity`
+  - [`map`](#mapTo)`identity`
+  - [`broadenFrom`](#broadenFrom)`identity`
   - [`validate`](#validate)`Ok`
   - [`translate`](#translate)`identity identity`
   - `{ broaden = identity, narrow = Ok }`
@@ -790,9 +789,9 @@ broaden broadenFromNarrow =
     translate identity broadenFromNarrow
 
 
-{-| [`Morph`](#Morph) that always [`broaden`](#broaden)s to a given constant.
+{-| [`Morph`](#Morph) that always [`broadenFrom`](#broadenFrom)s to a given constant.
 
-For any more complex [`broaden`](#broaden)ing process, use [`translate`](#translate)
+For any more complex [`broadenFrom`](#broadenFrom)ing process, use [`translate`](#translate)
 
 -}
 broad :
@@ -838,7 +837,7 @@ only broadConstantToString broadConstant =
 
   - a `String` description
   - `narrow`: a transformation that can fail with a `String` error
-  - `broaden`: a transformation that can build the parsed value back to what a value that can be parsed
+  - `broadenFrom`: a transformation that can build the parsed value back to what a value that can be parsed
 
 -}
 value :
@@ -959,7 +958,7 @@ lazy morphLazy =
 
 
 {-| [`Morph`](#Morph) on groups in progress.
-Start with [`group`](#group), complete with [`part`](#part), finally [`groupFinish`](#groupFinish)
+Start with [`group`](#group), complete with [`part`](#part), finally [`partsFinish`](#partsFinish)
 -}
 type alias PartsMorphEmptiable noPartPossiblyOrNever narrow broaden =
     RecordWithoutConstructorFunction
@@ -1228,7 +1227,7 @@ over morphNarrowBroad =
 
 
 {-| `Translate a <-> b`
-by swapping the functions [`map`](#map) <-> [`unmap`](#unmap).
+by swapping the functions [`map`](#mapTo) <-> [`unmap`](#broadenFrom).
 
     [ 'O', 'h', 'a', 'y', 'o' ]
         |> Morph.map
@@ -1265,7 +1264,7 @@ This can be used to easily create a `fromX`/`toX` pair
     toListNonEmpty =
         translate Stack.toListNonEmpty Stack.fromListNonEmpty
 
-[`unmap`](#unmap) `...` is equivalent to `map (... |> reverse)`.
+[`unmap`](#broadenFrom) `...` is equivalent to `map (... |> reverse)`.
 
 -}
 invert :
@@ -1289,7 +1288,7 @@ invert =
 {-| Change all [`DeadEnd`](#ErrorWithDeadEnd)s based on their current values.
 
 `deadEnd` can for example be changed to formatted text for display.
-For that, use [`MorphOrError`](#MorphOrError) [`ErrorWithDeadEnd`](#ErrorWithDeadEnd) doing [`mapDeadEnd`](#mapDeadEnd)
+For that, use [`MorphOrError`](#MorphOrError) [`ErrorWithDeadEnd`](#ErrorWithDeadEnd) doing [`deadEndMap`](#deadEndMap)
 on [`Morph`](#Morph) that are returned.
 
 Have trouble doing so because some API is too strict on errors? → issue
@@ -1360,7 +1359,7 @@ deadEndNever =
                     |> deadEndNever
 
 
-{-| Change the potential [`Error`](#Error) TODO This is usually used with either
+{-| Change the potential [`Error`](#Error). This is usually used with either
 
   - [`deadEndNever : ErrorWithDeadEnd Never -> any_`](#deadEndNever)
   - [`deadEndMap`](#deadEndMap)
@@ -1531,7 +1530,7 @@ Note before we start:
   - 👍 error messages will always show all options and why they failed,
     showing those that came the furthest first
 
-  - 👎 performs worse as there are more [possibilities](Choice#try) to parse to know it failed
+  - 👎 performs worse as there are more [possibilities](Morph#try) to parse to know it failed
 
 -}
 type alias MorphRow narrow broadElement =
@@ -1765,7 +1764,7 @@ grab partAccess grabbedNextMorphRow =
             )
     --> Ok { username = "user" }
 
-[`broad`](#broad) `... |>` [`Morph.overRow`](MorphRow#over) is cool:
+[`broad`](#broad) `... |>` [`Morph.overRow`](Morph#overRow) is cool:
 when multiple kinds of input can be dropped,
 it allows choosing a default possibility for building.
 
@@ -1954,15 +1953,7 @@ before untilStep =
         }
 
 
-{-| How to continue a loop.
-Either continue with a partial result or return with a complete value
--}
-type LoopStep partial complete
-    = GoOn partial
-    | Commit complete
-
-
-{-| How are [`in_`](#in_), ... defined?
+{-| How are [`ArraySized.Morph.in_`](ArraySized-Morph#in_), ... defined?
 
     decoderNameSubject : MorphRow String Char expectationCustom
     decoderNameSubject =
@@ -2113,13 +2104,21 @@ until untilStep =
     }
 
 
+{-| How to continue a loop.
+Either continue with a partial result or return with a complete value
+-}
+type LoopStep partial complete
+    = GoOn partial
+    | Commit complete
+
+
 
 --
 
 
 {-| Only matches when there's no further broad input afterwards.
 
-This is not required for [`narrow`](#narrow)ing to Morph.succeed.
+This is not required for [`narrow`](#narrowTo)ing to Morph.succeed.
 
 It can, however simplify checking for specific endings:
 
@@ -2203,8 +2202,8 @@ rowFinish =
 --
 
 
-{-| Possibly incomplete [`Morph`](Morph#Morph) a choice from a [`Value`](Value#Value).
-See [`Morph.choice`](Morph#choice), [`variantValue`](#variantValue), [`finishValue`](#finishValue)
+{-| Possibly incomplete [`Morph`](Morph#Morph) for a choice type.
+See [`Morph.choice`](Morph#choice), [`try`](#try), [`choiceFinish`](#choiceFinish)
 -}
 type alias ChoiceMorphEmptiable noTryPossiblyOrNever choiceNarrow choiceBeforeNarrow choiceBroaden error =
     VariantsMorphEmptiable
@@ -2218,21 +2217,6 @@ type alias ChoiceMorphEmptiable noTryPossiblyOrNever choiceNarrow choiceBeforeNa
                 choiceNarrow
         )
         choiceBroaden
-
-
-{-| Word in an incomplete morph in progress. For example
-
-    Morph.choiceFinish :
-        Choice.MorphEmptiable
-            Never
-            (N (In N0 N9)))
-            Char
-            (N (In N0 N9)) -> Char)
-        -> Morph (N (In N0 N9)) Char
-
--}
-type Empty
-    = EmptyTag Never
 
 
 {-| Discriminate into possibilities
@@ -2317,7 +2301,7 @@ type Empty
             |> Morph.choiceFinish
 
     {-| The end of a text line:
-    either a [return character](Return#Return) or the end of the whole text.
+    either a return character or the end of the whole text.
     -}
     type LineEnd
         = InputEnd
@@ -2366,16 +2350,16 @@ choice choiceBroadenDiscriminatedByPossibility =
 
 
 {-| Offer alternative [`Morph`](Morph#Morph) possibilities to a given preferred one.
-Functionally, it's the same as [`Choice.equivalent`](#equivalent) with an optimization
+Functionally, it's the same as [`choiceEquivalent`](#choiceEquivalent) with an optimization
 as shown in ["Fast parsing of String Sets in Elm" by Marcelo Lazaroni](https://lazamar.github.io/fast-parsing-of-string-sets-in-elm/)
 published as [`dict-parser`](https://dark.elm.dmy.fr/packages/lazamar/dict-parser/latest/Parser-Dict)
 
-Usually, you'll be better off with a [`Morph.choice`](#between)
+Usually, you'll be better off with a [`Morph.choice`](#choice)
 an explicit custom tagged union
 because you'll have the option to preserve what was [narrowed](Morph#narrowTo).
 (Remember: you can always discard that info and set a preferred option with [`Morph.broad`](Morph#broad))
 
-Go [`Choice.equivalent`](Choice#equivalent) if you have a dynamic list of aliases/morphs to treat equally.
+Go [`choiceEquivalent`](#choiceEquivalent) if you have a dynamic list of aliases/morphs to treat equally.
 An example is defined variable names
 
     import Order
@@ -2383,13 +2367,13 @@ An example is defined variable names
     Choice.equivalentRow String.Morph.only
         { broad = "∨"
         , alternatives = [ "|", "or" ]
-        , order = Order.string { case_ = Order.lowerUpper }
+        , order = Order.string (Char.Order.alphabetically Char.Order.lowerUpper)
         }
 
     Choice.equivalentRow String.Morph.only
         { broad = "±"
         , alternatives = [ "pm", "plusminus" ]
-        , order = Order.string { case_ = Order.lowerUpper }
+        , order = Order.string (Char.Order.alphabetically Char.Order.lowerUpper)
         }
 
 TODO: optimize
@@ -2428,12 +2412,12 @@ an explicit custom tagged union
 because you'll have the option to preserve what was [narrowed](Morph#narrowTo).
 (Remember: you can always discard that info and set a preferred option with [`Morph.broad`](Morph#broad))
 
-Go [`Choice.equivalent`](Choice#equivalent) if you have a dynamic list of aliases/morphs to treat equally.
+Go [`choiceEquivalent`](#choiceEquivalent) if you have a dynamic list of aliases/morphs to treat equally.
 An example is defined variable names
 
-    Choice.equivalent Char.Morph.only { broad = '∨', alternatives = [ '|' ] }
+    Morph.choiceEquivalent Char.Morph.only { broad = '∨', alternatives = [ '|' ] }
 
-Use [`Choice.equivalentRow`](#equivalentRow) for strings etc.
+Use [`choiceEquivalentRow`](#choiceEquivalentRow) for strings etc.
 
 -}
 choiceEquivalent :
@@ -2490,7 +2474,7 @@ choiceEquivalentTryNarrow :
             (beforeNarrow
              -> Result (ErrorWithDeadEnd deadEnd) narrow
             )
-            broaden
+            broaden_
     )
     -> Emptiable (Stacked element) Never
     ->
@@ -2523,7 +2507,7 @@ choiceEquivalentTryNarrow traverseTry tries =
 
 {-| Builder for a [`Morph`](#Morph) to a choice. Possibly incomplete
 
-Initialize with [`Morph.variants`](#toFrom)
+Initialize with [`Morph.variants`](#variants)
 
 -}
 type alias VariantsMorphEmptiable noTryPossiblyOrNever narrow broaden =
@@ -2637,10 +2621,10 @@ try possibilityToChoice possibilityMorph =
 -- each variant
 
 
-{-| Initialize a [choice morph](Choice#MorphEmptiable)
+{-| Initialize a [variants morph](#VariantsMorphEmptiable)
 by discriminating `(` the broad`,` the narrow `)` choices,
-then `|>` [`Morph.try`](Choice#try)ing each possibility,
-concluding the builder with [`Morph.choiceFinish`](#finish)
+then `|>` [`Morph.try`](Morph#try)ing each possibility,
+concluding the builder with [`Morph.choiceFinish`](#choiceFinish)
 
 A use case is [morphing](Morph#Morph) from and to an internal type
 
@@ -2662,8 +2646,8 @@ A use case is [morphing](Morph#Morph) from and to an internal type
                     AtLeast1 atLeast1Value ->
                         variantAtLeast1 atLeast1Value
             )
-            |> Choice.tryToFrom ( Fraction, Decimal.Internal.Fraction ) fractionInternal
-            |> Choice.tryToFrom ( AtLeast1, Decimal.Internal.AtLeast1 ) atLeast1Internal
+            |> Morph.variant ( Fraction, Decimal.Internal.Fraction ) fractionInternal
+            |> Morph.variant ( AtLeast1, Decimal.Internal.AtLeast1 ) atLeast1Internal
             |> Morph.choiceFinish
 
 For morphing choices with simple variants without values (enums),
@@ -2707,7 +2691,7 @@ variants ( narrowByPossibility, broadenByPossibility ) =
 
 
 {-| [`Morph`](Morph#Morph) the next variant value.
-Finish with [`Morph.variantsFinish`](#finishToFrom)
+Finish with [`Morph.variantsFinish`](#variantsFinish)
 -}
 variant :
     ( narrowVariantValue -> narrowChoice
@@ -2758,7 +2742,7 @@ variant ( possibilityToChoice, possibilityFromChoice ) possibilityMorph =
         }
 
 
-{-| Conclude a [`Morph.variants`](Choice#toFrom) `|>` [`Choice.tryToFrom`](Choice#tryToFrom) builder
+{-| Conclude a [`Morph.variants`](Morph#variants) `|>` [`Morph.variant`](Morph#variant) builder
 -}
 variantsFinish :
     VariantsMorphEmptiable Never narrow broaden
@@ -2874,7 +2858,7 @@ try this [`MorphRow`](#MorphRow).
                         letter char
             )
             |> Morph.tryRow Letter
-                (map String.Morph.fromList
+                (map String.Morph.list
                     (atLeast n1 AToZ.char)
                 )
             |> Morph.tryRow Digit
@@ -2989,7 +2973,7 @@ choiceRowFinish =
         }
 
 
-{-| Conclude a [`Morph.choice`](Morph#choice) `|>` [`Morph.try`](Choice#try) builder
+{-| Conclude a [`Morph.choice`](Morph#choice) `|>` [`Morph.try`](Morph#try) builder
 -}
 choiceFinish :
     ChoiceMorphEmptiable

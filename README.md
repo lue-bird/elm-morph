@@ -15,19 +15,19 @@ There's a lot of shiny applications of these ["morph"](Morph)s!
 Serialize from and to elm values the easy way.
 Independent of output format
 
-1:1 port of [an `elm/json` example](https://dark.elm.dmy.fr/packages/elm/json/latest/) ↓
+### Translation of [an `elm/json` example](https://dark.elm.dmy.fr/packages/elm/json/latest/)
 
 ```elm
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Value
-import FloatExplicit
+import FloatExplicit exposing (FloatExplicit)
 import String.Morph
 
 type alias Cause =
     RecordWithoutConstructorFunction
         { name : String
-        , percent : Float
-        , per100k : Float
+        , percent : FloatExplicit
+        , per100k : FloatExplicit
         }
 
 
@@ -44,7 +44,7 @@ value =
 ```
 surprisingly easy!
 
-Another example with a `type` adapted from [elm guide on custom types](https://guide.elm-lang.org/types/custom_types.html)
+### Another example with a `type` adapted from [elm guide on custom types](https://guide.elm-lang.org/types/custom_types.html)
 ```elm
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Value
@@ -70,8 +70,8 @@ value =
                 SignedIn signedIn ->
                     variantSignedIn signedIn
         )
-        |> Value.try ( \() -> Anonymous, "Anonymous" ) Value.unit
-        |> Value.try ( SignedIn, "SignedIn" ) signedInValue
+        |> Value.variant ( \() -> Anonymous, "Anonymous" ) Value.unit
+        |> Value.variant ( SignedIn, "SignedIn" ) signedInValue
         |> Value.choiceFinish
 
 signedInValue : Value.Morph SignedIn

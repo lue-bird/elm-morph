@@ -19,7 +19,7 @@ module N.Morph exposing
 
 -}
 
-import Morph exposing (Morph, MorphIndependently, translate)
+import Morph exposing (MorphIndependently, translate)
 import N exposing (Add1, In, Min, N, N9, On, To, Up, Up0, Up9, n0, n1, n2, n3, n4, n5, n6, n7, n8, n9)
 
 
@@ -46,25 +46,15 @@ int =
         }
 
 
-rangeDescription : ( N minRange_, N maxRange_ ) -> String
-rangeDescription =
-    \( min, max ) ->
-        [ min |> N.toInt |> String.fromInt
-        , "|..|"
-        , max |> N.toInt |> String.fromInt
-        ]
-            |> String.concat
-
-
 {-| [`Morph`](Morph#Morph) the `N` to a more narrow range
 -}
 in_ :
-    ( N (In lowerLimitMin (Up lowerLimitMinX To (Add1 lowerLimitMinPlusX)))
-    , N (In (Up upperLimitMinX To upperLimitMinPlusX) upperLimitMax)
+    ( N (In lowerLimitMin (Up lowerLimitMinX_ To (Add1 lowerLimitMinPlusX_)))
+    , N (In (Up upperLimitMinX_ To upperLimitMinPlusX_) upperLimitMax)
     )
     ->
         MorphIndependently
-            (N (In narrowMin narrowMax)
+            (N (In narrowMin_ narrowMax_)
              ->
                 Result
                     Morph.Error
@@ -90,6 +80,16 @@ in_ ( lowerLimit, upperLimit ) =
                         )
         , broaden = identity
         }
+
+
+rangeDescription : ( N minRange_, N maxRange_ ) -> String
+rangeDescription =
+    \( min, max ) ->
+        [ min |> N.toInt |> String.fromInt
+        , "|..|"
+        , max |> N.toInt |> String.fromInt
+        ]
+            |> String.concat
 
 
 {-| [`Morph`](Morph#Morph) a digit in a given range

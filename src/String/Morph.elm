@@ -1,5 +1,5 @@
 module String.Morph exposing
-    ( elementTranslate
+    ( eachElement
     , only
     , toList, list, value
     , for, forBroad
@@ -7,14 +7,12 @@ module String.Morph exposing
 
 {-| [`Morph`](Morph#Morph)s from and to a `String`.
 
-Necessary because a `String` isn't a `List` internally :(
-
 
 ## alter
 
 Also available: [`toggle`](Morph#toggle) `String.reverse`
 
-@docs elementTranslate
+@docs eachElement
 @docs only
 
 
@@ -31,7 +29,7 @@ Also available: [`toggle`](Morph#toggle) `String.reverse`
 
 import Char.Morph
 import List.Morph
-import Morph exposing (Morph, MorphOrError, MorphRow, Translate, broad, one, translate, translateOn)
+import Morph exposing (MorphOrError, MorphRow, Translate, translate, translateOn)
 import String.Morph.Internal
 import Value
 
@@ -49,12 +47,12 @@ toList =
 
 {-| [`Translate`](Morph#Translate) from `List Char` to a `String`.
 
-    "0123" |> Morph.mapTo String.Morph.fromList
+    "0123" |> Morph.mapTo String.Morph.list
     --> [ '0', '1', '2', '3' ]
 
 Parse-build a `String` →
-Use [`narrowTo`](Morph#narrow), [`broadenFrom`](Morph#broaden)
-with [`Morph.rowFinish`](MorphRow#finish) `|> over` [`Text.fromList`](#fromList)
+Use [`narrowTo`](Morph#narrowTo), [`broadenFrom`](Morph#broadenFrom)
+with [`Morph.rowFinish`](Morph#rowFinish) `|> over` [`String.Morph.List`](#list)
 
 -}
 list : MorphOrError String (List Char) error_
@@ -66,12 +64,12 @@ list =
 -- transform
 
 
-{-| [`Translate`](Morph#Translate) each element in a `String`
+{-| [`Translate`](Morph#Translate) each `Char` in a `String`
 -}
-elementTranslate :
+eachElement :
     Translate Char Char
     -> MorphOrError String String error_
-elementTranslate elementCharTranslate =
+eachElement elementCharTranslate =
     translateOn ( String.map, String.map ) elementCharTranslate
 
 
@@ -93,7 +91,7 @@ This is case sensitive.
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:3: I was expecting the text 'abc'. I got stuck when I got the character 'C'."
 
-See [`for`](#for), [`forBroad`](#forBroad) to control what to [morph](MorphRow#Row) for each `Char`.
+See [`for`](#for), [`forBroad`](#forBroad) to control what to [morph](Morph#MorphRow) for each `Char`.
 
 -}
 only : String -> MorphRow () Char
@@ -105,11 +103,11 @@ only expectedText =
         )
 
 
-{-| Match broad [`MorphRow`](#MorphRow)s
+{-| Match broad [`MorphRow`](Morph#MorphRow)s
 (those that can always [produce its broad value](Morph#broadenFrom))
 based a given `String`s `Char`s in sequence
 
-See [`Morph.forBroad`](Morph#forBroad)
+For more details, look at [`ArraySized.Morph.forBroad`](ArraySized-Morph#forBroad)
 
 -}
 forBroad :

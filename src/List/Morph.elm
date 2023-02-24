@@ -25,13 +25,11 @@ module List.Morph exposing
 
 import Array
 import ArraySized
-import Dict exposing (Dict)
-import Emptiable exposing (Emptiable, filled)
+import Emptiable exposing (filled)
 import Linear exposing (Direction(..))
-import Morph exposing (ErrorWithDeadEnd, Morph, MorphIndependently, MorphOrError, MorphRow, Translate, broad, broadenFrom, narrowTo, translate, translateOn)
-import N exposing (Up)
+import Morph exposing (MorphIndependently, MorphRow, broad, broadenFrom, narrowTo, translate)
 import Possibly exposing (Possibly(..))
-import Stack exposing (Stacked)
+import Stack
 import Value
 
 
@@ -53,8 +51,8 @@ reverse =
 -- sequence
 
 
-{-| Match broad [`MorphRow`](#MorphRow)s
-(those that can always [produce its broad value](#broadenFrom))
+{-| Match broad [`MorphRow`](Morph#MorphRow)s
+(those that can always [produce its broad value](Morph#broadenFrom))
 based given input elements in sequence
 
 This can get verbose, so create helpers with it where you see common patterns!
@@ -98,7 +96,7 @@ forBroad morphRowByElement expectedConstantInputList =
             )
 
 
-{-| [`grab`](#grab) the elements of a given `List` of [`MorphRow`](#MorphRow)s in order
+{-| [`Morph.grab`](Morph#grab) the elements of a given `List` of [`MorphRow`](Morph#MorphRow)s in order
 
 Some also call this "traverse"
 
@@ -116,7 +114,7 @@ Don't try to be clever with this.
             )
     --> Ok [ 'a', 'b' ]
 
-The usual [`Morph.succeed`](Morph#succeed)`(\... -> ...) |>`[`grab`](#grab)-[`skip`](#skip) chain
+The usual [`Morph.succeed`](Morph#succeed)`(\... -> ...) |>`[`grab`](Morph#grab)-[`skip`](Morph#skip) chain
 is often more explicit, descriptive and type-safe.
 
 Because of this, `MorphRow` only exposes `for`, not `sequence`,
@@ -193,7 +191,7 @@ for morphRowByElement elementsToTraverseInSequence =
 --
 
 
-{-| `List` [`Morph`](#Morph)
+{-| `List` [`Value.Morph`](Value#Morph)
 -}
 value : Value.Morph element -> Value.Morph (List element)
 value elementMorph =

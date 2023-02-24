@@ -161,36 +161,6 @@ rowChar =
 -- bits
 
 
-{-| Remove `O` padding at the front of the `ArraySized`
-to get a [`Natural`](#Natural)
--}
-bits :
-    MorphIndependently
-        (ArraySized Bit (In (On narrowMin_) narrowMax_)
-         -> Result error_ Natural
-        )
-        (Natural
-         -> ArraySized Bit (Min (Up0 x_))
-        )
-bits =
-    Morph.translate fromBitsImplementation toBitsImplementation
-
-
-{-| Its bits as an `ArraySized (Min (Up0 x_))`.
-Proceed from here over [`Bits`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bits)
--}
-toBits :
-    MorphIndependently
-        (Natural
-         -> Result error_ (ArraySized Bit (Min (Up0 narrowX_)))
-        )
-        (ArraySized Bit (In (On broadMin_) broadMax_)
-         -> Natural
-        )
-toBits =
-    Morph.translate toBitsImplementation fromBitsImplementation
-
-
 toBitsImplementation : Natural -> ArraySized Bit (Min (Up0 x_))
 toBitsImplementation =
     \natural ->
@@ -222,3 +192,33 @@ fromBitsImplementation =
                             |> ArraySized.maxToInfinity
                             |> ArraySized.minToNumber
                     }
+
+
+{-| Remove `O` padding at the front of the `ArraySized`
+to get a [`Natural`](#Natural)
+-}
+bits :
+    MorphIndependently
+        (ArraySized Bit (In (On narrowMin_) narrowMax_)
+         -> Result error_ Natural
+        )
+        (Natural
+         -> ArraySized Bit (Min (Up0 x_))
+        )
+bits =
+    Morph.translate fromBitsImplementation toBitsImplementation
+
+
+{-| Its bits as an `ArraySized (Min (Up0 x_))`.
+Proceed from here over [`Bits`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bits)
+-}
+toBits :
+    MorphIndependently
+        (Natural
+         -> Result error_ (ArraySized Bit (Min (Up0 narrowX_)))
+        )
+        (ArraySized Bit (In (On broadMin_) broadMax_)
+         -> Natural
+        )
+toBits =
+    Morph.translate toBitsImplementation fromBitsImplementation

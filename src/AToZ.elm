@@ -113,19 +113,6 @@ type Case
 -}
 char : Morph { case_ : Case, letter : AToZ } Char
 char =
-    cased { lower = lowerChar, upper = upperChar }
-
-
-cased :
-    -- TODO: MorphIndependently
-    { lower : Morph possibilityNarrow broad
-    , upper : Morph possibilityNarrow broad
-    }
-    ->
-        Morph
-            { case_ : Case, letter : possibilityNarrow }
-            broad
-cased casedLetters =
     Morph.choice
         (\lowerVariant upperVariant caseValue ->
             case caseValue.case_ of
@@ -137,10 +124,10 @@ cased casedLetters =
         )
         |> Morph.try
             (\letter -> { case_ = CaseLower, letter = letter })
-            casedLetters.lower
+            lowerChar
         |> Morph.try
             (\letter -> { case_ = CaseUpper, letter = letter })
-            casedLetters.upper
+            upperChar
         |> Morph.choiceFinish
 
 
