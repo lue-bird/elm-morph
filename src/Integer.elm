@@ -21,24 +21,18 @@ module Integer exposing
 -}
 
 import ArraySized exposing (ArraySized)
-import ArraySized.Morph
 import Bit exposing (Bit)
 import Bits
 import Decimal exposing (Decimal)
-import Decimal.Internal exposing (Whole)
-import Emptiable exposing (Emptiable)
 import Linear exposing (Direction(..))
 import Morph exposing (Morph, MorphRow, Translate)
-import N exposing (Add1, In, Infinity, Min, N, N0, N1, N9, On, To, Up, Up0, Up1, Up9, n0, n1, n2, n9)
-import N.Local exposing (N31, Up31, n32)
-import N.Morph
-import Possibly exposing (Possibly(..))
+import N exposing (Min, N0, n0, n1)
+import N.Local exposing (n32)
+import NaturalPositive
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Sign exposing (Sign)
-import Stack exposing (Stacked)
 import String.Morph
 import Value
-import Whole
 
 
 {-| Arbitrary-precision `Int`, constructable from bits
@@ -53,7 +47,7 @@ type Integer
 type alias Signed =
     RecordWithoutConstructorFunction
         { sign : Sign
-        , absoluteAfterI : ArraySized Bit (Min N0)
+        , absolute : { bitsAfterI : ArraySized Bit (Min N0) }
         }
 
 
@@ -132,26 +126,17 @@ internalFromInt =
 
                         else
                             Sign.Negative
-                    , absoluteAfterI =
-                        absoluteAtLeast1
-                            |> ArraySized.removeMin ( Up, n0 )
-                            |> ArraySized.minToNumber
-                            |> ArraySized.maxToInfinity
+                    , absolute =
+                        { bitsAfterI =
+                            absoluteAtLeast1
+                                |> ArraySized.removeMin ( Up, n0 )
+                                |> ArraySized.minToNumber
+                                |> ArraySized.maxToInfinity
+                        }
                     }
 
             Err _ ->
                 N0
-
-
-{-| [`Translate`](Morph#Translate) between an `Int` and a [decimal representation](#Integer).
-
-Keep in mind that `Integer -> Int` can overflow
-since `Int` is fixed in bit size while [`Integer`](#Integer) is not.
-
--}
-toInt : Translate Int Integer
-toInt =
-    Morph.invert int
 
 
 internalToInt : Integer -> Int
@@ -171,7 +156,7 @@ internalToInt =
                             Sign.Positive ->
                                 identity
                 in
-                signedValue.absoluteAfterI
+                signedValue.absolute.bitsAfterI
                     |> ArraySized.minToOn
                     |> ArraySized.insertMin ( Up, n0 ) Bit.I
                     |> Bits.takeAtMost n32
@@ -180,14 +165,24 @@ internalToInt =
                     |> intSign
 
 
-{-| Match an integer value as an `Int`.
+{-| [`Translate`](Morph#Translate) between an `Int` and a [decimal representation](#Integer).
+
+Keep in mind that `Integer -> Int` can overflow
+since `Int` is fixed in bit size while [`Integer`](#Integer) is not.
+
+-}
+toInt : Translate Int Integer
+toInt =
+    Morph.invert int
+
+
+{-| [`Integer`](#Integer) [`MorphRow`](Morph#MorphRow)
 
     import Morph.Error
 
-    -- you can parse integers as `Int` instead of `String`
     "123" |> Text.narrowTo integer --> Ok 123
 
-    -- It also works with negative numbers.
+    -- It also works with negative numbers
     "-123" |> Text.narrowTo integer --> Ok -123
 
     -- a decimal number is _not_ an integer
@@ -224,34 +219,10 @@ rowChar =
 signed : MorphRow Signed Char
 signed =
     Morph.succeed
-        (\signPart absoluteAfterIPart ->
+        (\signPart absolutePart ->
             { sign = signPart
-            , absoluteAfterI = absoluteAfterIPart
+            , absolute = absolutePart
             }
         )
         |> Morph.grab .sign Sign.maybeMinusChar
-        |> Morph.grab .absoluteAfterI absoluteAfterI
-
-
-absoluteAfterI :
-    Morph.MorphRowIndependently
-        (ArraySized Bit (In broadMin broadMax))
-        (ArraySized Bit (Min N0))
-        Char
-absoluteAfterI =
-    Morph.translate digitsToBitsAfterI bitsAfterIToDigits
-        |> Morph.overRow Whole.rowChar
-
-
-bitsAfterIToDigits : ArraySized Bit range_ -> Whole
-bitsAfterIToDigits =
-    \bitsAfterI ->
-        bitsAfterI
-            |> Debug.todo ""
-
-
-digitsToBitsAfterI : Whole -> ArraySized Bit (Min N0)
-digitsToBitsAfterI =
-    \digits ->
-        digits
-            |> Debug.todo ""
+        |> Morph.grab .absolute NaturalPositive.rowChar

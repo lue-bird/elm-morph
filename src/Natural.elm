@@ -1,19 +1,22 @@
-module Natural exposing (Natural(..))
+module Natural exposing
+    ( Natural(..)
+    , bits, toBits
+    , rowChar
+    , integer
+    )
 
-{-| TODO incorporate into `Integer`
-
-Natural number as bits
+{-| Natural number as bits
 
 @docs Natural
 
 
 ## [`Morph`](Morph#Morph)
 
-TODO bits, toBits
+@docs bits, toBits
 
-TODO rowChar
+@docs rowChar
 
-TODO integer
+@docs integer
 
 Feeling motivated? implement & PR
 
@@ -24,17 +27,18 @@ Feeling motivated? implement & PR
 import ArraySized exposing (ArraySized)
 import Bit exposing (Bit)
 import Bits
-import Bitwise
 import Integer exposing (Integer)
 import Linear exposing (Direction(..))
-import Morph exposing (Morph, MorphIndependently)
-import N exposing (Add1, Down, In, Min, N, N0, N1, On, To, Up, Up0, Up1, n0, n1)
-import N.Local exposing (Add31, N31, N32, n31)
+import Morph exposing (Morph, MorphIndependently, MorphRow)
+import N exposing (In, Min, N0, On, Up0, n0, n1)
+import NaturalPositive
 import Sign
+import String.Morph
 
 
 {-| Whole number (integer) >= 0 of arbitrary precision.
-Either the bit `O` directly or `I` followed by at most a given count of [`Bit`](Bit#Bit)s
+Either the bit `O` directly or `I` followed by at most a given count of
+[`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bit)s
 
 If you need a natural number representation with a specific number of bits, go
 
@@ -57,7 +61,7 @@ for arbitrary-precision arithmetic like addition, multiplication, ...
 -}
 type Natural
     = N0
-    | AtLeast1 { afterI : ArraySized Bit (Min N0) }
+    | AtLeast1 { bitsAfterI : ArraySized Bit (Min N0) }
 
 
 
@@ -91,17 +95,17 @@ integer =
             |> Morph.variant ( AtLeast1, Integer.Signed )
                 (Morph.value "positive"
                     { narrow =
-                        \{ sign, absoluteAfterI } ->
+                        \{ sign, absolute } ->
                             case sign of
                                 Sign.Negative ->
                                     "negative" |> Err
 
                                 Sign.Positive ->
-                                    { afterI = absoluteAfterI } |> Ok
+                                    absolute |> Ok
                     , broaden =
-                        \{ afterI } ->
+                        \atLeast1 ->
                             { sign = Sign.Positive
-                            , absoluteAfterI = afterI
+                            , absolute = atLeast1
                             }
                     }
                 )
@@ -110,7 +114,51 @@ integer =
 
 
 
--- to ArraySized
+-- MorphRow
+
+
+{-| [`Natural`](#Natural) [`MorphRow`](Morph#MorphRow)
+
+    import Morph.Error
+
+    "123" |> Text.narrowTo integer --> Ok 123
+
+    -- It doesn't work with negative numbers.
+    "-123" |> Text.narrowTo integer --> Ok -123
+
+    -- a decimal number is _not_ a natural
+    "3.14"
+        |> Text.narrowTo integer
+        |> Result.mapError Morph.Error.textMessage
+    --> Err "1:2: I was expecting an integer value. I got stuck when I got the character '.'."
+
+    -- but not with invalid numbers
+    "abc"
+        |> Text.narrowTo integer
+        |> Result.mapError Morph.Error.textMessage
+    --> Err "1:1: I was expecting an integer value. I got stuck when I got the character 'a'."
+
+-}
+rowChar : MorphRow Natural Char
+rowChar =
+    Morph.to "integer"
+        (Morph.choice
+            (\n0Variant atLeast1Variant integerNarrow ->
+                case integerNarrow of
+                    N0 ->
+                        n0Variant ()
+
+                    AtLeast1 atLeast1Value ->
+                        atLeast1Variant atLeast1Value
+            )
+            |> Morph.tryRow (\() -> N0) (String.Morph.only "0")
+            |> Morph.tryRow AtLeast1 NaturalPositive.rowChar
+            |> Morph.choiceRowFinish
+        )
+
+
+
+-- bits
 
 
 {-| Remove `O` padding at the front of the `ArraySized`
@@ -150,8 +198,8 @@ toBitsImplementation =
             N0 ->
                 ArraySized.empty |> ArraySized.maxToInfinity
 
-            AtLeast1 { afterI } ->
-                afterI
+            AtLeast1 atLeast1 ->
+                atLeast1.bitsAfterI
                     |> ArraySized.inToOn
                     |> ArraySized.minTo n0
                     |> ArraySized.insertMin ( Up, n0 ) Bit.I
@@ -167,7 +215,7 @@ fromBitsImplementation =
 
             Ok unpaddedAtLeast1 ->
                 AtLeast1
-                    { afterI =
+                    { bitsAfterI =
                         unpaddedAtLeast1
                             |> ArraySized.removeMin ( Up, n0 )
                             |> ArraySized.minTo n0

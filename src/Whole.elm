@@ -7,7 +7,7 @@ import ArraySized.Morph
 import Decimal.Internal exposing (Whole)
 import Emptiable exposing (Emptiable)
 import Morph exposing (MorphRow, grab, one)
-import N exposing (In, N, N0, N9, Up0, Up1, Up9, n0, n1, n10, n9)
+import N exposing (In, N, Up0, Up9, n0, n1, n10, n9)
 import N.Morph
 import Stack exposing (Stacked)
 import Stack.Morph

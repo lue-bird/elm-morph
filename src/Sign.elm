@@ -12,7 +12,6 @@ module Sign exposing
 -}
 
 import Char.Morph
-import Emptiable
 import Maybe.Morph
 import Morph exposing (Morph, MorphRow, translate)
 import String.Morph
