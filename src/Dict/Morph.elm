@@ -147,6 +147,6 @@ keyValueValue :
 keyValueValue entryMorph =
     Value.group
         (\key value_ -> { key = key, value = value_ })
-        |> Value.field ( .key, "key" ) entryMorph.key
-        |> Value.field ( .value, "value" ) entryMorph.value
+        |> Value.part ( .key, "key" ) entryMorph.key
+        |> Value.part ( .value, "value" ) entryMorph.value
         |> Value.groupFinish

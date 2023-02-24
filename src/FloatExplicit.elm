@@ -298,8 +298,8 @@ value =
                 Exception exception ->
                     variantException exception
         )
-        |> Value.variant ( Decimal, "Decimal" ) decimalInternalValue
-        |> Value.variant ( Exception, "Exception" ) exceptionValue
+        |> Value.try ( Decimal, "Decimal" ) decimalInternalValue
+        |> Value.try ( Exception, "Exception" ) exceptionValue
         |> Value.choiceFinish
 
 
@@ -334,8 +334,8 @@ exceptionValue =
                 Infinity sign ->
                     variantInfinity sign
         )
-        |> Value.variant ( \() -> NaN, "NaN" ) Value.unit
-        |> Value.variant ( Infinity, "NaN" ) signValue
+        |> Value.try ( \() -> NaN, "NaN" ) Value.unit
+        |> Value.try ( Infinity, "NaN" ) signValue
         |> Value.choiceFinish
 
 
@@ -350,6 +350,6 @@ signValue =
                 Sign.Positive ->
                     positive ()
         )
-        |> Value.variant ( \() -> Sign.Negative, "Negative" ) Value.unit
-        |> Value.variant ( \() -> Sign.Positive, "Positive" ) Value.unit
+        |> Value.try ( \() -> Sign.Negative, "Negative" ) Value.unit
+        |> Value.try ( \() -> Sign.Positive, "Positive" ) Value.unit
         |> Value.choiceFinish

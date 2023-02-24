@@ -2,9 +2,9 @@ module Value exposing
     ( Value, Atom(..), Composed(..), Record, Tagged
     , Morph
     , unit
-    , GroupMorphEmpty
-    , field, group, groupFinish
-    , variant, choiceFinish
+    , GroupMorphEmptiable
+    , group, part, groupFinish
+    , try, choiceFinish
     , Name, Index, IndexOrName(..), IndexAndName
     , descriptive, compact, eachTag, tagMap
     , AtomOrComposed(..)
@@ -43,8 +43,8 @@ for example
 
 ### grouping
 
-@docs GroupMorphEmpty
-@docs field, group, groupFinish
+@docs GroupMorphEmptiable
+@docs group, part, groupFinish
 
 
 ### choice
@@ -52,10 +52,10 @@ for example
 variant union [`Morph`](#Morph)
 
   - starting from [`Morph.choice`](Morph#choice)
-  - over [`Value.variant`](#variant)
+  - over [`Value.try`](#try)
   - and completed with [`Value.choiceFinish`](#choiceFinish)
 
-@docs variant, choiceFinish
+@docs try, choiceFinish
 
 
 ## tag
@@ -128,11 +128,9 @@ Motivated? Explore, PR ↓
 -}
 
 import Array exposing (Array)
-import ArraySized
 import Decimal.Internal exposing (Decimal)
-import Emptiable exposing (Emptiable, fill, filled)
-import Linear exposing (Direction(..))
-import Morph exposing (ChoiceMorphEmpty, Morph, MorphIndependently, MorphOrError, broadenFrom, narrowTo, to, translate)
+import Emptiable exposing (Emptiable)
+import Morph exposing (ChoiceMorphEmptiable, Morph, MorphIndependently, translate)
 import Possibly exposing (Possibly)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Stack exposing (Stacked)
@@ -240,8 +238,8 @@ type alias IndexAndName =
 
 {-| with readable names
 
-  - field tag = name given to the [`field` `Morph`](#field)
-  - variant tag = name given to the [`variant` `Morph`](#variant)
+  - field tag = name given to the [`part` `Morph`](#part)
+  - variant tag = name given to the [`try` `Morph`](#try)
   - →
       - readable by humans
       - readable by other tools
@@ -263,8 +261,8 @@ descriptive =
 
 {-| With compact indexes
 
-  - field tag = [`field` `Morph`](#field) index index in the builder
-  - variant tag = [`variant` `Morph`](#variant) index in the builder
+  - field tag = [`field` `Morph`](#part) index index in the builder
+  - variant tag = [`try` `Morph`](#try) index in the builder
   - →
       - not [`descriptive`](#descriptive)
 
@@ -320,27 +318,6 @@ tagMap tagChange =
         value |> composedMap (composedTagMap tagChange)
 
 
-{-| If the [`AtomOrComposed`](#AtomOrComposed) is a [`Composed`](#AtomOrComposed),
-change in a given way
--}
-composedMap :
-    (composed -> composedMapped)
-    ->
-        (AtomOrComposed atom composed
-         -> AtomOrComposed atom composedMapped
-        )
-composedMap composedChange =
-    \value ->
-        case value of
-            Atom atom_ ->
-                atom_ |> Atom
-
-            Composed composed_ ->
-                composed_
-                    |> composedChange
-                    |> Composed
-
-
 composedTagMap :
     (tag -> tagMapped)
     ->
@@ -379,6 +356,27 @@ taggedAnyTagMap tagChange =
         { tag = tagged.tag |> tagChange
         , value = tagged.value |> tagMap tagChange
         }
+
+
+{-| If the [`AtomOrComposed`](#AtomOrComposed) is a [`Composed`](#AtomOrComposed),
+change in a given way
+-}
+composedMap :
+    (composed -> composedMapped)
+    ->
+        (AtomOrComposed atom composed
+         -> AtomOrComposed atom composedMapped
+        )
+composedMap composedChange =
+    \value ->
+        case value of
+            Atom atom_ ->
+                atom_ |> Atom
+
+            Composed composed_ ->
+                composed_
+                    |> composedChange
+                    |> Composed
 
 
 
@@ -491,7 +489,7 @@ composedKindToString =
 
 {-| `()` [`Morph`](#Morph)
 
-Often used in when [morphing](Value#Morph) a [variants](Choice#variantValue)
+Often used in when [morphing](Value#Morph) a [variant](Value#try)
 with 0 attached values
 
 -}
@@ -513,7 +511,7 @@ unit =
 
 {-| Start a record assembly [`Morph`](#Morph)
 
-Continue with [`field`](#field)
+Continue with [`field`](#part)
 
     {-| `( ..., ... )` `Morph`
 
@@ -558,7 +556,7 @@ Continue with [`field`](#field)
 -}
 group :
     groupNarrowAssemble
-    -> GroupMorphEmpty Possibly groupNarrow_ groupNarrowAssemble
+    -> GroupMorphEmptiable Possibly groupNarrow_ groupNarrowAssemble
 group groupNarrowAssemble =
     Morph.parts ( groupNarrowAssemble, Emptiable.empty )
 
@@ -567,13 +565,13 @@ group groupNarrowAssemble =
 
 building:
 
-  - start with [`group`](#value)
-  - continue with [`field`](#field)
+  - start with [`group`](#group)
+  - continue with [`field`](#part)
   - finish with [`groupFinish`](#groupFinish)
 
 -}
-type alias GroupMorphEmpty noPartPossiblyOrNever groupNarrow groupNarrowFurther =
-    Morph.PartsMorphEmpty
+type alias GroupMorphEmptiable noPartPossiblyOrNever groupNarrow groupNarrowFurther =
+    Morph.PartsMorphEmptiable
         noPartPossiblyOrNever
         (Record IndexOrName
          ->
@@ -589,23 +587,23 @@ type alias GroupMorphEmpty noPartPossiblyOrNever groupNarrow groupNarrowFurther 
   - finish with [`groupFinish`](#groupFinish)
 
 -}
-field :
+part :
     ( group -> fieldValueNarrow
     , String
     )
     -> Morph fieldValueNarrow
     ->
-        (GroupMorphEmpty
+        (GroupMorphEmptiable
             noPartPossiblyOrNever_
             group
             (fieldValueNarrow -> groupNarrowFurther)
          ->
-            GroupMorphEmpty
+            GroupMorphEmptiable
                 noPartNever_
                 group
                 groupNarrowFurther
         )
-field ( accessFieldValue, fieldName ) fieldValueMorph =
+part ( accessFieldValue, fieldName ) fieldValueMorph =
     \groupMorphSoFar ->
         let
             tag : IndexAndName
@@ -648,14 +646,14 @@ partValueNarrow :
     IndexAndName
     -> Morph fieldValueNarrow
     ->
-        (Emptiable (Stacked (Tagged IndexOrName)) possiblyOrNever_
+        (Emptiable (Stacked (Tagged IndexOrName)) possiblyOrNever
          ->
             Result
                 (Morph.PartsError Morph.Error)
                 (fieldValueNarrow -> groupNarrowFurther)
         )
     ->
-        (Emptiable (Stacked (Tagged IndexOrName)) possiblyOrNever_
+        (Emptiable (Stacked (Tagged IndexOrName)) possiblyOrNever
          -> Result (Morph.PartsError Morph.Error) groupNarrowFurther
         )
 partValueNarrow tag fieldValueMorph groupSoFarNarrow =
@@ -712,10 +710,10 @@ partValueNarrow tag fieldValueMorph groupSoFarNarrow =
                     |> Err
 
 
-{-| Conclude the [`group`](#group) |> [`field`](#field) chain
+{-| Conclude the [`group`](#group) |> [`field`](#part) chain
 -}
 groupFinish :
-    GroupMorphEmpty Never record record
+    GroupMorphEmptiable Never record record
     -> Morph record
 groupFinish =
     \groupMorphComplete ->
@@ -737,7 +735,7 @@ groupFinish =
             |> Morph.over composed
 
 
-{-| Describe another variant value [`Morph`](#Morph) to [`Value`](#Value)
+{-| Describe another variant [`Morph`](#Morph) to [`Value`](#Value)
 
 Done? → [`Value.choiceFinish`](#choiceFinish)
 
@@ -756,18 +754,18 @@ If a variant doesn't have any value attached, use [`unit`](Value#unit)
                     False ->
                         false ()
             )
-            |> Value.variant ( \() -> True, "True" ) unit
-            |> Value.variant ( \() -> False, "False" ) unit
+            |> Value.try ( \() -> True, "True" ) unit
+            |> Value.try ( \() -> False, "False" ) unit
             |> Value.choiceFinish
 
 -}
-variant :
+try :
     ( possibilityNarrow -> choiceNarrow
     , String
     )
     -> Morph possibilityNarrow
     ->
-        (ChoiceMorphEmpty
+        (ChoiceMorphEmptiable
             noTryPossiblyOrNever_
             choiceNarrow
             (Tagged IndexOrName)
@@ -778,14 +776,14 @@ variant :
             )
             Morph.Error
          ->
-            ChoiceMorphEmpty
+            ChoiceMorphEmptiable
                 noTryNever_
                 choiceNarrow
                 (Tagged IndexOrName)
                 choiceBroadenFurther
                 Morph.Error
         )
-variant ( possibilityToChoice, possibilityTag ) possibilityMorph =
+try ( possibilityToChoice, possibilityTag ) possibilityMorph =
     \choiceMorphSoFar ->
         choiceMorphSoFar
             |> Morph.try possibilityToChoice
@@ -837,10 +835,10 @@ variantStepNarrow ( variantTag, possibilityNarrow ) =
                     "tag " ++ name |> Morph.DeadEnd |> Err
 
 
-{-| Conclude a [`Morph.choice`](Morph#Morph.choice) |> [`Value.variant`](#variant) chain
+{-| Conclude a [`Morph.choice`](Morph#choice) |> [`Value.try`](#try) chain
 -}
 choiceFinish :
-    ChoiceMorphEmpty
+    ChoiceMorphEmptiable
         Never
         choiceNarrow
         (Tagged IndexOrName)

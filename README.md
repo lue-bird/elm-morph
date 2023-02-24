@@ -4,11 +4,10 @@ Simple, easy to use, general-purpose parser-builder with great error messages
 
 > build one to transform narrow ⇄ broad types
 
-There's a lot of shiny applications of these ["morph"](Morph)s
-
   - 📻 related: ["codecs" elm-radio episode](https://elm-radio.com/episode/codecs/)
   - 🎧 while reading: ["Morphing", microtonal electronic music by Sevish](https://youtu.be/J-JZhCWsk3M?t=1702)
 
+There's a lot of shiny applications of these ["morph"](Morph)s!
 ↓ some appetizers. Click headers for documentation
 
 ## [`Value`](Value)
@@ -38,9 +37,9 @@ value =
         (\name percent per100k ->
             { name = name, percent = percent, per100k = per100k }
         )
-        |> Value.field ( .name, "name" ) String.Morph.value
-        |> Value.field ( .percent, "percent" ) FloatExplicit.value
-        |> Value.field ( .per100k, "per100k" ) FloatExplicit.value
+        |> Value.part ( .name, "name" ) String.Morph.value
+        |> Value.part ( .percent, "percent" ) FloatExplicit.value
+        |> Value.part ( .per100k, "per100k" ) FloatExplicit.value
         |> Value.groupFinish
 ```
 surprisingly easy!
@@ -71,8 +70,8 @@ value =
                 SignedIn signedIn ->
                     variantSignedIn signedIn
         )
-        |> Value.variant ( \() -> Anonymous, "Anonymous" ) Value.unit
-        |> Value.variant ( SignedIn, "SignedIn" ) signedInValue
+        |> Value.try ( \() -> Anonymous, "Anonymous" ) Value.unit
+        |> Value.try ( SignedIn, "SignedIn" ) signedInValue
         |> Value.choiceFinish
 
 signedInValue : Value.Morph SignedIn
@@ -81,8 +80,8 @@ signedInValue =
         (\name status ->
             { name = name, status = status }
         )
-        |> Value.field ( .name, "name" ) String.Morph.value
-        |> Value.field ( .statue, "status" ) String.Morph.value
+        |> Value.part ( .name, "name" ) String.Morph.value
+        |> Value.part ( .statue, "status" ) String.Morph.value
         |> Value.groupFinish
 ```
 clean

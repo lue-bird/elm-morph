@@ -30,6 +30,6 @@ value caseMorphs =
                 Err narrowError ->
                     narrowError |> err
         )
-        |> Value.variant ( Ok, "Ok" ) caseMorphs.ok
-        |> Value.variant ( Err, "Err" ) caseMorphs.err
+        |> Value.try ( Ok, "Ok" ) caseMorphs.ok
+        |> Value.try ( Err, "Err" ) caseMorphs.err
         |> Value.choiceFinish

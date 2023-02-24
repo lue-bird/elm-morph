@@ -26,8 +26,8 @@ value contentMorph =
                 Just content ->
                     content |> just
         )
-        |> Value.variant ( Just, "Just" ) contentMorph
-        |> Value.variant ( \() -> Nothing, "Nothing" ) Value.unit
+        |> Value.try ( Just, "Just" ) contentMorph
+        |> Value.try ( \() -> Nothing, "Nothing" ) Value.unit
         |> Value.choiceFinish
 
 
