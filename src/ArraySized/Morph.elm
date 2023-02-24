@@ -270,7 +270,7 @@ Don't try to be clever with this.
         |> narrow
             (Morph.for (Char.Morph.caseNo >> one) [ 'a', 'b' ]
                 |> Morph.rowFinish
-                |> Morph.over Stack.Morph.fromText
+                |> Morph.over Stack.Morph.string
             )
     --> Ok [ 'a', 'b' ]
 

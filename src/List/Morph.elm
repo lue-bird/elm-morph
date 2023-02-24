@@ -102,15 +102,15 @@ Some also call this "traverse"
 
 Don't try to be clever with this.
 
-    import Morph exposing (one)
+    import Morph
     import Char.Morph as Char
     import String.Morph as Text
 
     "AB"
         |> narrow
-            (Morph.for (Char.Morph.caseNo >> one) [ 'a', 'b' ]
+            (Morph.for (Char.Morph.caseNo >> Morph.one) [ 'a', 'b' ]
                 |> Morph.rowFinish
-                |> Morph.over Stack.Morph.fromText
+                |> Morph.over Stack.Morph.string
             )
     --> Ok [ 'a', 'b' ]
 
