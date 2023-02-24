@@ -15,7 +15,7 @@ There's a lot of shiny applications of these ["morph"](Morph)s!
 Serialize from and to elm values the easy way.
 Independent of output format
 
-### Translation of [an `elm/json` example](https://dark.elm.dmy.fr/packages/elm/json/latest/)
+### example translated from [`elm/json`](https://dark.elm.dmy.fr/packages/elm/json/latest/)
 
 ```elm
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
@@ -44,7 +44,7 @@ value =
 ```
 surprisingly easy!
 
-### Another example with a `type` adapted from [elm guide on custom types](https://guide.elm-lang.org/types/custom_types.html)
+### Another example adapted from [elm guide on custom types](https://guide.elm-lang.org/types/custom_types.html)
 ```elm
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Value
