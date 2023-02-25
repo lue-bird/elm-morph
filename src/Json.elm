@@ -180,7 +180,7 @@ atomJsValueMagicEncode =
             Number floatAtom ->
                 floatAtom
                     |> Morph.broadenFrom
-                        (Decimal.floatExplicit |> Morph.over DecimalOrException.float)
+                        (Decimal.orException |> Morph.over DecimalOrException.float)
                     |> Json.Encode.float
 
             String stringAtom ->
@@ -293,7 +293,7 @@ jsonAtomDecoder =
                 case
                     float
                         |> Morph.narrowTo
-                            (Decimal.floatExplicit
+                            (Decimal.orException
                                 |> Morph.over DecimalOrException.float
                             )
                 of

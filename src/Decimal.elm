@@ -1,6 +1,6 @@
 module Decimal exposing
     ( Decimal(..), Signed, Absolute(..), Fraction
-    , rowChar, floatExplicit, value
+    , rowChar, orException, value
     )
 
 {-| safe and explicit `Float`
@@ -11,7 +11,7 @@ without the possibility of [exceptions](DecimalOrException#Exception)
 
 ## [`Morph`](Morph#Morph)
 
-@docs rowChar, floatExplicit, value
+@docs rowChar, orException, value
 
 -}
 
@@ -176,8 +176,8 @@ signInternal =
 a [`Decimal`](#Decimal)
 to a [`DecimalOrException`](DecimalOrException#DecimalOrException)
 -}
-floatExplicit : Morph Decimal DecimalOrException
-floatExplicit =
+orException : Morph Decimal DecimalOrException
+orException =
     internal
         |> Morph.over
             (Morph.value "Decimal"
