@@ -1,5 +1,5 @@
 module Dict.Morph exposing
-    ( valueTranslate
+    ( eachValue
     , list, toList
     , value
     )
@@ -9,7 +9,7 @@ module Dict.Morph exposing
 
 ## alter
 
-@docs valueTranslate
+@docs eachValue
 
 
 ## transform
@@ -99,7 +99,7 @@ toList =
 
 {-| [`Translate`](Morph#Translate) each key in a `Dict`
 -}
-valueTranslate :
+eachValue :
     MorphIndependently
         (beforeMapValue -> Result (ErrorWithDeadEnd Never) mappedValue)
         (beforeUnmapValue -> unmappedValue)
@@ -111,7 +111,7 @@ valueTranslate :
             (Dict broadKey beforeUnmapValue
              -> Dict broadKey unmappedValue
             )
-valueTranslate entryValueTranslate =
+eachValue entryValueTranslate =
     translateOn ( valuesMap, valuesMap ) entryValueTranslate
 
 
