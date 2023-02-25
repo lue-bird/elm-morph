@@ -11,8 +11,6 @@ module Array.Morph exposing
 
 @docs eachElement
 
-Also try [`toggle`](Morph#toggle) [`Array.Extra.reverse`](https://dark.elm.dmy.fr/packages/elm-community/array-extra/latest/Array-Extra#reverse)
-
 
 ## transform
 

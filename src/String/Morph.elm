@@ -10,8 +10,6 @@ module String.Morph exposing
 
 ## alter
 
-Also available: [`toggle`](Morph#toggle) `String.reverse`
-
 @docs eachElement
 @docs only
 
