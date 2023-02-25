@@ -97,7 +97,7 @@ toList =
 --
 
 
-{-| [`Translate`](Morph#Translate) each key in a `Dict`
+{-| [`Translate`](Morph#Translate) each value in a `Dict`
 -}
 eachValue :
     MorphIndependently
@@ -112,13 +112,13 @@ eachValue :
              -> Dict broadKey unmappedValue
             )
 eachValue entryValueTranslate =
-    translateOn ( valuesMap, valuesMap ) entryValueTranslate
+    translateOn ( eachValueMap, eachValueMap ) entryValueTranslate
 
 
-valuesMap :
+eachValueMap :
     (value -> valueMapped)
     -> (Dict key value -> Dict key valueMapped)
-valuesMap valueMap =
+eachValueMap valueMap =
     Dict.map (\_ -> valueMap)
 
 
