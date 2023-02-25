@@ -2,7 +2,7 @@ module ArraySized.Morph exposing
     ( inNumber, inOn
     , list, toList
     , stack, toStack
-    , elementTranslate
+    , eachElement
     , for, forBroad
     , exactly, atLeast, in_
     )
@@ -23,7 +23,7 @@ module ArraySized.Morph exposing
 
 ## transform
 
-@docs elementTranslate
+@docs eachElement
 
 
 ## sequence
@@ -187,7 +187,7 @@ toStack =
 
 {-| [`Translate`](Morph#Translate) each element in an `Array`
 -}
-elementTranslate :
+eachElement :
     MorphIndependently
         (narrowBeforeMap
          -> Result (ErrorWithDeadEnd Never) narrowMapped
@@ -204,7 +204,7 @@ elementTranslate :
             (ArraySized broadBeforeUnmap broadRange
              -> ArraySized broadUnmapped broadRange
             )
-elementTranslate elementTranslate_ =
+eachElement elementTranslate_ =
     translateOn ( ArraySized.map, ArraySized.map ) elementTranslate_
 
 
