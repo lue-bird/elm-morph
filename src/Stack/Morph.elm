@@ -1,5 +1,5 @@
 module Stack.Morph exposing
-    ( reverse, eachElement
+    ( eachElement
     , list, toList
     , string, toString
     )
@@ -9,7 +9,7 @@ module Stack.Morph exposing
 
 ## alter
 
-@docs reverse, eachElement
+@docs eachElement
 
 
 ## transform
@@ -28,18 +28,6 @@ import Stack exposing (Stacked)
 
 
 -- alter
-
-
-{-| Flip the elements' order
--}
-reverse :
-    MorphIndependently
-        (List narrowElement
-         -> Result error_ (List narrowElement)
-        )
-        (List broadElement -> List broadElement)
-reverse =
-    translate List.reverse List.reverse
 
 
 {-| [`Morph`](Morph#Morph) each stacked element

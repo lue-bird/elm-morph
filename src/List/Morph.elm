@@ -1,5 +1,5 @@
 module List.Morph exposing
-    ( reverse, eachElement
+    ( eachElement
     , for, forBroad
     , value
     )
@@ -9,7 +9,7 @@ module List.Morph exposing
 
 ## alter
 
-@docs reverse, eachElement
+@docs eachElement
 
 
 ## sequence
@@ -31,20 +31,6 @@ import Morph exposing (MorphIndependently, MorphRow, broad, broadenFrom, narrowT
 import Possibly exposing (Possibly(..))
 import Stack
 import Value
-
-
-
--- alter
-
-
-{-| Flip the elements' order
--}
-reverse :
-    MorphIndependently
-        (List broadElement -> Result error_ (List broadElement))
-        (List narrowElement -> List narrowElement)
-reverse =
-    translate List.reverse List.reverse
 
 
 
