@@ -20,14 +20,14 @@ Independent of output format
 ```elm
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Value
-import FloatExplicit exposing (FloatExplicit)
+import Decimal exposing (Decimal)
 import String.Morph
 
 type alias Cause =
     RecordWithoutConstructorFunction
         { name : String
-        , percent : FloatExplicit
-        , per100k : FloatExplicit
+        , percent : Decimal
+        , per100k : Decimal
         }
 
 
@@ -38,8 +38,8 @@ value =
             { name = name, percent = percent, per100k = per100k }
         )
         |> Value.part ( .name, "name" ) String.Morph.value
-        |> Value.part ( .percent, "percent" ) FloatExplicit.value
-        |> Value.part ( .per100k, "per100k" ) FloatExplicit.value
+        |> Value.part ( .percent, "percent" ) Decimal.value
+        |> Value.part ( .per100k, "per100k" ) Decimal.value
         |> Value.groupFinish
 ```
 surprisingly easy!
