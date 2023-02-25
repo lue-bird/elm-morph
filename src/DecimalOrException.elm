@@ -1,15 +1,15 @@
-module FloatExplicit exposing
-    ( FloatExplicit(..), Exception(..)
+module DecimalOrException exposing
+    ( DecimalOrException(..), Exception(..)
     , value, exceptionValue
     , float, toFloat
     )
 
-{-| [`Morph`](Morph#Morph) an IEEE 754 floating point number
+{-| [`Morph`](Morph#Morph) a [`Decimal`](Decimal#Decimal) where infinities and NaN are possible states
 
 
 ## [`Decimal`](Decimal#Decimal) or [`Exception`](#Exception)
 
-@docs FloatExplicit, Exception
+@docs DecimalOrException, Exception
 @docs value, exceptionValue
 
 
@@ -32,13 +32,16 @@ import Value
 import Whole
 
 
-{-| IEEE 754 floating point number
+{-| [`Decimal`](Decimal#Decimal) where [IEEE 754 floating point number exception states](#Exception) are possible
 
 It's like an [`elm/core` `Float`](https://dark.elm.dmy.fr/packages/elm/core/latest/Basics#Float)
-but with an explicit case for an [`Exception`](#Exception)
+but
+
+  - [`Exception`](#Exception)s are an explicit case so you can easily extract a [`Decimal`](Decimal#Decimal)
+  - it can have arbitrary decimal points, see [`Decimal`](Decimal#Decimal)
 
 -}
-type FloatExplicit
+type DecimalOrException
     = Decimal Decimal.Internal.Decimal
     | Exception Exception
 
@@ -52,22 +55,22 @@ type Exception
 
 {-| [`Morph`](Morph#Morph)
 an [`elm/core` `Float`](https://dark.elm.dmy.fr/packages/elm/core/latest/Basics#Float)
-to a [`FloatExplicit`](#FloatExplicit)
+to a [`DecimalOrException`](#DecimalOrException)
 
-Keep in mind that `FloatExplicit -> Float` can be lossy
-since `Float` is fixed in bit size while [`FloatExplicit`](#FloatExplicit) is not
+Keep in mind that `DecimalOrException -> Float` can be lossy
+since `Float` is fixed in bit size while [`DecimalOrException`](#DecimalOrException) is not
 
     -9999.124
         |> broaden
             (Decimal.rowChar
                 |> Morph.overRow Decimal.floatExplicit
-                |> Morph.overRow FloatExplicit.toFloat
+                |> Morph.overRow DecimalOrException.toFloat
                 |> Morph.rowFinish
             )
     --> "-999.1239999999997962731868028640747070312"
 
 -}
-float : MorphOrError FloatExplicit Float error_
+float : MorphOrError DecimalOrException Float error_
 float =
     Morph.variants
         ( \variantDecimal variantNaN variantInfinity choiceFloat ->
@@ -264,30 +267,30 @@ floatFractionToDigits =
 
 
 {-| [`Morph`](Morph#Morph)
-a [`FloatExplicit`](#FloatExplicit)
+a [`DecimalOrException`](#DecimalOrException)
 to an [`elm/core` `Float`](https://dark.elm.dmy.fr/packages/elm/core/latest/Basics#Float)
 
-Keep in mind that `FloatExplicit -> Float` can be lossy
-since `Float` is fixed in bit size while [`FloatExplicit`](#FloatExplicit) is not
+Keep in mind that `DecimalOrException -> Float` can be lossy
+since `Float` is fixed in bit size while [`DecimalOrException`](#DecimalOrException) is not
 
     -9999.124
         |> broaden
             (Decimal.rowChar
                 |> Morph.overRow Decimal.floatExplicit
-                |> Morph.overRow FloatExplicit.toFloat
+                |> Morph.overRow DecimalOrException.toFloat
                 |> Morph.rowFinish
             )
     --> "-999.1239999999997962731868028640747070312"
 
 -}
-toFloat : MorphOrError Float FloatExplicit error_
+toFloat : MorphOrError Float DecimalOrException error_
 toFloat =
     Morph.invert float
 
 
 {-| `Float` [`Value.Morph`](Value#Morph)
 -}
-value : Value.Morph FloatExplicit
+value : Value.Morph DecimalOrException
 value =
     Morph.choice
         (\variantDecimal variantException choiceExplicit ->

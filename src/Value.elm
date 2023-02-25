@@ -31,7 +31,7 @@ Basically every `module` here has a [`Morph`](#Morph),
 for example
 
   - [`Integer`](Integer)
-  - [`FloatExplicit`](FloatExplicit)
+  - [`DecimalOrException`](DecimalOrException)
   - [`String.Morph`](String-Morph)
   - [`Maybe.Morph`](Maybe-Morph)
   - [`Result.Morph`](Result-Morph)

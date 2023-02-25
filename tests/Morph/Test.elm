@@ -39,7 +39,7 @@ pointTest =
 What could have gone wrong in case of an overflow?
 
 Maybe the lossy conversion
-hasn't been set up properly (see FloatExplicit.float).
+hasn't been set up properly (see DecimalOrException.float).
 
 Another option is a potentially missed chance to do TCO.
 This could have happened in many places, maybe because `|>` is used.

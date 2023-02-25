@@ -530,17 +530,17 @@ exactly repeatCount repeatedMorphRow =
         |> grab ...
 
 would only parse the first part until the end
-because it always [`Morph.succeed`](Morph#succeed)s.
+because it always [`succeed`](Morph#succeed)s.
 Nothing after would ever be parsed, making the whole thing fail.
 
 -}
 atLeast :
     MorphRow narrow broadElement
-    -> N (Exactly (On min))
+    -> N (In (On lowerLimit) (On lowerLimitMax))
     ->
         MorphRowIndependently
-            (ArraySized narrow (In (On min) max_))
-            (ArraySized narrow (Min (On min)))
+            (ArraySized narrow (In (On lowerLimitMax) max_))
+            (ArraySized narrow (Min (On lowerLimit)))
             broadElement
 atLeast elementStepMorphRow minimum =
     Morph.broaden ArraySized.maxToInfinity

@@ -12,7 +12,7 @@
         "Natural",
         "Integer",
         "Decimal",
-        "FloatExplicit",
+        "DecimalOrException",
         "N.Morph",
         "Maybe.Morph",
         "Result.Morph",

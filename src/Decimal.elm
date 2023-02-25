@@ -4,7 +4,7 @@ module Decimal exposing
     )
 
 {-| safe and explicit `Float`
-without the possibility of [exceptions](FloatExplicit#Exception)
+without the possibility of [exceptions](DecimalOrException#Exception)
 
 @docs Decimal, Signed, Absolute, Fraction
 
@@ -18,8 +18,8 @@ without the possibility of [exceptions](FloatExplicit#Exception)
 import ArraySized
 import ArraySized.Morph
 import Decimal.Internal exposing (Whole)
+import DecimalOrException exposing (DecimalOrException)
 import Emptiable exposing (Emptiable)
-import FloatExplicit exposing (FloatExplicit)
 import Maybe.Morph
 import Morph exposing (Morph, MorphOrError, MorphRow, grab, one, skip)
 import N exposing (In, N, N0, N1, N9, n0, n1, n9)
@@ -174,9 +174,9 @@ signInternal =
 
 {-| [`Morph`](Morph#Morph)
 a [`Decimal`](#Decimal)
-to a [`FloatExplicit`](FloatExplicit#FloatExplicit)
+to a [`DecimalOrException`](DecimalOrException#DecimalOrException)
 -}
-floatExplicit : Morph Decimal FloatExplicit
+floatExplicit : Morph Decimal DecimalOrException
 floatExplicit =
     internal
         |> Morph.over
@@ -184,12 +184,12 @@ floatExplicit =
                 { narrow =
                     \floatExplicit_ ->
                         case floatExplicit_ of
-                            FloatExplicit.Decimal decimal ->
+                            DecimalOrException.Decimal decimal ->
                                 decimal |> Ok
 
-                            FloatExplicit.Exception _ ->
+                            DecimalOrException.Exception _ ->
                                 "Exception" |> Err
-                , broaden = FloatExplicit.Decimal
+                , broaden = DecimalOrException.Decimal
                 }
             )
 
@@ -350,7 +350,7 @@ fraction =
 {-| [`Value.Morph`](Value#Morph) from a [`Decimal`](#Decimal)
 
 To get a [`Value.Morph`](Value#Morph) from a `Float`,
-see [`FloatExplicit.value`](FloatExplicit#value)
+see [`DecimalOrException.value`](DecimalOrException#value)
 
 -}
 value : Value.Morph Decimal

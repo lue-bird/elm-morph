@@ -33,8 +33,8 @@ module Json exposing
 import Array
 import Decimal exposing (Decimal)
 import Decimal.Internal
+import DecimalOrException
 import Emptiable exposing (Emptiable)
-import FloatExplicit
 import Json.Decode
 import Json.Encode
 import Linear exposing (Direction(..))
@@ -180,7 +180,7 @@ atomJsValueMagicEncode =
             Number floatAtom ->
                 floatAtom
                     |> Morph.broadenFrom
-                        (Decimal.floatExplicit |> Morph.over FloatExplicit.float)
+                        (Decimal.floatExplicit |> Morph.over DecimalOrException.float)
                     |> Json.Encode.float
 
             String stringAtom ->
@@ -294,7 +294,7 @@ jsonAtomDecoder =
                     float
                         |> Morph.narrowTo
                             (Decimal.floatExplicit
-                                |> Morph.over FloatExplicit.float
+                                |> Morph.over DecimalOrException.float
                             )
                 of
                     Ok decimal ->
