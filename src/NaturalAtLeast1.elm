@@ -1,4 +1,4 @@
-module NaturalPositive exposing (NaturalPositive, rowChar, toWhole, whole)
+module NaturalAtLeast1 exposing (NaturalAtLeast1, rowChar, toWhole, whole)
 
 import ArraySized exposing (ArraySized)
 import Bit exposing (Bit)
@@ -12,36 +12,36 @@ import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFuncti
 import Whole
 
 
-type alias NaturalPositive =
+type alias NaturalAtLeast1 =
     RecordWithoutConstructorFunction
         { bitsAfterI : ArraySized Bit (Min N0) }
 
 
-whole : MorphOrError NaturalPositive Whole never_
+whole : MorphOrError NaturalAtLeast1 Whole never_
 whole =
     Morph.translate fromWholeImplementation toWholeImplementation
 
 
-toWholeImplementation : NaturalPositive -> Whole
+toWholeImplementation : NaturalAtLeast1 -> Whole
 toWholeImplementation =
     \bitsAfterI ->
         bitsAfterI
             |> Debug.todo ""
 
 
-fromWholeImplementation : Whole -> NaturalPositive
+fromWholeImplementation : Whole -> NaturalAtLeast1
 fromWholeImplementation =
     \digits ->
         digits
             |> Debug.todo ""
 
 
-toWhole : MorphOrError Whole NaturalPositive never_
+toWhole : MorphOrError Whole NaturalAtLeast1 never_
 toWhole =
     Morph.invert whole
 
 
-rowChar : MorphRow NaturalPositive Char
+rowChar : MorphRow NaturalAtLeast1 Char
 rowChar =
     whole
         |> Morph.overRow Whole.rowChar

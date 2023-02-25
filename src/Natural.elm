@@ -31,7 +31,7 @@ import Integer exposing (Integer)
 import Linear exposing (Direction(..))
 import Morph exposing (Morph, MorphIndependently, MorphRow)
 import N exposing (In, Min, N0, On, Up0, n0, n1)
-import NaturalPositive
+import NaturalAtLeast1
 import Sign
 import String.Morph
 
@@ -152,7 +152,7 @@ rowChar =
                         atLeast1Variant atLeast1Value
             )
             |> Morph.tryRow (\() -> N0) (String.Morph.only "0")
-            |> Morph.tryRow AtLeast1 NaturalPositive.rowChar
+            |> Morph.tryRow AtLeast1 NaturalAtLeast1.rowChar
             |> Morph.choiceRowFinish
         )
 

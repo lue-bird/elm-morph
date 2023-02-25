@@ -28,7 +28,7 @@ import Linear exposing (Direction(..))
 import Morph exposing (Morph, MorphRow, Translate)
 import N exposing (Min, N0, n0, n1)
 import N.Local exposing (n32)
-import NaturalPositive
+import NaturalAtLeast1
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Sign exposing (Sign)
 import String.Morph
@@ -225,4 +225,4 @@ signed =
             }
         )
         |> Morph.grab .sign Sign.maybeMinusChar
-        |> Morph.grab .absolute NaturalPositive.rowChar
+        |> Morph.grab .absolute NaturalAtLeast1.rowChar
