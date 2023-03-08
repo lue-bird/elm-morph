@@ -182,6 +182,50 @@ atomJsValueMagicEncode =
                 stringAtom |> Json.Encode.string
 
 
+{-| Some elm functions,
+[for example html events](https://dark.elm.dmy.fr/packages/elm/html/latest/Html-Events#on)
+require a `Json.Decode.Decoder`,
+which is an opaque type and can't be constructed (for example by from `Json.Decode.Value -> Result Json.Error elm`)
+
+In general, try to use [`Json.jsValueMagic`](#jsValueMagic) instead wherever possible
+
+-}
+jsValueMagicDecoder : Json.Decode.Decoder (Json String)
+jsValueMagicDecoder =
+    Json.Decode.oneOf
+        [ Json.Decode.map Atom jsonAtomDecoder
+        , Json.Decode.map Composed jsonComposedDecoder
+        ]
+
+
+jsonAtomDecoder : Json.Decode.Decoder Atom
+jsonAtomDecoder =
+    Json.Decode.oneOf
+        [ Null () |> Json.Decode.null
+        , Json.Decode.map Bool Json.Decode.bool
+        , Json.Decode.andThen
+            (\float ->
+                case
+                    float
+                        |> Morph.narrowTo
+                            (Decimal.orException
+                                |> Morph.over DecimalOrException.float
+                            )
+                of
+                    Ok decimal ->
+                        Number decimal |> Json.Decode.succeed
+
+                    Err exception ->
+                        exception
+                            |> Morph.errorToLines
+                            |> Stack.fold Up (\line soFar -> soFar ++ "\n" ++ line)
+                            |> Json.Decode.fail
+            )
+            Json.Decode.float
+        , Json.Decode.map String Json.Decode.string
+        ]
+
+
 {-| [Morph](Morph#Morph) to valid [`Json` value](#Json) format from [`JsValueMagic`](#JsValueMagic)
 
 About json numbers...
@@ -260,50 +304,6 @@ composedJsValueMagicEncode () =
                         )
                     |> Stack.toList
                     |> Json.Encode.object
-
-
-{-| Some elm functions,
-[for example html events](https://dark.elm.dmy.fr/packages/elm/html/latest/Html-Events#on)
-require a `Json.Decode.Decoder`,
-which is an opaque type and can't be constructed (for example by from `Json.Decode.Value -> Result Json.Error elm`)
-
-In general, try to use [`Json.jsValueMagic`](#jsValueMagic) instead wherever possible
-
--}
-jsValueMagicDecoder : Json.Decode.Decoder (Json String)
-jsValueMagicDecoder =
-    Json.Decode.oneOf
-        [ Json.Decode.map Atom jsonAtomDecoder
-        , Json.Decode.map Composed jsonComposedDecoder
-        ]
-
-
-jsonAtomDecoder : Json.Decode.Decoder Atom
-jsonAtomDecoder =
-    Json.Decode.oneOf
-        [ Null () |> Json.Decode.null
-        , Json.Decode.map Bool Json.Decode.bool
-        , Json.Decode.andThen
-            (\float ->
-                case
-                    float
-                        |> Morph.narrowTo
-                            (Decimal.orException
-                                |> Morph.over DecimalOrException.float
-                            )
-                of
-                    Ok decimal ->
-                        Number decimal |> Json.Decode.succeed
-
-                    Err exception ->
-                        exception
-                            |> Morph.errorToLines
-                            |> Stack.fold Up (\line soFar -> soFar ++ "\n" ++ line)
-                            |> Json.Decode.fail
-            )
-            Json.Decode.float
-        , Json.Decode.map String Json.Decode.string
-        ]
 
 
 jsonComposedDecoder : Json.Decode.Decoder (Composed String)
