@@ -45,25 +45,6 @@ type alias NaturalAtLeast1Base10 =
     }
 
 
-digitToNumber :
-    ( N (In (On newMin) (N.Up newMinMaxToMin_ N.To min))
-    , N (In (On newMaxMin) (On newMax))
-    )
-    -> N (In (On min) (N.Up maxToNewMaxMin_ N.To newMaxMin))
-    -> N (In newMin newMax)
-digitToNumber ( low, high ) =
-    \digit1To9 ->
-        digit1To9 |> N.minTo low |> N.maxTo high |> N.inToNumber
-
-
-digitToUp :
-    ( N (In newMin (N.Up newMinMaxToMin_ N.To min)), N (In (On max) newMax) )
-    -> (N (In min max) -> N (In newMin newMax))
-digitToUp ( low, high ) =
-    \digit1To9 ->
-        digit1To9 |> N.inToOn |> N.minTo low |> N.maxTo high
-
-
 toBase2 : NaturalAtLeast1Base10 -> NaturalAtLeast1
 toBase2 =
     \naturalAtLeast1Base10 ->
@@ -93,6 +74,25 @@ digitsToBase2 =
         in
         (digitsDivisionBy2.remainder |> Bit.fromN)
             :: (digitsDivisionBy2.divided |> digitsToBase2)
+
+
+digitToNumber :
+    ( N (In (On newMin) (N.Up newMinMaxToMin_ N.To min))
+    , N (In (On newMaxMin) (On newMax))
+    )
+    -> N (In (On min) (N.Up maxToNewMaxMin_ N.To newMaxMin))
+    -> N (In newMin newMax)
+digitToNumber ( low, high ) =
+    \digit1To9 ->
+        digit1To9 |> N.minTo low |> N.maxTo high |> N.inToNumber
+
+
+digitToUp :
+    ( N (In newMin (N.Up newMinMaxToMin_ N.To min)), N (In (On max) newMax) )
+    -> (N (In min max) -> N (In newMin newMax))
+digitToUp ( low, high ) =
+    \digit1To9 ->
+        digit1To9 |> N.inToOn |> N.minTo low |> N.maxTo high
 
 
 digitsDivideBy2 :
