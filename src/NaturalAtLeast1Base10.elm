@@ -285,30 +285,6 @@ digitFor10Exponent n10Exponent =
             |> N.intModBy n10
 
 
-toInt : NaturalAtLeast1Base10 -> Int
-toInt =
-    \naturalAtLeast1Base10 ->
-        Array.Linear.insert ( Linear.Up, 0 )
-            (\() -> naturalAtLeast1Base10.first |> N.inToOn |> N.minTo n0 |> N.inToNumber)
-            naturalAtLeast1Base10.afterFirst
-            |> arrayToIntPositive
-
-
-arrayToIntPositive : Array (N range_) -> Int
-arrayToIntPositive =
-    \digits ->
-        let
-            lastIndex =
-                (digits |> Array.length) - 1
-        in
-        digits
-            |> Array.indexedMap
-                (\index digit ->
-                    (digit |> N.toInt) * (10 ^ (lastIndex - index))
-                )
-            |> Array.foldl (+) 0
-
-
 chars : MorphRow NaturalAtLeast1Base10 Char
 chars =
     Morph.to "natural >= 1"
