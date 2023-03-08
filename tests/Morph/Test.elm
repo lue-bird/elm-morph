@@ -7,7 +7,7 @@ import Char.Morph
 import Decimal exposing (Decimal)
 import Expect
 import Linear exposing (Direction(..))
-import Morph exposing (Morph, MorphRow, MorphRowIndependently, broad, broadenFrom, grab, narrowTo, one, match, translate)
+import Morph exposing (Morph, MorphRow, MorphRowIndependently, broad, broadenFrom, grab, match, narrowTo, one, translate)
 import N exposing (In, Min, N, N0, N1, N2, N9, On, n0, n1, n9)
 import N.Morph
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
@@ -80,23 +80,23 @@ point =
     Morph.succeed (\x y -> { x = x, y = y })
         |> match (String.Morph.only "(")
         |> match
-            (broad (ArraySized.one () |> ArraySized.minTo n0)
-                |> Morph.overRow (atLeast (String.Morph.only " ") n0)
+            (broad (ArraySized.one ())
+                |> Morph.overRow (atLeast n0 (String.Morph.only " "))
             )
         |> grab .x Decimal.chars
         |> match
             (broad ArraySized.empty
-                |> Morph.overRow (atLeast (String.Morph.only " ") n0)
+                |> Morph.overRow (atLeast n0 (String.Morph.only " "))
             )
         |> match (String.Morph.only ",")
         |> match
-            (broad (ArraySized.one () |> ArraySized.minTo n0)
-                |> Morph.overRow (atLeast (String.Morph.only " ") n0)
+            (broad (ArraySized.one ())
+                |> Morph.overRow (atLeast n0 (String.Morph.only " "))
             )
         |> grab .y Decimal.chars
         |> match
-            (broad (ArraySized.one () |> ArraySized.minTo n0)
-                |> Morph.overRow (atLeast (String.Morph.only " ") n0)
+            (broad (ArraySized.one ())
+                |> Morph.overRow (atLeast n0 (String.Morph.only " "))
             )
         |> match (String.Morph.only ")")
 
@@ -196,12 +196,11 @@ local =
         )
         |> grab (ArraySized.element ( Up, n0 )) localPart
         |> grab (ArraySized.removeMin ( Up, n0 ))
-            (atLeast
+            (atLeast n1
                 (Morph.succeed (\part -> part)
                     |> match (String.Morph.only ".")
                     |> grab (\part -> part) localPart
                 )
-                n1
             )
 
 
@@ -211,7 +210,7 @@ localPart :
         LocalPart
         Char
 localPart =
-    atLeast (localSymbol |> one) n1
+    atLeast n1 (localSymbol |> one)
 
 
 localSymbol : Morph LocalSymbol Char
@@ -323,12 +322,11 @@ domain =
         |> Morph.grab .first hostLabel
         |> Morph.match (String.Morph.only ".")
         |> Morph.grab .hostLabels
-            (atLeast
+            (atLeast n0
                 (Morph.succeed (\label -> label)
                     |> Morph.grab (\label -> label) hostLabel
                     |> Morph.match (String.Morph.only ".")
                 )
-                n0
             )
         |> Morph.grab .topLevel domainTopLevel
 
@@ -345,7 +343,7 @@ hostLabel =
         |> grab .firstSymbol
             (hostLabelSideSymbol |> one)
         |> grab .betweenFirstAndLastSymbols
-            (atLeast (hostLabelSymbol |> one) n0)
+            (atLeast n0 (hostLabelSymbol |> one))
         |> grab .lastSymbol
             (hostLabelSideSymbol |> one)
 
@@ -405,18 +403,17 @@ domainTopLevel =
             }
         )
         |> grab .startDigits
-            (atLeast
+            (atLeast n0
                 (N.Morph.in_ ( n0, n9 )
                     |> Morph.over N.Morph.char
                     |> one
                 )
-                n0
             )
         |> -- guarantees it can't be numeric only
            grab .firstAToZ
             (AToZ.char |> one)
         |> grab .afterFirstAToZ
-            (atLeast (domainTopLevelAfterFirstAToZSymbol |> one) n0)
+            (atLeast n0 (domainTopLevelAfterFirstAToZSymbol |> one))
 
 
 

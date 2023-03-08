@@ -322,13 +322,12 @@ chars =
             |> grab .afterFirst
                 (ArraySized.Morph.toArray
                     |> Morph.overRow
-                        (ArraySized.Morph.atLeast
+                        (ArraySized.Morph.atLeast n0
                             (N.Morph.inOn
                                 |> Morph.over (N.Morph.in_ ( n0, n9 ))
                                 |> Morph.over N.Morph.char
                                 |> one
                             )
-                            n0
                         )
                 )
         )

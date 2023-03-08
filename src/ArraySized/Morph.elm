@@ -415,8 +415,8 @@ for morphRowByElement elementsToTraverseInSequence =
 --- row
 
 
-{-| Match a value `exactly` a number of times
-and return them as a [`ArraySized`](https://package.elm-lang.org/packages/lue-bird/elm-typesafe-array/latest/ArraySized)
+{-| Match a value a given number of times
+and return them as an [`ArraySized`](https://package.elm-lang.org/packages/lue-bird/elm-typesafe-array/latest/ArraySized)
 
 > ℹ️ Equivalent regular expression: `{n}`
 
@@ -451,7 +451,8 @@ exactly repeatCount repeatedMorphRow =
         (for (\() -> repeatedMorphRow) (ArraySized.repeat () repeatCount))
 
 
-{-| Match a value at least a number of times and returns them as a `List`.
+{-| Match a value at least a given number of times
+and return them as an [`ArraySized`](https://package.elm-lang.org/packages/lue-bird/elm-typesafe-array/latest/ArraySized).
 
 > ℹ️ Equivalent regular expression: `{min,}`
 
@@ -471,7 +472,7 @@ exactly repeatCount repeatedMorphRow =
     --> Err "1:3: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '_'."
 
 
-## `atLeast ... n0`
+### `atLeast n0`
 
 > ℹ️ Equivalent regular expression: `*`
 
@@ -479,14 +480,14 @@ exactly repeatCount repeatedMorphRow =
     import String.Morph as Text
 
     -- We want as many letters as there are.
-    "abc" |> Text.narrowTo (atLeast AToZ.char n0)
+    "abc" |> Text.narrowTo (atLeast n0 AToZ.char)
     --> Ok [ 'a', 'b', 'c' ]
 
-    "abc123" |> Text.narrowTo (atLeast AToZ.char n0)
+    "abc123" |> Text.narrowTo (atLeast n0 AToZ.char)
     --> Ok [ 'a', 'b', 'c' ]
 
     -- even zero letters is okay
-    "123abc" |> Text.narrowTo (atLeast AToZ.char n0)
+    "123abc" |> Text.narrowTo (atLeast n0 AToZ.char)
     --> Ok []
 
 
@@ -500,10 +501,10 @@ exactly repeatCount repeatedMorphRow =
     import String.Morph as Text
 
     -- we want as many letters as there are
-    "abc" |> Text.narrowTo (atLeast AToZ.char n1)
+    "abc" |> Text.narrowTo (atLeast n1 AToZ.char)
     --> Ok [ 'a', 'b', 'c' ]
 
-    "abc123" |> Text.narrowTo (atLeast AToZ.char n1)
+    "abc123" |> Text.narrowTo (atLeast n1 AToZ.char)
     --> Ok [ 'a', 'b', 'c' ]
 
     -- but we want at least one
@@ -522,7 +523,7 @@ exactly repeatCount repeatedMorphRow =
 
 
     tag =
-        atLeast (Morph.AToZ.caseAnyLower |> one) n0
+        atLeast n0 (Morph.AToZ.caseAnyLower |> one)
 
     tags =
         Morph.succeed Stack.onTopLay
@@ -530,12 +531,11 @@ exactly repeatCount repeatedMorphRow =
             |> grab Stack.removeTop
                 (ArraySized.Morph.toStack
                     |> Morph.overRow
-                        (atLeast
+                        (atLeast n0
                             (Morph.succeed (\tag -> tag)
                                 |> match separator
                                 |> grab (\tag -> tag) tag
                             )
-                            n0
                         )
                 )
 
@@ -570,36 +570,63 @@ exactly repeatCount repeatedMorphRow =
 ### anti-example: parsing infinitely
 
     Morph.succeed ...
-        |> grab (atLeast (Morph.keep |> Morph.one) n0)
+        |> grab (atLeast n0 (Morph.keep |> Morph.one))
         |> grab ...
 
 would only parse the first part until the end
 because it always [`succeed`](Morph#succeed)s.
 Nothing after would ever be parsed, making the whole thing fail.
 
+
+### minimum type explanation
+
+The maximum of the lower limit argument enables what's shown in the following example:
+"match any number of spaces and broaden to 1"
+
+    broad (ArraySized.one ())
+        |> Morph.overRow (atLeast n0 (String.Morph.only " "))
+
+In this case, the minimum of the given "seed" before broadening `ArraySized.one ()` is 1,
+whereas the narrow result of `atLeast n0` will have a minimum length of 0.
+
+The maximum of the lower limit argument is a type-level proof that the "seed" minimum is greater
+or equal to the resulting narrow minimum length.
+
+↓ for example will lead to a compile time error:
+
+    broad ArraySized.empty
+        |> Morph.overRow (atLeast n1 (String.Morph.only " "))
+
+> The argument to `|>` is of type:
+>
+>     ... ArraySized () (In #(On N0)# (Up0 maxX_)) ...
+>
+> But it needs to be:
+>
+>     ... ArraySized () (In #(On N1)# (Up0 maxX_)) ...
+
 -}
 atLeast :
-    MorphRow narrow broadElement
-    -> N (In (On lowerLimit) (On lowerLimitMax))
+    N (In (On lowerLimit) (Up lowerLimitToBroad_ To broadLowerLimit))
+    -> MorphRow narrow broadElement
     ->
         MorphRowIndependently
-            (ArraySized narrow (In (On lowerLimitMax) max_))
+            (ArraySized narrow (In (On broadLowerLimit) max_))
             (ArraySized narrow (Min (On lowerLimit)))
             broadElement
-atLeast elementStepMorphRow minimum =
+atLeast minimum elementStepMorphRow =
     Morph.broaden ArraySized.maxToInfinity
         |> Morph.overRow
             (Morph.succeed
                 (\minimumArraySized overMinimum ->
                     minimumArraySized
-                        |> ArraySized.attachMin Up
-                            (overMinimum |> ArraySized.minTo n0)
+                        |> ArraySized.attachMin Up overMinimum
                 )
                 |> grab
                     (ArraySized.take Up { atLeast = minimum } minimum)
                     (exactly minimum elementStepMorphRow)
                 |> grab
-                    (ArraySized.dropMin Up minimum)
+                    (\arr -> arr |> ArraySized.dropMin Up minimum |> ArraySized.minTo n0)
                     (list
                         |> Morph.overRow (untilFail elementStepMorphRow)
                     )
@@ -631,7 +658,7 @@ atLeast elementStepMorphRow minimum =
             , element =
                 Morph.succeed (\n -> n)
                     |> grab (\n -> n) Number.Morph.text
-                    |> match (atLeast (String.Morph.only " ") n0)
+                    |> match (atLeast n0 (String.Morph.only " "))
             }
 
     -- stops before we reach a maximum of 6 in the sum
@@ -726,7 +753,8 @@ untilFail elementStepMorphRow =
         }
 
 
-{-| Match a value between a range of times and returns them as a `List`.
+{-| Match a value between a minimum and maximum number of times
+and return them as an [`ArraySized`](https://package.elm-lang.org/packages/lue-bird/elm-typesafe-array/latest/ArraySized).
 
 > ℹ️ Equivalent regular expression: `{min,max}`
 
@@ -735,24 +763,24 @@ untilFail elementStepMorphRow =
     import String.Morph as Text
 
     -- we want between two and four letters
-    "abcdef" |> Text.narrowTo (in_ AToZ.char ( n2, n4 ))
+    "abcdef" |> Text.narrowTo (in_ ( n2, n4 ) AToZ.char)
     --> Ok [ 'a', 'b', 'c', 'd' ]
 
-    "abc_ef" |> Text.narrowTo (in_ AToZ.char ( n2, n4 ))
+    "abc_ef" |> Text.narrowTo (in_ ( n2, n4 ) AToZ.char)
     --> Ok [ 'a', 'b', 'c' ]
 
-    "ab_def" |> Text.narrowTo (in_ AToZ.char ( n2, n4 ))
+    "ab_def" |> Text.narrowTo (in_ ( n2, n4 ) AToZ.char)
     --> Ok [ 'a', 'b' ]
 
 
     -- but less than that is not cool
     "i_am_here"
-        |> Text.narrowTo (in_ letter ( n2, n3 ))
+        |> Text.narrowTo (in_ ( n2, n3 ) letter)
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:2: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '_'."
 
 
-### example: `in_ ... ( n0, n1 )`
+### example: `in_ ( n0, n1 )`
 
 Alternative to [`Maybe.Morph.row`](Maybe-Morph#row) which instead returns a `List`.
 
@@ -762,11 +790,11 @@ Alternative to [`Maybe.Morph.row`](Maybe-Morph#row) which instead returns a `Lis
     import String.Morph as Text
 
     -- we want one letter, optionally
-    "abc" |> Text.narrowTo (in_ AToZ.char ( n0, n1 ))
+    "abc" |> Text.narrowTo (in_ ( n0, n1 ) AToZ.char)
     --> Ok [ 'a' ]
 
     -- if we don't get any, that's still okay
-    "123abc" |> Text.narrowTo (in_ AToZ.char ( n0, n1 ))
+    "123abc" |> Text.narrowTo (in_ ( n0, n1 ) AToZ.char)
     --> Ok []
 
 
@@ -779,38 +807,37 @@ Alternative to [`Maybe.Morph.row`](Maybe-Morph#row) which instead returns a `Lis
     import String.Morph as Text
 
     -- we want a maximum of three letters
-    "abcdef" |> Text.narrowTo (in_ AToZ.char ( n0, n3 ))
+    "abcdef" |> Text.narrowTo (in_ ( n0, n3 ) AToZ.char)
     --> Ok [ 'a', 'b', 'c' ]
 
     -- less than that is also okay
-    "ab_def" |> Text.narrowTo (in_ AToZ.char ( n0, n3 ))
+    "ab_def" |> Text.narrowTo (in_ ( n0, n3 ) AToZ.char)
     --> Ok [ 'a', 'b' ]
 
     -- even zero letters are fine
-    "_underscore" |> Text.narrowTo (in_ AToZ.char ( n0, n3 ))
+    "_underscore" |> Text.narrowTo (in_ ( n0, n3 ) AToZ.char)
     --> Ok []
 
     -- make sure we don't consume more than three letters
     "abcdef"
         |> Text.narrowTo
             (Morph.succeed (\letters -> letters)
-                |> grab (in_ AToZ.char ( n0, n3 ))
+                |> grab (in_ ( n0, n3 ) AToZ.char)
                 |> match (one 'd')
             )
     --> Ok [ 'a', 'b', 'c' ]
 
 -}
 in_ :
-    MorphRow element broadElement
-    ->
-        ( N (Exactly (On min))
-        , N (In (On min) (On max))
-        )
+    ( N (Exactly (On min))
+    , N (In (On min) (On max))
+    )
+    -> MorphRow element broadElement
     ->
         MorphRow
             (ArraySized element (In (On min) (On max)))
             broadElement
-in_ repeatedElementMorphRow ( lowerLimit, upperLimit ) =
+in_ ( lowerLimit, upperLimit ) repeatedElementMorphRow =
     translate identity
         (ArraySized.minTo lowerLimit)
         |> Morph.overRow

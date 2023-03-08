@@ -26,7 +26,7 @@ module Morph exposing
     , before
     )
 
-{-| Call it Codec, ToFrom, ParserBuilder, Convert-, Transform-, Shape-, FormReversible, ...
+{-| Call it Codec, Coder, ParserBuilder, Convert-, Transform-, Shape-, FormReversible, ToFrom, ...
 We call it
 
 @docs Morph, Translate, MorphOrError, MorphIndependently
@@ -179,7 +179,7 @@ for example `Morph Email String`, can
 ### `narrow : broad -> Result error narrow`
 
   - example: `String -> Result Morph.Error Email`
-      - ↑ is exactly how running your typical parser looks
+      - ↑ is exactly how running your typical parser looks like
   - going from a general type to a specific one
   - the result can always be turned back successfully
   - 📰 [blog post "A Broader Take on Parsing" by Joël Quenneville](https://thoughtbot.com/blog/a-broader-take-on-parsing?utm_campaign=Elm%20Weekly&utm_medium=email&utm_source=Revue%20newsletter)
@@ -1476,22 +1476,22 @@ type alias MorphText narrow =
                 |> match (String.Morph.only "(")
                 |> match
                     (broad (ArraySIzed.one ())
-                        |> Morph.overRow (atLeast (String.Morph.only " ") n0)
+                        |> Morph.overRow (atLeast n0 (String.Morph.only " "))
                     )
                 |> grab number
                 |> match
                     (broad ArraySIzed.empty
-                        |> Morph.overRow (atLeast (String.Morph.only " ") n0)
+                        |> Morph.overRow (atLeast n0 (String.Morph.only " "))
                     )
                 |> match (String.Morph.only ",")
                 |> match
                     (broad (ArraySIzed.one ())
-                        |> Morph.overRow (atLeast (String.Morph.only " ") n0)
+                        |> Morph.overRow (atLeast n0 (String.Morph.only " "))
                     )
                 |> grab .x Number.Morph.text
                 |> match
                     (broad (ArraySIzed.one ())
-                        |> Morph.overRow (atLeast (String.Morph.only " ") n0)
+                        |> Morph.overRow (atLeast n0 (String.Morph.only " "))
                     )
                 |> match (String.Morph.only ")")
             )
@@ -1635,7 +1635,7 @@ Never fails.
 
 For anything composed of multiple parts,
 first declaratively describes what you expect to get in the end,
-then [taking](#grab) and [dropping](#match) what you need to parse
+then [grabbing (taking)](#grab) and [matching (dropping/skipping)](#match) what you need
 
     import Morph exposing (Morph.succeed, one)
     import String.Morph exposing (integer)
@@ -1648,15 +1648,28 @@ then [taking](#grab) and [dropping](#match) what you need to parse
             , y : Int
             }
 
-    point : MorphRow Char Point
+    point : MorphRow Point Char
     point =
         Morph.succeed (\x y -> { x = x, y = y })
             |> grab .x integer
-            |> match (MorphRow.only [ ',' ])
+            |> match (String.Morph.only ",")
             |> grab .y integer
 
     "12,34" |> Text.narrowTo point
     --> Ok { x = 12, y = 34 }
+
+
+### example: infix-separated elements
+
+    Morph.succeed (\first separatedElements -> { first = first, separatedElements = separatedElements })
+        |> grab .first element
+        |> grab .separatedElements
+            (ArraySized.Morph.atLeast n0
+                (Morph.succeed (\separator element -> { element = element, separator = separator })
+                    |> grab .separator separator
+                    |> grab .element element
+                )
+            )
 
 
 ### `Morph.succeed` anti-patterns
@@ -1928,12 +1941,12 @@ You might think: Why not use
     decoderNameSubject =
         Morph.succeed (\subject -> subject)
             |> grab (\subject -> subject)
-                (atLeast (Morph.keep |> Morph.one) n0)
+                (atLeast n0 (Morph.keep |> Morph.one))
             |> match (String.Morph.only "Decoder")
             |> match Morph.end
 
-Problem is: This will never Morph.succeed.
-`atLeast (Morph.keep |> Morph.one) n0` always goes on.
+Problem is: This will never (Morph.)succeed.
+`atLeast n0 (Morph.keep |> Morph.one)` always goes on.
 We never reach the necessary [`match`](#match)ped things.
 
 -}

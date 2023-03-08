@@ -142,7 +142,7 @@ or : MorphRow { left : Boolean, right : Boolean } Char
 or =
     let 
         spaces =
-            ArraySized.Morph.atLeast (String.Morph.only " ") n0
+            ArraySized.Morph.atLeast n0 (String.Morph.only " ")
     in
     Morph.succeed
         (\left right -> { left = left, right = right })

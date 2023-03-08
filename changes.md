@@ -9,17 +9,17 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
   - `Parser.Expression` remove
   - `Parser.Sequence` merge → `MorphRow`
       - `zeroOrMore` remove
-          - in favor of `atLeast ... n0`
+          - in favor of `atLeast n0`
       - `oneOrMore` remove
           - in favor of `atLeast n1`
       - `zeroOrOne` remove
-          - in favor of `maybe`
+          - in favor of `choice` or `in_ ( n0, n1 )`
       - `atMost max` remove
-          - in favor of `between 0 max`
+          - in favor of `in ( n0, max )`
       - `concat` remove
       - `fold`, `foldWhile` remove
           - in favor of `whileAccumulate`
-      - `atLeast`, `between`, `exactly`, `split` return `typesafe-array`
+      - `atLeast`, `in_`, `exactly` return `typesafe-array`
       - `until` changed
         ```elm
         until :
@@ -42,7 +42,7 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
             }
             -> MorphRow broadElement commitResult expectedCustom
         ```
-        and its simpler cousin
+        and its simpler version
         ```elm
         before :
             { end : MorphRow broadElement () expectedCustom
@@ -53,38 +53,37 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
       - `split`, `splitIncluding` remove
           - in favor of
             ```elm
-            Morph.succeed
-                |> grab element
-                |> grab
-                    (atLeast
-                        (Morph.succeed
-                            |> grab separator
-                            |> grab element
+            Morph.succeed (\first separatedElements -> { first = first, separatedElements = separatedElements })
+                |> grab .first element
+                |> grab .separatedElements
+                    (atLeast n0
+                        (Morph.succeed (\separator element -> { element = element, separator = separator })
+                            |> grab .separator separator
+                            |> grab .element element
                         )
-                        n0
                     )
             ```
   - `Parser.Common` merge → `String.Morph`
       - `digits` remove
-          - in favor of `atLeast (Digit.n0To9 |> one) n0` explicitly
+          - in favor of `atLeast n0 (Digit.n0To9 |> one)` explicitly
       - `letters` remove
-          - in favor of `atLeast (Morph.AToZ.caseAny |> one) n0` explicitly
+          - in favor of `atLeast n0 (Morph.AToZ.caseAny |> one)` explicitly
       - `spaces` remove
-          - in favor of `atLeast (blankChar |> one) n0` explicitly
+          - in favor of `atLeast n0 (blankChar |> one)` explicitly
             where `blankChar` is a custom definition or just `Char.Morph.only ' '`
       - `token` token
           - in favor of
             ```elm
             import Char.Morph as Char
             Morph.succeed (\... -> ...)
-                |> skip (atLeast (String.Morph.only " ") n0)
+                |> match (atLeast n0 (String.Morph.only " "))
                 |> grab ...
-                |> skip (atLeast (String.Morph.only " ") n0)
+                |> match (atLeast n0 (String.Morph.only " "))
             ```
             explicitly
       - `textNoCase` name → `caseAny`
       - `line` remove
-        in favor of `... |> skip String.Morph.lineEnd`
+        in favor of `... |> match String.Morph.lineEnd`
   - `Parser.Check` remove
       - `end` move → `MorphRow`
       - lookahead/-before remove
@@ -114,7 +113,7 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
       - `map2`, `map3`, `map4`, `map5` remove
           - in favor of `Morph.succeed |> grab |> grab ...`
       - `andThenKeep`, `andThenIgnore` remove
-          - in favor of `grab`, `skip`
+          - in favor of `grab`, `match`
       - `andThen2` remove
       - `textOf` remove
           - in favor of `String.Morph.list |> Morph.rowOver ...`

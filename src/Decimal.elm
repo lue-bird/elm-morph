@@ -147,9 +147,8 @@ chars =
             |> match
                 (Morph.broad (ArraySized.repeat () n0)
                     |> Morph.overRow
-                        (ArraySized.Morph.atLeast
+                        (ArraySized.Morph.atLeast n0
                             (String.Morph.only "0")
-                            n0
                         )
                 )
         )
@@ -217,13 +216,12 @@ fractionChars =
                 (Stack.Morph.list
                     |> Morph.over ArraySized.Morph.toList
                     |> Morph.overRow
-                        (ArraySized.Morph.atLeast
+                        (ArraySized.Morph.atLeast n0
                             (N.Morph.inOn
                                 |> Morph.over (N.Morph.in_ ( n0, n9 ))
                                 |> Morph.over N.Morph.char
                                 |> one
                             )
-                            n0
                         )
                 )
             |> Morph.grab .last
