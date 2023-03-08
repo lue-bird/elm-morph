@@ -100,7 +100,7 @@ Don't try to be clever with this.
             )
     --> Ok [ 'a', 'b' ]
 
-The usual [`Morph.succeed`](Morph#succeed)`(\... -> ...) |>`[`grab`](Morph#grab)-[`skip`](Morph#skip) chain
+The usual [`Morph.succeed`](Morph#succeed)`(\... -> ...) |>`[`grab`](Morph#grab)-[`match`](Morph#match) chain
 is often more explicit, descriptive and type-safe.
 
 Because of this, `MorphRow` only exposes `for`, not `sequence`,

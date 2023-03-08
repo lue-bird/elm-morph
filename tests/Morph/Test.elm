@@ -7,7 +7,7 @@ import Char.Morph
 import Decimal exposing (Decimal)
 import Expect
 import Linear exposing (Direction(..))
-import Morph exposing (Morph, MorphRow, MorphRowIndependently, broad, broadenFrom, grab, narrowTo, one, skip, translate)
+import Morph exposing (Morph, MorphRow, MorphRowIndependently, broad, broadenFrom, grab, narrowTo, one, match, translate)
 import N exposing (In, Min, N, N0, N1, N2, N9, On, n0, n1, n9)
 import N.Morph
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
@@ -78,27 +78,27 @@ This could have happened in many places, maybe because `|>` is used.
 point : MorphRow Point Char
 point =
     Morph.succeed (\x y -> { x = x, y = y })
-        |> skip (String.Morph.only "(")
-        |> skip
+        |> match (String.Morph.only "(")
+        |> match
             (broad (ArraySized.one () |> ArraySized.minTo n0)
                 |> Morph.overRow (atLeast (String.Morph.only " ") n0)
             )
         |> grab .x Decimal.chars
-        |> skip
+        |> match
             (broad ArraySized.empty
                 |> Morph.overRow (atLeast (String.Morph.only " ") n0)
             )
-        |> skip (String.Morph.only ",")
-        |> skip
+        |> match (String.Morph.only ",")
+        |> match
             (broad (ArraySized.one () |> ArraySized.minTo n0)
                 |> Morph.overRow (atLeast (String.Morph.only " ") n0)
             )
         |> grab .y Decimal.chars
-        |> skip
+        |> match
             (broad (ArraySized.one () |> ArraySized.minTo n0)
                 |> Morph.overRow (atLeast (String.Morph.only " ") n0)
             )
-        |> skip (String.Morph.only ")")
+        |> match (String.Morph.only ")")
 
 
 emailTest : Test
@@ -182,7 +182,7 @@ email =
             }
         )
         |> grab .local local
-        |> skip (String.Morph.only "@")
+        |> match (String.Morph.only "@")
         |> grab .domain domain
 
 
@@ -198,7 +198,7 @@ local =
         |> grab (ArraySized.removeMin ( Up, n0 ))
             (atLeast
                 (Morph.succeed (\part -> part)
-                    |> skip (String.Morph.only ".")
+                    |> match (String.Morph.only ".")
                     |> grab (\part -> part) localPart
                 )
                 n1
@@ -321,12 +321,12 @@ domain =
             { first = first, hostLabels = hostLabels, topLevel = topLevel }
         )
         |> Morph.grab .first hostLabel
-        |> Morph.skip (String.Morph.only ".")
+        |> Morph.match (String.Morph.only ".")
         |> Morph.grab .hostLabels
             (atLeast
                 (Morph.succeed (\label -> label)
                     |> Morph.grab (\label -> label) hostLabel
-                    |> Morph.skip (String.Morph.only ".")
+                    |> Morph.match (String.Morph.only ".")
                 )
                 n0
             )

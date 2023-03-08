@@ -25,7 +25,7 @@ import ArraySized
 import ArraySized.Morph
 import DecimalOrException exposing (OrException)
 import Maybe.Morph
-import Morph exposing (Morph, MorphRow, grab, one, skip)
+import Morph exposing (Morph, MorphRow, grab, match, one)
 import N exposing (n0, n1, n9)
 import N.Morph
 import NaturalAtLeast1
@@ -144,7 +144,7 @@ chars =
             |> Morph.tryRow DecimalSigned signedChars
             |> Morph.tryRow (\() -> DecimalN0) (String.Morph.only "0.")
             |> Morph.choiceRowFinish
-            |> skip
+            |> match
                 (Morph.broad (ArraySized.repeat () n0)
                     |> Morph.overRow
                         (ArraySized.Morph.atLeast
@@ -183,12 +183,12 @@ signedAbsoluteChars =
             )
             |> Morph.tryRow DecimalFraction
                 (Morph.succeed (\fraction_ -> fraction_)
-                    |> skip
+                    |> match
                         (Morph.broad (Just ())
                             |> Morph.overRow
                                 (Maybe.Morph.row (String.Morph.only "0"))
                         )
-                    |> skip (String.Morph.only ".")
+                    |> match (String.Morph.only ".")
                     |> grab (\fraction_ -> fraction_) fractionChars
                 )
             |> Morph.tryRow DecimalAtLeast1
@@ -199,7 +199,7 @@ signedAbsoluteChars =
                         }
                     )
                     |> grab .whole NaturalAtLeast1.Internal.chars
-                    |> skip (String.Morph.only ".")
+                    |> match (String.Morph.only ".")
                     |> grab .fraction (Maybe.Morph.row fractionChars)
                 )
             |> Morph.choiceRowFinish

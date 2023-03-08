@@ -6,7 +6,7 @@ module Morph exposing
     , value, only, validate
     , translate, broad, toggle, keep, translateOn
     , lazy
-    , end, one, succeed, grab, skip
+    , end, one, succeed, grab, match
     , to
     , invert
     , deadEndMap
@@ -46,7 +46,7 @@ We call it
 
 ### create row
 
-@docs end, one, succeed, grab, skip
+@docs end, one, succeed, grab, match
 
 
 ## alter
@@ -479,11 +479,11 @@ indent =
     point =
         Morph.to "point"
             (Morph.succeed (\x y -> { x = x, y = y })
-                |> skip (Char.Morph.only '(' |> one)
+                |> match (Char.Morph.only '(' |> one)
                 |> grab .x Text.number
-                |> skip (Char.Morph.only ',' |> one)
+                |> match (Char.Morph.only ',' |> one)
                 |> grab .y Text.number
-                |> skip (Char.Morph.only ')' |> one)
+                |> match (Char.Morph.only ')' |> one)
             )
 
     "(12,34)" |> narrow (map Text.fromList point)
@@ -868,7 +868,7 @@ value descriptionCustom morphTransformations =
 
 {-| To reference a [`Morph`](#Morph) in recursive definitions
 
-    import Morph exposing (grab, skip, one)
+    import Morph exposing (grab, match, one)
     import Integer.Morph
     import String.Morph
 
@@ -894,13 +894,13 @@ value descriptionCustom morphTransformations =
                         (Integer.Morph.toInt
                             |> Morph.overRow Integer.Morph.text
                         )
-                    |> skip
+                    |> match
                         (broad [ () ]
                             |> Morph.overRow
                                 (atLeast n1 (String.Morph.only " "))
                         )
-                    |> skip (String.Morph.only "::")
-                    |> skip
+                    |> match (String.Morph.only "::")
+                    |> match
                         (broad [ () ]
                             |> Morph.overRow
                                 (atLeast n1 (String.Morph.only " "))
@@ -1450,7 +1450,7 @@ type alias MorphText narrow =
 
 ## example: 2D point
 
-    import Morph exposing (MorphRow, atLeast, skip, into, Morph.succeed, grab, one)
+    import Morph exposing (MorphRow, atLeast, match, into, Morph.succeed, grab, one)
     import Char.Morph as Char
     import String.Morph as Text exposing (number)
     import Morph.Error
@@ -1475,27 +1475,27 @@ type alias MorphText narrow =
     point =
         Morph.to "point"
             (Morph.succeed (\x y -> { x = x, y = y })
-                |> skip (String.Morph.only "(")
-                |> skip
+                |> match (String.Morph.only "(")
+                |> match
                     (broad (ArraySIzed.one ())
                         |> Morph.overRow (atLeast (String.Morph.only " ") n0)
                     )
                 |> grab number
-                |> skip
+                |> match
                     (broad ArraySIzed.empty
                         |> Morph.overRow (atLeast (String.Morph.only " ") n0)
                     )
-                |> skip (String.Morph.only ",")
-                |> skip
+                |> match (String.Morph.only ",")
+                |> match
                     (broad (ArraySIzed.one ())
                         |> Morph.overRow (atLeast (String.Morph.only " ") n0)
                     )
                 |> grab .x Number.Morph.text
-                |> skip
+                |> match
                     (broad (ArraySIzed.one ())
                         |> Morph.overRow (atLeast (String.Morph.only " ") n0)
                     )
-                |> skip (String.Morph.only ")")
+                |> match (String.Morph.only ")")
             )
 
     -- we can get a nice error message if it fails
@@ -1547,7 +1547,7 @@ type alias MorphRow narrow broadElement =
 
 
 {-| Incomplete [`MorphRow`](#MorphRow) for a thing composed of multiple parts = group.
-It's what you supply during a [`Morph.succeed`](Morph#succeed)`|>`[`grab`](#grab)/[`skip`](#skip) build
+It's what you supply during a [`Morph.succeed`](Morph#succeed)`|>`[`grab`](#grab)/[`match`](#match) build
 -}
 type alias MorphRowIndependently beforeBroaden narrowed broadElement =
     MorphIndependently
@@ -1637,7 +1637,7 @@ Never fails.
 
 For anything composed of multiple parts,
 first declaratively describes what you expect to get in the end,
-then [taking](#grab) and [dropping](#skip) what you need to parse
+then [taking](#grab) and [dropping](#match) what you need to parse
 
     import Morph exposing (Morph.succeed, one)
     import String.Morph exposing (integer)
@@ -1654,7 +1654,7 @@ then [taking](#grab) and [dropping](#skip) what you need to parse
     point =
         Morph.succeed (\x y -> { x = x, y = y })
             |> grab .x integer
-            |> skip (MorphRow.only [ ',' ])
+            |> match (MorphRow.only [ ',' ])
             |> grab .y integer
 
     "12,34" |> Text.narrowTo point
@@ -1666,10 +1666,10 @@ then [taking](#grab) and [dropping](#skip) what you need to parse
 One example you'll run into when using other parsers is using
 
     Morph.succeed identity
-        |> skip ...
-        |> skip ...
+        |> match ...
+        |> match ...
         |> grab ...
-        |> skip ...
+        |> match ...
 
 it get's pretty hard to read as you have to jump around the code to know what you're actually producing
 
@@ -1744,7 +1744,8 @@ grab partAccess grabbedNextMorphRow =
         }
 
 
-{-| Require values to be matched next to continue but ignore the result.
+{-| Require values to be present next to continue but ignore the result.
+On the parsing side, this is often called "skip" or "drop", `elm/parser` uses `|.`
 
     import String.Morph exposing (text)
     import Morph exposing (Morph.succeed, atLeast, take, drop)
@@ -1754,13 +1755,13 @@ grab partAccess grabbedNextMorphRow =
         |> Text.narrowTo
             (Morph.succeed (\userName -> { username = userName })
                 |> grab .username (atLeast n1 aToZ)
-                |> skip (one '@')
-                |> skip
+                |> match (one '@')
+                |> match
                     (Text.fromList
                         |> Morph.overRow (atLeast n1 aToZ)
                         |> broad "example"
                     )
-                |> skip (text ".com")
+                |> match (text ".com")
             )
     --> Ok { username = "user" }
 
@@ -1769,13 +1770,13 @@ when multiple kinds of input can be dropped,
 it allows choosing a default possibility for building.
 
 -}
-skip :
+match :
     MorphRow () broadElement
     ->
         (MorphRowIndependently groupNarrow narrow broadElement
          -> MorphRowIndependently groupNarrow narrow broadElement
         )
-skip ignoredNext =
+match ignoredNext =
     \groupMorphRowSoFar ->
         { description = groupMorphRowSoFar |> description
         , narrow =
@@ -1917,8 +1918,8 @@ overRow morphRowBeforeMorph =
                 (MorphRow.before
                     { end =
                         Morph.succeed ()
-                            |> skip (String.Morph.only "Decoder")
-                            |> skip Morph.end
+                            |> match (String.Morph.only "Decoder")
+                            |> match Morph.end
                     , goOn = Morph.keep |> Morph.one
                     }
                 )
@@ -1930,12 +1931,12 @@ You might think: Why not use
         Morph.succeed (\subject -> subject)
             |> grab (\subject -> subject)
                 (atLeast (Morph.keep |> Morph.one) n0)
-            |> skip (String.Morph.only "Decoder")
-            |> skip Morph.end
+            |> match (String.Morph.only "Decoder")
+            |> match Morph.end
 
 Problem is: This will never Morph.succeed.
 `atLeast (Morph.keep |> Morph.one) n0` always goes on.
-We never reach the necessary [`skip`](#skip)ped things.
+We never reach the necessary [`match`](#match)ped things.
 
 -}
 before :
@@ -1965,8 +1966,8 @@ before untilStep =
                             (\before -> { before = before, end = () })
                     , end =
                         Morph.succeed ()
-                            |> skip (String.Morph.only "Decoder")
-                            |> skip Morph.end
+                            |> match (String.Morph.only "Decoder")
+                            |> match Morph.end
                     , goOn = Morph.keep |> Morph.one
                     }
                 )
@@ -2132,8 +2133,8 @@ It can, however simplify checking for specific endings:
                             (\before -> { before = before, end = () })
                     , end =
                         Morph.succeed ()
-                            |> skip (String.Morph.only "Decoder")
-                            |> skip Morph.end
+                            |> match (String.Morph.only "Decoder")
+                            |> match Morph.end
                     , goOn = Morph.keep |> Morph.one
                     }
                 )

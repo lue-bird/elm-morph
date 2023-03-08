@@ -99,7 +99,7 @@ Like [`Morph`](Morph#Morph), [`MorphRow`](Morph#MorphRow) makes the process simp
 
 Here a 1:1 port of [an example from `elm/parser`](https://dark.elm.dmy.fr/packages/elm/parser/latest/Parser#lazy):
 ```elm
-import Morph exposing (MorphRow, broad, narrowTo, one, skip, grab)
+import Morph exposing (MorphRow, broad, narrowTo, one, match, grab)
 import Char.Morph
 import String.Morph
 import N exposing (n0)
@@ -146,15 +146,15 @@ or =
     in
     Morph.succeed
         (\left right -> { left = left, right = right })
-        |> skip (String.Morph.only "(")
-        |> skip (broad ArraySized.empty |> Morph.rowOver spaces)
+        |> match (String.Morph.only "(")
+        |> match (broad ArraySized.empty |> Morph.rowOver spaces)
         |> grab .left boolean
-        |> skip (broad (ArraySized.one ()) |> Morph.rowOver spaces)
-        |> skip (String.Morph.only "||")
-        |> skip (broad (ArraySized.one ()) |> Morph.rowOver spaces)
+        |> match (broad (ArraySized.one ()) |> Morph.rowOver spaces)
+        |> match (String.Morph.only "||")
+        |> match (broad (ArraySized.one ()) |> Morph.rowOver spaces)
         |> grab .right boolean
-        |> skip (broad ArraySized.empty |> Morph.rowOver spaces)
-        |> skip (String.Morph.only ")")
+        |> match (broad ArraySized.empty |> Morph.rowOver spaces)
+        |> match (String.Morph.only ")")
 ```
 
 What's different from writing a parser?

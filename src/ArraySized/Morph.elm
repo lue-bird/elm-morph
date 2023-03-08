@@ -318,7 +318,7 @@ Don't try to be clever with this.
             )
     --> Ok [ 'a', 'b' ]
 
-The usual [`Morph.succeed`](Morph#succeed)`(\... -> ...) |>`[`grab`](Morph#grab)-[`skip`](Morph#skip) chain
+The usual [`Morph.succeed`](Morph#succeed)`(\... -> ...) |>`[`grab`](Morph#grab)-[`match`](Morph#match) chain
 is often more explicit, descriptive and type-safe.
 
 Because of this, `MorphRow` only exposes `for`, not `sequence`,
@@ -532,7 +532,7 @@ exactly repeatCount repeatedMorphRow =
                     |> Morph.overRow
                         (atLeast
                             (Morph.succeed (\tag -> tag)
-                                |> skip separator
+                                |> match separator
                                 |> grab (\tag -> tag) tag
                             )
                             n0
@@ -631,7 +631,7 @@ atLeast elementStepMorphRow minimum =
             , element =
                 Morph.succeed (\n -> n)
                     |> grab (\n -> n) Number.Morph.text
-                    |> skip (atLeast (String.Morph.only " ") n0)
+                    |> match (atLeast (String.Morph.only " ") n0)
             }
 
     -- stops before we reach a maximum of 6 in the sum
@@ -641,7 +641,7 @@ atLeast elementStepMorphRow minimum =
                 |> Morph.overRow
                     (Morph.succeed (\numbers -> numbers)
                         |> grab (\numbers -> numbers) (sumWhileLessThan 6)
-                        |> skip (String.Morph.only "4")
+                        |> match (String.Morph.only "4")
                     )
             )
     --> Ok 5
@@ -795,7 +795,7 @@ Alternative to [`Maybe.Morph.row`](Maybe-Morph#row) which instead returns a `Lis
         |> Text.narrowTo
             (Morph.succeed (\letters -> letters)
                 |> grab (in_ AToZ.char ( n0, n3 ))
-                |> skip (one 'd')
+                |> match (one 'd')
             )
     --> Ok [ 'a', 'b', 'c' ]
 
