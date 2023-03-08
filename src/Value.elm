@@ -14,10 +14,13 @@ module Value exposing
 
 {-| Generic, `case`-able elm value
 
-json encoders/decoders are too low-level for serialization,
-explicitly describing how to serialize individual data types that all have the same shape
+json encoders/decoders are pretty low-level which makes them mildly unpleasant for serialization,
+explicitly describing **how** to serialize individual data types.
+Data that has same shape could at the low level be coded differently,
+so each time you have to spell it out.
 
-Plus it makes it harder to switch to a different format
+Switching to a different format would also be a lot of work;
+some low-level primitives like bools might not be supported etc.
 
 @docs Value, Atom, Composed, Record, Tagged
 
@@ -70,7 +73,7 @@ variant union [`Morph`](#Morph)
 
 build on existing ones
 
-    {-| `Posix` `Morph`
+    {-| `Posix` `Value.Morph`
     -}
     posixValue : Value.Morph Posix
     posixValue =
@@ -94,11 +97,10 @@ or define new atoms, composed structures, ... (↓ are used by [`Json`](Json) fo
 
 Motivated? Explore, PR ↓
 
+  - `Url`/`AppUrl`
+  - `Xml`
   - `Yaml`
       - following [`MaybeJustJames/yaml`](https://github.com/MaybeJustJames/yaml/blob/2.1.1/src/Yaml/Parser.elm)
-  - `Xml`
-  - `Url`
-  - `Bytes`
   - ...
 
 
@@ -147,8 +149,8 @@ type Atom
 
 {-| elm value. Either
 
-  - a atom that don't itself contain values
-  - a composed that can itself contain values
+  - an atom that don't itself contain values
+  - a composed structure that can itself contain recursive values
 
 -}
 type AtomOrComposed atom composed
@@ -159,11 +161,7 @@ type AtomOrComposed atom composed
 {-| Generic representation of any value representable in elm
 
 Use to the [`Morph`](#Morph)s present in most `module`s of this package
-to construct a [`Value`](#Value).
-
-PR if you'd like to see a structure or atom (like `Dict String ...` or `Random.Seed`)
-that can't be converted in constant time
-(turning tuples into records would only take O(1) time for example)
+to convert a [`Value`](#Value).
 
 -}
 type alias Value tag =
@@ -172,7 +170,10 @@ type alias Value tag =
 
 {-| elm structure that can itself contain values
 
-Note: To not have overly complex recursive types,
+Other kinds of structures should be converted to one of these.
+A tuple for example can be represented as a record.
+
+Note: To not have overly complex recursive-ish types,
 a [`Value.Composed`](#Composed) _can_ describe an invalid elm value,
 for example
 
@@ -193,7 +194,7 @@ type alias Tagged tag =
         { tag : tag, value : Value tag }
 
 
-{-| The composed of a record that can hold [any](#Value) field value
+{-| The [structure](#Composed) of a record which can hold multiple [tagged field](#Tagged) [value](#Value)s
 -}
 type alias Record tag =
     Emptiable (Stacked (Tagged tag)) Possibly
@@ -237,7 +238,7 @@ type alias IndexAndName =
 -- alter
 
 
-{-| with readable names
+{-| with readable names. Use in combination with [`eachTag`](#eachTag)
 
   - field tag = name given to the [`part` `Morph`](#part)
   - variant tag = name given to the [`variant` `Morph`](#variant)
@@ -260,7 +261,7 @@ descriptive =
         (\tag -> { name = tag.name })
 
 
-{-| With compact indexes
+{-| With compact indexes. Use in combination with [`eachTag`](#eachTag)
 
   - field tag = [`field` `Morph`](#part) index index in the builder
   - variant tag = [`variant` `Morph`](#variant) index in the builder
