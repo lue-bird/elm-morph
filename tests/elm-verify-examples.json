@@ -5,6 +5,7 @@
     "Char.Morph",
     "String.Morph",
     "N.Morph",
+    "Number",
     "Natural",
     "Integer",
     "Decimal",

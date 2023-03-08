@@ -1,14 +1,20 @@
 module Integer exposing
-    ( Integer(..), Signed
+    ( Integer
+    , absolute, negate
     , int, toInt
     , decimal
     , value
     , rowChar
     )
 
-{-| Arbitrary-precision `Int`
+{-| Arbitrary-precision whole number
 
-@docs Integer, Signed
+@docs Integer
+
+
+## alter
+
+@docs absolute, negate
 
 
 ## [`Morph`](Morph#Morph)
@@ -20,79 +26,96 @@ module Integer exposing
 
 -}
 
-import ArraySized exposing (ArraySized)
-import Bit exposing (Bit)
-import Bits
 import Decimal exposing (Decimal)
-import Linear exposing (Direction(..))
+import Integer.Internal
 import Morph exposing (Morph, MorphRow, Translate)
-import N exposing (Min, N0, n0, n1)
-import N.Local exposing (n32)
 import NaturalAtLeast1
-import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
-import Sign exposing (Sign)
+import Number exposing (Decimal(..), DecimalSigned, DecimalSignedAbsolute(..), Integer(..), IntegerSigned, Natural(..), NaturalAtLeast1)
+import Sign
 import String.Morph
 import Value
 
 
 {-| Arbitrary-precision `Int`, constructable from bits
 -}
-type Integer
-    = N0
-    | Signed Signed
-
-
-{-| Arbitrary-precision signed [`Integer`](#Integer), constructable from bits
--}
-type alias Signed =
-    RecordWithoutConstructorFunction
-        { sign : Sign
-        , absolute : { bitsAfterI : ArraySized Bit (Min N0) }
-        }
+type alias Integer =
+    Number.Integer
 
 
 {-| [`Morph`](Morph#Morph) an [`Integer`](#Integer)
 from a [`Decimal`](Decimal#Decimal)
 without digits after the decimal point
+
+Other possibilities of handling the fraction after the decimal points are
+
+  - [`Decimal.truncate`](Decimal#truncate)
+  - [`Decimal.floor`](Decimal#floor)
+  - [`Decimal.ceiling`](Decimal#ceiling)
+
 -}
 decimal : Morph Integer Decimal
 decimal =
     Morph.variants
         ( \n0 variantSigned decimalChoice ->
             case decimalChoice of
-                Decimal.N0 ->
+                DecimalN0 ->
                     n0 ()
 
-                Decimal.Signed signedValue ->
+                DecimalSigned signedValue ->
                     variantSigned signedValue
         , \variantN0 variantSigned integerChoice ->
             case integerChoice of
-                N0 ->
+                IntegerN0 ->
                     variantN0 ()
 
-                Signed signedValue ->
+                IntegerSigned signedValue ->
                     variantSigned signedValue
         )
         |> Morph.variant
-            ( \() -> N0, \() -> Decimal.N0 )
+            ( \() -> IntegerN0, \() -> DecimalN0 )
             (Morph.broad ())
         |> Morph.variant
-            ( Signed, Decimal.Signed )
+            ( IntegerSigned, DecimalSigned )
             decimalSigned
         |> Morph.variantsFinish
 
 
-decimalSigned : Morph Signed Decimal.Signed
+decimalSigned : Morph IntegerSigned DecimalSigned
 decimalSigned =
-    Debug.todo ""
+    Morph.parts
+        ( \sign absolute_ -> { sign = sign, absolute = absolute_ }
+        , \sign absolute_ -> { sign = sign, absolute = absolute_ }
+        )
+        |> Morph.part ( .sign, .sign ) Morph.keep
+        |> Morph.part ( .absolute, .absolute ) decimalSignedAbsolute
+        |> Morph.partsFinish
+
+
+decimalSignedAbsolute : Morph NaturalAtLeast1 DecimalSignedAbsolute
+decimalSignedAbsolute =
+    Morph.value "whole absolute"
+        { broaden = \whole -> DecimalAtLeast1 { whole = whole, fraction = Nothing }
+        , narrow =
+            \decimalAbsolute ->
+                case decimalAbsolute of
+                    DecimalFraction _ ->
+                        Err "decimal is fraction"
+
+                    DecimalAtLeast1 atLeast1 ->
+                        case atLeast1.fraction of
+                            Nothing ->
+                                Ok atLeast1.whole
+
+                            Just _ ->
+                                Err "decimal has fraction part"
+        }
 
 
 {-| [`Value.Morph`](Value#Morph) from an [`Integer`](#Integer)
 -}
 value : Value.Morph Integer
 value =
-    decimal
-        |> Morph.over Decimal.value
+    decimal |> Morph.over Decimal.value
 
 
 {-| [`Translate`](Morph#Translate) between an `Int` and a [decimal representation](#Integer).
@@ -103,66 +126,7 @@ since `Int` is fixed in bit size while [`Integer`](#Integer) is not.
 -}
 int : Translate Integer Int
 int =
-    Morph.translate internalFromInt internalToInt
-
-
-internalFromInt : Int -> Integer
-internalFromInt =
-    \intBroad ->
-        case
-            intBroad
-                |> abs
-                |> N.intToAtLeast n0
-                |> Bits.fromN
-                |> Bits.unpad
-                |> ArraySized.maxTo n32
-                |> ArraySized.hasAtLeast n1
-        of
-            Ok absoluteAtLeast1 ->
-                Signed
-                    { sign =
-                        if intBroad >= 0 then
-                            Sign.Positive
-
-                        else
-                            Sign.Negative
-                    , absolute =
-                        { bitsAfterI =
-                            absoluteAtLeast1
-                                |> ArraySized.removeMin ( Up, n0 )
-                                |> ArraySized.minToNumber
-                                |> ArraySized.maxToInfinity
-                        }
-                    }
-
-            Err _ ->
-                N0
-
-
-internalToInt : Integer -> Int
-internalToInt =
-    \integerNarrow ->
-        case integerNarrow of
-            N0 ->
-                0
-
-            Signed signedValue ->
-                let
-                    intSign =
-                        case signedValue.sign of
-                            Sign.Negative ->
-                                negate
-
-                            Sign.Positive ->
-                                identity
-                in
-                signedValue.absolute.bitsAfterI
-                    |> ArraySized.minToOn
-                    |> ArraySized.insertMin ( Up, n0 ) Bit.I
-                    |> Bits.takeAtMost n32
-                    |> Bits.toN
-                    |> N.toInt
-                    |> intSign
+    Morph.translate Integer.Internal.fromInt Integer.Internal.toInt
 
 
 {-| [`Translate`](Morph#Translate) between an `Int` and a [decimal representation](#Integer).
@@ -204,20 +168,20 @@ rowChar =
         (Morph.choice
             (\n0Variant signedVariant integerNarrow ->
                 case integerNarrow of
-                    N0 ->
+                    IntegerN0 ->
                         n0Variant ()
 
-                    Signed signedValue ->
+                    IntegerSigned signedValue ->
                         signedVariant signedValue
             )
-            |> Morph.tryRow (\() -> N0) (String.Morph.only "0")
-            |> Morph.tryRow Signed signed
+            |> Morph.tryRow (\() -> IntegerN0) (String.Morph.only "0")
+            |> Morph.tryRow IntegerSigned signedRowChar
             |> Morph.choiceRowFinish
         )
 
 
-signed : MorphRow Signed Char
-signed =
+signedRowChar : MorphRow IntegerSigned Char
+signedRowChar =
     Morph.succeed
         (\signPart absolutePart ->
             { sign = signPart
@@ -226,3 +190,63 @@ signed =
         )
         |> Morph.grab .sign Sign.maybeMinusChar
         |> Morph.grab .absolute NaturalAtLeast1.rowChar
+
+
+{-| Flip its [`Sign`](Sign#Sign)
+-}
+negate : Integer -> Integer
+negate =
+    \integer ->
+        case integer of
+            IntegerN0 ->
+                IntegerN0
+
+            IntegerSigned signed ->
+                IntegerSigned { signed | sign = signed.sign |> Sign.opposite }
+
+
+{-| Remove its [`Sign`](Sign#Sign)
+-}
+absolute : Integer -> Natural
+absolute =
+    \integer ->
+        case integer of
+            IntegerN0 ->
+                NaturalN0
+
+            IntegerSigned signed ->
+                NaturalAtLeast1 signed.absolute
+
+
+
+{-
+   add : Integer -> (Integer -> Integer)
+   add toAdd =
+       \integer ->
+           case ( integer, toAdd ) of
+               ( IntegerN0, result ) ->
+                   result
+
+               ( IntegerSigned integerSigned, IntegerN0 ) ->
+                   IntegerSigned integerSigned
+
+               ( IntegerSigned integerSigned, IntegerSigned toAddSigned ) ->
+                   integerSigned |> signedAdd toAddSigned
+
+
+   signedAdd : IntegerSigned -> (IntegerSigned -> Integer)
+   signedAdd toAdd =
+       \signed ->
+           case ( signed.sign, toAdd.sign ) of
+               ( Positive, Positive ) ->
+                   IntegerSigned { sign = Positive, absolute = signed.absolute |> NaturalAtLeast1.add toAdd.absolute }
+
+               ( Negative, Negative ) ->
+                   IntegerSigned { sign = Negative, absolute = signed.absolute |> NaturalAtLeast1.add toAdd.absolute }
+
+               ( Negative, Positive ) ->
+                   signed.absolute |> NaturalAtLeast1.subtract toAdd.absolute |> negate
+
+               ( Positive, Negative ) ->
+                   signed.absolute |> NaturalAtLeast1.subtract toAdd.absolute
+-}

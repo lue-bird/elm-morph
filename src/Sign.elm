@@ -1,11 +1,11 @@
 module Sign exposing
-    ( Sign(..)
+    ( Sign, opposite
     , char, maybeMinusChar
     )
 
 {-|
 
-@docs Sign
+@docs Sign, opposite
 
 @docs char, maybeMinusChar
 
@@ -14,14 +14,27 @@ module Sign exposing
 import Char.Morph
 import Maybe.Morph
 import Morph exposing (Morph, MorphRow, translate)
+import Number exposing (Sign(..))
 import String.Morph
 
 
 {-| A number's sign
 -}
-type Sign
-    = Negative
-    | Positive
+type alias Sign =
+    Number.Sign
+
+
+{-| Flip the [`Sign`](#Sign) `Negative` ↔ `Positive`
+-}
+opposite : Sign -> Sign
+opposite =
+    \sign ->
+        case sign of
+            Negative ->
+                Positive
+
+            Positive ->
+                Negative
 
 
 {-| [`Sign`](#Sign) `'+'` or `'-'`

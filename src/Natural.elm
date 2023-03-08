@@ -1,5 +1,5 @@
 module Natural exposing
-    ( Natural(..)
+    ( Natural
     , bits, toBits
     , rowChar
     , integer
@@ -27,12 +27,11 @@ Feeling motivated? implement & PR
 import ArraySized exposing (ArraySized)
 import Bit exposing (Bit)
 import Bits
-import Integer exposing (Integer)
 import Linear exposing (Direction(..))
 import Morph exposing (Morph, MorphIndependently, MorphRow)
-import N exposing (In, Min, N0, On, Up0, n0, n1)
+import N exposing (In, Min, On, Up0, n0, n1)
 import NaturalAtLeast1
-import Sign
+import Number exposing (Integer(..), Natural(..), Sign(..))
 import String.Morph
 
 
@@ -59,9 +58,8 @@ but feel free to PR or open an issue if you'd like to see support
 for arbitrary-precision arithmetic like addition, multiplication, ...
 
 -}
-type Natural
-    = N0
-    | AtLeast1 { bitsAfterI : ArraySized Bit (Min N0) }
+type alias Natural =
+    Number.Natural
 
 
 
@@ -77,34 +75,34 @@ integer =
         (Morph.variants
             ( \variantN0 variantSigned integerChoice ->
                 case integerChoice of
-                    Integer.N0 ->
+                    IntegerN0 ->
                         variantN0 ()
 
-                    Integer.Signed signedValue ->
+                    IntegerSigned signedValue ->
                         variantSigned signedValue
             , \variantN0 variantAtLeast1 natural ->
                 case natural of
-                    N0 ->
+                    NaturalN0 ->
                         variantN0 ()
 
-                    AtLeast1 atLeast1Value ->
+                    NaturalAtLeast1 atLeast1Value ->
                         variantAtLeast1 atLeast1Value
             )
-            |> Morph.variant ( \() -> N0, \() -> Integer.N0 )
+            |> Morph.variant ( \() -> NaturalN0, \() -> IntegerN0 )
                 (Morph.broad ())
-            |> Morph.variant ( AtLeast1, Integer.Signed )
+            |> Morph.variant ( NaturalAtLeast1, IntegerSigned )
                 (Morph.value "positive"
                     { narrow =
                         \{ sign, absolute } ->
                             case sign of
-                                Sign.Negative ->
+                                Negative ->
                                     "negative" |> Err
 
-                                Sign.Positive ->
+                                Positive ->
                                     absolute |> Ok
                     , broaden =
                         \atLeast1 ->
-                            { sign = Sign.Positive
+                            { sign = Positive
                             , absolute = atLeast1
                             }
                     }
@@ -145,14 +143,14 @@ rowChar =
         (Morph.choice
             (\n0Variant atLeast1Variant integerNarrow ->
                 case integerNarrow of
-                    N0 ->
+                    NaturalN0 ->
                         n0Variant ()
 
-                    AtLeast1 atLeast1Value ->
+                    NaturalAtLeast1 atLeast1Value ->
                         atLeast1Variant atLeast1Value
             )
-            |> Morph.tryRow (\() -> N0) (String.Morph.only "0")
-            |> Morph.tryRow AtLeast1 NaturalAtLeast1.rowChar
+            |> Morph.tryRow (\() -> NaturalN0) (String.Morph.only "0")
+            |> Morph.tryRow NaturalAtLeast1 NaturalAtLeast1.rowChar
             |> Morph.choiceRowFinish
         )
 
@@ -165,10 +163,10 @@ toBitsImplementation : Natural -> ArraySized Bit (Min (Up0 x_))
 toBitsImplementation =
     \natural ->
         case natural of
-            N0 ->
+            NaturalN0 ->
                 ArraySized.empty |> ArraySized.maxToInfinity
 
-            AtLeast1 atLeast1 ->
+            NaturalAtLeast1 atLeast1 ->
                 atLeast1.bitsAfterI
                     |> ArraySized.inToOn
                     |> ArraySized.minTo n0
@@ -181,10 +179,10 @@ fromBitsImplementation =
     \arraySized ->
         case arraySized |> Bits.unpad |> ArraySized.hasAtLeast n1 of
             Err _ ->
-                N0
+                NaturalN0
 
             Ok unpaddedAtLeast1 ->
-                AtLeast1
+                NaturalAtLeast1
                     { bitsAfterI =
                         unpaddedAtLeast1
                             |> ArraySized.removeMin ( Up, n0 )

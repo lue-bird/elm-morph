@@ -32,17 +32,14 @@ module Json exposing
 
 import Array
 import Decimal exposing (Decimal)
-import Decimal.Internal
 import DecimalOrException
 import Emptiable exposing (Emptiable)
 import Json.Decode
 import Json.Encode
 import Linear exposing (Direction(..))
-import Morph exposing (Morph, MorphIndependently, MorphOrError, translate)
+import Morph exposing (Morph, MorphIndependently, translate)
 import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
-import Sign exposing (Sign)
-import Sign.Internal
 import Stack exposing (Stacked)
 import Value exposing (AtomOrComposed(..))
 
@@ -116,7 +113,7 @@ decodeErrorToMorph =
                     |> Morph.errorToLines
                     |> Stack.fold Up (\line soFar -> soFar ++ "\n" ++ line)
                 , "\n\n"
-                , "`Morph` can't turn this into a more composedd error"
+                , "`Morph` can't turn this into a more structured error"
                 , " because it refers to field errors by their location in the dict/record/object."
                 , "\n"
                 , "When decoding elm-internal json however, the error only preserves names."
@@ -343,92 +340,6 @@ toValue =
                 composed |> composedToValue |> Composed
 
 
-decimalInternal :
-    MorphOrError
-        Decimal
-        Decimal.Internal.Decimal
-        (Morph.ErrorWithDeadEnd deadEnd_)
-decimalInternal =
-    Morph.variants
-        ( \variantN0 variantSigned decimalInternalBeforeNarrow ->
-            case decimalInternalBeforeNarrow of
-                Decimal.Internal.N0 ->
-                    variantN0 ()
-
-                Decimal.Internal.Signed signedValue ->
-                    variantSigned signedValue
-        , \variantN0 variantSigned decimal ->
-            case decimal of
-                Decimal.N0 ->
-                    variantN0 ()
-
-                Decimal.Signed signedValue ->
-                    variantSigned signedValue
-        )
-        |> Morph.variant ( \() -> Decimal.N0, \() -> Decimal.Internal.N0 ) Morph.keep
-        |> Morph.variant ( Decimal.Signed, Decimal.Internal.Signed ) signedInternal
-        |> Morph.variantsFinish
-
-
-signedInternal :
-    MorphOrError
-        Decimal.Signed
-        Decimal.Internal.Signed
-        (Morph.ErrorWithDeadEnd deadEnd_)
-signedInternal =
-    Morph.parts
-        ( \sign absolutePart -> { sign = sign, absolute = absolutePart }
-        , \sign absolutePart -> { sign = sign, absolute = absolutePart }
-        )
-        |> Morph.part ( .sign, .sign ) signInternal
-        |> Morph.part ( .absolute, .absolute ) absoluteInternal
-        |> Morph.partsFinish
-
-
-absoluteInternal : MorphOrError Decimal.Absolute Decimal.Internal.Absolute error_
-absoluteInternal =
-    Morph.variants
-        ( \variantFraction variantAtLeast1 decimal ->
-            case decimal of
-                Decimal.Internal.Fraction fractionValue ->
-                    variantFraction fractionValue
-
-                Decimal.Internal.AtLeast1 atLeast1Value ->
-                    variantAtLeast1 atLeast1Value
-        , \variantFraction variantAtLeast1 decimal ->
-            case decimal of
-                Decimal.Fraction fractionValue ->
-                    variantFraction fractionValue
-
-                Decimal.AtLeast1 atLeast1Value ->
-                    variantAtLeast1 atLeast1Value
-        )
-        |> Morph.variant ( Decimal.Fraction, Decimal.Internal.Fraction ) Morph.keep
-        |> Morph.variant ( Decimal.AtLeast1, Decimal.Internal.AtLeast1 ) Morph.keep
-        |> Morph.variantsFinish
-
-
-signInternal : MorphOrError Sign Sign.Internal.Sign error_
-signInternal =
-    Morph.translate
-        (\signInternalBeforeNarrow ->
-            case signInternalBeforeNarrow of
-                Sign.Internal.Negative ->
-                    Sign.Negative
-
-                Sign.Internal.Positive ->
-                    Sign.Positive
-        )
-        (\signBeforeBroaden ->
-            case signBeforeBroaden of
-                Sign.Negative ->
-                    Sign.Internal.Negative
-
-                Sign.Positive ->
-                    Sign.Internal.Positive
-        )
-
-
 atomToValue : Atom -> Value.Value Value.IndexAndName
 atomToValue =
     \atom ->
@@ -437,7 +348,7 @@ atomToValue =
                 unit |> Value.Unit |> Atom
 
             Number decimal ->
-                decimal |> Morph.broadenFrom decimalInternal |> Value.Number |> Atom
+                decimal |> Value.Number |> Atom
 
             String string_ ->
                 string_ |> Value.String |> Atom
@@ -481,7 +392,7 @@ atomFromValue =
                 stringAtom |> String
 
             Value.Number decimal ->
-                decimal |> Morph.mapTo decimalInternal |> Number
+                decimal |> Number
 
 
 {-| Convert a [representation of an elm value](Value#Value) to a [valid `Json` value](#Json)

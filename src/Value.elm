@@ -128,9 +128,9 @@ Motivated? Explore, PR ↓
 -}
 
 import Array exposing (Array)
-import Decimal.Internal exposing (Decimal)
 import Emptiable exposing (Emptiable)
 import Morph exposing (ChoiceMorphEmptiable, Morph, MorphIndependently, translate)
+import Number exposing (Decimal)
 import Possibly exposing (Possibly)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Stack exposing (Stacked)

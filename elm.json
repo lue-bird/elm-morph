@@ -9,6 +9,7 @@
         "Char.Morph",
         "AToZ",
         "Sign",
+        "Number",
         "Natural",
         "Integer",
         "Decimal",
