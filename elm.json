@@ -7,6 +7,7 @@
     "exposed-modules": [
         "Morph",
         "Char.Morph",
+        "Bit.Morph",
         "AToZ",
         "Sign",
         "Number",
