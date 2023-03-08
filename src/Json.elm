@@ -468,6 +468,8 @@ composedFromValue =
     ...
         |> Morph.over (Json.eachTag Value.descriptive)
 
+Links: [`Value.compact`](Value#compact), [`Value.descriptive`](Value#descriptive)
+
 -}
 eachTag :
     MorphIndependently
