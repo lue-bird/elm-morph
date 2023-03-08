@@ -134,7 +134,7 @@ import N exposing (Min, N2, On)
 import Possibly exposing (Possibly)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Stack exposing (Stacked)
-import Util exposing (restoreTry)
+import Util exposing (recoverTry)
 
 
 
@@ -2494,7 +2494,7 @@ choiceEquivalentTryNarrow traverseTry tries =
                 Up
                 (\elementForMorph resultSoFar ->
                     resultSoFar
-                        |> restoreTry
+                        |> recoverTry
                             (\errorsSoFar ->
                                 beforeNarrow
                                     |> narrowTo (traverseTry elementForMorph)
@@ -2598,7 +2598,7 @@ try possibilityToChoice possibilityMorph =
             \broadValue ->
                 broadValue
                     |> choiceMorphSoFar.narrow
-                    |> restoreTry
+                    |> recoverTry
                         (\soFarTryErrors ->
                             case broadValue |> narrowTo possibilityMorph of
                                 Ok possibilityNarrow ->
@@ -2909,7 +2909,7 @@ tryRow possibilityToChoice possibilityMorph =
             \choiceBroad ->
                 choiceBroad
                     |> choiceMorphSoFar.narrow
-                    |> restoreTry
+                    |> recoverTry
                         (\soFarErrorPossibilities ->
                             case choiceBroad |> narrowTo possibilityMorph of
                                 Ok possibilityParsed ->
