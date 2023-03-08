@@ -27,7 +27,7 @@ import Array
 import ArraySized
 import Emptiable exposing (filled)
 import Linear exposing (Direction(..))
-import Morph exposing (MorphIndependently, MorphRow, broad, broadenFrom, narrowTo, translate)
+import Morph exposing (MorphIndependently, MorphRow, broad, broadenFrom, narrowTo)
 import Possibly exposing (Possibly(..))
 import Stack
 import Value
