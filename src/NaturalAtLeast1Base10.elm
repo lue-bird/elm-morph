@@ -64,21 +64,6 @@ digitToUp ( low, high ) =
         digit1To9 |> N.inToOn |> N.minTo low |> N.maxTo high
 
 
-
--- divideBy2 : NaturalAtLeast1Base10 -> { remainder : }
-
-
-lastDigit : NaturalAtLeast1Base10 -> N (In (Up0 minX_) (Up9 maxX_))
-lastDigit =
-    \naturalAtLeast1Base10 ->
-        case naturalAtLeast1Base10.afterFirst |> Array.Linear.element ( Linear.Down, 0 ) of
-            Nothing ->
-                naturalAtLeast1Base10.first |> digitToUp ( n0, n9 )
-
-            Just lastDigitAfterFirst ->
-                lastDigitAfterFirst |> digitToUp ( n0, n9 )
-
-
 toBase2 : NaturalAtLeast1Base10 -> NaturalAtLeast1
 toBase2 =
     \naturalAtLeast1Base10 ->
