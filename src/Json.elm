@@ -3,8 +3,7 @@ module Json exposing
     , value
     , string, stringBroadWith
     , tagMap, eachTag
-    , JsValueMagic
-    , jsValueMagic, jsValueMagicDecoder
+    , JsValueMagic, jsValueMagic
     )
 
 {-| JSON
@@ -25,8 +24,7 @@ module Json exposing
 
 ## js value magic
 
-@docs JsValueMagic
-@docs jsValueMagic, jsValueMagicDecoder
+@docs JsValueMagic, jsValueMagic
 
 -}
 
