@@ -1,4 +1,4 @@
-module NaturalAtLeast1.Internal exposing (n1, rowChar, toN)
+module NaturalAtLeast1.Internal exposing (chars, n1, toN)
 
 import ArraySized
 import Bit
@@ -28,7 +28,7 @@ toN =
             |> Bits.toN
 
 
-rowChar : MorphRow NaturalAtLeast1 Char
-rowChar =
+chars : MorphRow NaturalAtLeast1 Char
+chars =
     Morph.translate NaturalAtLeast1Base10.toBase2 NaturalAtLeast1Base10.fromBase2
-        |> Morph.overRow NaturalAtLeast1Base10.rowChar
+        |> Morph.overRow NaturalAtLeast1Base10.chars

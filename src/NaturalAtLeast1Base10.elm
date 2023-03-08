@@ -2,7 +2,7 @@ module NaturalAtLeast1Base10 exposing
     ( NaturalAtLeast1Base10
     , fromIntPositive
     , fromBase2, toBase2
-    , rowChar
+    , chars
     )
 
 {-| **Should not be exposed**
@@ -22,7 +22,7 @@ module NaturalAtLeast1Base10 exposing
 
 ## morph
 
-@docs rowChar
+@docs chars
 
 -}
 
@@ -324,8 +324,8 @@ arrayToIntPositive =
             |> Array.foldl (+) 0
 
 
-rowChar : MorphRow NaturalAtLeast1Base10 Char
-rowChar =
+chars : MorphRow NaturalAtLeast1Base10 Char
+chars =
     Morph.to "natural >= 1"
         (Morph.succeed (\first afterFirst -> { first = first, afterFirst = afterFirst })
             |> grab .first

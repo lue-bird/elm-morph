@@ -1,7 +1,7 @@
 module Decimal exposing
     ( Decimal, Fraction
     , ceiling, floor, truncate
-    , rowChar, orException, value
+    , chars, orException, value
     )
 
 {-| safe and explicit floating point number
@@ -17,7 +17,7 @@ without the possibility of [exceptions](DecimalOrException#Exception)
 
 ## [`Morph`](Morph#Morph)
 
-@docs rowChar, orException, value
+@docs chars, orException, value
 
 -}
 
@@ -122,15 +122,15 @@ orException =
 
 To allow integers to parse as decimals as well,
 build a [`Morph.choice`](Morph#choice)
-[`Decimal.rowChar`](#rowChar)
-and [`Integer.rowChar`](Integer#rowChar)
+[`Decimal.chars`](#chars)
+and [`Integer.chars`](Integer#chars)
 
 For different parsing behavior, spin your own
-using [`Decimal.rowChar`](#rowChar) implementation as a reference
+using [`Decimal.chars`](#chars) implementation as a reference
 
 -}
-rowChar : MorphRow Decimal Char
-rowChar =
+chars : MorphRow Decimal Char
+chars =
     Morph.to "decimal"
         (Morph.choice
             (\signedVariant n0Variant numberNarrow ->
@@ -141,7 +141,7 @@ rowChar =
                     DecimalSigned signedValue ->
                         signedVariant signedValue
             )
-            |> Morph.tryRow DecimalSigned signedRowChar
+            |> Morph.tryRow DecimalSigned signedChars
             |> Morph.tryRow (\() -> DecimalN0) (String.Morph.only "0.")
             |> Morph.choiceRowFinish
             |> skip
@@ -155,8 +155,8 @@ rowChar =
         )
 
 
-signedRowChar : MorphRow DecimalSigned Char
-signedRowChar =
+signedChars : MorphRow DecimalSigned Char
+signedChars =
     Morph.to "signed"
         (Morph.succeed
             (\signPart absolutePart ->
@@ -165,12 +165,12 @@ signedRowChar =
                 }
             )
             |> grab .sign Sign.maybeMinusChar
-            |> grab .absolute signedAbsoluteRowChar
+            |> grab .absolute signedAbsoluteChars
         )
 
 
-signedAbsoluteRowChar : MorphRow DecimalSignedAbsolute Char
-signedAbsoluteRowChar =
+signedAbsoluteChars : MorphRow DecimalSignedAbsolute Char
+signedAbsoluteChars =
     Morph.to "absolute"
         (Morph.choice
             (\fractionVariant atLeast1Variant absoluteUnion ->
@@ -189,7 +189,7 @@ signedAbsoluteRowChar =
                                 (Maybe.Morph.row (String.Morph.only "0"))
                         )
                     |> skip (String.Morph.only ".")
-                    |> grab (\fraction_ -> fraction_) fractionRowChar
+                    |> grab (\fraction_ -> fraction_) fractionChars
                 )
             |> Morph.tryRow DecimalAtLeast1
                 (Morph.succeed
@@ -198,16 +198,16 @@ signedAbsoluteRowChar =
                         , fraction = fractionPart
                         }
                     )
-                    |> grab .whole NaturalAtLeast1.Internal.rowChar
+                    |> grab .whole NaturalAtLeast1.Internal.chars
                     |> skip (String.Morph.only ".")
-                    |> grab .fraction (Maybe.Morph.row fractionRowChar)
+                    |> grab .fraction (Maybe.Morph.row fractionChars)
                 )
             |> Morph.choiceRowFinish
         )
 
 
-fractionRowChar : MorphRow Fraction Char
-fractionRowChar =
+fractionChars : MorphRow Fraction Char
+fractionChars =
     Morph.to "fraction"
         (Morph.succeed
             (\beforeLast last ->

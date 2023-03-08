@@ -4,7 +4,7 @@ module Integer exposing
     , int, toInt
     , decimal
     , value
-    , rowChar
+    , chars
     )
 
 {-| Arbitrary-precision whole number
@@ -22,7 +22,7 @@ module Integer exposing
 @docs int, toInt
 @docs decimal
 @docs value
-@docs rowChar
+@docs chars
 
 -}
 
@@ -162,8 +162,8 @@ toInt =
     --> Err "1:1: I was expecting an integer value. I got stuck when I got the character 'a'."
 
 -}
-rowChar : MorphRow Integer Char
-rowChar =
+chars : MorphRow Integer Char
+chars =
     Morph.to "integer"
         (Morph.choice
             (\n0Variant signedVariant integerNarrow ->
@@ -175,13 +175,13 @@ rowChar =
                         signedVariant signedValue
             )
             |> Morph.tryRow (\() -> IntegerN0) (String.Morph.only "0")
-            |> Morph.tryRow IntegerSigned signedRowChar
+            |> Morph.tryRow IntegerSigned signedChars
             |> Morph.choiceRowFinish
         )
 
 
-signedRowChar : MorphRow IntegerSigned Char
-signedRowChar =
+signedChars : MorphRow IntegerSigned Char
+signedChars =
     Morph.succeed
         (\signPart absolutePart ->
             { sign = signPart
@@ -189,7 +189,7 @@ signedRowChar =
             }
         )
         |> Morph.grab .sign Sign.maybeMinusChar
-        |> Morph.grab .absolute NaturalAtLeast1.rowChar
+        |> Morph.grab .absolute NaturalAtLeast1.chars
 
 
 {-| Flip its [`Sign`](Sign#Sign)

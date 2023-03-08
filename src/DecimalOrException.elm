@@ -95,7 +95,7 @@ since `Float` is fixed in bit size while [`OrException Decimal`](#OrException) i
 
     -9999.124
         |> broaden
-            (Decimal.rowChar
+            (Decimal.chars
                 |> Morph.overRow Decimal.orException
                 |> Morph.overRow DecimalOrException.toFloat
                 |> Morph.rowFinish
@@ -309,7 +309,7 @@ since `Float` is fixed in bit size while [`OrException Decimal`](#OrException) i
 
     -9999.124
         |> broaden
-            (Decimal.rowChar
+            (Decimal.chars
                 |> Morph.overRow Decimal.orException
                 |> Morph.overRow DecimalOrException.toFloat
                 |> Morph.rowFinish

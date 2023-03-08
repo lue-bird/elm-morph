@@ -983,13 +983,13 @@ when each broad, narrow [`part`](#part) always has their respective counterpart
                 )
                 |> Group.part ( .x, Tuple.first )
                     (Integer.Morph.toInt
-                        |> Morph.overRow Integer.Morph.rowChar
+                        |> Morph.overRow Integer.Morph.chars
                         |> Morph.rowFinish
                     )
                 |> Group.part ( .y, Tuple.second )
                     (Integer.Morph.toInt
                         |> Morph.over (Integer.Morph.bitSizeAtMost n32)
-                        |> Morph.overRow Integer.Morph.rowChar
+                        |> Morph.overRow Integer.Morph.chars
                         |> Morph.rowFinish
                     )
                 |> Group.finish
@@ -2170,7 +2170,7 @@ transforming it into a [`Morph`](#Morph) on the full stack of input elements.
 
     fromString =
         narrowTo
-            (Point.morphRowChar
+            (Point.morphChars
                 |> Morph.rowFinish
                 |> Morph.over Stack.Morph.toString
             )

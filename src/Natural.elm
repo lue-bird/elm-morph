@@ -1,7 +1,7 @@
 module Natural exposing
     ( Natural
     , bits, toBits
-    , rowChar
+    , chars
     , integer
     )
 
@@ -14,7 +14,7 @@ module Natural exposing
 
 @docs bits, toBits
 
-@docs rowChar
+@docs chars
 
 @docs integer
 
@@ -137,8 +137,8 @@ integer =
     --> Err "1:1: I was expecting an integer value. I got stuck when I got the character 'a'."
 
 -}
-rowChar : MorphRow Natural Char
-rowChar =
+chars : MorphRow Natural Char
+chars =
     Morph.to "integer"
         (Morph.choice
             (\n0Variant atLeast1Variant integerNarrow ->
@@ -150,7 +150,7 @@ rowChar =
                         atLeast1Variant atLeast1Value
             )
             |> Morph.tryRow (\() -> NaturalN0) (String.Morph.only "0")
-            |> Morph.tryRow NaturalAtLeast1 NaturalAtLeast1.rowChar
+            |> Morph.tryRow NaturalAtLeast1 NaturalAtLeast1.chars
             |> Morph.choiceRowFinish
         )
 

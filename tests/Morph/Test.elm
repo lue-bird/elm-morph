@@ -83,7 +83,7 @@ point =
             (broad (ArraySized.one () |> ArraySized.minTo n0)
                 |> Morph.overRow (atLeast (String.Morph.only " ") n0)
             )
-        |> grab .x Decimal.rowChar
+        |> grab .x Decimal.chars
         |> skip
             (broad ArraySized.empty
                 |> Morph.overRow (atLeast (String.Morph.only " ") n0)
@@ -93,7 +93,7 @@ point =
             (broad (ArraySized.one () |> ArraySized.minTo n0)
                 |> Morph.overRow (atLeast (String.Morph.only " ") n0)
             )
-        |> grab .y Decimal.rowChar
+        |> grab .y Decimal.chars
         |> skip
             (broad (ArraySized.one () |> ArraySized.minTo n0)
                 |> Morph.overRow (atLeast (String.Morph.only " ") n0)

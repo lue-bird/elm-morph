@@ -2,7 +2,7 @@ module NaturalAtLeast1 exposing
     ( NaturalAtLeast1
     , n1
     , add
-    , rowChar
+    , chars
     )
 
 {-|
@@ -19,7 +19,7 @@ module NaturalAtLeast1 exposing
 
 ## morph
 
-@docs rowChar
+@docs chars
 
 -}
 
@@ -144,6 +144,6 @@ toBits =
             |> ArraySized.insertMin ( Up, n0 ) Bit.I
 
 
-rowChar : MorphRow NaturalAtLeast1 Char
-rowChar =
-    NaturalAtLeast1.Internal.rowChar
+chars : MorphRow NaturalAtLeast1 Char
+chars =
+    NaturalAtLeast1.Internal.chars
