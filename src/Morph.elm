@@ -659,7 +659,7 @@ Examples:
         translate .before
             (\before_ -> { before = before_, end = () })
 
-Only use [`Translate`](#Translate) to annotate consumed inputs, for results,
+Only use [`Translate`](#Translate) to annotate arguments, for results,
 
     MorphOrError (List Char) String error_
 
