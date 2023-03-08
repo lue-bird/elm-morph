@@ -57,7 +57,7 @@ char =
         )
 
 
-{-| Am optional `'-'` sign → [`Negative`](#Sign),
+{-| An optional `'-'` sign → [`Negative`](#Sign),
 else [narrows to](Morph#narrowTo) [`Positive`](#Sign)
 -}
 maybeMinusChar : MorphRow Sign Char
