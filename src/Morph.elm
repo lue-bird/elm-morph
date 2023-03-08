@@ -204,7 +204,7 @@ for example `Morph Email String`, can
 
 Errors with more narrow structural information are mostly useful for recovery based on what went wrong.
 
-You _can_ use [`MorphOrError`](#MorphOrError) in these cases (TODO recovering).
+You _can_ use [`MorphOrError`](#MorphOrError) in these cases.
 
 Without needing to recover, benefits of having narrow error types for every interaction
 aren't worth
