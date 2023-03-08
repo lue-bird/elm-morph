@@ -18,7 +18,6 @@ module Morph exposing
     , PartsMorphEmptiable
     , parts, part, partsFinish
     , choiceEquivalent
-    , choiceEquivalentRow
     , VariantsMorphEmptiable, variants, variant, variantsFinish
     , choice
     , ChoiceMorphEmptiable, try, choiceFinish
@@ -81,10 +80,9 @@ We call it
 
 ## choice [`Morph`](Morph#Morph)
 
-[`Morph`](#Morph) a tagged union `type`
+[`Morph`](#Morph) a union `type`
 
 @docs choiceEquivalent
-@docs choiceEquivalentRow
 
 
 ### morph by variant
@@ -2351,78 +2349,45 @@ choice choiceBroadenDiscriminatedByPossibility =
 
 
 {-| Offer alternative [`Morph`](Morph#Morph) possibilities to a given preferred one.
-Functionally, it's the same as [`choiceEquivalent`](#choiceEquivalent) with an optimization
+
+Usually, you'll be better off with a [`Morph.choice`](#choice)
+an explicit custom tagged union
+because you'll have the option to preserve what was [narrowed](Morph#narrowTo).
+(Remember: you can always discard that info and set a preferred option with [`Morph.broad`](Morph#broad))
+
+Use [`choiceEquivalent`](#choiceEquivalent) if you have a dynamic list of aliases/morphs to treat equally.
+An example is defined variable names
+
+    Morph.choiceEquivalent Char.Morph.only
+        { broad = '∨'
+        , alternatives = [ '|' ]
+        }
+
+    Morph.choiceEquivalent String.Morph.only
+        { broad = "∨"
+        , alternatives = [ "|", "or" ]
+        }
+
+    Morph.choiceEquivalent String.Morph.only
+        { broad = "±"
+        , alternatives = [ "pm", "plusminus" ]
+        }
+
+Performance note: This could be optimized
 as shown in ["Fast parsing of String Sets in Elm" by Marcelo Lazaroni](https://lazamar.github.io/fast-parsing-of-string-sets-in-elm/)
 published as [`dict-parser`](https://dark.elm.dmy.fr/packages/lazamar/dict-parser/latest/Parser-Dict)
 
-Usually, you'll be better off with a [`Morph.choice`](#choice)
-an explicit custom tagged union
-because you'll have the option to preserve what was [narrowed](Morph#narrowTo).
-(Remember: you can always discard that info and set a preferred option with [`Morph.broad`](Morph#broad))
+Currently, such an optimized version isn't provided because
+There is no existing Trie implementation
+that can use non-`comparable` constrained elements
+which means we would have to write a complete trie implementation from scratch including the Dict part
+(`dict-parser` bases it's trie on `Dict`).
 
-Go [`choiceEquivalent`](#choiceEquivalent) if you have a dynamic list of aliases/morphs to treat equally.
-An example is defined variable names
-
-    import Order
-
-    Choice.equivalentRow String.Morph.only
-        { broad = "∨"
-        , alternatives = [ "|", "or" ]
-        , order = Order.string (Char.Order.alphabetically Char.Order.lowerUpper)
-        }
-
-    Choice.equivalentRow String.Morph.only
-        { broad = "±"
-        , alternatives = [ "pm", "plusminus" ]
-        , order = Order.string (Char.Order.alphabetically Char.Order.lowerUpper)
-        }
-
-TODO: optimize
-
--}
-choiceEquivalentRow :
-    (broadElement
-     ->
-        MorphIndependently
-            (beforeNarrow
-             -> Result (ErrorWithDeadEnd deadEnd) narrow
-            )
-            broaden
-    )
-    ->
-        { broad : Emptiable (Stacked broadElement) broadPossibilityEmptyPossiblyOrNever_
-        , alternatives :
-            List
-                (Emptiable (Stacked broadElement) alternativePossibilityEmptyPossiblyOrNever_)
-        , order : broadElement -> broadElement -> Order
-        }
-    ->
-        MorphIndependently
-            (beforeNarrow
-             -> Result (ErrorWithDeadEnd deadEnd) narrow
-            )
-            broaden
-choiceEquivalentRow possibilityMorph possibilitiesOrdered =
-    Debug.todo ""
-
-
-{-| Offer alternative [`Morph`](Morph#Morph) possibilities to a given preferred one.
-
-Usually, you'll be better off with a [`Morph.choice`](#choice)
-an explicit custom tagged union
-because you'll have the option to preserve what was [narrowed](Morph#narrowTo).
-(Remember: you can always discard that info and set a preferred option with [`Morph.broad`](Morph#broad))
-
-Go [`choiceEquivalent`](#choiceEquivalent) if you have a dynamic list of aliases/morphs to treat equally.
-An example is defined variable names
-
-    Morph.choiceEquivalent Char.Morph.only { broad = '∨', alternatives = [ '|' ] }
-
-Use [`choiceEquivalentRow`](#choiceEquivalentRow) for strings etc.
+Happy to merge your contributions!
 
 -}
 choiceEquivalent :
-    (element
+    (broadPossibility
      ->
         MorphIndependently
             (beforeNarrow
@@ -2431,8 +2396,8 @@ choiceEquivalent :
             broaden
     )
     ->
-        { broad : element
-        , alternatives : List element
+        { broad : broadPossibility
+        , alternatives : List broadPossibility
         }
     ->
         MorphIndependently
