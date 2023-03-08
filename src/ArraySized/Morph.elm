@@ -1,5 +1,6 @@
 module ArraySized.Morph exposing
     ( inNumber, inOn
+    , array, toArray
     , list, toList
     , stack, toStack
     , eachElement
@@ -17,6 +18,7 @@ module ArraySized.Morph exposing
 
 ## structure
 
+@docs array, toArray
 @docs list, toList
 @docs stack, toStack
 
@@ -37,6 +39,7 @@ module ArraySized.Morph exposing
 
 -}
 
+import Array exposing (Array)
 import ArraySized exposing (ArraySized)
 import Emptiable exposing (Emptiable)
 import Linear exposing (Direction(..))
@@ -82,14 +85,62 @@ inNumber =
     translate ArraySized.inToOn ArraySized.inToNumber
 
 
-{-| [`Translate`](Morph#Translate) from `List` to `ArraySized`
+{-| [`Translate`](Morph#Translate) from `Array` to `ArraySized`
+
+    import N exposing (n0)
+    import ArraySized
+    import Array
+
+    Array.fromList [ 0, 1, 2, 3 ]
+        |> Morph.mapTo ArraySized.Morph.fromArray
+    --: ArraySized (Min (Up x To x)) number_
+
+-}
+array :
+    MorphIndependently
+        (Array narrowElement
+         ->
+            Result
+                error_
+                (ArraySized narrowElement (Min (Up0 narrowX_)))
+        )
+        (ArraySized broadElement broadRange_
+         -> Array broadElement
+        )
+array =
+    translate ArraySized.fromArray ArraySized.toArray
+
+
+{-| [`Translate`](Morph#Translate) from `ArraySized` to `Array`
 
     import N exposing (n0)
     import ArraySized
 
+    ArraySized.l4 0 1 2 3
+        |> ArraySized.minTo n0
+        |> Morph.map ArraySized.Morph.toArray
+    --> Array.fromList [ 0, 1, 2, 3 ]
+
+-}
+toArray :
+    MorphIndependently
+        (ArraySized narrowElement narrowRange_
+         -> Result error_ (Array narrowElement)
+        )
+        (Array broadElement
+         -> ArraySized broadElement (Min (Up0 broadX_))
+        )
+toArray =
+    Morph.invert array
+
+
+{-| [`Translate`](Morph#Translate) from `List` to `ArraySized`
+
+    import ArraySized
+
     [ 0, 1, 2, 3 ]
         |> Morph.mapTo ArraySized.Morph.fromList
-    --: ArraySized (Min (Up x To x)) number_
+    --: ArraySized (Min (Up0 x)) number_
 
 -}
 list :
@@ -109,11 +160,9 @@ list =
 
 {-| [`Translate`](Morph#Translate) from `ArraySized` to `List`
 
-    import N exposing (n0)
     import ArraySized
 
     ArraySized.l4 0 1 2 3
-        |> ArraySized.minLower n0
         |> Morph.map ArraySized.Morph.toList
     --> [ 0, 1, 2, 3 ]
 
@@ -127,12 +176,11 @@ toList :
          -> ArraySized broadElement (Min (Up0 broadX_))
         )
 toList =
-    translate ArraySized.toList ArraySized.fromList
+    Morph.invert list
 
 
 {-| [`Translate`](Morph#Translate) from `Emptiable (Stacked ...) ...` to `ArraySized`
 
-    import N exposing (n0)
     import ArraySized
 
     Stack.topBelow 0 [ 1, 2, 3, 4 ]
@@ -157,11 +205,9 @@ stack =
 
 {-| [`Translate`](Morph#Translate) from `ArraySized` to `Emptiable (Stacked ...) ...`
 
-    import N exposing (n0)
     import ArraySized
 
     ArraySized.l4 0 1 2 3
-        |> ArraySized.minLower n0
         |> Morph.map ArraySized.Morph.toStack
     --> Stack.topBelow 0 [ 1, 2, 3 ]
 
