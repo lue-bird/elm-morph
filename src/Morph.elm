@@ -248,9 +248,6 @@ where
 
 This general form is helpful to describe a step in building an incomplete [`Morph`](#Morph).
 
-TODO: dream:
-Choice by group/Morph.choice/... associating errors and description
-
 -}
 type alias MorphIndependently narrow broaden =
     RecordWithoutConstructorFunction
