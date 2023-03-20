@@ -754,7 +754,7 @@ partsFinish =
                         (\error ->
                             case error of
                                 TagsMissing missingTags ->
-                                    "I'm missing the following parts: "
+                                    "missing parts: "
                                         ++ (missingTags |> Stack.toList |> List.map String.fromInt |> String.join ", ")
                                         |> DeadEnd
 
