@@ -77,11 +77,7 @@ On the narrowing side all [narrowed](Morph#narrowTo) values must be `Ok`
 for it to not result in a [`Morph.Error`](Morph#Error)
 
 If the given element [`Morph`](Morph#Morph) is a [`Translate`](Morph#Translate),
-`eachElement` will be equivalent to
-
-    Morph.translateOn ( Set.map, Set.map )
-
-which always succeeds with the type knowing it does
+`eachElement` will always succeeds with the type knowing it does
 
 -}
 eachElement :
