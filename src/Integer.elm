@@ -71,10 +71,10 @@ decimal =
                 IntegerSigned signedValue ->
                     variantSigned signedValue
         )
-        |> Morph.variant
+        |> Morph.variant "0"
             ( \() -> IntegerN0, \() -> DecimalN0 )
             (Morph.broad ())
-        |> Morph.variant
+        |> Morph.variant "signed"
             ( IntegerSigned, DecimalSigned )
             decimalSigned
         |> Morph.variantsFinish
@@ -86,8 +86,8 @@ decimalSigned =
         ( \sign absolute_ -> { sign = sign, absolute = absolute_ }
         , \sign absolute_ -> { sign = sign, absolute = absolute_ }
         )
-        |> Morph.part ( .sign, .sign ) Morph.keep
-        |> Morph.part ( .absolute, .absolute ) decimalSignedAbsolute
+        |> Morph.part "sign" ( .sign, .sign ) Morph.keep
+        |> Morph.part "absolute" ( .absolute, .absolute ) decimalSignedAbsolute
         |> Morph.partsFinish
 
 

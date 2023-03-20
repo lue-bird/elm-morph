@@ -1,7 +1,7 @@
 module Morph exposing
     ( Morph, Translate, MorphOrError, MorphIndependently
     , Description, DescriptionInner(..)
-    , Error, ErrorWithDeadEnd(..), PartsError
+    , Error, ErrorWithDeadEnd(..), GroupError
     , broaden
     , value, only, validate
     , translate, broad, toggle, keep, translateOn
@@ -21,7 +21,7 @@ module Morph exposing
     , VariantsMorphEmptiable, variants, variant, variantsFinish
     , choice
     , ChoiceMorphEmptiable, try, choiceFinish
-    , ChoiceMorphRowEmpty, tryRow, choiceRowFinish
+    , ChoiceMorphRowEmptiable, tryRow, choiceRowFinish
     , MorphRow, MorphRowIndependently, rowFinish
     , before
     )
@@ -31,7 +31,7 @@ We call it
 
 @docs Morph, Translate, MorphOrError, MorphIndependently
 @docs Description, DescriptionInner
-@docs Error, ErrorWithDeadEnd, PartsError
+@docs Error, ErrorWithDeadEnd, GroupError
 
 
 ## create
@@ -94,7 +94,7 @@ We call it
 
 ## choice [`MorphRow`](#MorphRow)
 
-@docs ChoiceMorphRowEmpty, tryRow, choiceRowFinish
+@docs ChoiceMorphRowEmptiable, tryRow, choiceRowFinish
 
 
 ## row
@@ -127,6 +127,7 @@ Up for a challenge? implement & PR
 
 import ArraySized exposing (ArraySized)
 import Emptiable exposing (Emptiable, filled)
+import Json.Decode exposing (Error)
 import Linear exposing (Direction(..))
 import N exposing (Min, N2, On)
 import Possibly exposing (Possibly)
@@ -291,14 +292,16 @@ type alias Description =
 
 -}
 type DescriptionInner
-    = Translate
-    | Over { narrow : Description, broad : Description }
-    | Group (ArraySized Description (Min (On N2)))
-    | Choice (ArraySized Description (Min (On N2)))
-    | Elements Description
+    = TranslateDescription
+    | OverDescription { narrow : Description, broad : Description }
+    | GroupDescription (ArraySized Description (Min (On N2)))
+    | PartsDescription (Emptiable (Stacked { tag : String, value : Description }) Never)
+    | ChoiceDescription (ArraySized Description (Min (On N2)))
+    | VariantsDescription (Emptiable (Stacked { tag : String, value : Description }) Never)
+    | ElementsDescription Description
       -- row
-    | While Description
-    | Until { end : Description, element : Description }
+    | WhileDescription Description
+    | UntilDescription { end : Description, element : Description }
 
 
 {-| Where [narrowing](#narrowTo) has failed.
@@ -326,7 +329,7 @@ on [`Morph`](#Morph) that are returned.
 Have trouble doing so because some API is too strict on errors? → issue
 
 
-### Why use text instead of a more narrow type for dead ends?
+### Why use text instead of a more structured type for dead ends?
 
 Different cases shouldn't invoke different responses.
 Types give the benefit that all error conditions are explicit and transparent and that users are only able to produce those kinds of errors.
@@ -336,10 +339,10 @@ Then again: They don't have to be.
 -}
 type ErrorWithDeadEnd deadEnd
     = DeadEnd deadEnd
-    | Row { startDown : Int, error : ErrorWithDeadEnd deadEnd }
-      -- TODO | Variant { index : Int, error : ErrorWithDeadEnd deadEnd }
-    | Parts (PartsError (ErrorWithDeadEnd deadEnd))
-    | Tries
+    | RowError { startDown : Int, error : ErrorWithDeadEnd deadEnd }
+    | VariantError { index : Int, error : ErrorWithDeadEnd deadEnd }
+    | GroupError (GroupError (ErrorWithDeadEnd deadEnd))
+    | ChoiceError
         (Emptiable
             (Stacked (ErrorWithDeadEnd deadEnd))
             Never
@@ -348,7 +351,7 @@ type ErrorWithDeadEnd deadEnd
 
 {-| A group's part [`Error`](#Error)s, each with their part index
 -}
-type alias PartsError partError =
+type alias GroupError partError =
     Emptiable
         (Stacked { index : Int, error : partError })
         Never
@@ -382,7 +385,7 @@ errorToLines =
             DeadEnd unexpectedDescription ->
                 Stack.one unexpectedDescription
 
-            Row row ->
+            RowError row ->
                 Stack.onTopLay
                     ([ row.startDown |> String.fromInt
                      , " elements from the last"
@@ -391,7 +394,7 @@ errorToLines =
                     )
                     (Stack.onTopLay "" (row.error |> errorToLines))
 
-            Parts parts_ ->
+            GroupError parts_ ->
                 Stack.onTopLay
                     "in the parts"
                     (parts_
@@ -408,20 +411,36 @@ errorToLines =
                         |> Stack.flatten
                     )
 
-            Tries possibilities ->
+            ChoiceError possibilities ->
                 Stack.onTopLay
                     "i tried"
                     (possibilities
                         |> Emptiable.emptyAdapt never
                         |> Stack.map
                             (\_ possibility ->
-                                Stack.onTopLay
-                                    "possibility:"
-                                    (possibility |> errorToLines)
+                                Stack.onTopLay ""
+                                    (Stack.topAlter (\firstLine -> "possibility: " ++ firstLine)
+                                        (possibility |> errorToLinesRecursive)
+                                    )
                                     |> markdownElement
                             )
                         |> Stack.flatten
                     )
+
+            VariantError variantError ->
+                let
+                    attachmentError : Emptiable (Stacked String) attachmentNever_
+                    attachmentError =
+                        errorToLinesRecursive variantError.error
+                in
+                Stack.onTopLay
+                    ("on the variant " ++ (variantError.index |> String.fromInt) ++ ", " ++ (attachmentError |> Stack.top))
+                    (attachmentError |> Stack.removeTop)
+
+
+errorToLinesRecursive : Error -> Emptiable (Stacked String) never_
+errorToLinesRecursive =
+    errorToLines
 
 
 markdownElement :
@@ -959,7 +978,7 @@ type alias PartsMorphEmptiable noPartPossiblyOrNever narrow broaden =
     RecordWithoutConstructorFunction
         { description :
             -- parts
-            Emptiable (Stacked Description) noPartPossiblyOrNever
+            Emptiable (Stacked { tag : String, value : Description }) noPartPossiblyOrNever
         , narrow : narrow
         , broaden : broaden
         }
@@ -1012,22 +1031,24 @@ parts ( narrowAssemble, broadAssemble ) =
 
 {-| The [`Morph`](#Morph) of the next part in a [`group`](#group).
 
-    Group.build
+    Morph.parts
         ( \nameFirst nameLast email ->
             { nameFirst = nameFirst, nameLast = nameLast, email = email }
         , \nameFirst nameLast email ->
             { nameFirst = nameFirst, nameLast = nameLast, email = email }
         )
-        |> Group.part ( .nameFirst, .nameFirst ) remain
-        |> Group.part ( .nameLast, .nameLast ) remain
-        |> Group.part ( .email, .email ) emailMorph
-        |> Group.finish
+        |> Morph.part "name first" ( .nameFirst, .nameFirst ) Morph.keep
+        |> Morph.part "name last" ( .nameLast, .nameLast ) Morph.keep
+        |> Morph.part "email" ( .email, .email ) emailMorph
+        |> Morph.finishParts
 
 -}
 part :
-    ( groupNarrow -> partNarrow
-    , groupBroad -> partBroad
-    )
+    String
+    ->
+        ( groupNarrow -> partNarrow
+        , groupBroad -> partBroad
+        )
     -> MorphOrError partNarrow partBroad partError
     ->
         (PartsMorphEmptiable
@@ -1035,7 +1056,7 @@ part :
             (groupBroad
              ->
                 Result
-                    (PartsError partError)
+                    { index : Int, error : partError }
                     (partNarrow -> groupNarrowFurther)
             )
             (groupNarrow -> (partBroad -> groupBroadenFurther))
@@ -1045,16 +1066,16 @@ part :
                 (groupBroad
                  ->
                     Result
-                        (PartsError partError)
+                        { index : Int, error : partError }
                         groupNarrowFurther
                 )
                 (groupNarrow -> groupBroadenFurther)
         )
-part ( narrowPartAccess, broadPartAccess ) partMorph =
+part partTagName ( narrowPartAccess, broadPartAccess ) partMorph =
     \groupMorphSoFar ->
         { description =
             groupMorphSoFar.description
-                |> Stack.onTopLay partMorph.description
+                |> Stack.onTopLay { tag = partTagName, value = partMorph.description }
         , narrow =
             groupMorphSoFar.narrow
                 |> narrowPart
@@ -1092,43 +1113,36 @@ narrowPart :
         ((groupBroad
           ->
             Result
-                (PartsError partError)
+                { index : Int, error : partError }
                 (partNarrow -> groupNarrowFurther)
          )
          ->
             (groupBroad
              ->
                 Result
-                    (PartsError partError)
+                    { index : Int, error : partError }
                     groupNarrowFurther
             )
         )
 narrowPart index broadPartAccess narrowPartMorph =
     \groupMorphSoFarNarrow ->
         \groupBroad ->
-            let
-                narrowPartOrError : Result partError partNarrow
-                narrowPartOrError =
-                    groupBroad
-                        |> broadPartAccess
-                        |> narrowPartMorph
-            in
-            case ( groupBroad |> groupMorphSoFarNarrow, narrowPartOrError ) of
-                ( Ok groupMorphSoFarEat, Ok partNarrow ) ->
-                    groupMorphSoFarEat partNarrow |> Ok
+            case groupBroad |> groupMorphSoFarNarrow of
+                Err partsSoFarError ->
+                    partsSoFarError |> Err
 
-                ( Ok _, Err partError ) ->
-                    { index = index, error = partError }
-                        |> Stack.one
-                        |> Err
+                Ok groupMorphSoFarEat ->
+                    case
+                        groupBroad
+                            |> broadPartAccess
+                            |> narrowPartMorph
+                    of
+                        Ok partNarrow ->
+                            groupMorphSoFarEat partNarrow |> Ok
 
-                ( Err partsSoFarErrors, Ok _ ) ->
-                    partsSoFarErrors |> Err
-
-                ( Err partsSoFarErrors, Err partError ) ->
-                    partsSoFarErrors
-                        |> Stack.onTopLay { index = index, error = partError }
-                        |> Err
+                        Err partError ->
+                            { index = index, error = partError }
+                                |> Err
 
 
 {-| Conclude a [`Group.build`](#group) |> [`Group.part`](#part) chain
@@ -1139,7 +1153,7 @@ partsFinish :
         (beforeNarrow
          ->
             Result
-                (PartsError (ErrorWithDeadEnd deadEnd))
+                { index : Int, error : ErrorWithDeadEnd deadEnd }
                 narrowed
         )
         (beforeBroaden -> broadened)
@@ -1152,24 +1166,14 @@ partsFinish :
 partsFinish =
     \groupMorphInProgress ->
         { description =
-            case groupMorphInProgress.description |> Emptiable.fill of
-                Stack.TopBelow ( part0, part1 :: parts2Up ) ->
-                    { inner =
-                        ArraySized.l2 part0 part1
-                            |> ArraySized.attachMin Up
-                                (parts2Up |> ArraySized.fromList)
-                            |> Group
-                            |> Emptiable.filled
-                    , custom = Emptiable.empty
-                    }
-
-                Stack.TopBelow ( partOnly, [] ) ->
-                    partOnly
+            { custom = Emptiable.empty
+            , inner = groupMorphInProgress.description |> PartsDescription |> Emptiable.filled
+            }
         , narrow =
             \broad_ ->
                 broad_
                     |> groupMorphInProgress.narrow
-                    |> Result.mapError Parts
+                    |> Result.mapError (\error -> error |> Stack.one |> GroupError)
         , broaden = groupMorphInProgress.broaden
         }
 
@@ -1206,7 +1210,7 @@ over morphNarrowBroad =
         { description =
             { custom = Emptiable.empty
             , inner =
-                Over
+                OverDescription
                     { narrow = morph |> description
                     , broad = morphNarrowBroad |> description
                     }
@@ -1303,13 +1307,13 @@ deadEndMap deadEndChange =
             DeadEnd deadEnd ->
                 deadEnd |> deadEndChange |> DeadEnd
 
-            Row row ->
+            RowError row ->
                 { startDown = row.startDown
                 , error = row.error |> deadEndMap deadEndChange
                 }
-                    |> Row
+                    |> RowError
 
-            Parts parts_ ->
+            GroupError parts_ ->
                 parts_
                     |> Stack.map
                         (\_ partError ->
@@ -1317,13 +1321,19 @@ deadEndMap deadEndChange =
                             , error = partError.error |> deadEndMap deadEndChange
                             }
                         )
-                    |> Parts
+                    |> GroupError
 
-            Tries possibilities ->
+            ChoiceError possibilities ->
                 possibilities
                     |> Stack.map
                         (\_ -> deadEndMap deadEndChange)
-                    |> Tries
+                    |> ChoiceError
+
+            VariantError variantError ->
+                { index = variantError.index
+                , error = variantError.error |> deadEndMap deadEndChange
+                }
+                    |> VariantError
 
 
 {-| An [`Error`](#ErrorWithDeadEnd) where running into a dead end is impossible can't be created.
@@ -1339,19 +1349,22 @@ deadEndNever =
             DeadEnd deadEnd ->
                 deadEnd |> never
 
-            Row row ->
+            RowError row ->
                 row.error |> deadEndNever
 
-            Parts parts_ ->
+            GroupError parts_ ->
                 parts_
                     |> Stack.top
                     |> .error
                     |> deadEndNever
 
-            Tries possibilities ->
+            ChoiceError possibilities ->
                 possibilities
                     |> Stack.top
                     |> deadEndNever
+
+            VariantError variantError ->
+                variantError.error |> deadEndNever
 
 
 {-| Change the potential [`Error`](#Error). This is usually used with either
@@ -1598,7 +1611,7 @@ one =
                         { error = "end of input" |> DeadEnd
                         , startDown = 0
                         }
-                            |> Row
+                            |> RowError
                             |> Err
 
                     Emptiable.Filled (Stack.TopBelow ( nextBroadElement, afterNextBroadElement )) ->
@@ -1618,7 +1631,7 @@ one =
                                 { error = error
                                 , startDown = broad_ |> Stack.length
                                 }
-                                    |> Row
+                                    |> RowError
                                     |> Err
         , broaden =
             broadenFrom morph
@@ -1879,7 +1892,7 @@ overRow morphRowBeforeMorph =
         { description =
             { custom = Emptiable.empty
             , inner =
-                Over
+                OverDescription
                     { narrow = narrowMorph |> description
                     , broad = morphRowBeforeMorph |> description
                     }
@@ -1904,7 +1917,7 @@ overRow morphRowBeforeMorph =
                                         { error = error
                                         , startDown = broad_ |> Stack.length
                                         }
-                                            |> Row
+                                            |> RowError
                                     )
                         )
         , broaden =
@@ -2016,12 +2029,12 @@ until untilStep =
     { description =
         { custom = Emptiable.empty
         , inner =
-            Over
+            OverDescription
                 { narrow = untilStep.commit |> description
                 , broad =
                     { custom = Emptiable.empty
                     , inner =
-                        Until
+                        UntilDescription
                             { end = untilStep.end |> description
                             , element = untilStep.goOn |> description
                             }
@@ -2095,7 +2108,7 @@ until untilStep =
                                                 { error = error
                                                 , startDown = stepped.broad |> Stack.length
                                                 }
-                                                    |> Row
+                                                    |> RowError
                                                     |> Err
 
                                             Ok commitResult ->
@@ -2167,7 +2180,7 @@ end =
                     { startDown = stacked |> filled |> Stack.length
                     , error = "remaining input" |> DeadEnd
                     }
-                        |> Row
+                        |> RowError
                         |> Err
     , broaden =
         \() -> Emptiable.empty
@@ -2215,17 +2228,19 @@ rowFinish =
 See [`Morph.choice`](Morph#choice), [`try`](#try), [`choiceFinish`](#choiceFinish)
 -}
 type alias ChoiceMorphEmptiable noTryPossiblyOrNever choiceNarrow choiceBeforeNarrow choiceBroaden error =
-    VariantsMorphEmptiable
-        noTryPossiblyOrNever
-        (choiceBeforeNarrow
-         ->
-            Result
-                (-- tries
-                 Emptiable (Stacked error) noTryPossiblyOrNever
-                )
-                choiceNarrow
-        )
-        choiceBroaden
+    RecordWithoutConstructorFunction
+        { description :
+            Emptiable (Stacked Description) noTryPossiblyOrNever
+        , narrow :
+            choiceBeforeNarrow
+            ->
+                Result
+                    (-- tries
+                     Emptiable (Stacked error) noTryPossiblyOrNever
+                    )
+                    choiceNarrow
+        , broaden : choiceBroaden
+        }
 
 
 {-| Discriminate into possibilities
@@ -2428,7 +2443,7 @@ choiceEquivalent traversePossibility possibilities =
                         |> ArraySized.attachMin Up (alternatives1Up |> ArraySized.fromList)
                         |> ArraySized.map traversePossibility
                         |> ArraySized.map description
-                        |> Choice
+                        |> ChoiceDescription
                         |> Emptiable.filled
                 }
             , narrow =
@@ -2478,7 +2493,7 @@ choiceEquivalentTryNarrow traverseTry tries =
                                         (\error -> errorsSoFar |> Stack.onTopLay error)
                             )
                 )
-            |> Result.mapError Tries
+            |> Result.mapError ChoiceError
 
 
 {-| Builder for a [`Morph`](#Morph) to a choice. Possibly incomplete
@@ -2488,7 +2503,10 @@ Initialize with [`Morph.variants`](#variants)
 -}
 type alias VariantsMorphEmptiable noTryPossiblyOrNever narrow broaden =
     RecordWithoutConstructorFunction
-        { description : Emptiable (Stacked Description) noTryPossiblyOrNever
+        { description :
+            Emptiable
+                (Stacked { tag : String, value : Description })
+                noTryPossiblyOrNever
         , narrow : narrow
         , broaden : broaden
         }
@@ -2670,9 +2688,11 @@ variants ( narrowByPossibility, broadenByPossibility ) =
 Finish with [`Morph.variantsFinish`](#variantsFinish)
 -}
 variant :
-    ( narrowVariantValue -> narrowChoice
-    , possibilityBroad -> broadChoice
-    )
+    String
+    ->
+        ( narrowVariantValue -> narrowChoice
+        , possibilityBroad -> broadChoice
+        )
     ->
         MorphIndependently
             (beforeNarrowVariantValue
@@ -2683,7 +2703,7 @@ variant :
         (VariantsMorphEmptiable
             noTryPossiblyOrNever_
             ((beforeNarrowVariantValue
-              -> Result error narrowChoice
+              -> Result { index : Int, error : error } narrowChoice
              )
              -> narrowChoiceFurther
             )
@@ -2696,17 +2716,21 @@ variant :
                 narrowChoiceFurther
                 broadenChoiceFurther
         )
-variant ( possibilityToChoice, possibilityFromChoice ) possibilityMorph =
+variant variantTagName ( possibilityToChoice, possibilityFromChoice ) possibilityMorph =
     \choiceMorphSoFar ->
         { description =
             choiceMorphSoFar.description
-                |> Stack.onTopLay possibilityMorph.description
+                |> Stack.onTopLay
+                    { tag = variantTagName, value = possibilityMorph.description }
         , narrow =
             choiceMorphSoFar.narrow
                 (\broad_ ->
-                    broad_
-                        |> narrowTo possibilityMorph
-                        |> Result.map possibilityToChoice
+                    case broad_ |> narrowTo possibilityMorph of
+                        Ok possibility ->
+                            possibility |> possibilityToChoice |> Ok
+
+                        Err error ->
+                            { index = choiceMorphSoFar.description |> Stack.length, error = error } |> Err
                 )
         , broaden =
             choiceMorphSoFar.broaden
@@ -2721,25 +2745,32 @@ variant ( possibilityToChoice, possibilityFromChoice ) possibilityMorph =
 {-| Conclude a [`Morph.variants`](Morph#variants) `|>` [`Morph.variant`](Morph#variant) builder
 -}
 variantsFinish :
-    VariantsMorphEmptiable Never narrow broaden
-    -> MorphIndependently narrow broaden
+    VariantsMorphEmptiable
+        Never
+        (beforeNarrow
+         -> Result { index : Int, error : ErrorWithDeadEnd deadEnd } narrow
+        )
+        broaden
+    ->
+        MorphIndependently
+            (beforeNarrow
+             -> Result (ErrorWithDeadEnd deadEnd) narrow
+            )
+            broaden
 variantsFinish =
     \choiceMorphComplete ->
         { description =
-            case choiceMorphComplete.description |> Emptiable.fill of
-                Stack.TopBelow ( variantOnly, [] ) ->
-                    variantOnly
-
-                Stack.TopBelow ( variant0, variant1 :: variants2Up ) ->
-                    { custom = Emptiable.empty
-                    , inner =
-                        ArraySized.l2 variant0 variant1
-                            |> ArraySized.attachMin Up
-                                (variants2Up |> ArraySized.fromList)
-                            |> Choice
-                            |> Emptiable.filled
-                    }
-        , narrow = choiceMorphComplete.narrow
+            { custom = Emptiable.empty
+            , inner =
+                choiceMorphComplete.description
+                    |> VariantsDescription
+                    |> Emptiable.filled
+            }
+        , narrow =
+            \beforeNarrow ->
+                beforeNarrow
+                    |> choiceMorphComplete.narrow
+                    |> Result.mapError VariantError
         , broaden = choiceMorphComplete.broaden
         }
 
@@ -2751,11 +2782,12 @@ variantsFinish =
 {-| Possibly incomplete [`MorphRow`](#MorphRow) to and from a Morph.choice.
 See [`Morph.choice`](Morph#choice), [`Morph.tryRow`](#try), [`Morph.choiceRowFinish`](#choiceFinish)
 -}
-type alias ChoiceMorphRowEmpty noTryPossiblyOrNever choiceNarrow choiceBroaden broadElement =
-    VariantsMorphEmptiable
-        noTryPossiblyOrNever
-        (Emptiable (Stacked broadElement) Possibly
-         ->
+type alias ChoiceMorphRowEmptiable noTryPossiblyOrNever choiceNarrow choiceBroaden broadElement =
+    { description :
+        Emptiable (Stacked Description) noTryPossiblyOrNever
+    , narrow :
+        Emptiable (Stacked broadElement) Possibly
+        ->
             Result
                 (-- tries
                  Emptiable (Stacked Error) noTryPossiblyOrNever
@@ -2763,8 +2795,8 @@ type alias ChoiceMorphRowEmpty noTryPossiblyOrNever choiceNarrow choiceBroaden b
                 { narrow : choiceNarrow
                 , broad : Emptiable (Stacked broadElement) Possibly
                 }
-        )
-        choiceBroaden
+    , broaden : choiceBroaden
+    }
 
 
 {-| If the previous [`possibility`](#try) fails
@@ -2862,7 +2894,7 @@ tryRow :
     (possibilityNarrow -> choiceNarrow)
     -> MorphRow possibilityNarrow broadElement
     ->
-        (ChoiceMorphRowEmpty
+        (ChoiceMorphRowEmptiable
             noTryPossiblyOrNever_
             choiceNarrow
             ((possibilityNarrow -> Emptiable (Stacked broadElement) Possibly)
@@ -2870,7 +2902,7 @@ tryRow :
             )
             broadElement
          ->
-            ChoiceMorphRowEmpty
+            ChoiceMorphRowEmptiable
                 never_
                 choiceNarrow
                 choiceBroadenFurther
@@ -2891,8 +2923,7 @@ tryRow possibilityToChoice possibilityMorph =
                                 Ok possibilityParsed ->
                                     { broad = possibilityParsed.broad
                                     , narrow =
-                                        possibilityParsed.narrow
-                                            |> possibilityToChoice
+                                        possibilityParsed.narrow |> possibilityToChoice
                                     }
                                         |> Ok
 
@@ -2910,7 +2941,7 @@ tryRow possibilityToChoice possibilityMorph =
 {-| Always the last step in a [`Morph.choice`](#choice) `|>` [`Morph.tryRow`](#tryRow) build process
 -}
 choiceRowFinish :
-    ChoiceMorphRowEmpty
+    ChoiceMorphRowEmptiable
         Never
         choiceNarrow
         (choiceNarrow
@@ -2931,7 +2962,7 @@ choiceRowFinish =
                         ArraySized.l2 description0 description1
                             |> ArraySized.attachMin Up
                                 (description2Up |> ArraySized.fromList)
-                            |> Group
+                            |> ChoiceDescription
                             |> Emptiable.filled
                     }
         , narrow =
@@ -2941,9 +2972,9 @@ choiceRowFinish =
                     |> Result.mapError
                         (\errorPossibilities ->
                             { startDown = broad_ |> Stack.length
-                            , error = errorPossibilities |> Tries
+                            , error = errorPossibilities |> ChoiceError
                             }
-                                |> Row
+                                |> RowError
                         )
         , broaden = choiceMorphRowComplete.broaden
         }
@@ -2977,12 +3008,12 @@ choiceFinish =
                         ArraySized.l2 variant0 variant1
                             |> ArraySized.attachMin Up
                                 (variants2Up |> ArraySized.fromList)
-                            |> Choice
+                            |> ChoiceDescription
                             |> Emptiable.filled
                     }
         , narrow =
             choiceMorphComplete.narrow
-                >> Result.mapError Tries
+                >> Result.mapError ChoiceError
         , broaden =
             choiceMorphComplete.broaden
         }

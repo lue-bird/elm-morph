@@ -120,7 +120,7 @@ eachElement elementMorph =
     { description =
         { custom = Stack.one "each"
         , inner =
-            Morph.Elements (elementMorph |> Morph.description)
+            Morph.ElementsDescription (elementMorph |> Morph.description)
                 |> filled
         }
     , narrow =
@@ -158,7 +158,7 @@ eachElement elementMorph =
                     }
                 |> .collected
                 |> Result.map Array.fromList
-                |> Result.mapError Morph.Parts
+                |> Result.mapError Morph.GroupError
     , broaden =
         \array ->
             array |> Array.map (Morph.broadenFrom elementMorph)

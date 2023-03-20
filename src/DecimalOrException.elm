@@ -132,7 +132,8 @@ float =
                 Exception (Infinity sign) ->
                     variantInfinity sign
         )
-        |> Morph.variant ( Number, identity )
+        |> Morph.variant "Number"
+            ( Number, identity )
             (Morph.translate
                 (\float_ ->
                     if float_ == 0 then
@@ -198,8 +199,9 @@ float =
                             numberSigned.absolute |> signedAbsoluteToFloat |> toSigned
                 )
             )
-        |> Morph.variant ( \() -> Exception NaN, identity ) (Morph.broaden (\() -> floatNaN))
-        |> Morph.variant ( \sign -> Exception (Infinity sign), identity )
+        |> Morph.variant "NaN" ( \() -> Exception NaN, identity ) (Morph.broaden (\() -> floatNaN))
+        |> Morph.variant "Infinity"
+            ( \sign -> Exception (Infinity sign), identity )
             (Morph.broaden
                 (\sign ->
                     let
@@ -215,6 +217,7 @@ float =
                 )
             )
         |> Morph.variantsFinish
+        |> Morph.narrowErrorMap Morph.deadEndNever
 
 
 floatNaN : Float

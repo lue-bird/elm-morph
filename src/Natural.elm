@@ -88,9 +88,11 @@ integer =
                     NaturalAtLeast1 atLeast1Value ->
                         variantAtLeast1 atLeast1Value
             )
-            |> Morph.variant ( \() -> NaturalN0, \() -> IntegerN0 )
+            |> Morph.variant "0"
+                ( \() -> NaturalN0, \() -> IntegerN0 )
                 (Morph.broad ())
-            |> Morph.variant ( NaturalAtLeast1, IntegerSigned )
+            |> Morph.variant "signed"
+                ( NaturalAtLeast1, IntegerSigned )
                 (Morph.value "positive"
                     { narrow =
                         \{ sign, absolute } ->

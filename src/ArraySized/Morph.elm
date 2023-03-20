@@ -231,7 +231,10 @@ toStack =
 --
 
 
-{-| [`Translate`](Morph#Translate) each element in an `Array`
+{-| [`Translate`](Morph#Translate) each element in an `ArraySized`
+
+TODO Make generic. See List.Morph.eachElement
+
 -}
 eachElement :
     MorphIndependently
@@ -354,7 +357,7 @@ for morphRowByElement elementsToTraverseInSequence =
                                     |> Morph.description
                             )
                         |> ArraySized.maxToInfinity
-                        |> Morph.Group
+                        |> Morph.GroupDescription
                         |> Emptiable.filled
                 }
     , narrow =
@@ -689,7 +692,7 @@ whileAccumulate { initial, step, element } =
     { description =
         { custom = Emptiable.empty
         , inner =
-            Morph.While (element |> Morph.description)
+            Morph.WhileDescription (element |> Morph.description)
                 |> Emptiable.filled
         }
     , broaden =

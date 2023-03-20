@@ -133,7 +133,7 @@ import Array exposing (Array)
 import Emptiable exposing (Emptiable)
 import Morph exposing (ChoiceMorphEmptiable, Morph, MorphIndependently, translate)
 import Number exposing (Decimal)
-import Possibly exposing (Possibly)
+import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Stack exposing (Stacked)
 
@@ -575,12 +575,14 @@ type alias GroupMorphEmptiable noPartPossiblyOrNever groupNarrow groupNarrowFurt
     Morph.PartsMorphEmptiable
         noPartPossiblyOrNever
         (Record IndexOrName
-         ->
-            Result
-                (Morph.PartsError Morph.Error)
-                groupNarrowFurther
+         -> Result PartsError groupNarrowFurther
         )
         (groupNarrow -> Record IndexAndName)
+
+
+type PartsError
+    = TagsMissing (Emptiable (Stacked Int) Never)
+    | ValueError { index : Int, error : Morph.Error }
 
 
 {-| Continue a group assembly [`Morph`](#Morph) to [`Value`](#Value).
@@ -616,9 +618,7 @@ part ( accessFieldValue, fieldName ) fieldValueMorph =
         { description =
             groupMorphSoFar.description
                 |> Stack.onTopLay
-                    (Morph.to tag.name fieldValueMorph
-                        |> Morph.description
-                    )
+                    { tag = tag.name, value = fieldValueMorph.description }
         , narrow =
             \groupBroad ->
                 partValueNarrow tag fieldValueMorph groupMorphSoFar.narrow groupBroad
@@ -648,14 +648,11 @@ partValueNarrow :
     -> Morph fieldValueNarrow
     ->
         (Emptiable (Stacked (Tagged IndexOrName)) possiblyOrNever
-         ->
-            Result
-                (Morph.PartsError Morph.Error)
-                (fieldValueNarrow -> groupNarrowFurther)
+         -> Result PartsError (fieldValueNarrow -> groupNarrowFurther)
         )
     ->
         (Emptiable (Stacked (Tagged IndexOrName)) possiblyOrNever
-         -> Result (Morph.PartsError Morph.Error) groupNarrowFurther
+         -> Result PartsError groupNarrowFurther
         )
 partValueNarrow tag fieldValueMorph groupSoFarNarrow =
     let
@@ -673,19 +670,10 @@ partValueNarrow tag fieldValueMorph groupSoFarNarrow =
         let
             wholeAssemblyResult :
                 Result
-                    (Morph.PartsError Morph.Error)
+                    PartsError
                     (fieldValueNarrow -> groupNarrowFurther)
             wholeAssemblyResult =
                 groupBroad |> groupSoFarNarrow
-
-            errorsSoFar : () -> Emptiable (Stacked { index : Int, error : Morph.Error }) Possibly
-            errorsSoFar () =
-                case wholeAssemblyResult of
-                    Ok _ ->
-                        Emptiable.empty
-
-                    Err expectations ->
-                        expectations |> Emptiable.emptyAdapt never
         in
         case groupBroad |> Stack.toList |> List.filter (.tag >> matches) of
             partBroad :: _ ->
@@ -695,20 +683,27 @@ partValueNarrow tag fieldValueMorph groupSoFarNarrow =
                             |> Result.map (\eat -> eat partNarrow)
 
                     Err innerError ->
-                        errorsSoFar ()
-                            |> Stack.onTopLay
-                                { index = tag.index
-                                , error = innerError
-                                }
+                        ValueError
+                            { index = tag.index
+                            , error = innerError
+                            }
                             |> Err
 
             [] ->
-                errorsSoFar ()
-                    |> Stack.onTopLay
-                        { index = tag.index
-                        , error = (tag.name ++ " missing") |> Morph.DeadEnd
-                        }
-                    |> Err
+                let
+                    tagsMissingSoFar : Emptiable (Stacked Int) Possibly
+                    tagsMissingSoFar =
+                        case wholeAssemblyResult of
+                            Err (TagsMissing tagsMissing) ->
+                                tagsMissing |> Emptiable.emptyAdapt (\_ -> Possible)
+
+                            Err (ValueError _) ->
+                                Emptiable.empty
+
+                            Ok _ ->
+                                Emptiable.empty
+                in
+                TagsMissing (Stack.onTopLay tag.index (Debug.todo "tagsMissingSoFar")) |> Err
 
 
 {-| Conclude the [`group`](#group) |> [`field`](#part) chain
@@ -719,7 +714,7 @@ groupFinish :
 groupFinish =
     \groupMorphComplete ->
         groupMorphComplete
-            |> Morph.partsFinish
+            |> partsFinish
             |> Morph.over
                 (Morph.value "Record"
                     { broaden = Record
@@ -734,6 +729,38 @@ groupFinish =
                     }
                 )
             |> Morph.over composed
+
+
+partsFinish :
+    GroupMorphEmptiable
+        Never
+        groupNarrow
+        groupNarrow
+    ->
+        MorphIndependently
+            (Record IndexOrName -> Result Morph.Error groupNarrow)
+            (groupNarrow -> Record IndexAndName)
+partsFinish =
+    \groupMorphInProgress ->
+        { description =
+            { custom = Emptiable.empty
+            , inner = groupMorphInProgress.description |> Morph.PartsDescription |> Emptiable.filled
+            }
+        , narrow =
+            \broad_ ->
+                broad_
+                    |> groupMorphInProgress.narrow
+                    |> Result.mapError
+                        (\error ->
+                            case error of
+                                TagsMissing missingTags ->
+                                    Debug.todo "tags missing error"
+
+                                ValueError valueError ->
+                                    valueError |> Stack.one |> Morph.GroupError
+                        )
+        , broaden = groupMorphInProgress.broaden
+        }
 
 
 {-| Describe another variant [`Morph`](#Morph) to [`Value`](#Value)

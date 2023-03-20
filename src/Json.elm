@@ -124,19 +124,19 @@ decodeErrorToMorph =
                 , error = error |> decodeErrorToMorph
                 }
                     |> Stack.one
-                    |> Morph.Parts
+                    |> Morph.GroupError
 
             Json.Decode.OneOf possibilities ->
                 case possibilities |> Stack.fromList of
                     Emptiable.Empty Possible ->
-                        "no expected possibilities in Json.Decode.oneOf"
+                        "missing expected possibilities in Json.Decode.oneOf"
                             |> Morph.DeadEnd
 
                     Emptiable.Filled stacked ->
                         stacked
                             |> Emptiable.filled
                             |> Stack.map (\_ -> decodeErrorToMorph)
-                            |> Morph.Tries
+                            |> Morph.ChoiceError
 
             Json.Decode.Failure custom jsValue ->
                 [ custom

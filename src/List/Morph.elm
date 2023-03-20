@@ -131,7 +131,7 @@ for morphRowByElement elementsToTraverseInSequence =
                         |> ArraySized.map
                             (morphRowByElement >> Morph.description)
                         |> ArraySized.maxToInfinity
-                        |> Morph.Group
+                        |> Morph.GroupDescription
                         |> Emptiable.filled
                 }
     , narrow =
@@ -208,11 +208,7 @@ On the narrowing side all [narrowed](Morph#narrowTo) values must be `Ok`
 for it to not result in a [`Morph.Error`](Morph#Error)
 
 If the element [`Morph`](Morph#Morph) is a [`Translate`](Morph#Translate),
-`eachElement` will be equivalent to
-
-    Morph.translateOn ( List.map, List.map )
-
-which always succeeds with the type knowing it does
+`eachElement` will always succeeds with the type knowing it does
 
 -}
 eachElement :
@@ -234,7 +230,7 @@ eachElement elementMorph =
     { description =
         { custom = Stack.one "each"
         , inner =
-            Morph.Elements (elementMorph |> Morph.description)
+            Morph.ElementsDescription (elementMorph |> Morph.description)
                 |> filled
         }
     , narrow =
@@ -271,7 +267,7 @@ eachElement elementMorph =
                     , index = (list |> List.length) - 1
                     }
                 |> .collected
-                |> Result.mapError Morph.Parts
+                |> Result.mapError Morph.GroupError
     , broaden =
         \list ->
             list |> List.map (Morph.broadenFrom elementMorph)
