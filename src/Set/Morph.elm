@@ -28,12 +28,12 @@ import Stack
 import Value
 
 
-{-| [`Translate`](Morph#Translate) from `List` to `Set`.
+{-| [`Translate`](Morph#Translate) from `List` to `Set`
 
     import Set
 
     [ 0, 1, 2, 3 ]
-        |> (Set.Morph.fromList |> Morph.map)
+        |> Morph.mapTo Set.Morph.list
     --> Set.fromList [ 0, 1, 2, 3 ]
 
 -}
@@ -47,12 +47,12 @@ list =
     translate Set.fromList Set.toList
 
 
-{-| [`Translate`](Morph#Translate) from `Set` to `List`.
+{-| [`Translate`](Morph#Translate) from `Set` to `List`
 
     import Set
 
     Set.fromList [ 0, 1, 2, 3 ]
-        |> (Set.Morph.toList |> Morph.map)
+        |> Morph.mapTo Set.Morph.toList
     --> [ 0, 1, 2, 3 ]
 
 -}

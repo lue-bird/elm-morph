@@ -130,12 +130,14 @@ eachElement elementMorph =
 -- transform
 
 
-{-| [`Translate`](Morph#Translate) from a stack to a `List`.
+{-| [`Translate`](Morph#Translate) from a stack to a `List`
 
     import Stack
+    import Stack.Morph
+    import Morph
 
     Stack.topBelow 0 [ 12, 3 ]
-        |> Morph.map Stack.Morph.toList
+        |> Morph.mapTo Stack.Morph.toList
     --> [ 0, 12, 3 ]
 
 -}
@@ -154,10 +156,13 @@ toList =
 {-| [`Translate`](Morph#Translate) from `List` to a stack.
 
     import Stack
+    import Stack.Morph
+    import Morph
 
     [ 0, 12, 3 ]
         |> Morph.mapTo Stack.Morph.list
     --> Stack.topBelow 0 [ 12, 3 ]
+    --: Emptiable (Stacked Int) Possibly
 
 -}
 list :
@@ -178,9 +183,10 @@ list =
 {-| [`Translate`](Morph#Translate) from a stack of `Char`s to a `String`.
 
     import Stack
+    import Morph
 
     Stack.topBelow '0' [ '1', '2' ]
-        |> Morph.map Stack.Morph.toString
+        |> Morph.mapTo Stack.Morph.toString
     --> "012"
 
 -}
@@ -196,6 +202,7 @@ toString =
 {-| [`Translate`](Morph#Translate) from `String` to a stack of `Char`s.
 
     import Stack
+    import Morph
 
     "012" |> Morph.mapTo Stack.Morph.string
     --> Stack.fromList [ '0', '1', '2' ]

@@ -25,33 +25,11 @@ import Morph exposing (ErrorWithDeadEnd, MorphIndependently, translate, translat
 import Value
 
 
-fromListImplementation :
-    List { key : comparableKey, value : value }
-    -> Dict comparableKey value
-fromListImplementation =
-    \dict ->
-        dict
-            |> List.foldl
-                (\entry -> Dict.insert entry.key entry.value)
-                Dict.empty
-
-
-toListImplementation : Dict key value -> List { key : key, value : value }
-toListImplementation =
-    \dict ->
-        dict
-            |> Dict.foldr
-                (\key value_ -> (::) { key = key, value = value_ })
-                []
-
-
-
---
-
-
 {-| [`Translate`](Morph#Translate) from a `List { key : key, value : value }` to a `Dict key value`.
 
-    import Array
+    import Dict
+    import Dict.Morph
+    import Morph
 
     [ { key = "hi", value = "there" }
     , { key = "git", value = "gud" }
@@ -69,16 +47,30 @@ list :
          -> List { key : broadKey, value : broadValue }
         )
 list =
-    translate fromListImplementation toListImplementation
+    translate
+        (\dict ->
+            dict
+                |> List.foldl
+                    (\entry -> Dict.insert entry.key entry.value)
+                    Dict.empty
+        )
+        (\dict ->
+            dict
+                |> Dict.foldr
+                    (\key value_ -> (::) { key = key, value = value_ })
+                    []
+        )
 
 
 {-| [`Translate`](Morph#Translate) from a `Dict key value` to a `List { key : key, value : value }`.
 
-    import Array
+    import Dict
+    import Dict.Morph
+    import Morph
 
-    Array.fromList [ 0, 1, 2, 3 ]
-        |> (Morph.arrayToList |> Morph.map)
-    --> [ 0, 1, 2, 3 ]
+    Dict.fromList [ ( 0, 'a' ), ( 1, 'b' ) ]
+        |> Morph.mapTo Dict.Morph.toList
+    --> [ { key = 0, value = 'a' }, { key = 1, value = 'b' } ]
 
 -}
 toList :
@@ -90,7 +82,7 @@ toList :
          -> Dict comparableNarrowKey narrowValue
         )
 toList =
-    translate toListImplementation fromListImplementation
+    Morph.invert list
 
 
 

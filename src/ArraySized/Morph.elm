@@ -117,8 +117,7 @@ array =
     import ArraySized
 
     ArraySized.l4 0 1 2 3
-        |> ArraySized.minTo n0
-        |> Morph.map ArraySized.Morph.toArray
+        |> Morph.mapTo ArraySized.Morph.toArray
     --> Array.fromList [ 0, 1, 2, 3 ]
 
 -}
@@ -163,7 +162,7 @@ list =
     import ArraySized
 
     ArraySized.l4 0 1 2 3
-        |> Morph.map ArraySized.Morph.toList
+        |> Morph.mapTo ArraySized.Morph.toList
     --> [ 0, 1, 2, 3 ]
 
 -}
@@ -208,7 +207,7 @@ stack =
     import ArraySized
 
     ArraySized.l4 0 1 2 3
-        |> Morph.map ArraySized.Morph.toStack
+        |> Morph.mapTo ArraySized.Morph.toStack
     --> Stack.topBelow 0 [ 1, 2, 3 ]
 
 -}
@@ -644,7 +643,7 @@ atLeast minimum elementStepMorphRow =
     import String.Morph
     import Number.Morph
 
-    sumWhileLessThan : Float -> MorphRow Char (List Number)
+    sumWhileLessThan : Float -> MorphRow Char (List (OrException Decimal))
     sumWhileLessThan max =
         whileAccumulate
             { initial = 0
@@ -652,7 +651,7 @@ atLeast minimum elementStepMorphRow =
                 \element stepped ->
                     let
                         floats =
-                            stepped + (element |> Morph.map Number.Morph.toFloat)
+                            stepped + (element |> Morph.mapTo DecimalOrException.Morph.toFloat)
                     in
                     if floats >= max then
                         Err ()

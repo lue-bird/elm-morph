@@ -1236,8 +1236,7 @@ over morphNarrowBroad =
 by swapping the functions [`map`](#mapTo) <-> [`unmap`](#broadenFrom).
 
     [ 'O', 'h', 'a', 'y', 'o' ]
-        |> Morph.map
-           (Text.toList |> Morph.invert)
+        |> Morph.mapTo String.Morph.list
     --> "Ohayo"
 
 This can be used to easily create a `fromX`/`toX` pair

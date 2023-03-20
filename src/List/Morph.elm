@@ -89,11 +89,10 @@ Some also call this "traverse"
 Don't try to be clever with this.
 
     import Morph
-    import Char.Morph as Char
-    import String.Morph as Text
+    import Char.Morph
 
     "AB"
-        |> narrow
+        |> Morph.narrowTo
             (Morph.for (Char.Morph.caseNo >> Morph.one) [ 'a', 'b' ]
                 |> Morph.rowFinish
                 |> Morph.over Stack.Morph.string

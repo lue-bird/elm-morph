@@ -49,7 +49,7 @@ list =
     import Array
 
     Array.fromList [ 0, 1, 2, 3 ]
-        |> Morph.mapTo Array.Morph.list
+        |> Morph.mapTo Array.Morph.toList
     --> [ 0, 1, 2, 3 ]
 
 -}
