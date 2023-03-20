@@ -107,9 +107,9 @@ import ArraySized
 import ArraySized.Morph
 
 type Boolean
-    = True
-    | False
-    | Or { left : Boolean, right : Boolean }
+    = BooleanTrue
+    | BooleanFalse
+    | BooleanOr { left : Boolean, right : Boolean }
 
 "((true || false) || false)"
     |> narrowTo
@@ -133,9 +133,9 @@ boolean =
                 BooleanOr arguments ->
                     variantOr arguments
         )
-        |> Morph.tryRow (\() -> True) (String.Morph.only "true")
-        |> Morph.tryRow (\() -> False) (String.Morph.only "false")
-        |> Morph.tryRow Or or
+        |> Morph.tryRow (\() -> BooleanTrue) (String.Morph.only "true")
+        |> Morph.tryRow (\() -> BooleanFalse) (String.Morph.only "false")
+        |> Morph.tryRow BooleanOr or
         |> Morph.choiceRowFinish
 
 or : MorphRow { left : Boolean, right : Boolean } Char
