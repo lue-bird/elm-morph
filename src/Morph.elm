@@ -114,6 +114,11 @@ We call it
 `whileAccumulate`, `until` aren't exposed for simplicity.
 Have a need for them? → issue
 
+
+### other art
+
+  - [`jmpavlick/bimap`](https://dark.elm.dmy.fr/packages/jmpavlick/bimap/latest/) a simple way to parse-build an enum over a String
+
 ---
 
 Up for a challenge? implement & PR
