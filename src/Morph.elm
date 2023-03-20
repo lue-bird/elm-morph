@@ -117,7 +117,9 @@ Have a need for them? → issue
 
 ### other art
 
-  - [`jmpavlick/bimap`](https://dark.elm.dmy.fr/packages/jmpavlick/bimap/latest/) a simple way to parse-build an enum over a String
+  - [`invertible-syntax`](https://hackage.haskell.org/package/invertible-syntax) same idea in the haskell world
+  - parse-build an enum over a String: [`jmpavlick/bimap`](https://dark.elm.dmy.fr/packages/jmpavlick/bimap/latest/), [`toastal/select-prism`](https://package.elm-lang.org/packages/toastal/select-prism/latest/), [`Herteby/enum`](https://package.elm-lang.org/packages/Herteby/enum/latest), [`genthaler/elm-enum`](https://package.elm-lang.org/packages/genthaler/elm-enum/latest/), [`the-sett/elm-refine` `Enum`](https://package.elm-lang.org/packages/the-sett/elm-refine/latest/Enum)
+  - equivalent to [`Translate`](#Translate): [`arturopala/elm-monocle` `Monocle.Iso`](https://package.elm-lang.org/packages/arturopala/elm-monocle/latest/Monocle-Iso), [`Heimdell/elm-optics` `Optics.Core.Iso`](https://package.elm-lang.org/packages/Heimdell/elm-optics/latest/Optics-Core#Iso), [`erlandsona/elm-accessors` `Accessors.Iso`](https://dark.elm.dmy.fr/packages/erlandsona/elm-accessors/latest/Accessors#Iso), [`fujiy/elm-json-convert` `Json.Convert.Iso`](https://package.elm-lang.org/packages/fujiy/elm-json-convert/latest/Json-Convert#Iso)
 
 ---
 
