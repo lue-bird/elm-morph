@@ -131,7 +131,7 @@ Motivated? Explore, PR ↓
 
 import Array exposing (Array)
 import Emptiable exposing (Emptiable)
-import Morph exposing (ChoiceMorphEmptiable, Morph, MorphIndependently, translate)
+import Morph exposing (ChoiceMorphEmptiable, ErrorWithDeadEnd(..), Morph, MorphIndependently, translate)
 import Number exposing (Decimal)
 import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
@@ -703,7 +703,7 @@ partValueNarrow tag fieldValueMorph groupSoFarNarrow =
                             Ok _ ->
                                 Emptiable.empty
                 in
-                TagsMissing (Stack.onTopLay tag.index (Debug.todo "tagsMissingSoFar")) |> Err
+                TagsMissing (Stack.onTopLay tag.index tagsMissingSoFar) |> Err
 
 
 {-| Conclude the [`group`](#group) |> [`field`](#part) chain
@@ -754,7 +754,9 @@ partsFinish =
                         (\error ->
                             case error of
                                 TagsMissing missingTags ->
-                                    Debug.todo "tags missing error"
+                                    "I'm missing the following parts: "
+                                        ++ (missingTags |> Stack.toList |> List.map String.fromInt |> String.join ", ")
+                                        |> DeadEnd
 
                                 ValueError valueError ->
                                     valueError |> Stack.one |> Morph.GroupError
