@@ -2,7 +2,7 @@ module Value exposing
     ( Value, Atom(..), Composed(..), Record, Tagged
     , Morph
     , unit
-    , GroupMorphEmptiable
+    , GroupMorphEmptiable, PartsError(..)
     , group, part, groupFinish
     , variant, choiceFinish
     , Name, Index, IndexOrName(..), IndexAndName
@@ -46,7 +46,7 @@ for example
 
 ### grouping
 
-@docs GroupMorphEmptiable
+@docs GroupMorphEmptiable, PartsError
 @docs group, part, groupFinish
 
 
@@ -580,6 +580,8 @@ type alias GroupMorphEmptiable noPartPossiblyOrNever groupNarrow groupNarrowFurt
         (groupNarrow -> Record IndexAndName)
 
 
+{-| What can go wrong narrowing a [`Record`](#Record)
+-}
 type PartsError
     = TagsMissing (Emptiable (Stacked Int) Never)
     | ValueError { index : Int, error : Morph.Error }
