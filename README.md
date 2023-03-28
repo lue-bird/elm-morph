@@ -1,8 +1,8 @@
 ## [elm morph](https://dark.elm.dmy.fr/packages/lue-bird/elm-morph/latest/)
 
-Simple, easy to use, general-purpose parser-builder with great error messages
+Simple, general-purpose parser-builder with great error messages
 
-> build one to transform narrow ⇄ broad types
+> build one to convert between narrow ⇄ broad types
 
   - 📻 related: ["codecs" elm-radio episode](https://elm-radio.com/episode/codecs/)
   - 🎧 while reading: ["Morphing", microtonal electronic music by Sevish](https://youtu.be/J-JZhCWsk3M?t=1702)
@@ -99,7 +99,7 @@ Like [`Morph`](Morph#Morph), [`MorphRow`](Morph#MorphRow) makes the process simp
 
 Here a 1:1 port of [an example from `elm/parser`](https://dark.elm.dmy.fr/packages/elm/parser/latest/Parser#lazy):
 ```elm
-import Morph exposing (MorphRow, broad, narrowTo, one, match, grab)
+import Morph exposing (MorphRow, broad, toNarrow, one, match, grab)
 import Char.Morph
 import String.Morph
 import N exposing (n0)
@@ -112,7 +112,7 @@ type Boolean
     | BooleanOr { left : Boolean, right : Boolean }
 
 "((true || false) || false)"
-    |> narrowTo
+    |> toNarrow
         (boolean
             |> Morph.rowFinish
             |> Morph.over Stack.Morph.string

@@ -1,7 +1,7 @@
 {
     "type": "package",
     "name": "lue-bird/elm-morph",
-    "summary": "build one parser-builder to transform narrow ⇄ broad types",
+    "summary": "Simple, general-purpose parser-builder with great error messages",
     "license": "MIT",
     "version": "1.0.0",
     "exposed-modules": [
@@ -37,9 +37,10 @@
         "lue-bird/elm-emptiness-typed": "9.2.0 <= v < 10.0.0",
         "lue-bird/elm-linear-direction": "11.0.0 <= v < 12.0.0",
         "lue-bird/elm-no-record-type-alias-constructor-function": "1.0.0 <= v < 2.0.0",
-        "lue-bird/elm-typesafe-array": "30.0.0 <= v < 31.0.0"
+        "lue-bird/elm-typesafe-array": "30.0.0 <= v < 31.0.0",
+        "zwilias/elm-rosetree": "1.5.0 <= v < 2.0.0"
     },
     "test-dependencies": {
-        "elm-explorations/test": "2.0.1 <= v < 3.0.0"
+        "elm-explorations/test": "2.1.0 <= v < 3.0.0"
     }
 }
