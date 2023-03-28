@@ -92,7 +92,7 @@ Know `Parser`s? [`MorphRow`](Morph#MorphRow) simply always creates a builder alo
 
   - `Email/Id/Time/Url.fromString` ⇄ `Email/Id/Time/Url.toString`
   - concrete syntax tree parser ⇄ pretty formatter
-  - decompiler ⇄ compiler
+  - decompiler ⇄ code generation
   - ...
 
 Like [`Morph`](Morph#Morph), [`MorphRow`](Morph#MorphRow) makes the process simpler and more reliable
