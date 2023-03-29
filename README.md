@@ -147,20 +147,20 @@ or =
     Morph.succeed
         (\left right -> { left = left, right = right })
         |> match (String.Morph.only "(")
-        |> match (broad ArraySized.empty |> Morph.rowOver spaces)
+        |> match (broad ArraySized.empty |> Morph.overRow spaces)
         |> grab .left boolean
-        |> match (broad (ArraySized.one ()) |> Morph.rowOver spaces)
+        |> match (broad (ArraySized.one ()) |> Morph.overRow spaces)
         |> match (String.Morph.only "||")
-        |> match (broad (ArraySized.one ()) |> Morph.rowOver spaces)
+        |> match (broad (ArraySized.one ()) |> Morph.overRow spaces)
         |> grab .right boolean
-        |> match (broad ArraySized.empty |> Morph.rowOver spaces)
+        |> match (broad ArraySized.empty |> Morph.overRow spaces)
         |> match (String.Morph.only ")")
 ```
 
 What's different from writing a parser?
 
-  - `broad ...` provides defaults for generated broad values
-  - `Morph.choice (\... -> case ... of ...)` exhaustively matches possibilities with according broad values
-  - `grab ... ...` also shows how to access the morphed positional part
+  - [`Morph.broad ...`](Morph#broad) provides defaults for generated broad values
+  - [`Morph.choice (\... -> case ... of ...)`](Morph#choice) exhaustively matches narrow possibilities
+  - [`grab ... ...`](Morph#grab) also shows how to access the morphed positional part
 
 Confused? Hyped? Hit @lue up on anything on slack!
