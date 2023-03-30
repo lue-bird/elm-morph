@@ -1,6 +1,6 @@
 ## [elm morph](https://dark.elm.dmy.fr/packages/lue-bird/elm-morph/latest/)
 
-Simple, general-purpose parser-builder with great error messages
+a parser-builder: developer-friendly, general-purpose, great error messages
 
 > build one to convert between narrow ⇄ broad types
 

@@ -1,7 +1,7 @@
 {
     "type": "package",
     "name": "lue-bird/elm-morph",
-    "summary": "Simple, general-purpose parser-builder with great error messages",
+    "summary": "a parser-builder: developer-friendly, general-purpose, great error messages",
     "license": "MIT",
     "version": "1.0.0",
     "exposed-modules": [
@@ -37,7 +37,7 @@
         "lue-bird/elm-emptiness-typed": "9.2.0 <= v < 10.0.0",
         "lue-bird/elm-linear-direction": "11.0.0 <= v < 12.0.0",
         "lue-bird/elm-no-record-type-alias-constructor-function": "1.0.0 <= v < 2.0.0",
-        "lue-bird/elm-typesafe-array": "30.0.0 <= v < 31.0.0",
+        "lue-bird/elm-typesafe-array": "30.1.0 <= v < 31.0.0",
         "zwilias/elm-rosetree": "1.5.0 <= v < 2.0.0"
     },
     "test-dependencies": {
