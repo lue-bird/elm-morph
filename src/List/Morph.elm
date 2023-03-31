@@ -1,5 +1,5 @@
 module List.Morph exposing
-    ( eachElement
+    ( each
     , for, forBroad
     , value
     )
@@ -9,7 +9,7 @@ module List.Morph exposing
 
 ## alter
 
-@docs eachElement
+@docs each
 
 
 ## sequence
@@ -25,11 +25,12 @@ module List.Morph exposing
 
 import Array
 import ArraySized
-import Emptiable exposing (filled)
+import Emptiable
 import Linear exposing (Direction(..))
-import Morph exposing (MorphIndependently, MorphRow, broad, broadenFrom, narrowTo)
+import Morph exposing (MorphIndependently, MorphRow, broad, toBroad, toNarrow)
 import Possibly exposing (Possibly(..))
 import Stack
+import StructureMorph
 import Value
 
 
@@ -38,7 +39,7 @@ import Value
 
 
 {-| Match broad [`MorphRow`](Morph#MorphRow)s
-(those that can always [produce its broad value](Morph#broadenFrom))
+(those that can always [produce its broad value](Morph#toBroad))
 based given input elements in sequence
 
 This can get verbose, so create helpers with it where you see common patterns!
@@ -54,12 +55,12 @@ This can get verbose, so create helpers with it where you see common patterns!
 
     -- Match a specific character, case sensitive
     "abc"
-        |> Text.narrowTo (textOnly "abc")
+        |> Text.toNarrow (textOnly "abc")
     --> Ok ()
 
     -- It fails if it's not _exactly_ the same
     "abC"
-        |> Text.narrowTo (textOnly "abC")
+        |> Text.toNarrow (textOnly "abC")
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting the character 'a'. I got stuck when I got the character 'A'."
 
@@ -92,7 +93,7 @@ Don't try to be clever with this.
     import Char.Morph
 
     "AB"
-        |> Morph.narrowTo
+        |> Morph.toNarrow
             (Morph.for (Char.Morph.caseNo >> Morph.one) [ 'a', 'b' ]
                 |> Morph.rowFinish
                 |> Morph.over Stack.Morph.string
@@ -102,7 +103,7 @@ Don't try to be clever with this.
 The usual [`Morph.succeed`](Morph#succeed)`(\... -> ...) |>`[`grab`](Morph#grab)-[`match`](Morph#match) chain
 is often more explicit, descriptive and type-safe.
 
-Because of this, `MorphRow` only exposes `for`, not `sequence`,
+Because of this, `List.Morph` only exposes `for`, not `sequence`,
 making misuse a bit more obvious.
 
 -}
@@ -113,63 +114,70 @@ for :
     -> List element
     -> MorphRow (List narrow) broadElement
 for morphRowByElement elementsToTraverseInSequence =
-    { description =
-        case elementsToTraverseInSequence of
-            [] ->
-                { inner = Emptiable.empty, custom = Emptiable.empty }
+    elementsToTraverseInSequence
+        |> List.map morphRowByElement
+        |> sequence
 
-            [ only1 ] ->
-                only1 |> morphRowByElement |> Morph.description
 
-            element0 :: element1 :: elements2Up ->
+sequence :
+    List (MorphRow narrow broadElement)
+    -> MorphRow (List narrow) broadElement
+sequence toSequence =
+    case toSequence of
+        [] ->
+            Morph.succeed []
+
+        toSequence0 :: toSequence1Up ->
+            { description =
                 { custom = Emptiable.empty
                 , inner =
-                    ArraySized.l2 element0 element1
-                        |> ArraySized.attachMin Up
-                            (elements2Up |> ArraySized.fromList)
-                        |> ArraySized.map
-                            (morphRowByElement >> Morph.description)
-                        |> ArraySized.maxToInfinity
-                        |> Morph.GroupDescription
-                        |> Emptiable.filled
+                    Morph.StructureDescription "sequence"
+                        (Stack.topBelow toSequence0 toSequence1Up
+                            |> Stack.map (\_ -> Morph.description)
+                        )
                 }
-    , narrow =
-        let
-            stepFrom traversedElement =
-                \soFar ->
-                    soFar.broad
-                        |> narrowTo (traversedElement |> morphRowByElement)
-                        |> Result.map
-                            (\stepParsed ->
-                                { broad = stepParsed.broad
-                                , narrow =
-                                    soFar.narrow
-                                        |> (::) stepParsed.narrow
+            , narrow =
+                let
+                    stepFrom index sequenceMorphRow =
+                        \soFar ->
+                            case soFar.broad |> toNarrow sequenceMorphRow of
+                                Ok stepParsed ->
+                                    { broad = stepParsed.broad
+                                    , narrow =
+                                        soFar.narrow
+                                            |> (::) stepParsed.narrow
+                                    }
+                                        |> Ok
+
+                                Err error ->
+                                    Morph.InStructureError { index = index, error = error }
+                                        |> Err
+                in
+                \initialInput ->
+                    (toSequence0 :: toSequence1Up)
+                        |> List.foldl
+                            (\sequenceMorphRow soFar ->
+                                { index = soFar.index + 1
+                                , status = soFar.status |> Result.andThen (stepFrom soFar.index sequenceMorphRow)
                                 }
                             )
-        in
-        \initialInput ->
-            elementsToTraverseInSequence
-                |> List.foldl
-                    (\stepElement ->
-                        Result.andThen (stepFrom stepElement)
-                    )
-                    ({ narrow = []
-                     , broad = initialInput
-                     }
-                        |> Ok
-                    )
-    , broaden =
-        \narrowSequence ->
-            List.map2
-                (\morphInSequence ->
-                    broadenFrom (morphInSequence |> morphRowByElement)
-                )
-                elementsToTraverseInSequence
-                narrowSequence
-                |> List.concatMap Stack.toList
-                |> Stack.fromList
-    }
+                            { index = 0
+                            , status =
+                                { narrow = []
+                                , broad = initialInput
+                                }
+                                    |> Ok
+                            }
+                        |> .status
+            , broaden =
+                \narrowSequence ->
+                    List.map2
+                        (\morphInSequence narrowElement -> narrowElement |> toBroad morphInSequence)
+                        (toSequence0 :: toSequence1Up)
+                        narrowSequence
+                        |> List.concatMap Stack.toList
+                        |> Stack.fromList
+            }
 
 
 
@@ -180,7 +188,7 @@ for morphRowByElement elementsToTraverseInSequence =
 -}
 value : Value.Morph element -> Value.Morph (List element)
 value elementMorph =
-    eachElement elementMorph
+    each elementMorph
         |> Morph.over
             (Morph.value "List"
                 { narrow =
@@ -203,14 +211,14 @@ value elementMorph =
 
 
 {-| [`Morph`](Morph#Morph) all elements in sequence.
-On the narrowing side all [narrowed](Morph#narrowTo) values must be `Ok`
+On the narrowing side all [narrowed](Morph#toNarrow) values must be `Ok`
 for it to not result in a [`Morph.Error`](Morph#Error)
 
 If the element [`Morph`](Morph#Morph) is a [`Translate`](Morph#Translate),
-`eachElement` will always succeeds with the type knowing it does
+`each` will always succeed with the type knowing it does
 
 -}
-eachElement :
+each :
     MorphIndependently
         (beforeNarrow
          -> Result (Morph.ErrorWithDeadEnd deadEnd) narrow
@@ -225,20 +233,35 @@ eachElement :
                     (List narrow)
             )
             (List beforeBroaden -> List broad)
-eachElement elementMorph =
-    { description =
-        { custom = Stack.one "each"
-        , inner =
-            Morph.ElementsDescription (elementMorph |> Morph.description)
-                |> filled
+each elementMorph =
+    StructureMorph.for "each" morphEachElement
+        |> StructureMorph.add elementMorph
+        |> StructureMorph.finish
+
+
+morphEachElement :
+    MorphIndependently
+        (beforeNarrow
+         -> Result (Morph.ErrorWithDeadEnd deadEnd) narrow
+        )
+        (beforeBroaden -> broad)
+    ->
+        { narrow :
+            List beforeNarrow
+            ->
+                Result
+                    (Morph.ErrorWithDeadEnd deadEnd)
+                    (List narrow)
+        , broaden : List beforeBroaden -> List broad
         }
-    , narrow =
+morphEachElement elementMorph =
+    { narrow =
         \list ->
             list
                 |> List.foldr
                     (\element { index, collected } ->
                         { collected =
-                            case element |> Morph.narrowTo elementMorph of
+                            case element |> Morph.toNarrow elementMorph of
                                 Ok elementValue ->
                                     collected
                                         |> Result.map (\l -> l |> (::) elementValue)
@@ -269,5 +292,5 @@ eachElement elementMorph =
                 |> Result.mapError Morph.GroupError
     , broaden =
         \list ->
-            list |> List.map (Morph.broadenFrom elementMorph)
+            list |> List.map (Morph.toBroad elementMorph)
     }

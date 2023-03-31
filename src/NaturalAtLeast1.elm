@@ -1,13 +1,10 @@
 module NaturalAtLeast1 exposing
-    ( NaturalAtLeast1
-    , n1
+    ( n1
     , add
     , chars
     )
 
-{-|
-
-@docs NaturalAtLeast1
+{-| Helpers for [`Natural.AtLeast1`](Natural#AtLeast1)
 
 @docs n1
 
@@ -29,26 +26,20 @@ import Emptiable
 import Linear exposing (Direction(..))
 import Morph exposing (MorphRow)
 import N exposing (Min, N, N0, N1, On, n0)
+import Natural
 import NaturalAtLeast1.Internal
-import Number
 
 
-{-| Positive natural number, can be arbitrarily large
+{-| The [positive natural number](#Natural.AtLeast1) 1
 -}
-type alias NaturalAtLeast1 =
-    Number.NaturalAtLeast1
-
-
-{-| The [positive natural number](#NaturalAtLeast1) 1
--}
-n1 : NaturalAtLeast1
+n1 : Natural.AtLeast1
 n1 =
     NaturalAtLeast1.Internal.n1
 
 
 add :
-    NaturalAtLeast1
-    -> (NaturalAtLeast1 -> NaturalAtLeast1)
+    Natural.AtLeast1
+    -> (Natural.AtLeast1 -> Natural.AtLeast1)
 add toAdd =
     \naturalPositive ->
         let
@@ -73,9 +64,9 @@ add toAdd =
 
 
 addBits :
-    NaturalAtLeast1
+    Natural.AtLeast1
     ->
-        (NaturalAtLeast1
+        (Natural.AtLeast1
          ->
             { inRange : ArraySized Bit (Min (On N1))
             , overflow : Bit
@@ -135,7 +126,7 @@ addBits toAdd =
 
 
 toBits :
-    NaturalAtLeast1
+    Natural.AtLeast1
     -> ArraySized Bit (Min (On N1))
 toBits =
     \naturalAtLeast1 ->
@@ -144,6 +135,6 @@ toBits =
             |> ArraySized.insertMin ( Up, n0 ) Bit.I
 
 
-chars : MorphRow NaturalAtLeast1 Char
+chars : MorphRow Natural.AtLeast1 Char
 chars =
     NaturalAtLeast1.Internal.chars

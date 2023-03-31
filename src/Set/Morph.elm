@@ -1,5 +1,5 @@
 module Set.Morph exposing
-    ( eachElement
+    ( each
     , list, toList
     , value
     )
@@ -9,7 +9,7 @@ module Set.Morph exposing
 
 ## alter
 
-@docs eachElement
+@docs each
 
 
 ## transform
@@ -19,12 +19,13 @@ module Set.Morph exposing
 
 -}
 
-import Emptiable exposing (filled)
+import Emptiable
 import List.Morph
 import Morph exposing (MorphIndependently, translate)
 import Possibly exposing (Possibly(..))
 import Set exposing (Set)
 import Stack
+import StructureMorph
 import Value
 
 
@@ -73,14 +74,14 @@ toList =
 
 
 {-| [`Morph`](Morph#Morph) all elements in sequence.
-On the narrowing side all [narrowed](Morph#narrowTo) values must be `Ok`
+On the narrowing side all [narrowed](Morph#toNarrow) values must be `Ok`
 for it to not result in a [`Morph.Error`](Morph#Error)
 
 If the given element [`Morph`](Morph#Morph) is a [`Translate`](Morph#Translate),
-`eachElement` will always succeeds with the type knowing it does
+`each` will always succeed with the type knowing it does
 
 -}
-eachElement :
+each :
     MorphIndependently
         (comparableBeforeNarrow
          -> Result (Morph.ErrorWithDeadEnd deadEnd) comparableNarrow
@@ -95,20 +96,35 @@ eachElement :
                     (Set comparableNarrow)
             )
             (Set comparableBeforeBroaden -> Set comparableBroad)
-eachElement elementMorph =
-    { description =
-        { custom = Stack.one "each"
-        , inner =
-            Morph.ElementsDescription (elementMorph |> Morph.description)
-                |> filled
+each elementMorph =
+    StructureMorph.for "each" morphEachElement
+        |> StructureMorph.add elementMorph
+        |> StructureMorph.finish
+
+
+morphEachElement :
+    MorphIndependently
+        (comparableBeforeNarrow
+         -> Result (Morph.ErrorWithDeadEnd deadEnd) comparableNarrow
+        )
+        (comparableBeforeBroaden -> comparableBroad)
+    ->
+        { narrow :
+            Set comparableBeforeNarrow
+            ->
+                Result
+                    (Morph.ErrorWithDeadEnd deadEnd)
+                    (Set comparableNarrow)
+        , broaden : Set comparableBeforeBroaden -> Set comparableBroad
         }
-    , narrow =
+morphEachElement elementMorph =
+    { narrow =
         \set ->
             set
                 |> Set.foldl
                     (\element { index, collected } ->
                         { collected =
-                            case element |> Morph.narrowTo elementMorph of
+                            case element |> Morph.toNarrow elementMorph of
                                 Ok elementValue ->
                                     collected
                                         |> Result.map (\l -> l |> Set.insert elementValue)
@@ -139,7 +155,7 @@ eachElement elementMorph =
                 |> Result.mapError Morph.GroupError
     , broaden =
         \set ->
-            set |> Set.map (Morph.broadenFrom elementMorph)
+            set |> Set.map (Morph.toBroad elementMorph)
     }
 
 

@@ -1,5 +1,5 @@
 module String.Morph exposing
-    ( eachElement
+    ( each
     , only
     , toList, list, value
     , for, forBroad
@@ -10,7 +10,7 @@ module String.Morph exposing
 
 ## alter
 
-@docs eachElement
+@docs each
 @docs only
 
 
@@ -49,7 +49,7 @@ toList =
     --> [ '0', '1', '2', '3' ]
 
 Parse-build a `String` →
-Use [`narrowTo`](Morph#narrowTo), [`broadenFrom`](Morph#broadenFrom)
+Use [`toNarrow`](Morph#toNarrow), [`toBroad`](Morph#toBroad)
 with [`Morph.rowFinish`](Morph#rowFinish) `|> over` [`String.Morph.List`](#list)
 
 -}
@@ -64,10 +64,10 @@ list =
 
 {-| [`Translate`](Morph#Translate) each `Char` in a `String`
 -}
-eachElement :
+each :
     Translate Char Char
     -> MorphOrError String String error_
-eachElement elementCharTranslate =
+each elementCharTranslate =
     translateOn ( String.map, String.map ) elementCharTranslate
 
 
@@ -81,11 +81,11 @@ This is case sensitive.
     import Morph.Error
 
     -- match an exact text, case sensitive
-    "abcdef" |> Text.narrowTo (text "abc") --> Ok "abc"
+    "abcdef" |> Text.toNarrow (text "abc") --> Ok "abc"
 
     -- but anything else makes it fail
     "abCDEF"
-        |> Text.narrowTo (text "abc")
+        |> Text.toNarrow (text "abc")
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:3: I was expecting the text 'abc'. I got stuck when I got the character 'C'."
 
@@ -102,7 +102,7 @@ only expectedText =
 
 
 {-| Match broad [`MorphRow`](Morph#MorphRow)s
-(those that can always [produce its broad value](Morph#broadenFrom))
+(those that can always [produce its broad value](Morph#toBroad))
 based a given `String`s `Char`s in sequence
 
 For more details, look at [`ArraySized.Morph.forBroad`](ArraySized-Morph#forBroad)

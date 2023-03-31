@@ -17,17 +17,17 @@ import Value
 
 {-| Character by unicode [code point][cp]
 
-    Morph.narrowTo Char.code 65 --> Ok 'A'
+    Morph.toNarrow Char.code 65 --> Ok 'A'
 
-    Morph.narrowTo Char.code 66 --> Ok 'B'
+    Morph.toNarrow Char.code 66 --> Ok 'B'
 
-    Morph.narrowTo Char.code 0x6728 --> Ok '木'
+    Morph.toNarrow Char.code 0x6728 --> Ok '木'
 
-    Morph.narrowTo Char.code 0x0001D306 --> Ok '𝌆'
+    Morph.toNarrow Char.code 0x0001D306 --> Ok '𝌆'
 
-    Morph.narrowTo Char.code 0x0001F603 --> Ok '😃'
+    Morph.toNarrow Char.code 0x0001F603 --> Ok '😃'
 
-    Morph.narrowTo Char.code -1
+    Morph.toNarrow Char.code -1
     --> Err "unicode code point outside of range 0 to 0x10FFFF"
 
 The full range of unicode is from `0` to `0x10FFFF`. With numbers outside that
@@ -53,8 +53,8 @@ code =
 {-| `Char` [`Value.Morph`](Value#Morph)
 
 Be aware, that [special-cased characters as the result of `Char.toUpper`](https://github.com/elm/core/issues/1001)
-are [encoded](Morph#broadenFrom) as 2 `Char`s in a `String`
-and therefore can't be [decoded](Morph#narrowTo) again
+are [encoded](Morph#toBroad) as 2 `Char`s in a `String`
+and therefore can't be [decoded](Morph#toNarrow) again
 
 -}
 value : Value.Morph Char
@@ -65,8 +65,8 @@ value =
 {-| [`Morph`](Morph#Morph) a `String` of length 1 to a `Char`
 
 Be aware, that [special-cased characters as the result of `Char.toUpper`](https://github.com/elm/core/issues/1001)
-are [encoded](Morph#broadenFrom) as 2 `Char`s in a `String`
-and therefore can't be [decoded](Morph#narrowTo) again
+are [encoded](Morph#toBroad) as 2 `Char`s in a `String`
+and therefore can't be [decoded](Morph#toNarrow) again
 
 -}
 string : Morph Char String
@@ -95,4 +95,4 @@ string =
 -}
 only : Char -> Morph () Char
 only broadConstant =
-    Morph.only String.fromChar broadConstant
+    Morph.only (\char -> [ "'", char |> String.fromChar, "'" ] |> String.concat) broadConstant

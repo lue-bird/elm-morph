@@ -30,15 +30,16 @@ module Json exposing
 
 import Array
 import Decimal exposing (Decimal)
+import Decimal.Morph
 import DecimalOrException
 import Emptiable exposing (Emptiable)
 import Json.Decode
 import Json.Encode
-import Linear exposing (Direction(..))
 import Morph exposing (Morph, MorphIndependently, translate)
 import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Stack exposing (Stacked)
+import Tree
 import Value exposing (AtomOrComposed(..))
 
 
@@ -106,10 +107,12 @@ decodeErrorToMorph =
                 [ "field `"
                 , fieldName
                 , "`:\n"
-                , error
-                    |> decodeErrorToMorph
-                    |> Morph.errorToLines
-                    |> Stack.fold Up (\line soFar -> soFar ++ "\n" ++ line)
+                , -- TODO find better error display
+                  Morph.descriptionAndErrorToTree { custom = Emptiable.empty, inner = Morph.CustomDescription }
+                    (error |> decodeErrorToMorph |> Just)
+                    |> Tree.map .text
+                    |> Morph.treeToLines
+                    |> String.join "\n"
                 , "\n\n"
                 , "`Morph` can't turn this into a more structured error"
                 , " because it refers to field errors by their location in the dict/record/object."
@@ -174,8 +177,8 @@ atomJsValueMagicEncode =
 
             Number floatAtom ->
                 floatAtom
-                    |> Morph.broadenFrom
-                        (Decimal.orException |> Morph.over DecimalOrException.float)
+                    |> Morph.toBroad
+                        (Decimal.Morph.orException |> Morph.over DecimalOrException.float)
                     |> Json.Encode.float
 
             String stringAtom ->
@@ -205,25 +208,27 @@ jsonAtomDecoder =
         , Json.Decode.map Bool Json.Decode.bool
         , Json.Decode.andThen
             (\float ->
-                case
-                    float
-                        |> Morph.narrowTo
-                            (Decimal.orException
-                                |> Morph.over DecimalOrException.float
-                            )
-                of
+                case float |> Morph.toNarrow decimalFloatMorph of
                     Ok decimal ->
                         Number decimal |> Json.Decode.succeed
 
                     Err exception ->
-                        exception
-                            |> Morph.errorToLines
-                            |> Stack.fold Up (\line soFar -> soFar ++ "\n" ++ line)
+                        Morph.descriptionAndErrorToTree (decimalFloatMorph |> Morph.description)
+                            (exception |> Just)
+                            |> Tree.map .text
+                            |> Morph.treeToLines
+                            |> String.join "\n"
                             |> Json.Decode.fail
             )
             Json.Decode.float
         , Json.Decode.map String Json.Decode.string
         ]
+
+
+decimalFloatMorph : Morph Decimal Float
+decimalFloatMorph =
+    Decimal.Morph.orException
+        |> Morph.over DecimalOrException.float
 
 
 {-| [Morph](Morph#Morph) to valid [`Json` value](#Json) format from [`JsValueMagic`](#JsValueMagic)
@@ -246,7 +251,7 @@ About json numbers...
 jsValueMagic : Morph (Json String) JsValueMagic
 jsValueMagic =
     Morph.to "JSON"
-        { description = { custom = Emptiable.empty, inner = Emptiable.empty }
+        { description = { custom = Emptiable.empty, inner = Morph.CustomDescription }
         , narrow =
             \jsValueMagicBeforeNarrow ->
                 jsValueMagicBeforeNarrow
@@ -258,7 +263,7 @@ jsValueMagic =
 
 {-| [Morph](Morph#Morph) to valid [`Json` value](#Json) format from a `String`
 
-[Broadens](Morph#broadenFrom) to a compact `String`.
+[Broadens](Morph#toBroad) to a compact `String`.
 To adjust format readability → [`stringBroadWith`](#stringBroadWith)
 
 -}
@@ -272,7 +277,7 @@ string =
 stringBroadWith : { indentation : Int } -> Morph (Json String) String
 stringBroadWith { indentation } =
     Morph.to "JSON"
-        { description = { custom = Emptiable.empty, inner = Emptiable.empty }
+        { description = { custom = Emptiable.empty, inner = Morph.CustomDescription }
         , narrow =
             \jsValueMagicBroad ->
                 jsValueMagicBroad
@@ -482,7 +487,7 @@ eachTag :
 eachTag tagTranslate_ =
     translate
         (tagMap (Morph.mapTo tagTranslate_))
-        (tagMap (Morph.broadenFrom tagTranslate_))
+        (tagMap (Morph.toBroad tagTranslate_))
 
 
 {-| Reduce the amount of tag information.

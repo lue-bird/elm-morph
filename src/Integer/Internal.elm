@@ -2,11 +2,12 @@ module Integer.Internal exposing (fromInt, toInt)
 
 import ArraySized
 import Bits
+import Integer exposing (Integer(..))
 import Linear exposing (Direction(..))
 import N exposing (n0, n1)
 import N.Local exposing (n32)
 import NaturalAtLeast1.Internal
-import Number exposing (Integer(..), Sign(..))
+import Sign exposing (Sign(..))
 
 
 fromInt : Int -> Integer
@@ -22,7 +23,7 @@ fromInt =
                 |> ArraySized.hasAtLeast n1
         of
             Ok absoluteAtLeast1 ->
-                IntegerSigned
+                Integer.Signed
                     { sign =
                         if intBroad >= 0 then
                             Positive
@@ -39,17 +40,17 @@ fromInt =
                     }
 
             Err _ ->
-                IntegerN0
+                Integer.N0
 
 
 toInt : Integer -> Int
 toInt =
     \integerNarrow ->
         case integerNarrow of
-            IntegerN0 ->
+            Integer.N0 ->
                 0
 
-            IntegerSigned signedValue ->
+            Integer.Signed signedValue ->
                 signedValue.absolute
                     |> NaturalAtLeast1.Internal.toN
                     |> N.toInt

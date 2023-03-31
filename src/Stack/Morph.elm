@@ -1,5 +1,5 @@
 module Stack.Morph exposing
-    ( eachElement
+    ( each
     , list, toList
     , string, toString
     )
@@ -9,7 +9,7 @@ module Stack.Morph exposing
 
 ## alter
 
-@docs eachElement
+@docs each
 
 
 ## transform
@@ -24,6 +24,7 @@ import Linear exposing (Direction(..))
 import Morph exposing (MorphIndependently, MorphOrError, translate)
 import Possibly exposing (Possibly(..))
 import Stack exposing (Stacked)
+import StructureMorph
 
 
 
@@ -33,10 +34,10 @@ import Stack exposing (Stacked)
 {-| [`Morph`](Morph#Morph) each stacked element
 
 If the given [`Morph`](Morph#Morph) is a [`Translate`](Morph#Translate),
-[`eachElement`](#eachElement) will also be a [`Translate`](Morph#Translate)
+[`each`](#each) will also be a [`Translate`](Morph#Translate)
 
 -}
-eachElement :
+each :
     MorphIndependently
         (beforeNarrow
          -> Result (Morph.ErrorWithDeadEnd deadEnd) narrow
@@ -53,14 +54,31 @@ eachElement :
             (Emptiable (Stacked beforeBroaden) narrowPossiblyOrNever
              -> Emptiable (Stacked broad) narrowPossiblyOrNever
             )
-eachElement elementMorph =
-    { description =
-        { custom = Stack.one "each"
-        , inner =
-            Morph.ElementsDescription (elementMorph |> Morph.description)
-                |> filled
+each elementMorph =
+    StructureMorph.for "each" morphEachElement
+        |> StructureMorph.add elementMorph
+        |> StructureMorph.finish
+
+
+morphEachElement :
+    MorphIndependently
+        (beforeNarrow
+         -> Result (Morph.ErrorWithDeadEnd deadEnd) narrow
+        )
+        (beforeBroaden -> broad)
+    ->
+        { narrow :
+            Emptiable (Stacked beforeNarrow) broadEmptiablePossiblyOrNever
+            ->
+                Result
+                    (Morph.ErrorWithDeadEnd deadEnd)
+                    (Emptiable (Stacked narrow) broadEmptiablePossiblyOrNever)
+        , broaden :
+            Emptiable (Stacked beforeBroaden) narrowPossiblyOrNever
+            -> Emptiable (Stacked broad) narrowPossiblyOrNever
         }
-    , narrow =
+morphEachElement elementMorph =
+    { narrow =
         \stack ->
             case stack of
                 Emptiable.Empty emptyPossiblyOrNever ->
@@ -79,7 +97,7 @@ eachElement elementMorph =
                         |> Stack.removeTop
                         |> Stack.foldFrom
                             { collected =
-                                case reversed |> Stack.top |> Morph.narrowTo elementMorph of
+                                case reversed |> Stack.top |> Morph.toNarrow elementMorph of
                                     Err topError ->
                                         { index = lastIndex, error = topError }
                                             |> Stack.one
@@ -94,7 +112,7 @@ eachElement elementMorph =
                             Up
                             (\element { index, collected } ->
                                 { collected =
-                                    case element |> Morph.narrowTo elementMorph of
+                                    case element |> Morph.toNarrow elementMorph of
                                         Ok elementValue ->
                                             collected
                                                 |> Result.map
@@ -122,7 +140,7 @@ eachElement elementMorph =
                         |> .collected
                         |> Result.mapError Morph.GroupError
     , broaden =
-        Stack.map (\_ -> Morph.broadenFrom elementMorph)
+        Stack.map (\_ -> Morph.toBroad elementMorph)
     }
 
 

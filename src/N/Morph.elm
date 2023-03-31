@@ -95,7 +95,7 @@ rangeDescription =
 {-| [`Morph`](Morph#Morph) a digit in a given range
 
 You can require a maximum >= 10.
-In that case, the [narrowed](Morph#narrowTo) `N` will also have a maximum >= 10
+In that case, the [narrowed](Morph#toNarrow) `N` will also have a maximum >= 10
 even though every possible `Char` can only show a digit <= 9
 
 -}

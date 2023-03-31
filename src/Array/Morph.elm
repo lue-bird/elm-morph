@@ -1,5 +1,5 @@
 module Array.Morph exposing
-    ( eachElement
+    ( each
     , list, toList
     , value
     )
@@ -9,7 +9,7 @@ module Array.Morph exposing
 
 ## alter
 
-@docs eachElement
+@docs each
 
 
 ## transform
@@ -20,10 +20,11 @@ module Array.Morph exposing
 -}
 
 import Array exposing (Array)
-import Emptiable exposing (filled)
+import Emptiable
 import Morph exposing (MorphIndependently, translate)
 import Possibly exposing (Possibly(..))
 import Stack
+import StructureMorph
 import Value
 
 
@@ -69,7 +70,7 @@ toList =
 -}
 value : Value.Morph element -> Value.Morph (Array element)
 value elementMorph =
-    eachElement elementMorph
+    each elementMorph
         |> Morph.over
             (Morph.value "Array"
                 { narrow =
@@ -90,14 +91,14 @@ value elementMorph =
 
 
 {-| [`Morph`](Morph#Morph) all elements in sequence.
-On the narrowing side all [narrowed](Morph#narrowTo) values must be `Ok`
+On the narrowing side all [narrowed](Morph#toNarrow) values must be `Ok`
 for it to not result in a [`Morph.Error`](Morph#Error)
 
 If the element [`Morph`](Morph#Morph) is a [`Translate`](Morph#Translate),
-`eachElement` will always succeeds with the type knowing it does
+`each` will always succeed with the type knowing it does
 
 -}
-eachElement :
+each :
     MorphIndependently
         (beforeNarrow
          -> Result (Morph.ErrorWithDeadEnd deadEnd) narrow
@@ -112,20 +113,35 @@ eachElement :
                     (Array narrow)
             )
             (Array beforeBroaden -> Array broad)
-eachElement elementMorph =
-    { description =
-        { custom = Stack.one "each"
-        , inner =
-            Morph.ElementsDescription (elementMorph |> Morph.description)
-                |> filled
+each elementMorph =
+    StructureMorph.for "each" morphEachElement
+        |> StructureMorph.add elementMorph
+        |> StructureMorph.finish
+
+
+morphEachElement :
+    MorphIndependently
+        (beforeNarrow
+         -> Result (Morph.ErrorWithDeadEnd deadEnd) narrow
+        )
+        (beforeBroaden -> broad)
+    ->
+        { narrow :
+            Array beforeNarrow
+            ->
+                Result
+                    (Morph.ErrorWithDeadEnd deadEnd)
+                    (Array narrow)
+        , broaden : Array beforeBroaden -> Array broad
         }
-    , narrow =
+morphEachElement elementMorph =
+    { narrow =
         \array ->
             array
                 |> Array.foldr
                     (\element { index, collected } ->
                         { collected =
-                            case element |> Morph.narrowTo elementMorph of
+                            case element |> Morph.toNarrow elementMorph of
                                 Ok elementValue ->
                                     collected
                                         |> Result.map (\l -> l |> (::) elementValue)
@@ -157,5 +173,5 @@ eachElement elementMorph =
                 |> Result.mapError Morph.GroupError
     , broaden =
         \array ->
-            array |> Array.map (Morph.broadenFrom elementMorph)
+            array |> Array.map (Morph.toBroad elementMorph)
     }

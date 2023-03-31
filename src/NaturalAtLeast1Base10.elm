@@ -36,7 +36,7 @@ import List.Linear
 import Morph exposing (MorphRow, grab, one)
 import N exposing (Add1, In, N, N0, N1, N9, On, Up0, Up9, n0, n1, n10, n2, n9)
 import N.Morph
-import Number exposing (NaturalAtLeast1)
+import Natural
 
 
 type alias NaturalAtLeast1Base10 =
@@ -45,7 +45,7 @@ type alias NaturalAtLeast1Base10 =
     }
 
 
-toBase2 : NaturalAtLeast1Base10 -> NaturalAtLeast1
+toBase2 : NaturalAtLeast1Base10 -> Natural.AtLeast1
 toBase2 =
     \naturalAtLeast1Base10 ->
         let
@@ -128,7 +128,7 @@ digitsDivideBy2 =
         }
 
 
-base2DigitsUnpad : List Bit -> Maybe NaturalAtLeast1
+base2DigitsUnpad : List Bit -> Maybe Natural.AtLeast1
 base2DigitsUnpad =
     \base2Digits ->
         case base2Digits of
@@ -230,7 +230,7 @@ addDigits toAdd =
         }
 
 
-fromBase2 : NaturalAtLeast1 -> NaturalAtLeast1Base10
+fromBase2 : Natural.AtLeast1 -> NaturalAtLeast1Base10
 fromBase2 =
     \digits ->
         digits.bitsAfterI

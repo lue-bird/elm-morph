@@ -87,7 +87,7 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
   - `Parser.Check` remove
       - `end` move → `MorphRow`
       - lookahead/-before remove
-      - no `end` in favor of `narrowTo : ... -> Result (ExpectationMiss ... | InputRemaining ...)`
+      - no `end` in favor of `toNarrow : ... -> Result (ExpectationMiss ... | InputRemaining ...)`
       - only `endOfLine` kept → consuming `lineEnd`
   - name `Parser.Char` → `Char.Morph`
       - `anyChar` remove
@@ -106,7 +106,7 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
   - `MorphRow`
       - `parse : String -> MorphRow narrow -> Result Error narrow` remove
           - in favor of
-            `narrowTo (... |> Morph.over Stack.Morph.toText)`
+            `toNarrow (... |> Morph.over Stack.Morph.toText)`
       - `first |> orElse second` remove
           - in favor of `onFailDown [ first, second ]`
       - can parse any input list (not only `String`)
@@ -116,7 +116,7 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
           - in favor of `grab`, `match`
       - `andThen2` remove
       - `textOf` remove
-          - in favor of `String.Morph.list |> Morph.rowOver ...`
+          - in favor of `String.Morph.list |> Morph.overRow ...`
       - `oneAny` add
       - `one` add
       - `before` add

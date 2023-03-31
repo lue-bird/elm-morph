@@ -130,9 +130,9 @@ Motivated? Explore, PR ↓
 -}
 
 import Array exposing (Array)
+import Decimal exposing (Decimal)
 import Emptiable exposing (Emptiable)
 import Morph exposing (ChoiceMorphEmptiable, ErrorWithDeadEnd(..), Morph, MorphIndependently, translate)
-import Number exposing (Decimal)
 import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Stack exposing (Stacked)
@@ -306,7 +306,7 @@ eachTag :
 eachTag tagTranslate_ =
     translate
         (tagMap (Morph.mapTo tagTranslate_))
-        (tagMap (Morph.broadenFrom tagTranslate_))
+        (tagMap (Morph.toBroad tagTranslate_))
 
 
 {-| Reduce the amount of tag information of the [`Value`](#Value)
@@ -631,7 +631,7 @@ part ( accessFieldValue, fieldName ) fieldValueMorph =
                     fieldValueBroad =
                         wholeNarrow
                             |> accessFieldValue
-                            |> Morph.broadenFrom fieldValueMorph
+                            |> Morph.toBroad fieldValueMorph
 
                     fieldBroad : Tagged IndexAndName
                     fieldBroad =
@@ -679,7 +679,7 @@ partValueNarrow tag fieldValueMorph groupSoFarNarrow =
         in
         case groupBroad |> Stack.toList |> List.filter (.tag >> matches) of
             partBroad :: _ ->
-                case partBroad.value |> Morph.narrowTo fieldValueMorph of
+                case partBroad.value |> Morph.toNarrow fieldValueMorph of
                     Ok partNarrow ->
                         wholeAssemblyResult
                             |> Result.map (\eat -> eat partNarrow)
@@ -746,7 +746,7 @@ partsFinish =
     \groupMorphInProgress ->
         { description =
             { custom = Emptiable.empty
-            , inner = groupMorphInProgress.description |> Morph.PartsDescription |> Emptiable.filled
+            , inner = groupMorphInProgress.description |> Morph.PartsDescription
             }
         , narrow =
             \broad_ ->
@@ -820,13 +820,13 @@ variant ( possibilityToChoice, possibilityTag ) possibilityMorph =
         choiceMorphSoFar
             |> Morph.try possibilityToChoice
                 (Morph.to possibilityTag
-                    { description = { custom = Emptiable.empty, inner = Emptiable.empty }
+                    { description = possibilityMorph |> Morph.description
                     , narrow =
                         variantStepNarrow
                             ( { name = possibilityTag
                               , index = choiceMorphSoFar.description |> Stack.length
                               }
-                            , Morph.narrowTo possibilityMorph
+                            , Morph.toNarrow possibilityMorph
                             )
                     , broaden =
                         \narrowValue ->
@@ -834,7 +834,7 @@ variant ( possibilityToChoice, possibilityTag ) possibilityMorph =
                                 { name = possibilityTag
                                 , index = choiceMorphSoFar.description |> Stack.length
                                 }
-                            , value = narrowValue |> Morph.broadenFrom possibilityMorph
+                            , value = narrowValue |> Morph.toBroad possibilityMorph
                             }
                     }
                 )

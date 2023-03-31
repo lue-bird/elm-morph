@@ -19,14 +19,15 @@ module DecimalOrException exposing
 
 -}
 
+import Decimal exposing (Decimal, Fraction)
 import Emptiable exposing (Emptiable)
 import Linear exposing (Direction(..))
 import Morph exposing (MorphOrError)
 import N exposing (In, N, N0, N9, n0, n1, n9)
 import NaturalAtLeast1.Internal
 import NaturalAtLeast1Base10
-import Number exposing (Decimal(..), DecimalSignedAbsolute(..), Fraction, Sign(..))
 import Possibly exposing (Possibly)
+import Sign exposing (Sign(..))
 import Stack exposing (Stacked)
 import Value
 
@@ -95,7 +96,7 @@ since `Float` is fixed in bit size while [`OrException Decimal`](#OrException) i
 
     -9999.124
         |> broaden
-            (Decimal.chars
+            (Decimal.Morph.chars
                 |> Morph.overRow Decimal.orException
                 |> Morph.overRow DecimalOrException.toFloat
                 |> Morph.rowFinish
@@ -137,7 +138,7 @@ float =
             (Morph.translate
                 (\float_ ->
                     if float_ == 0 then
-                        DecimalN0
+                        Decimal.N0
 
                     else
                         -- /= 0
@@ -157,7 +158,7 @@ float =
                         , absolute =
                             case wholeAbsolute of
                                 0 ->
-                                    floatAbsolute |> floatToFraction |> DecimalFraction
+                                    floatAbsolute |> floatToFraction |> Decimal.Fraction
 
                                 wholeAbsoluteExcept0 ->
                                     { whole =
@@ -177,16 +178,16 @@ float =
                                                 |> floatToFraction
                                                 |> Just
                                     }
-                                        |> DecimalAtLeast1
+                                        |> Decimal.AtLeast1
                         }
-                            |> DecimalSigned
+                            |> Decimal.Signed
                 )
                 (\floatNarrow ->
                     case floatNarrow of
-                        DecimalN0 ->
+                        Decimal.N0 ->
                             0
 
-                        DecimalSigned numberSigned ->
+                        Decimal.Signed numberSigned ->
                             let
                                 toSigned =
                                     case numberSigned.sign of
@@ -230,14 +231,14 @@ floatInfinity =
     1.0 / 0.0
 
 
-signedAbsoluteToFloat : DecimalSignedAbsolute -> Float
+signedAbsoluteToFloat : Decimal.SignedAbsolute -> Float
 signedAbsoluteToFloat =
     \absolute ->
         case absolute of
-            DecimalFraction fraction ->
+            Decimal.Fraction fraction ->
                 fraction |> fractionToFloat
 
-            DecimalAtLeast1 atLeast1 ->
+            Decimal.AtLeast1 atLeast1 ->
                 let
                     wholeFloat : Float
                     wholeFloat =
@@ -312,7 +313,7 @@ since `Float` is fixed in bit size while [`OrException Decimal`](#OrException) i
 
     -9999.124
         |> broaden
-            (Decimal.chars
+            (Decimal.Morph.chars
                 |> Morph.overRow Decimal.orException
                 |> Morph.overRow DecimalOrException.toFloat
                 |> Morph.rowFinish
@@ -343,7 +344,7 @@ value =
         |> Value.choiceFinish
 
 
-decimalInternalValue : Value.Morph Number.Decimal
+decimalInternalValue : Value.Morph Decimal
 decimalInternalValue =
     Morph.value "Decimal"
         { narrow =

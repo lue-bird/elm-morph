@@ -21,6 +21,7 @@ Independent of output format
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Value
 import Decimal exposing (Decimal)
+import Decimal.Morph
 import String.Morph
 
 type alias Cause =
@@ -38,8 +39,8 @@ value =
             { name = name, percent = percent, per100k = per100k }
         )
         |> Value.part ( .name, "name" ) String.Morph.value
-        |> Value.part ( .percent, "percent" ) Decimal.value
-        |> Value.part ( .per100k, "per100k" ) Decimal.value
+        |> Value.part ( .percent, "percent" ) Decimal.Morph.value
+        |> Value.part ( .per100k, "per100k" ) Decimal.Morph.value
         |> Value.groupFinish
 ```
 surprisingly easy!

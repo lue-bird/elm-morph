@@ -7,18 +7,18 @@ import Linear exposing (Direction(..))
 import Morph exposing (MorphRow)
 import N exposing (Min, N, N0, On, n0)
 import N.Local exposing (n32)
+import Natural
 import NaturalAtLeast1Base10
-import Number exposing (NaturalAtLeast1)
 
 
-n1 : NaturalAtLeast1
+n1 : Natural.AtLeast1
 n1 =
     { bitsAfterI =
         ArraySized.empty |> ArraySized.maxToInfinity |> ArraySized.minToNumber
     }
 
 
-toN : NaturalAtLeast1 -> N (Min (On N0))
+toN : Natural.AtLeast1 -> N (Min (On N0))
 toN =
     \naturalAtLeast1 ->
         naturalAtLeast1.bitsAfterI
@@ -28,7 +28,7 @@ toN =
             |> Bits.toN
 
 
-chars : MorphRow NaturalAtLeast1 Char
+chars : MorphRow Natural.AtLeast1 Char
 chars =
     Morph.translate NaturalAtLeast1Base10.toBase2 NaturalAtLeast1Base10.fromBase2
         |> Morph.overRow NaturalAtLeast1Base10.chars

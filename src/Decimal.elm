@@ -1,40 +1,32 @@
 module Decimal exposing
-    ( Decimal, Fraction
+    ( Decimal(..), Signed, SignedAbsolute(..), Fraction
     , ceiling, floor, truncate
-    , chars, orException, value
     )
 
 {-| safe and explicit floating point number
 without the possibility of [exceptions](DecimalOrException#Exception)
 
-@docs Decimal, Fraction
+@docs Decimal, Signed, SignedAbsolute, Fraction
 
 
 ## alter
 
 @docs ceiling, floor, truncate
 
-
-## [`Morph`](Morph#Morph)
-
-@docs chars, orException, value
-
 -}
 
 import ArraySized
-import ArraySized.Morph
-import DecimalOrException exposing (OrException)
-import Maybe.Morph
-import Morph exposing (Morph, MorphRow, grab, match, one)
-import N exposing (n0, n1, n9)
+import Emptiable exposing (Emptiable)
+import Integer exposing (Integer)
+import N exposing (In, N, N0, N1, N9, n0, n1, n9)
 import N.Morph
+import Natural
 import NaturalAtLeast1
 import NaturalAtLeast1.Internal
-import Number exposing (Decimal(..), DecimalSigned, DecimalSignedAbsolute(..), Integer(..), Sign(..))
-import Sign
-import Stack.Morph
-import String.Morph
-import Value
+import Possibly exposing (Possibly)
+import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
+import Sign exposing (Sign(..))
+import Stack exposing (Stacked)
 
 
 {-| A decimal number that can have a floating point
@@ -49,210 +41,41 @@ Don't shy away from spinning your own version of this if needed, like
 See also [`OrException Decimal`](DecimalOrException#OrException)
 
 -}
-type alias Decimal =
-    Number.Decimal
+type Decimal
+    = N0
+    | Signed Signed
 
 
 {-| _Some_ digits after the decimal point. Can't be none
 -}
 type alias Fraction =
-    Number.Fraction
+    RecordWithoutConstructorFunction
+        { beforeLast : Emptiable (Stacked (N (In N0 N9))) Possibly
+        , last : N (In N1 N9)
+        }
+
+
+{-| Any [`Decimal`](Decimal#Decimal) except `0` is represented this way
+-}
+type alias Signed =
+    RecordWithoutConstructorFunction
+        { sign : Sign
+        , absolute : SignedAbsolute
+        }
+
+
+{-| What comes after its [`Sign`](Sign#Sign)
+-}
+type SignedAbsolute
+    = Fraction Fraction
+    | AtLeast1
+        { whole : Natural.AtLeast1
+        , fraction : Maybe Fraction
+        }
 
 
 
 --
-
-
-{-| [`Morph`](Morph#Morph)
-a [`Decimal`](#Decimal)
-to an [`OrException Decimal`](DecimalOrException#OrException)
--}
-orException : Morph Decimal (OrException Decimal)
-orException =
-    Morph.value "Decimal"
-        { narrow =
-            \floatExplicit_ ->
-                case floatExplicit_ of
-                    DecimalOrException.Number number ->
-                        number |> Ok
-
-                    DecimalOrException.Exception _ ->
-                        "Exception" |> Err
-        , broaden = DecimalOrException.Number
-        }
-
-
-{-| Match a decimal number
-
-    import Morph.Error
-
-
-    -- trailing 0s aren't represented in the final type
-
-    "12.0340000" |> Text.narrowTo number  --> Ok 12.034
-    "-12.000" |> Text.narrowTo number --> Ok -12.0
-
-    -- leading floating point is allowed
-
-    ".012" |> Text.narrowTo number    --> Ok 0.012
-    "-.12" |> Text.narrowTo number   --> Ok -0.12
-
-    -- fails for integers without a floating point
-
-    "12"
-        |> Text.narrowTo number
-        |> Result.mapError Morph.Error.textMessage
-    --> Err ...
-
-    -- but succeeds for integers with a trailing floating point
-
-    "12." |> Text.narrowTo number    --> Ok 12.0
-
-    -- fails for everything else
-
-    "."
-        |> Text.narrowTo number
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting a digit [0-9]. I got stuck when I got the character '.'."
-
-    "abc"
-        |> Text.narrowTo number
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting a digit [0-9]. I got stuck when I got the character 'a'."
-
-To allow integers to parse as decimals as well,
-build a [`Morph.choice`](Morph#choice)
-[`Decimal.chars`](#chars)
-and [`Integer.chars`](Integer#chars)
-
-For different parsing behavior, spin your own
-using [`Decimal.chars`](#chars) implementation as a reference
-
--}
-chars : MorphRow Decimal Char
-chars =
-    Morph.to "decimal"
-        (Morph.choice
-            (\signedVariant n0Variant numberNarrow ->
-                case numberNarrow of
-                    DecimalN0 ->
-                        n0Variant ()
-
-                    DecimalSigned signedValue ->
-                        signedVariant signedValue
-            )
-            |> Morph.tryRow DecimalSigned signedChars
-            |> Morph.tryRow (\() -> DecimalN0) (String.Morph.only "0.")
-            |> Morph.choiceRowFinish
-            |> match
-                (Morph.broad (ArraySized.repeat () n0)
-                    |> Morph.overRow
-                        (ArraySized.Morph.atLeast n0
-                            (String.Morph.only "0")
-                        )
-                )
-        )
-
-
-signedChars : MorphRow DecimalSigned Char
-signedChars =
-    Morph.to "signed"
-        (Morph.succeed
-            (\signPart absolutePart ->
-                { sign = signPart
-                , absolute = absolutePart
-                }
-            )
-            |> grab .sign Sign.maybeMinusChar
-            |> grab .absolute signedAbsoluteChars
-        )
-
-
-signedAbsoluteChars : MorphRow DecimalSignedAbsolute Char
-signedAbsoluteChars =
-    Morph.to "absolute"
-        (Morph.choice
-            (\fractionVariant atLeast1Variant absoluteUnion ->
-                case absoluteUnion of
-                    DecimalFraction fractionValue ->
-                        fractionVariant fractionValue
-
-                    DecimalAtLeast1 atLeast1Value ->
-                        atLeast1Variant atLeast1Value
-            )
-            |> Morph.tryRow DecimalFraction
-                (Morph.succeed (\fraction_ -> fraction_)
-                    |> match
-                        (Morph.broad (Just ())
-                            |> Morph.overRow
-                                (Maybe.Morph.row (String.Morph.only "0"))
-                        )
-                    |> match (String.Morph.only ".")
-                    |> grab (\fraction_ -> fraction_) fractionChars
-                )
-            |> Morph.tryRow DecimalAtLeast1
-                (Morph.succeed
-                    (\wholePart fractionPart ->
-                        { whole = wholePart
-                        , fraction = fractionPart
-                        }
-                    )
-                    |> grab .whole NaturalAtLeast1.Internal.chars
-                    |> match (String.Morph.only ".")
-                    |> grab .fraction (Maybe.Morph.row fractionChars)
-                )
-            |> Morph.choiceRowFinish
-        )
-
-
-fractionChars : MorphRow Fraction Char
-fractionChars =
-    Morph.to "fraction"
-        (Morph.succeed
-            (\beforeLast last ->
-                { beforeLast = beforeLast, last = last }
-            )
-            |> Morph.grab .beforeLast
-                (Stack.Morph.list
-                    |> Morph.over ArraySized.Morph.toList
-                    |> Morph.overRow
-                        (ArraySized.Morph.atLeast n0
-                            (N.Morph.inOn
-                                |> Morph.over (N.Morph.in_ ( n0, n9 ))
-                                |> Morph.over N.Morph.char
-                                |> one
-                            )
-                        )
-                )
-            |> Morph.grab .last
-                (N.Morph.inOn
-                    |> Morph.over (N.Morph.in_ ( n1, n9 ))
-                    |> Morph.over N.Morph.char
-                    |> one
-                )
-        )
-
-
-{-| [`Value.Morph`](Value#Morph) from a [`Decimal`](#Decimal)
-
-To get a [`Value.Morph`](Value#Morph) from a `Float`,
-see [`DecimalOrException.value`](DecimalOrException#value)
-
--}
-value : Value.Morph Decimal
-value =
-    Morph.value "Decimal"
-        { narrow =
-            \atom ->
-                case atom of
-                    Value.Number decimal ->
-                        decimal |> Ok
-
-                    atomExceptDecimal ->
-                        atomExceptDecimal |> Value.atomKindToString |> Err
-        , broaden = Value.Number
-        }
-        |> Morph.over Value.atom
 
 
 {-| Remove the [`Fraction`](#Fraction) part after the decimal point `.`
@@ -262,22 +85,22 @@ truncate : Decimal -> Integer
 truncate =
     \decimal ->
         case decimal of
-            DecimalN0 ->
-                IntegerN0
+            N0 ->
+                Integer.N0
 
-            DecimalSigned signed ->
+            Signed signed ->
                 signed |> signedTruncate
 
 
-signedTruncate : DecimalSigned -> Integer
+signedTruncate : Signed -> Integer
 signedTruncate =
     \signed ->
         case signed.absolute of
-            DecimalFraction _ ->
-                IntegerN0
+            Fraction _ ->
+                Integer.N0
 
-            DecimalAtLeast1 atLeast1 ->
-                IntegerSigned
+            AtLeast1 atLeast1 ->
+                Integer.Signed
                     { sign = signed.sign
                     , absolute = atLeast1.whole
                     }
@@ -289,22 +112,22 @@ floor : Decimal -> Integer
 floor =
     \decimal ->
         case decimal of
-            DecimalN0 ->
-                IntegerN0
+            N0 ->
+                Integer.N0
 
-            DecimalSigned signed ->
+            Signed signed ->
                 signed |> signedFloor
 
 
-signedFloor : DecimalSigned -> Integer
+signedFloor : Signed -> Integer
 signedFloor =
     \signed ->
         case signed.absolute of
-            DecimalFraction _ ->
-                IntegerN0
+            Fraction _ ->
+                Integer.N0
 
-            DecimalAtLeast1 atLeast1 ->
-                IntegerSigned
+            AtLeast1 atLeast1 ->
+                Integer.Signed
                     { sign = signed.sign
                     , absolute =
                         case signed.sign of
@@ -322,22 +145,22 @@ ceiling : Decimal -> Integer
 ceiling =
     \decimal ->
         case decimal of
-            DecimalN0 ->
-                IntegerN0
+            N0 ->
+                Integer.N0
 
-            DecimalSigned signed ->
+            Signed signed ->
                 signed |> signedCeiling
 
 
-signedCeiling : DecimalSigned -> Integer
+signedCeiling : Signed -> Integer
 signedCeiling =
     \signed ->
         case signed.absolute of
-            DecimalFraction _ ->
-                IntegerN0
+            Fraction _ ->
+                Integer.N0
 
-            DecimalAtLeast1 atLeast1 ->
-                IntegerSigned
+            AtLeast1 atLeast1 ->
+                Integer.Signed
                     { sign = signed.sign
                     , absolute =
                         case signed.sign of

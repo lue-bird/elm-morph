@@ -1,6 +1,6 @@
 module AToZ exposing
     ( AToZ(..), Case(..)
-    , only
+    , only, caseBroad
     , lowerChar, upperChar, char
     )
 
@@ -11,7 +11,7 @@ module AToZ exposing
 
 ## [`Morph`](Morph#Morph)
 
-@docs only
+@docs only, caseBroad
 @docs lowerChar, upperChar, char
 
 -}
@@ -58,6 +58,28 @@ type Case
     | CaseUpper
 
 
+{-| [`Morph`](Morph#Morph) that when calling [`toBroad`](Morph#toBroad) always returns a letter with a given [`Case`](#Case).
+
+For any more complex [`toBroad`](Morph#toBroad) process, use [`translate`](Morph#translate)
+
+For the general idea, check out [`Morph.broad`](Morph#broad)
+
+Example: We want to format it as lowercase but also accept uppercase:
+
+    AToZ.caseBroad AToZ.CaseLower
+        |> Morph.over AToZ.char
+
+which would be equivalent to
+
+    Morph.translate .letter (\letter -> { letter = letter, case_ = AToZ.CaseLower })
+        |> Morph.over AToZ.char
+
+-}
+caseBroad : Case -> Morph AToZ { case_ : Case, letter : AToZ }
+caseBroad caseSeed =
+    Morph.translate .letter (\letter -> { letter = letter, case_ = caseSeed })
+
+
 {-| Parses exactly 1 lower or upper case [`AToZ`](#AToZ).
 
 > ℹ️ Equivalent regular expression: `[a-zA-Z]`
@@ -66,14 +88,14 @@ type Case
     import String.Morph
 
     -- match any letter, case insensitive
-    "abc" |> Text.narrowTo letter --> Ok 'a'
-    "ABC" |> Text.narrowTo letter --> Ok 'A'
+    "abc" |> Text.toNarrow letter --> Ok 'a'
+    "ABC" |> Text.toNarrow letter --> Ok 'A'
 
     -- But anything else makes it fail.
     import Morph.Error
 
     "123"
-        |> Text.narrowTo letter
+        |> Text.toNarrow letter
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '1'."
 
@@ -88,24 +110,30 @@ type Case
 
     -- match many letters, case insensitive
     "aBcEY"
-        |> Text.narrowTo
-            (atLeast n1 aToZ
-                |> map String.fromList
+        |> Morph.toNarrow
+            (ArraySized.Morph.toString
+                |> Morph.overRow (atLeast n0 (AToZ.char |> Morph.one))
+                |> Morph.rowFinish
+                |> Morph.over Stack.Morph.string
             )
     --> Ok "aBcEY"
 
     "π123abc"
-        |> Text.narrowTo
-            (atLeast n1 aToZ
-                |> map String.fromList
+        |> Morph.toNarrow
+            (ArraySized.Morph.toString
+                |> Morph.overRow (atLeast n0 (AToZ.char |> Morph.one))
+                |> Morph.rowFinish
+                |> Morph.over Stack.Morph.string
             )
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting at least 1 letters [a-zA-Z]+. I got stuck when I got 'π'."
 
     "abc-efg"
-        |> Text.narrowTo
-            (atLeast n1 aToZ
-                |> map String.fromList
+        |> Morph.toNarrow
+            (ArraySized.Morph.toString
+                |> Morph.overRow (atLeast n0 (AToZ.char |> Morph.one))
+                |> Morph.rowFinish
+                |> Morph.over Stack.Morph.string
             )
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting at least 1 letters [a-zA-Z]+. I got stuck when I got '-'."
@@ -129,6 +157,7 @@ char =
             (\letter -> { case_ = CaseUpper, letter = letter })
             upperChar
         |> Morph.choiceFinish
+        |> Morph.to "a|..|Z"
 
 
 {-| Match exactly one lowercase letter character.
@@ -140,11 +169,11 @@ This is case sensitive.
     import String.Morph as Text
 
     -- match a lowercase letter
-    "abc" |> Text.narrowTo aToZLower --> Ok 'a'
+    "abc" |> Text.toNarrow aToZLower --> Ok 'a'
 
     -- but anything else makes it fail
     "ABC"
-        |> Text.narrowTo aToZLower
+        |> Text.toNarrow aToZLower
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting a lowercase letter [a-z]. I got stuck when I got the character 'A'."
 
@@ -259,6 +288,7 @@ lowerChar =
         |> Morph.try (\() -> Y) (Char.Morph.only 'y')
         |> Morph.try (\() -> Z) (Char.Morph.only 'z')
         |> Morph.choiceFinish
+        |> Morph.to "a|..|z"
 
 
 {-| Match exactly one uppercase letter character.
@@ -271,11 +301,11 @@ This is case sensitive.
     import String.Morph as Text
 
     -- match an uppercase letter
-    aToZUpper |> Text.narrowTo "ABC" --> Ok 'A'
+    aToZUpper |> Text.toNarrow "ABC" --> Ok 'A'
 
     -- but anything else makes it fail
     "abc"
-        |> Text.narrowTo aToZUpper
+        |> Text.toNarrow aToZUpper
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting a letter uppercase [A-Z]. I got stuck when I got the character 'a'."
 
@@ -390,6 +420,7 @@ upperChar =
         |> Morph.try (\() -> Y) (Char.Morph.only 'Y')
         |> Morph.try (\() -> Z) (Char.Morph.only 'Z')
         |> Morph.choiceFinish
+        |> Morph.to "A|..|Z"
 
 
 {-| Match only the specific given broad input. See [`Morph.only`](Morph#only)
@@ -399,6 +430,6 @@ only =
     Morph.only
         (\aToZ ->
             aToZ
-                |> Morph.broadenFrom upperChar
+                |> Morph.toBroad upperChar
                 |> String.fromChar
         )
