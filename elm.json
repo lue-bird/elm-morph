@@ -41,6 +41,7 @@
         "lue-bird/elm-linear-direction": "11.0.0 <= v < 12.0.0",
         "lue-bird/elm-no-record-type-alias-constructor-function": "1.0.0 <= v < 2.0.0",
         "lue-bird/elm-typesafe-array": "30.1.0 <= v < 31.0.0",
+        "miniBill/elm-rope": "1.0.0 <= v < 2.0.0",
         "zwilias/elm-rosetree": "1.5.0 <= v < 2.0.0"
     },
     "test-dependencies": {

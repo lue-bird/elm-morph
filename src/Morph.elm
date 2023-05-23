@@ -149,6 +149,7 @@ import Linear exposing (Direction(..))
 import N exposing (Min, N2, On)
 import Possibly exposing (Possibly)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
+import Rope exposing (Rope)
 import Stack exposing (Stacked)
 import Tree exposing (Tree)
 import Util exposing (recoverTry)
@@ -1816,7 +1817,12 @@ type alias MorphRow narrow broadElement =
                 , broad : Emptiable (Stacked broadElement) Possibly
                 }
         )
-        (narrow -> Emptiable (Stacked broadElement) Possibly)
+        (narrow
+         ->
+            -- Rope is like a List that has faster nested concatenation
+            -- see https://dark.elm.dmy.fr/packages/miniBill/elm-rope/latest/
+            Rope broadElement
+        )
 
 
 {-| Incomplete [`MorphRow`](#MorphRow) for a thing composed of multiple parts = group.
@@ -1833,7 +1839,10 @@ type alias MorphRowIndependently beforeBroaden narrowed broadElement =
                 }
         )
         (beforeBroaden
-         -> Emptiable (Stacked broadElement) Possibly
+         ->
+            -- Rope is like a List that has faster nested concatenation
+            -- see https://dark.elm.dmy.fr/packages/miniBill/elm-rope/latest/
+            Rope broadElement
         )
 
 
@@ -1899,8 +1908,10 @@ one =
                                     |> RowError
                                     |> Err
         , broaden =
-            toBroad morph
-                >> Stack.one
+            \beforeToBroad ->
+                beforeToBroad
+                    |> toBroad morph
+                    |> Rope.singleton
         }
 
 
@@ -1976,7 +1987,7 @@ succeed narrowConstant =
                 }
                     |> Ok
         , broaden =
-            \_ -> Emptiable.empty
+            \_ -> Rope.empty
         }
         |> structureFinish
 
@@ -2085,7 +2096,7 @@ morphNext :
                     }
         , broaden :
             groupNarrow
-            -> Emptiable (Stacked broadElement) Possibly
+            -> Rope broadElement
         }
 morphNext partAccess partChange groupMorphRowSoFar nextMorphRow =
     { narrow =
@@ -2110,7 +2121,7 @@ morphNext partAccess partChange groupMorphRowSoFar nextMorphRow =
             groupNarrow
                 |> partAccess
                 |> toBroad nextMorphRow
-                |> Stack.attach Down
+                |> Rope.appendTo
                     (groupNarrow
                         |> toBroad groupMorphRowSoFar
                     )
@@ -2203,7 +2214,7 @@ morphOverRow :
                         }
             , broaden :
                 beforeBeforeBroaden
-                -> Emptiable (Stacked broadElement) Possibly
+                -> Rope broadElement
             }
         )
 morphOverRow morphRowBeforeMorph narrowMorph =
@@ -2413,7 +2424,7 @@ morphUntil :
     -> MorphRow endElement broadElement
     -> MorphRow goOnElement broadElement
     ->
-        { broaden : commitResult -> Emptiable (Stacked broadElement) Possibly
+        { broaden : commitResult -> Rope broadElement
         , narrow :
             Emptiable (Stacked broadElement) Possibly
             ->
@@ -2435,10 +2446,11 @@ morphUntil commit endStep goOn =
                     commitResultNarrow |> toBroad commit
             in
             committedBack.before
-                |> Stack.reverse
-                |> Stack.map (\_ -> toBroad goOn)
-                |> Stack.flatten
-                |> Stack.attach Down
+                |> Stack.toList
+                |> List.reverse
+                |> Rope.fromList
+                |> Rope.concatMap (toBroad goOn)
+                |> Rope.appendTo
                     (committedBack.end |> toBroad endStep)
     , narrow =
         let
@@ -2548,7 +2560,7 @@ end =
                         |> RowError
                         |> Err
     , broaden =
-        \() -> Emptiable.empty
+        \() -> Rope.empty
     }
 
 
@@ -2581,7 +2593,7 @@ rowFinish =
                                     (\_ -> result.narrow)
                         )
         , broaden =
-            \narrow -> narrow |> toBroad morphRow
+            \narrow -> narrow |> toBroad morphRow |> Rope.toList |> Stack.fromList
         }
 
 
@@ -3260,7 +3272,7 @@ tryRow :
         (ChoiceMorphRowEmptiable
             noTryPossiblyOrNever_
             choiceNarrow
-            ((possibilityNarrow -> Emptiable (Stacked broadElement) Possibly)
+            ((possibilityNarrow -> Rope broadElement)
              -> choiceBroadenFurther
             )
             broadElement
@@ -3307,9 +3319,7 @@ choiceRowFinish :
     ChoiceMorphRowEmptiable
         Never
         choiceNarrow
-        (choiceNarrow
-         -> Emptiable (Stacked broadElement) Possibly
-        )
+        (choiceNarrow -> Rope broadElement)
         broadElement
     -> MorphRow choiceNarrow broadElement
 choiceRowFinish =
@@ -3373,8 +3383,10 @@ choiceFinish =
                             |> ChoiceDescription
                     }
         , narrow =
-            choiceMorphComplete.narrow
-                >> Result.mapError ChoiceError
+            \beforeToNarrow ->
+                beforeToNarrow
+                    |> choiceMorphComplete.narrow
+                    |> Result.mapError ChoiceError
         , broaden =
             choiceMorphComplete.broaden
         }
