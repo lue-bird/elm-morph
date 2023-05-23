@@ -29,6 +29,7 @@ import Emptiable
 import Linear exposing (Direction(..))
 import Morph exposing (MorphIndependently, MorphRow, broad, toBroad, toNarrow)
 import Possibly exposing (Possibly(..))
+import Rope
 import Stack
 import StructureMorph
 import Value
@@ -175,8 +176,8 @@ sequence toSequence =
                         (\morphInSequence narrowElement -> narrowElement |> toBroad morphInSequence)
                         (toSequence0 :: toSequence1Up)
                         narrowSequence
-                        |> List.concatMap Stack.toList
-                        |> Stack.fromList
+                        |> Rope.fromList
+                        |> Rope.concat
             }
 
 

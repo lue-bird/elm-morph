@@ -200,10 +200,10 @@ float =
                             numberSigned.absolute |> signedAbsoluteToFloat |> toSigned
                 )
             )
-        |> Morph.variant "NaN" ( \() -> Exception NaN, identity ) (Morph.toBroad (\() -> floatNaN))
+        |> Morph.variant "NaN" ( \() -> Exception NaN, identity ) (Morph.translate identity (\() -> floatNaN))
         |> Morph.variant "Infinity"
             ( \sign -> Exception (Infinity sign), identity )
-            (Morph.toBroad
+            (Morph.translate identity
                 (\sign ->
                     let
                         toSigned =

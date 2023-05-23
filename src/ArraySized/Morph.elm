@@ -48,6 +48,7 @@ import Linear exposing (Direction(..))
 import Morph exposing (Error, ErrorWithDeadEnd, MorphIndependently, MorphRow, MorphRowIndependently, broad, grab, toBroad, toNarrow, translate, translateOn)
 import N exposing (Exactly, In, Min, N, N0, N0OrAdd1, On, To, Up, Up0, n0, n1)
 import Possibly exposing (Possibly(..))
+import Rope exposing (Rope)
 import Stack exposing (Stacked)
 import StructureMorph
 
@@ -492,8 +493,8 @@ sequenceNamed structureName toSequence =
                 )
                 (toSequence |> ArraySized.toList)
                 (narrowSequence |> ArraySized.toList)
-                |> List.concatMap Stack.toList
-                |> Stack.fromList
+                |> Rope.fromList
+                |> Rope.concat
     }
 
 
@@ -701,7 +702,7 @@ atLeast :
 atLeast minimum elementStepMorphRow =
     Morph.to
         ([ "repeating ≥ ", minimum |> N.toString ] |> String.concat)
-        (Morph.toBroad ArraySized.maxToInfinity
+        (Morph.translate identity ArraySized.maxToInfinity
             |> Morph.overRow
                 (Morph.succeed
                     (\minimumArraySized overMinimum ->
@@ -787,15 +788,14 @@ morphWhileFold :
                     { toNarrow : List goOnElement
                     , broad : Emptiable (Stacked broadElement) Possibly
                     }
-        , toBroad : List goOnElement -> Emptiable (Stacked broadElement) Possibly
+        , toBroad : List goOnElement -> Rope broadElement
         }
 morphWhileFold { initial, step } element =
     { toBroad =
         \list_ ->
             list_
-                |> List.map (toBroad element)
-                |> Stack.fromList
-                |> Stack.flatten
+                |> Rope.fromList
+                |> Rope.concatMap (toBroad element)
     , toNarrow =
         let
             loopNarrowStep :
