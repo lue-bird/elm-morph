@@ -91,7 +91,7 @@ clean
 
 Know `Parser`s? [`MorphRow`](Morph#MorphRow) simply always creates a builder alongside. Think
 
-  - `Email/Id/Time/Url.fromString` ⇄ `Email/Id/Time/Url.toString`
+  - `Email/Id/Time/Path/Url.fromString` ⇄ `Email/Id/Time/Path/Url.toString`
   - concrete syntax tree parser ⇄ pretty formatter
   - decompiler ⇄ code generation
   - ...
