@@ -252,9 +252,7 @@ and
 
 -}
 type alias Morph narrow broad =
-    MorphIndependently
-        (broad -> Result Error narrow)
-        (narrow -> broad)
+    MorphOrError narrow broad Error
 
 
 {-| Sometimes, you'll see the most general version of [`Morph`](#Morph):
@@ -263,10 +261,20 @@ type alias Morph narrow broad =
 
 where
 
-  - [`narrow`](#toNarrow)ed value types can't necessarily be [`toBroad`](#toBroad)ed
-  - [`toBroad`](#toBroad)ed value types can't necessarily be [`narrow`](#toNarrow)ed
+  - [`toNarrow`](#toNarrow) result types can't necessarily be used as input for [`toBroad`](#toBroad)
+  - [`toBroad`](#toBroad) result types can't necessarily be used as input for [`toNarrow`](#toNarrow)
 
-This general form is helpful to describe a step in building an incomplete [`Morph`](#Morph).
+For example:
+
+  - [`Value.Morph`](Value#Morph): [`toBroad`](#toBroad) returns a value where we know
+    **both index and name** for each field/variant,
+    whereas [`toNarrow`](#toNarrow) allows **either index or name** for each field/variant.
+    This allows us to choose whether we want a [`descriptive`](Value#descriptive) or [`compact`](Value#compact)
+    view at the end, being able to switch anytime or use both for different situations.
+  - [`Stack.Morph.list`](Stack-Morph#list) allows different element types for both directions.
+    This is not necessary at all but allows it to be used more generally.
+  - [`MorphRow`](#MorphRow): [`toNarrow`](#toNarrow) accepts a row of elements
+    but [`toBroad`](#toBroad) results in a [`Rope`](https://dark.elm.dmy.fr/packages/miniBill/elm-rope/latest/) for better performance
 
 -}
 type alias MorphIndependently narrow broaden =
