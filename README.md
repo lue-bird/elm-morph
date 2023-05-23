@@ -5,7 +5,7 @@ a parser-builder: developer-friendly, general-purpose, great error messages
 > build one to convert between narrow ⇄ broad types
 
   - 📻 related: ["codecs" elm-radio episode](https://elm-radio.com/episode/codecs/)
-  - 🎧 while reading: ["Morphing", microtonal electronic music by Sevish](https://youtu.be/J-JZhCWsk3M?t=1702)
+  - 🎧 while reading: ["Morphable", microtonal electronic music by Sevish](https://www.youtube.com/watch?v=J-JZhCWsk3M&t=330s)
 
 There's a lot of shiny applications of these ["morph"](Morph)s!
 ↓ some appetizers. Click headers for documentation
