@@ -200,10 +200,10 @@ float =
                             numberSigned.absolute |> signedAbsoluteToFloat |> toSigned
                 )
             )
-        |> Morph.variant "NaN" ( \() -> Exception NaN, identity ) (Morph.broaden (\() -> floatNaN))
+        |> Morph.variant "NaN" ( \() -> Exception NaN, identity ) (Morph.toBroad (\() -> floatNaN))
         |> Morph.variant "Infinity"
             ( \sign -> Exception (Infinity sign), identity )
-            (Morph.broaden
+            (Morph.toBroad
                 (\sign ->
                     let
                         toSigned =
@@ -347,7 +347,7 @@ value =
 decimalInternalValue : Value.Morph Decimal
 decimalInternalValue =
     Morph.value "Decimal"
-        { narrow =
+        { toNarrow =
             \atom ->
                 case atom of
                     Value.Number decimal ->
@@ -357,6 +357,6 @@ decimalInternalValue =
                         atomExceptDecimal
                             |> Value.atomKindToString
                             |> Err
-        , broaden = Value.Number
+        , toBroad = Value.Number
         }
         |> Morph.over Value.atom

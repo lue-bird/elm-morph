@@ -63,7 +63,7 @@ integer =
             |> Morph.variant "signed"
                 ( AtLeast1, Integer.Signed )
                 (Morph.value "positive"
-                    { narrow =
+                    { toNarrow =
                         \{ sign, absolute } ->
                             case sign of
                                 Negative ->
@@ -71,7 +71,7 @@ integer =
 
                                 Positive ->
                                     absolute |> Ok
-                    , broaden =
+                    , toBroad =
                         \atLeast1 ->
                             { sign = Positive
                             , absolute = atLeast1

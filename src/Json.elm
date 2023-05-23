@@ -252,12 +252,12 @@ jsValueMagic : Morph (Json String) JsValueMagic
 jsValueMagic =
     Morph.to "JSON"
         { description = { custom = Emptiable.empty, inner = Morph.CustomDescription }
-        , narrow =
+        , toNarrow =
             \jsValueMagicBeforeNarrow ->
                 jsValueMagicBeforeNarrow
                     |> Json.Decode.decodeValue jsValueMagicDecoder
                     |> Result.mapError decodeErrorToMorph
-        , broaden = jsValueMagicEncode ()
+        , toBroad = jsValueMagicEncode ()
         }
 
 
@@ -278,12 +278,12 @@ stringBroadWith : { indentation : Int } -> Morph (Json String) String
 stringBroadWith { indentation } =
     Morph.to "JSON"
         { description = { custom = Emptiable.empty, inner = Morph.CustomDescription }
-        , narrow =
+        , toNarrow =
             \jsValueMagicBroad ->
                 jsValueMagicBroad
                     |> Json.Decode.decodeString jsValueMagicDecoder
                     |> Result.mapError decodeErrorToMorph
-        , broaden =
+        , toBroad =
             \json ->
                 json
                     |> jsValueMagicEncode ()

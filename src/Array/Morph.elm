@@ -73,7 +73,7 @@ value elementMorph =
     each elementMorph
         |> Morph.over
             (Morph.value "Array"
-                { narrow =
+                { toNarrow =
                     \broad ->
                         case broad of
                             Value.Array arrayElements ->
@@ -84,7 +84,7 @@ value elementMorph =
 
                             composedOther ->
                                 composedOther |> Value.composedKindToString |> Err
-                , broaden = Value.Array
+                , toBroad = Value.Array
                 }
             )
         |> Morph.over Value.composed
@@ -100,19 +100,19 @@ If the element [`Morph`](Morph#Morph) is a [`Translate`](Morph#Translate),
 -}
 each :
     MorphIndependently
-        (beforeNarrow
+        (beforeToNarrow
          -> Result (Morph.ErrorWithDeadEnd deadEnd) narrow
         )
-        (beforeBroaden -> broad)
+        (beforeToBroad -> broad)
     ->
         MorphIndependently
-            (Array beforeNarrow
+            (Array beforeToNarrow
              ->
                 Result
                     (Morph.ErrorWithDeadEnd deadEnd)
                     (Array narrow)
             )
-            (Array beforeBroaden -> Array broad)
+            (Array beforeToBroad -> Array broad)
 each elementMorph =
     StructureMorph.for "each" morphEachElement
         |> StructureMorph.add elementMorph
@@ -121,21 +121,21 @@ each elementMorph =
 
 morphEachElement :
     MorphIndependently
-        (beforeNarrow
+        (beforeToNarrow
          -> Result (Morph.ErrorWithDeadEnd deadEnd) narrow
         )
-        (beforeBroaden -> broad)
+        (beforeToBroad -> broad)
     ->
-        { narrow :
-            Array beforeNarrow
+        { toNarrow :
+            Array beforeToNarrow
             ->
                 Result
                     (Morph.ErrorWithDeadEnd deadEnd)
                     (Array narrow)
-        , broaden : Array beforeBroaden -> Array broad
+        , toBroad : Array beforeToBroad -> Array broad
         }
 morphEachElement elementMorph =
-    { narrow =
+    { toNarrow =
         \array ->
             array
                 |> Array.foldr
@@ -171,7 +171,7 @@ morphEachElement elementMorph =
                 |> .collected
                 |> Result.map Array.fromList
                 |> Result.mapError Morph.GroupError
-    , broaden =
+    , toBroad =
         \array ->
             array |> Array.map (Morph.toBroad elementMorph)
     }

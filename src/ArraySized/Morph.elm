@@ -313,24 +313,24 @@ morphEachElement :
         )
         (broadBeforeUnmap -> broadUnmapped)
     ->
-        { narrow :
+        { toNarrow :
             ArraySized narrowBeforeMap narrowRange
             ->
                 Result
                     (ErrorWithDeadEnd deadEnd)
                     (ArraySized narrowMapped narrowRange)
-        , broaden :
+        , toBroad :
             ArraySized broadBeforeUnmap broadRange
             -> ArraySized broadUnmapped broadRange
         }
 morphEachElement elementMorph =
-    { narrow =
+    { toNarrow =
         \arraySized ->
             arraySized
                 |> ArraySized.map (Morph.toNarrow elementMorph)
                 |> ArraySized.allOk
                 |> Result.mapError Morph.GroupError
-    , broaden =
+    , toBroad =
         \arraySized ->
             arraySized |> ArraySized.map (Morph.toBroad elementMorph)
     }
@@ -449,7 +449,7 @@ sequenceNamed structureName toSequence =
                     Morph.StructureDescription "sequence"
                         (Stack.topBelow inSequence0 inSequence1Up |> Stack.map (\_ -> Morph.description))
                 }
-    , narrow =
+    , toNarrow =
         \initialInput ->
             let
                 traversed =
@@ -460,7 +460,7 @@ sequenceNamed structureName toSequence =
                             (\state ->
                                 case state.folded.broad |> toNarrow state.element of
                                     Ok parsed ->
-                                        { element = parsed.narrow |> Ok
+                                        { element = parsed.toNarrow |> Ok
                                         , folded =
                                             { index = state.folded.index + 1
                                             , broad = parsed.broad
@@ -483,8 +483,8 @@ sequenceNamed structureName toSequence =
                     error |> Morph.GroupError |> Err
 
                 Ok sequenceArraySized ->
-                    { narrow = sequenceArraySized, broad = traversed.folded.broad } |> Ok
-    , broaden =
+                    { toNarrow = sequenceArraySized, broad = traversed.folded.broad } |> Ok
+    , toBroad =
         \narrowSequence ->
             List.map2
                 (\morphRowSequence ->
@@ -701,7 +701,7 @@ atLeast :
 atLeast minimum elementStepMorphRow =
     Morph.to
         ([ "repeating ≥ ", minimum |> N.toString ] |> String.concat)
-        (Morph.broaden ArraySized.maxToInfinity
+        (Morph.toBroad ArraySized.maxToInfinity
             |> Morph.overRow
                 (Morph.succeed
                     (\minimumArraySized overMinimum ->
@@ -779,31 +779,31 @@ morphWhileFold :
     }
     -> MorphRow goOnElement broadElement
     ->
-        { narrow :
+        { toNarrow :
             Emptiable (Stacked broadElement) Possibly
             ->
                 Result
                     error_
-                    { narrow : List goOnElement
+                    { toNarrow : List goOnElement
                     , broad : Emptiable (Stacked broadElement) Possibly
                     }
-        , broaden : List goOnElement -> Emptiable (Stacked broadElement) Possibly
+        , toBroad : List goOnElement -> Emptiable (Stacked broadElement) Possibly
         }
 morphWhileFold { initial, step } element =
-    { broaden =
+    { toBroad =
         \list_ ->
             list_
                 |> List.map (toBroad element)
                 |> Stack.fromList
                 |> Stack.flatten
-    , narrow =
+    , toNarrow =
         let
             loopNarrowStep :
                 { folded : folded }
                 ->
                     (Emptiable (Stacked broadElement) Possibly
                      ->
-                        { narrow : List goOnElement
+                        { toNarrow : List goOnElement
                         , broad : Emptiable (Stacked broadElement) Possibly
                         }
                     )
@@ -811,17 +811,17 @@ morphWhileFold { initial, step } element =
                 \broad_ ->
                     case broad_ |> toNarrow element of
                         Err _ ->
-                            { broad = broad_, narrow = [] }
+                            { broad = broad_, toNarrow = [] }
 
                         Ok stepped ->
-                            case folded |> step stepped.narrow of
+                            case folded |> step stepped.toNarrow of
                                 Nothing ->
-                                    { broad = broad_, narrow = [] }
+                                    { broad = broad_, toNarrow = [] }
 
                                 Just foldedAltered ->
                                     let
                                         tail :
-                                            { narrow : List goOnElement
+                                            { toNarrow : List goOnElement
                                             , broad : Emptiable (Stacked broadElement) Possibly
                                             }
                                         tail =
@@ -829,7 +829,7 @@ morphWhileFold { initial, step } element =
                                                 |> loopNarrowStep { folded = foldedAltered }
                                     in
                                     { broad = tail.broad
-                                    , narrow = tail.narrow |> (::) stepped.narrow
+                                    , toNarrow = tail.toNarrow |> (::) stepped.toNarrow
                                     }
         in
         \initialBroad ->

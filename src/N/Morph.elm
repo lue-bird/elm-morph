@@ -34,7 +34,7 @@ int :
         (N broadRange_ -> Int)
 int =
     Morph.value ">= 0"
-        { narrow =
+        { toNarrow =
             \narrowInt ->
                 narrowInt
                     |> N.intIsAtLeast n0
@@ -42,7 +42,7 @@ int =
                         (\intNegative ->
                             [ intNegative |> String.fromInt, " is <= -1 " ] |> String.concat
                         )
-        , broaden = N.toInt
+        , toBroad = N.toInt
         }
 
 
@@ -63,7 +63,7 @@ in_ :
             (N broadRange -> N broadRange)
 in_ ( lowerLimit, upperLimit ) =
     Morph.value (( lowerLimit, upperLimit ) |> rangeDescription)
-        { narrow =
+        { toNarrow =
             \n ->
                 n
                     |> N.isIn ( lowerLimit, upperLimit )
@@ -78,7 +78,7 @@ in_ ( lowerLimit, upperLimit ) =
                                     [ ">= ", (above |> N.toInt) + 1 |> String.fromInt ]
                                         |> String.concat
                         )
-        , broaden = identity
+        , toBroad = identity
         }
 
 
@@ -110,7 +110,7 @@ char :
         (N (In narrowMin_ (Up narrowMaxTo9_ To N9)) -> Char)
 char =
     Morph.value "digit"
-        { narrow =
+        { toNarrow =
             \charBroad ->
                 case charBroad of
                     '0' ->
@@ -145,7 +145,7 @@ char =
 
                     charExceptDigit ->
                         charExceptDigit |> String.fromChar |> Err
-        , broaden =
+        , toBroad =
             \n ->
                 case n |> N.toInt of
                     0 ->

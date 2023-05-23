@@ -7,8 +7,8 @@ import Value
 value : Value.Morph String
 value =
     Morph.value "String"
-        { broaden = Value.String
-        , narrow =
+        { toBroad = Value.String
+        , toNarrow =
             \valueBroad ->
                 case valueBroad of
                     Value.String stringNarrow ->

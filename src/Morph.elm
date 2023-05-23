@@ -1,7 +1,6 @@
 module Morph exposing
     ( Morph, Translate, MorphOrError, MorphIndependently
     , Description, DescriptionInner(..)
-    , broaden
     , value, only, validate
     , translate, broad, toggle, keep, translateOn
     , lazy
@@ -277,11 +276,11 @@ For example:
     but [`toBroad`](#toBroad) results in a [`Rope`](https://dark.elm.dmy.fr/packages/miniBill/elm-rope/latest/) for better performance
 
 -}
-type alias MorphIndependently narrow broaden =
+type alias MorphIndependently toNarrow toBroad =
     RecordWithoutConstructorFunction
         { description : Description
-        , narrow : narrow
-        , broaden : broaden
+        , toNarrow : toNarrow
+        , toBroad : toBroad
         }
 
 
@@ -785,7 +784,7 @@ Some call it "build"
 -}
 toBroad : MorphIndependently narrow_ broaden -> broaden
 toBroad =
-    .broaden
+    .toBroad
 
 
 {-| Its transformation that turns `broad` into `narrow` or an `error`.
@@ -793,7 +792,7 @@ Some call it "parse"
 -}
 toNarrow : MorphIndependently narrow broaden_ -> narrow
 toNarrow =
-    .narrow
+    .toNarrow
 
 
 {-| Convert values of the arbitrarily chosen types `unmapped -> mapped`.
@@ -884,8 +883,8 @@ validate :
             (broad -> broad)
 validate descriptionCustom narrowConvert =
     value descriptionCustom
-        { narrow = narrowConvert
-        , broaden = identity
+        { toNarrow = narrowConvert
+        , toBroad = identity
         }
 
 
@@ -969,7 +968,7 @@ Same as writing:
   - [`toBroad`](#toBroad)`identity`
   - [`validate`](#validate)`Ok`
   - [`translate`](#translate)`identity identity`
-  - `{ broaden = identity, narrow = Ok }`
+  - `{ toBroad = identity, toNarrow = Ok }`
   - [`toggle`](#toggle)`identity` when broad and narrow types match
 
 -}
@@ -1000,8 +999,8 @@ translate :
 translate map unmap =
     { description =
         { custom = Emptiable.empty, inner = CustomDescription }
-    , narrow = map >> Ok
-    , broaden = unmap
+    , toNarrow = map >> Ok
+    , toBroad = unmap
     }
 
 
@@ -1017,24 +1016,24 @@ What is great is using this to make inputs more "user-usable":
              -> ArraySized element (In (On min) Infinity)
             )
     ArraySized.Morph.maxToInfinity =
-        Morph.broaden ArraySized.maxToInfinity
+        Morph.toBroad ArraySized.maxToInfinity
 
 However! This can also often be an anti-pattern. See [`validate`](#validate).
 
     "WOW"
         |> Morph.toBroad
-            (Morph.broaden String.toLower
+            (Morph.toBroad String.toLower
                 |> Morph.over stringValidation
             )
     --→ "wow"
 
 -}
 broaden :
-    (beforeBroaden -> broad)
+    (beforeToBroad -> broad)
     ->
         MorphIndependently
             (narrow -> Result error_ narrow)
-            (beforeBroaden -> broad)
+            (beforeToBroad -> broad)
 broaden broadenFromNarrow =
     translate identity broadenFromNarrow
 
@@ -1071,7 +1070,7 @@ only broadConstantToString broadConstant =
         { custom = Emptiable.empty
         , inner = OnlyDescription (broadConstant |> broadConstantToString)
         }
-    , narrow =
+    , toNarrow =
         \broadValue ->
             if broadValue == broadConstant then
                 () |> Ok
@@ -1081,7 +1080,7 @@ only broadConstantToString broadConstant =
                     |> broadConstantToString
                     |> DeadEnd
                     |> Err
-    , broaden = \() -> broadConstant
+    , toBroad = \() -> broadConstant
     }
 
 
@@ -1095,22 +1094,24 @@ only broadConstantToString broadConstant =
 value :
     String
     ->
-        { narrow : beforeNarrow -> Result deadEnd narrow
-        , broaden : beforeBroaden -> broad
+        { toNarrow : beforeToNarrow -> Result deadEnd narrow
+        , toBroad : beforeToBroad -> broad
         }
     ->
         MorphIndependently
-            (beforeNarrow -> Result (ErrorWithDeadEnd deadEnd) narrow)
-            (beforeBroaden -> broad)
+            (beforeToNarrow -> Result (ErrorWithDeadEnd deadEnd) narrow)
+            (beforeToBroad -> broad)
 value descriptionCustom morphTransformations =
     { description =
         { custom = Stack.one descriptionCustom
         , inner = CustomDescription
         }
-    , narrow =
-        morphTransformations.narrow
-            >> Result.mapError DeadEnd
-    , broaden = morphTransformations.broaden
+    , toNarrow =
+        \beforeToNarrow ->
+            beforeToNarrow
+                |> morphTransformations.toNarrow
+                |> Result.mapError DeadEnd
+    , toBroad = morphTransformations.toBroad
     }
 
 
@@ -1191,19 +1192,19 @@ lazy :
     (()
      ->
         MorphIndependently
-            (beforeNarrow -> Result error narrow)
-            (beforeBroaden -> broad)
+            (beforeToNarrow -> Result error narrow)
+            (beforeToBroad -> broad)
     )
     ->
         MorphIndependently
-            (beforeNarrow -> Result error narrow)
-            (beforeBroaden -> broad)
+            (beforeToNarrow -> Result error narrow)
+            (beforeToBroad -> broad)
 lazy morphLazy =
     { description = morphLazy () |> description
-    , narrow =
+    , toNarrow =
         \broadValue ->
             broadValue |> toNarrow (morphLazy ())
-    , broaden =
+    , toBroad =
         \narrowValue ->
             narrowValue |> toBroad (morphLazy ())
     }
@@ -1217,15 +1218,15 @@ type alias PartsMorphEmptiable noPartPossiblyOrNever narrow broaden =
         { description :
             -- parts
             Emptiable (Stacked { tag : String, value : Description }) noPartPossiblyOrNever
-        , narrow : narrow
-        , broaden : broaden
+        , toNarrow : narrow
+        , toBroad : broaden
         }
 
 
 {-| Assemble a group from narrow and broad [`part`](#part)s
 
 Use [`group`](#group)
-when each broad, narrow [`part`](#part) always has their respective counterpart
+when each broad, toNarrow [`part`](#part) always has their respective counterpart
 
     ( "4", "5" )
         |> Morph.toNarrow
@@ -1262,8 +1263,8 @@ parts :
             (groupNarrow_ -> broadAssemble)
 parts ( narrowAssemble, broadAssemble ) =
     { description = Emptiable.empty
-    , narrow = \_ -> narrowAssemble |> Ok
-    , broaden = \_ -> broadAssemble
+    , toNarrow = \_ -> narrowAssemble |> Ok
+    , toBroad = \_ -> broadAssemble
     }
 
 
@@ -1314,14 +1315,14 @@ part partTagName ( narrowPartAccess, broadPartAccess ) partMorph =
         { description =
             groupMorphSoFar.description
                 |> Stack.onTopLay { tag = partTagName, value = partMorph.description }
-        , narrow =
-            groupMorphSoFar.narrow
+        , toNarrow =
+            .toNarrow groupMorphSoFar
                 |> narrowPart
                     (groupMorphSoFar.description |> Stack.length)
                     broadPartAccess
                     (toNarrow partMorph)
-        , broaden =
-            groupMorphSoFar.broaden
+        , toBroad =
+            .toBroad groupMorphSoFar
                 |> broadenPart narrowPartAccess (toBroad partMorph)
         }
 
@@ -1388,31 +1389,31 @@ narrowPart index broadPartAccess narrowPartMorph =
 partsFinish :
     PartsMorphEmptiable
         Never
-        (beforeNarrow
+        (beforeToNarrow
          ->
             Result
                 { index : Int, error : ErrorWithDeadEnd deadEnd }
                 narrowed
         )
-        (beforeBroaden -> broadened)
+        (beforeToBroad -> broadened)
     ->
         MorphIndependently
-            (beforeNarrow
+            (beforeToNarrow
              -> Result (ErrorWithDeadEnd deadEnd) narrowed
             )
-            (beforeBroaden -> broadened)
+            (beforeToBroad -> broadened)
 partsFinish =
     \groupMorphInProgress ->
         { description =
             { custom = Emptiable.empty
             , inner = groupMorphInProgress.description |> PartsDescription
             }
-        , narrow =
+        , toNarrow =
             \broad_ ->
                 broad_
-                    |> groupMorphInProgress.narrow
+                    |> groupMorphInProgress.toNarrow
                     |> Result.mapError (\error -> error |> Stack.one |> GroupError)
-        , broaden = groupMorphInProgress.broaden
+        , toBroad = groupMorphInProgress.toBroad
         }
 
 
@@ -1432,12 +1433,12 @@ This can be used to, for example
 -}
 over :
     MorphIndependently
-        (beforeBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) beforeNarrow)
-        (beforeBroaden -> broad)
+        (beforeBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) beforeToNarrow)
+        (beforeToBroad -> broad)
     ->
         (MorphIndependently
-            (beforeNarrow -> Result (ErrorWithDeadEnd deadEnd) narrow)
-            (beforeBeforeBroaden -> beforeBroaden)
+            (beforeToNarrow -> Result (ErrorWithDeadEnd deadEnd) narrow)
+            (beforeBeforeBroaden -> beforeToBroad)
          ->
             MorphIndependently
                 (beforeBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) narrow)
@@ -1450,23 +1451,25 @@ over morphNarrowBroad =
 
 morphOver :
     MorphIndependently
-        (beforeNarrow -> Result (ErrorWithDeadEnd deadEnd) narrow)
-        (beforeBeforeBroaden -> beforeBroaden)
+        (beforeToNarrow -> Result (ErrorWithDeadEnd deadEnd) narrow)
+        (beforeBeforeToBroad -> beforeToBroad)
     ->
         MorphIndependently
-            (beforeBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) beforeNarrow)
-            (beforeBroaden -> broad)
+            (beforeBeforeToNarrow -> Result (ErrorWithDeadEnd deadEnd) beforeToNarrow)
+            (beforeToBroad -> broad)
     ->
-        { narrow : beforeBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) narrow
-        , broaden : beforeBeforeBroaden -> broad
+        { toNarrow : beforeBeforeToNarrow -> Result (ErrorWithDeadEnd deadEnd) narrow
+        , toBroad : beforeBeforeToBroad -> broad
         }
 morphOver morph morphNarrowBroad =
-    { broaden =
-        toBroad morph
-            >> toBroad morphNarrowBroad
-    , narrow =
-        \beforeNarrow ->
-            beforeNarrow
+    { toBroad =
+        \beforeToBroad ->
+            beforeToBroad
+                |> toBroad morph
+                |> toBroad morphNarrowBroad
+    , toNarrow =
+        \beforeToNarrow ->
+            beforeToNarrow
                 |> toNarrow morphNarrowBroad
                 |> Result.mapError (\error -> InStructureError { index = 1, error = error })
                 |> Result.andThen
@@ -1538,14 +1541,14 @@ translateInvert :
         (beforeMap -> Result (ErrorWithDeadEnd Never) mapped)
         (beforeUnmap -> unmapped)
     ->
-        { narrow : beforeUnmap -> Result error unmapped
-        , broaden : beforeMap -> mapped
+        { toNarrow : beforeUnmap -> Result error unmapped
+        , toBroad : beforeMap -> mapped
         }
 translateInvert translate_ =
-    { narrow =
+    { toNarrow =
         \unmapped ->
             unmapped |> toBroad translate_ |> Ok
-    , broaden = mapTo translate_
+    , toBroad = mapTo translate_
     }
 
 
@@ -1610,7 +1613,8 @@ deadEndMap deadEndChange =
 {-| An [`Error`](#ErrorWithDeadEnd) where running into a dead end is impossible can't be created.
 Therefore, you can treat it as _any_ value.
 
-Under the hood, only [`Basics.never`] is used so it's completely safe to use.
+Under the hood, only [`Basics.never`](https://dark.elm.dmy.fr/packages/elm/core/latest/Basics#never)
+is used so it's completely safe to use.
 
 -}
 deadEndNever : ErrorWithDeadEnd Never -> any_
@@ -1651,17 +1655,17 @@ narrowErrorMap :
     (error -> errorMapped)
     ->
         MorphIndependently
-            (beforeNarrow -> Result error narrowed)
+            (beforeToNarrow -> Result error narrowed)
             toBroad
     ->
         MorphIndependently
-            (beforeNarrow -> Result errorMapped narrowed)
+            (beforeToNarrow -> Result errorMapped narrowed)
             toBroad
 narrowErrorMap errorChange =
     \morph ->
         { description = morph |> description
-        , broaden = toBroad morph
-        , narrow =
+        , toBroad = toBroad morph
+        , toNarrow =
             toNarrow morph
                 >> Result.mapError errorChange
         }
@@ -1699,12 +1703,12 @@ translateOn ( structureMap, structureUnmap ) elementTranslate =
         { custom = Emptiable.empty
         , inner = CustomDescription
         }
-    , narrow =
+    , toNarrow =
         \broad_ ->
             broad_
                 |> structureMap (mapTo elementTranslate)
                 |> Ok
-    , broaden =
+    , toBroad =
         structureUnmap (toBroad elementTranslate)
     }
 
@@ -1821,7 +1825,7 @@ type alias MorphRow narrow broadElement =
          ->
             Result
                 Error
-                { narrow : narrow
+                { toNarrow : narrow
                 , broad : Emptiable (Stacked broadElement) Possibly
                 }
         )
@@ -1836,17 +1840,17 @@ type alias MorphRow narrow broadElement =
 {-| Incomplete [`MorphRow`](#MorphRow) for a thing composed of multiple parts = group.
 It's what you supply during a [`Morph.succeed`](Morph#succeed)`|>`[`grab`](#grab)/[`match`](#match) build
 -}
-type alias MorphRowIndependently beforeBroaden narrowed broadElement =
+type alias MorphRowIndependently beforeToBroad narrowed broadElement =
     MorphIndependently
         (Emptiable (Stacked broadElement) Possibly
          ->
             Result
                 Error
-                { narrow : narrowed
+                { toNarrow : narrowed
                 , broad : Emptiable (Stacked broadElement) Possibly
                 }
         )
-        (beforeBroaden
+        (beforeToBroad
          ->
             -- Rope is like a List that has faster nested concatenation
             -- see https://dark.elm.dmy.fr/packages/miniBill/elm-rope/latest/
@@ -1886,7 +1890,7 @@ one =
     \morph ->
         { description =
             morph |> description
-        , narrow =
+        , toNarrow =
             \broad_ ->
                 case broad_ of
                     Emptiable.Empty _ ->
@@ -1902,7 +1906,7 @@ one =
                                 |> toNarrow morph
                         of
                             Ok narrowNarrow ->
-                                { narrow = narrowNarrow
+                                { toNarrow = narrowNarrow
                                 , broad =
                                     afterNextBroadElement
                                         |> Stack.fromList
@@ -1915,7 +1919,7 @@ one =
                                 }
                                     |> RowError
                                     |> Err
-        , broaden =
+        , toBroad =
             \beforeToBroad ->
                 beforeToBroad
                     |> toBroad morph
@@ -1988,13 +1992,13 @@ succeed :
     -> MorphRowIndependently beforeBroaden_ narrowConstant broadElement_
 succeed narrowConstant =
     structure "sequence"
-        { narrow =
+        { toNarrow =
             \broad_ ->
-                { narrow = narrowConstant
+                { toNarrow = narrowConstant
                 , broad = broad_
                 }
                     |> Ok
-        , broaden =
+        , toBroad =
             \_ -> Rope.empty
         }
         |> structureFinish
@@ -2094,20 +2098,20 @@ morphNext :
             broadElement
     -> MorphRow partNextNarrow broadElement
     ->
-        { narrow :
+        { toNarrow :
             Emptiable (Stacked broadElement) Possibly
             ->
                 Result
                     Error
-                    { narrow : groupNarrowConstructChanged
+                    { toNarrow : groupNarrowConstructChanged
                     , broad : Emptiable (Stacked broadElement) Possibly
                     }
-        , broaden :
+        , toBroad :
             groupNarrow
             -> Rope broadElement
         }
 morphNext partAccess partChange groupMorphRowSoFar nextMorphRow =
-    { narrow =
+    { toNarrow =
         \broad_ ->
             broad_
                 |> toNarrow groupMorphRowSoFar
@@ -2115,7 +2119,7 @@ morphNext partAccess partChange groupMorphRowSoFar nextMorphRow =
                     (\result ->
                         case result.broad |> toNarrow nextMorphRow of
                             Ok nextParsed ->
-                                { narrow = result.narrow |> partChange nextParsed.narrow
+                                { toNarrow = result.toNarrow |> partChange nextParsed.toNarrow
                                 , broad = nextParsed.broad
                                 }
                                     |> Ok
@@ -2124,7 +2128,7 @@ morphNext partAccess partChange groupMorphRowSoFar nextMorphRow =
                                 nextError
                                     |> Err
                     )
-    , broaden =
+    , toBroad =
         \groupNarrow ->
             groupNarrow
                 |> partAccess
@@ -2193,11 +2197,11 @@ morphNext partAccess partChange groupMorphRowSoFar nextMorphRow =
 
 -}
 overRow :
-    MorphRowIndependently beforeBroaden beforeNarrow broadElement
+    MorphRowIndependently beforeToBroad beforeToNarrow broadElement
     ->
         (MorphIndependently
-            (beforeNarrow -> Result Error narrow)
-            (beforeBeforeBroaden -> beforeBroaden)
+            (beforeToNarrow -> Result Error narrow)
+            (beforeBeforeBroaden -> beforeToBroad)
          -> MorphRowIndependently beforeBeforeBroaden narrow broadElement
         )
 overRow morphRowBeforeMorph =
@@ -2206,37 +2210,37 @@ overRow morphRowBeforeMorph =
 
 
 morphOverRow :
-    MorphRowIndependently beforeBroaden beforeNarrow broadElement
+    MorphRowIndependently beforeToBroad beforeToNarrow broadElement
     ->
         (MorphIndependently
-            (beforeNarrow -> Result Error narrow)
-            (beforeBeforeBroaden -> beforeBroaden)
+            (beforeToNarrow -> Result Error narrow)
+            (beforeBeforeBroaden -> beforeToBroad)
          ->
-            { narrow :
+            { toNarrow :
                 Emptiable (Stacked broadElement) Possibly
                 ->
                     Result
                         Error
-                        { narrow : narrow
+                        { toNarrow : narrow
                         , broad : Emptiable (Stacked broadElement) Possibly
                         }
-            , broaden :
+            , toBroad :
                 beforeBeforeBroaden
                 -> Rope broadElement
             }
         )
 morphOverRow morphRowBeforeMorph narrowMorph =
-    { narrow =
+    { toNarrow =
         \broad_ ->
             broad_
                 |> toNarrow morphRowBeforeMorph
                 |> Result.andThen
                     (\narrowed ->
-                        narrowed.narrow
+                        narrowed.toNarrow
                             |> toNarrow narrowMorph
                             |> Result.map
                                 (\narrowNarrow ->
-                                    { narrow = narrowNarrow
+                                    { toNarrow = narrowNarrow
                                     , broad = narrowed.broad
                                     }
                                 )
@@ -2248,9 +2252,9 @@ morphOverRow morphRowBeforeMorph narrowMorph =
                                         |> RowError
                                 )
                     )
-    , broaden =
-        \beforeNarrow ->
-            beforeNarrow
+    , toBroad =
+        \beforeToNarrow ->
+            beforeToNarrow
                 |> toBroad narrowMorph
                 |> toBroad morphRowBeforeMorph
     }
@@ -2261,7 +2265,7 @@ structureBinaryExtension :
     ->
         (MorphIndependently (soFarBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) soFarNarrow) soFarBroaden
          -> MorphIndependently (nextBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) nextNarrow) nextBroaden
-         -> { a | narrow : toNarrow, broaden : toBroad }
+         -> { a | toNarrow : toNarrow, toBroad : toBroad }
         )
     -> MorphIndependently (soFarBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) soFarNarrow) soFarBroaden
     -> MorphIndependently (nextBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) nextNarrow) nextBroaden
@@ -2298,8 +2302,8 @@ structureBinaryExtension structureName morphExtend soFarMorph nextMorph =
                             |> Stack.attach Up (Stack.one (nextMorph |> description))
                             |> StructureDescription structureName
                     }
-                , narrow = morphExtendedStructure.narrow
-                , broaden = morphExtendedStructure.broaden
+                , toNarrow = morphExtendedStructure.toNarrow
+                , toBroad = morphExtendedStructure.toBroad
                 }
 
             else
@@ -2312,7 +2316,7 @@ structureBinaryExtension structureName morphExtend soFarMorph nextMorph =
 chained :
     (MorphIndependently (soFarBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) soFarNarrow) soFarBroaden
      -> MorphIndependently (nextBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) nextNarrow) nextBroaden
-     -> { a | narrow : toNarrow, broaden : toBroad }
+     -> { a | toNarrow : toNarrow, toBroad : toBroad }
     )
     -> MorphIndependently (soFarBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) soFarNarrow) soFarBroaden
     -> MorphIndependently (nextBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) nextNarrow) nextBroaden
@@ -2432,18 +2436,18 @@ morphUntil :
     -> MorphRow endElement broadElement
     -> MorphRow goOnElement broadElement
     ->
-        { broaden : commitResult -> Rope broadElement
-        , narrow :
+        { toBroad : commitResult -> Rope broadElement
+        , toNarrow :
             Emptiable (Stacked broadElement) Possibly
             ->
                 Result
                     Error
-                    { narrow : commitResult
+                    { toNarrow : commitResult
                     , broad : Emptiable (Stacked broadElement) Possibly
                     }
         }
 morphUntil commit endStep goOn =
-    { broaden =
+    { toBroad =
         \commitResultNarrow ->
             let
                 committedBack :
@@ -2460,7 +2464,7 @@ morphUntil commit endStep goOn =
                 |> Rope.concatMap (toBroad goOn)
                 |> Rope.appendTo
                     (committedBack.end |> toBroad endStep)
-    , narrow =
+    , toNarrow =
         let
             loopStep beforeSoFar =
                 choice
@@ -2487,7 +2491,7 @@ morphUntil commit endStep goOn =
                      ->
                         Result
                             Error
-                            { narrow : commitResult
+                            { toNarrow : commitResult
                             , broad : Emptiable (Stacked broadElement) Possibly
                             }
                     )
@@ -2497,9 +2501,9 @@ morphUntil commit endStep goOn =
                         |> toNarrow (loopStep beforeSoFar)
                         |> Result.andThen
                             (\stepped ->
-                                case stepped.narrow of
+                                case stepped.toNarrow of
                                     Commit committed ->
-                                        { narrow = committed, broad = stepped.broad } |> Ok
+                                        { toNarrow = committed, broad = stepped.broad } |> Ok
 
                                     GoOn goOnElement ->
                                         stepped.broad
@@ -2552,11 +2556,11 @@ end =
         { custom = Emptiable.empty
         , inner = EndDescription
         }
-    , narrow =
+    , toNarrow =
         \broad_ ->
             case broad_ of
                 Emptiable.Empty _ ->
-                    { narrow = ()
+                    { toNarrow = ()
                     , broad = Emptiable.empty
                     }
                         |> Ok
@@ -2567,7 +2571,7 @@ end =
                     }
                         |> RowError
                         |> Err
-    , broaden =
+    , toBroad =
         \() -> Rope.empty
     }
 
@@ -2589,7 +2593,7 @@ rowFinish :
 rowFinish =
     \morphRow ->
         { description = morphRow.description
-        , narrow =
+        , toNarrow =
             \broadElements ->
                 broadElements
                     |> toNarrow morphRow
@@ -2598,9 +2602,9 @@ rowFinish =
                             result.broad
                                 |> toNarrow end
                                 |> Result.map
-                                    (\_ -> result.narrow)
+                                    (\_ -> result.toNarrow)
                         )
-        , broaden =
+        , toBroad =
             \narrow -> narrow |> toBroad morphRow |> Rope.toList |> Stack.fromList
         }
 
@@ -2616,7 +2620,7 @@ type alias ChoiceMorphEmptiable noTryPossiblyOrNever choiceNarrow choiceBeforeNa
     RecordWithoutConstructorFunction
         { description :
             Emptiable (Stacked Description) noTryPossiblyOrNever
-        , narrow :
+        , toNarrow :
             choiceBeforeNarrow
             ->
                 Result
@@ -2624,7 +2628,7 @@ type alias ChoiceMorphEmptiable noTryPossiblyOrNever choiceNarrow choiceBeforeNa
                      Emptiable (Stacked error) noTryPossiblyOrNever
                     )
                     choiceNarrow
-        , broaden : choiceBroaden
+        , toBroad : choiceBroaden
         }
 
 
@@ -2751,10 +2755,10 @@ choice :
             error_
 choice choiceBroadenDiscriminatedByPossibility =
     { description = Emptiable.empty
-    , narrow =
+    , toNarrow =
         \_ ->
             Emptiable.empty |> Err
-    , broaden = choiceBroadenDiscriminatedByPossibility
+    , toBroad = choiceBroadenDiscriminatedByPossibility
     }
 
 
@@ -2800,7 +2804,7 @@ choiceEquivalent :
     (broadPossibility
      ->
         MorphIndependently
-            (beforeNarrow
+            (beforeToNarrow
              -> Result (ErrorWithDeadEnd deadEnd) narrow
             )
             broaden
@@ -2811,7 +2815,7 @@ choiceEquivalent :
         }
     ->
         MorphIndependently
-            (beforeNarrow
+            (beforeToNarrow
              -> Result (ErrorWithDeadEnd deadEnd) narrow
             )
             broaden
@@ -2830,15 +2834,15 @@ choiceEquivalent traversePossibility possibilities =
                         |> ArraySized.map description
                         |> ChoiceDescription
                 }
-            , narrow =
-                \beforeNarrow ->
-                    beforeNarrow
+            , toNarrow =
+                \beforeToNarrow ->
+                    beforeToNarrow
                         |> choiceEquivalentTryNarrow traversePossibility
                             (Stack.topBelow possibilities.broad
                                 (alternative0 :: alternatives1Up)
                             )
-            , broaden =
-                (traversePossibility possibilities.broad).broaden
+            , toBroad =
+                (traversePossibility possibilities.broad).toBroad
             }
 
 
@@ -2846,22 +2850,22 @@ choiceEquivalentTryNarrow :
     (element
      ->
         MorphIndependently
-            (beforeNarrow
+            (beforeToNarrow
              -> Result (ErrorWithDeadEnd deadEnd) narrow
             )
             broaden_
     )
     -> Emptiable (Stacked element) Never
     ->
-        (beforeNarrow
+        (beforeToNarrow
          -> Result (ErrorWithDeadEnd deadEnd) narrow
         )
 choiceEquivalentTryNarrow traverseTry tries =
-    \beforeNarrow ->
+    \beforeToNarrow ->
         tries
             |> Stack.removeTop
             |> Stack.foldFrom
-                (beforeNarrow
+                (beforeToNarrow
                     |> toNarrow
                         (traverseTry (tries |> Stack.top))
                     |> Result.mapError Stack.one
@@ -2871,7 +2875,7 @@ choiceEquivalentTryNarrow traverseTry tries =
                     resultSoFar
                         |> recoverTry
                             (\errorsSoFar ->
-                                beforeNarrow
+                                beforeToNarrow
                                     |> toNarrow (traverseTry elementForMorph)
                                     |> Result.mapError
                                         (\error -> errorsSoFar |> Stack.onTopLay error)
@@ -2891,8 +2895,8 @@ type alias VariantsMorphEmptiable noTryPossiblyOrNever narrow broaden =
             Emptiable
                 (Stacked { tag : String, value : Description })
                 noTryPossiblyOrNever
-        , narrow : narrow
-        , broaden : broaden
+        , toNarrow : narrow
+        , toBroad : broaden
         }
 
 
@@ -2972,10 +2976,10 @@ try possibilityToChoice possibilityMorph =
         { description =
             choiceMorphSoFar.description
                 |> Stack.onTopLay possibilityMorph.description
-        , narrow =
+        , toNarrow =
             \broadValue ->
                 broadValue
-                    |> choiceMorphSoFar.narrow
+                    |> choiceMorphSoFar.toNarrow
                     |> recoverTry
                         (\soFarTryErrors ->
                             case broadValue |> toNarrow possibilityMorph of
@@ -2989,8 +2993,8 @@ try possibilityToChoice possibilityMorph =
                                         |> Stack.onTopLay tryError
                                         |> Err
                         )
-        , broaden =
-            choiceMorphSoFar.broaden
+        , toBroad =
+            choiceMorphSoFar.toBroad
                 (toBroad possibilityMorph)
         }
 
@@ -3063,8 +3067,8 @@ variants :
             broadenByPossibility
 variants ( narrowByPossibility, broadenByPossibility ) =
     { description = Emptiable.empty
-    , narrow = narrowByPossibility
-    , broaden = broadenByPossibility
+    , toNarrow = narrowByPossibility
+    , toBroad = broadenByPossibility
     }
 
 
@@ -3106,8 +3110,8 @@ variant variantTagName ( possibilityToChoice, possibilityFromChoice ) possibilit
             choiceMorphSoFar.description
                 |> Stack.onTopLay
                     { tag = variantTagName, value = possibilityMorph.description }
-        , narrow =
-            choiceMorphSoFar.narrow
+        , toNarrow =
+            choiceMorphSoFar.toNarrow
                 (\broad_ ->
                     case broad_ |> toNarrow possibilityMorph of
                         Ok possibility ->
@@ -3116,8 +3120,8 @@ variant variantTagName ( possibilityToChoice, possibilityFromChoice ) possibilit
                         Err error ->
                             { index = choiceMorphSoFar.description |> Stack.length, error = error } |> Err
                 )
-        , broaden =
-            choiceMorphSoFar.broaden
+        , toBroad =
+            choiceMorphSoFar.toBroad
                 (\narrow ->
                     narrow
                         |> toBroad possibilityMorph
@@ -3131,13 +3135,13 @@ variant variantTagName ( possibilityToChoice, possibilityFromChoice ) possibilit
 variantsFinish :
     VariantsMorphEmptiable
         Never
-        (beforeNarrow
+        (beforeToNarrow
          -> Result { index : Int, error : ErrorWithDeadEnd deadEnd } narrow
         )
         broaden
     ->
         MorphIndependently
-            (beforeNarrow
+            (beforeToNarrow
              -> Result (ErrorWithDeadEnd deadEnd) narrow
             )
             broaden
@@ -3149,12 +3153,12 @@ variantsFinish =
                 choiceMorphComplete.description
                     |> VariantsDescription
             }
-        , narrow =
-            \beforeNarrow ->
-                beforeNarrow
-                    |> choiceMorphComplete.narrow
+        , toNarrow =
+            \beforeToNarrow ->
+                beforeToNarrow
+                    |> choiceMorphComplete.toNarrow
                     |> Result.mapError VariantError
-        , broaden = choiceMorphComplete.broaden
+        , toBroad = choiceMorphComplete.toBroad
         }
 
 
@@ -3168,17 +3172,17 @@ See [`Morph.choice`](Morph#choice), [`Morph.tryRow`](#try), [`Morph.choiceRowFin
 type alias ChoiceMorphRowEmptiable noTryPossiblyOrNever choiceNarrow choiceBroaden broadElement =
     { description :
         Emptiable (Stacked Description) noTryPossiblyOrNever
-    , narrow :
+    , toNarrow :
         Emptiable (Stacked broadElement) Possibly
         ->
             Result
                 (-- tries
                  Emptiable (Stacked Error) noTryPossiblyOrNever
                 )
-                { narrow : choiceNarrow
+                { toNarrow : choiceNarrow
                 , broad : Emptiable (Stacked broadElement) Possibly
                 }
-    , broaden : choiceBroaden
+    , toBroad : choiceBroaden
     }
 
 
@@ -3296,17 +3300,17 @@ tryRow possibilityToChoice possibilityMorph =
         { description =
             choiceMorphSoFar.description
                 |> Stack.onTopLay (possibilityMorph |> description)
-        , narrow =
+        , toNarrow =
             \choiceBroad ->
                 choiceBroad
-                    |> choiceMorphSoFar.narrow
+                    |> choiceMorphSoFar.toNarrow
                     |> recoverTry
                         (\soFarErrorPossibilities ->
                             case choiceBroad |> toNarrow possibilityMorph of
                                 Ok possibilityParsed ->
                                     { broad = possibilityParsed.broad
-                                    , narrow =
-                                        possibilityParsed.narrow |> possibilityToChoice
+                                    , toNarrow =
+                                        possibilityParsed.toNarrow |> possibilityToChoice
                                     }
                                         |> Ok
 
@@ -3315,8 +3319,8 @@ tryRow possibilityToChoice possibilityMorph =
                                         |> Stack.onTopLay possibilityExpectation
                                         |> Err
                         )
-        , broaden =
-            choiceMorphSoFar.broaden
+        , toBroad =
+            choiceMorphSoFar.toBroad
                 (toBroad possibilityMorph)
         }
 
@@ -3345,10 +3349,10 @@ choiceRowFinish =
                                 (description2Up |> ArraySized.fromList)
                             |> ChoiceDescription
                     }
-        , narrow =
+        , toNarrow =
             \broad_ ->
                 broad_
-                    |> choiceMorphRowComplete.narrow
+                    |> choiceMorphRowComplete.toNarrow
                     |> Result.mapError
                         (\errorPossibilities ->
                             { startDown = broad_ |> Stack.length
@@ -3356,7 +3360,7 @@ choiceRowFinish =
                             }
                                 |> RowError
                         )
-        , broaden = choiceMorphRowComplete.broaden
+        , toBroad = choiceMorphRowComplete.toBroad
         }
 
 
@@ -3390,13 +3394,13 @@ choiceFinish =
                                 (variants2Up |> ArraySized.fromList)
                             |> ChoiceDescription
                     }
-        , narrow =
+        , toNarrow =
             \beforeToNarrow ->
                 beforeToNarrow
-                    |> choiceMorphComplete.narrow
+                    |> choiceMorphComplete.toNarrow
                     |> Result.mapError ChoiceError
-        , broaden =
-            choiceMorphComplete.broaden
+        , toBroad =
+            choiceMorphComplete.toBroad
         }
 
 
@@ -3447,9 +3451,9 @@ structureAdd partMorph =
         , morph =
             structureCreatorSoFar.morph
                 { partMorph
-                    | narrow =
-                        \beforeNarrow ->
-                            beforeNarrow
+                    | toNarrow =
+                        \beforeToNarrow ->
+                            beforeToNarrow
                                 |> toNarrow partMorph
                                 |> Result.mapError
                                     (\error ->
@@ -3463,7 +3467,7 @@ structureAdd partMorph =
 
 
 structureFinish :
-    StructureMorph { morph_ | narrow : toNarrow, broaden : toBroad }
+    StructureMorph { morph_ | toNarrow : toNarrow, toBroad : toBroad }
     -> MorphIndependently toNarrow toBroad
 structureFinish =
     \structureCreator ->
@@ -3474,6 +3478,6 @@ structureFinish =
                     structureCreator.description.structure
                     (structureCreator.description.inner |> Stack.reverse)
             }
-        , narrow = structureCreator.morph.narrow
-        , broaden = structureCreator.morph.broaden
+        , toNarrow = structureCreator.morph.toNarrow
+        , toBroad = structureCreator.morph.toBroad
         }

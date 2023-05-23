@@ -417,8 +417,8 @@ atom :
         )
 atom =
     Morph.value "Atom"
-        { broaden = Atom
-        , narrow =
+        { toBroad = Atom
+        , toNarrow =
             \value ->
                 case value of
                     Atom atomAny ->
@@ -441,8 +441,8 @@ composed :
         )
 composed =
     Morph.value "Composed"
-        { broaden = Composed
-        , narrow =
+        { toBroad = Composed
+        , toNarrow =
             \value ->
                 case value of
                     Composed composed_ ->
@@ -497,8 +497,8 @@ with 0 attached values
 unit : Morph ()
 unit =
     Morph.value "Unit"
-        { broaden = Unit
-        , narrow =
+        { toBroad = Unit
+        , toNarrow =
             \value_ ->
                 case value_ of
                     Unit unitValue ->
@@ -621,10 +621,10 @@ part ( accessFieldValue, fieldName ) fieldValueMorph =
             groupMorphSoFar.description
                 |> Stack.onTopLay
                     { tag = tag.name, value = fieldValueMorph.description }
-        , narrow =
+        , toNarrow =
             \groupBroad ->
-                partValueNarrow tag fieldValueMorph groupMorphSoFar.narrow groupBroad
-        , broaden =
+                partValueNarrow tag fieldValueMorph groupMorphSoFar.toNarrow groupBroad
+        , toBroad =
             \wholeNarrow ->
                 let
                     fieldValueBroad : Value IndexAndName
@@ -640,7 +640,7 @@ part ( accessFieldValue, fieldName ) fieldValueMorph =
                         }
                 in
                 wholeNarrow
-                    |> groupMorphSoFar.broaden
+                    |> groupMorphSoFar.toBroad
                     |> Stack.onTopLay fieldBroad
         }
 
@@ -719,8 +719,8 @@ groupFinish =
             |> partsFinish
             |> Morph.over
                 (Morph.value "Record"
-                    { broaden = Record
-                    , narrow =
+                    { toBroad = Record
+                    , toNarrow =
                         \composedBroad ->
                             case composedBroad of
                                 Record recordNarrow ->
@@ -748,10 +748,10 @@ partsFinish =
             { custom = Emptiable.empty
             , inner = groupMorphInProgress.description |> Morph.PartsDescription
             }
-        , narrow =
+        , toNarrow =
             \broad_ ->
                 broad_
-                    |> groupMorphInProgress.narrow
+                    |> groupMorphInProgress.toNarrow
                     |> Result.mapError
                         (\error ->
                             case error of
@@ -763,7 +763,7 @@ partsFinish =
                                 ValueError valueError ->
                                     valueError |> Stack.one |> Morph.GroupError
                         )
-        , broaden = groupMorphInProgress.broaden
+        , toBroad = groupMorphInProgress.toBroad
         }
 
 
@@ -821,14 +821,14 @@ variant ( possibilityToChoice, possibilityTag ) possibilityMorph =
             |> Morph.try possibilityToChoice
                 (Morph.to possibilityTag
                     { description = possibilityMorph |> Morph.description
-                    , narrow =
+                    , toNarrow =
                         variantStepNarrow
                             ( { name = possibilityTag
                               , index = choiceMorphSoFar.description |> Stack.length
                               }
                             , Morph.toNarrow possibilityMorph
                             )
-                    , broaden =
+                    , toBroad =
                         \narrowValue ->
                             { tag =
                                 { name = possibilityTag
@@ -883,7 +883,7 @@ choiceFinish =
             |> Morph.choiceFinish
             |> Morph.over
                 (Morph.value "Variant"
-                    { narrow =
+                    { toNarrow =
                         \value ->
                             case value of
                                 Variant variant_ ->
@@ -893,7 +893,7 @@ choiceFinish =
                                     composedExceptVariant
                                         |> composedKindToString
                                         |> Err
-                    , broaden = Variant
+                    , toBroad = Variant
                     }
                 )
             |> Morph.over composed

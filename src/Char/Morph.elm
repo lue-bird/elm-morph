@@ -39,8 +39,8 @@ range, you'll get an error.
 code : Morph Char Int
 code =
     Morph.value "unicode character"
-        { broaden = Char.toCode
-        , narrow =
+        { toBroad = Char.toCode
+        , toNarrow =
             \codePoint ->
                 if codePoint >= 0 && codePoint <= 0x0010FFFF then
                     codePoint |> Char.fromCode |> Ok
@@ -72,8 +72,8 @@ and therefore can't be [decoded](Morph#toNarrow) again
 string : Morph Char String
 string =
     Morph.value "Char"
-        { broaden = String.fromChar
-        , narrow =
+        { toBroad = String.fromChar
+        , toNarrow =
             \stringBroad ->
                 case stringBroad |> String.uncons of
                     Just ( charValue, "" ) ->

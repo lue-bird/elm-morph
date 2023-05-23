@@ -109,16 +109,16 @@ morphEachElement :
         )
         (comparableBeforeBroaden -> comparableBroad)
     ->
-        { narrow :
+        { toNarrow :
             Set comparableBeforeNarrow
             ->
                 Result
                     (Morph.ErrorWithDeadEnd deadEnd)
                     (Set comparableNarrow)
-        , broaden : Set comparableBeforeBroaden -> Set comparableBroad
+        , toBroad : Set comparableBeforeBroaden -> Set comparableBroad
         }
 morphEachElement elementMorph =
-    { narrow =
+    { toNarrow =
         \set ->
             set
                 |> Set.foldl
@@ -153,7 +153,7 @@ morphEachElement elementMorph =
                     }
                 |> .collected
                 |> Result.mapError Morph.GroupError
-    , broaden =
+    , toBroad =
         \set ->
             set |> Set.map (Morph.toBroad elementMorph)
     }

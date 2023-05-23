@@ -48,9 +48,9 @@ add partMorph =
         , morph =
             structureCreatorSoFar.morph
                 { partMorph
-                    | narrow =
-                        \beforeNarrow ->
-                            beforeNarrow
+                    | toNarrow =
+                        \beforeToNarrow ->
+                            beforeToNarrow
                                 |> Morph.toNarrow partMorph
                                 |> Result.mapError
                                     (\error ->
@@ -64,7 +64,7 @@ add partMorph =
 
 
 finish :
-    StructureMorphCreator { morph_ | narrow : toNarrow, broaden : toBroad }
+    StructureMorphCreator { morph_ | toNarrow : toNarrow, toBroad : toBroad }
     -> MorphIndependently toNarrow toBroad
 finish =
     \structureCreator ->
@@ -75,6 +75,6 @@ finish =
                     structureCreator.description.structure
                     (structureCreator.description.inner |> Stack.reverse)
             }
-        , narrow = structureCreator.morph.narrow
-        , broaden = structureCreator.morph.broaden
+        , toNarrow = structureCreator.morph.toNarrow
+        , toBroad = structureCreator.morph.toBroad
         }

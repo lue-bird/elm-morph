@@ -79,8 +79,8 @@ decimalSigned =
 decimalSignedAbsolute : Morph Natural.AtLeast1 Decimal.SignedAbsolute
 decimalSignedAbsolute =
     Morph.value "whole absolute"
-        { broaden = \whole -> Decimal.AtLeast1 { whole = whole, fraction = Nothing }
-        , narrow =
+        { toBroad = \whole -> Decimal.AtLeast1 { whole = whole, fraction = Nothing }
+        , toNarrow =
             \decimalAbsolute ->
                 case decimalAbsolute of
                     Decimal.Fraction _ ->

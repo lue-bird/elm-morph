@@ -39,19 +39,19 @@ If the given [`Morph`](Morph#Morph) is a [`Translate`](Morph#Translate),
 -}
 each :
     MorphIndependently
-        (beforeNarrow
+        (beforeToNarrow
          -> Result (Morph.ErrorWithDeadEnd deadEnd) narrow
         )
-        (beforeBroaden -> broad)
+        (beforeToBroad -> broad)
     ->
         MorphIndependently
-            (Emptiable (Stacked beforeNarrow) broadEmptiablePossiblyOrNever
+            (Emptiable (Stacked beforeToNarrow) broadEmptiablePossiblyOrNever
              ->
                 Result
                     (Morph.ErrorWithDeadEnd deadEnd)
                     (Emptiable (Stacked narrow) broadEmptiablePossiblyOrNever)
             )
-            (Emptiable (Stacked beforeBroaden) narrowPossiblyOrNever
+            (Emptiable (Stacked beforeToBroad) narrowPossiblyOrNever
              -> Emptiable (Stacked broad) narrowPossiblyOrNever
             )
 each elementMorph =
@@ -62,23 +62,23 @@ each elementMorph =
 
 morphEachElement :
     MorphIndependently
-        (beforeNarrow
+        (beforeToNarrow
          -> Result (Morph.ErrorWithDeadEnd deadEnd) narrow
         )
-        (beforeBroaden -> broad)
+        (beforeToBroad -> broad)
     ->
-        { narrow :
-            Emptiable (Stacked beforeNarrow) broadEmptiablePossiblyOrNever
+        { toNarrow :
+            Emptiable (Stacked beforeToNarrow) broadEmptiablePossiblyOrNever
             ->
                 Result
                     (Morph.ErrorWithDeadEnd deadEnd)
                     (Emptiable (Stacked narrow) broadEmptiablePossiblyOrNever)
-        , broaden :
-            Emptiable (Stacked beforeBroaden) narrowPossiblyOrNever
+        , toBroad :
+            Emptiable (Stacked beforeToBroad) narrowPossiblyOrNever
             -> Emptiable (Stacked broad) narrowPossiblyOrNever
         }
 morphEachElement elementMorph =
-    { narrow =
+    { toNarrow =
         \stack ->
             case stack of
                 Emptiable.Empty emptyPossiblyOrNever ->
@@ -139,7 +139,7 @@ morphEachElement elementMorph =
                             )
                         |> .collected
                         |> Result.mapError Morph.GroupError
-    , broaden =
+    , toBroad =
         Stack.map (\_ -> Morph.toBroad elementMorph)
     }
 

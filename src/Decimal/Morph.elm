@@ -36,7 +36,7 @@ to an [`OrException Decimal`](DecimalOrException#OrException)
 orException : Morph Decimal (OrException Decimal)
 orException =
     Morph.value "Decimal"
-        { narrow =
+        { toNarrow =
             \floatExplicit_ ->
                 case floatExplicit_ of
                     DecimalOrException.Number number ->
@@ -44,7 +44,7 @@ orException =
 
                     DecimalOrException.Exception _ ->
                         "Exception" |> Err
-        , broaden = DecimalOrException.Number
+        , toBroad = DecimalOrException.Number
         }
 
 
@@ -208,7 +208,7 @@ see [`DecimalOrException.value`](DecimalOrException#value)
 value : Value.Morph Decimal
 value =
     Morph.value "Decimal"
-        { narrow =
+        { toNarrow =
             \atom ->
                 case atom of
                     Value.Number decimal ->
@@ -216,6 +216,6 @@ value =
 
                     atomExceptDecimal ->
                         atomExceptDecimal |> Value.atomKindToString |> Err
-        , broaden = Value.Number
+        , toBroad = Value.Number
         }
         |> Morph.over Value.atom

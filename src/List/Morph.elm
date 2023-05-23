@@ -136,16 +136,16 @@ sequence toSequence =
                             |> Stack.map (\_ -> Morph.description)
                         )
                 }
-            , narrow =
+            , toNarrow =
                 let
                     stepFrom index sequenceMorphRow =
                         \soFar ->
                             case soFar.broad |> toNarrow sequenceMorphRow of
                                 Ok stepParsed ->
                                     { broad = stepParsed.broad
-                                    , narrow =
-                                        soFar.narrow
-                                            |> (::) stepParsed.narrow
+                                    , toNarrow =
+                                        soFar.toNarrow
+                                            |> (::) stepParsed.toNarrow
                                     }
                                         |> Ok
 
@@ -163,13 +163,13 @@ sequence toSequence =
                             )
                             { index = 0
                             , status =
-                                { narrow = []
+                                { toNarrow = []
                                 , broad = initialInput
                                 }
                                     |> Ok
                             }
                         |> .status
-            , broaden =
+            , toBroad =
                 \narrowSequence ->
                     List.map2
                         (\morphInSequence narrowElement -> narrowElement |> toBroad morphInSequence)
@@ -191,7 +191,7 @@ value elementMorph =
     each elementMorph
         |> Morph.over
             (Morph.value "List"
-                { narrow =
+                { toNarrow =
                     \broad ->
                         case broad of
                             Value.List listElements ->
@@ -204,7 +204,7 @@ value elementMorph =
                                 composedExceptList
                                     |> Value.composedKindToString
                                     |> Err
-                , broaden = Value.List
+                , toBroad = Value.List
                 }
             )
         |> Morph.over Value.composed
@@ -220,19 +220,19 @@ If the element [`Morph`](Morph#Morph) is a [`Translate`](Morph#Translate),
 -}
 each :
     MorphIndependently
-        (beforeNarrow
+        (beforeToNarrow
          -> Result (Morph.ErrorWithDeadEnd deadEnd) narrow
         )
-        (beforeBroaden -> broad)
+        (beforeToBroad -> broad)
     ->
         MorphIndependently
-            (List beforeNarrow
+            (List beforeToNarrow
              ->
                 Result
                     (Morph.ErrorWithDeadEnd deadEnd)
                     (List narrow)
             )
-            (List beforeBroaden -> List broad)
+            (List beforeToBroad -> List broad)
 each elementMorph =
     StructureMorph.for "each" morphEachElement
         |> StructureMorph.add elementMorph
@@ -241,21 +241,21 @@ each elementMorph =
 
 morphEachElement :
     MorphIndependently
-        (beforeNarrow
+        (beforeToNarrow
          -> Result (Morph.ErrorWithDeadEnd deadEnd) narrow
         )
-        (beforeBroaden -> broad)
+        (beforeToBroad -> broad)
     ->
-        { narrow :
-            List beforeNarrow
+        { toNarrow :
+            List beforeToNarrow
             ->
                 Result
                     (Morph.ErrorWithDeadEnd deadEnd)
                     (List narrow)
-        , broaden : List beforeBroaden -> List broad
+        , toBroad : List beforeToBroad -> List broad
         }
 morphEachElement elementMorph =
-    { narrow =
+    { toNarrow =
         \list ->
             list
                 |> List.foldr
@@ -290,7 +290,7 @@ morphEachElement elementMorph =
                     }
                 |> .collected
                 |> Result.mapError Morph.GroupError
-    , broaden =
+    , toBroad =
         \list ->
             list |> List.map (Morph.toBroad elementMorph)
     }
