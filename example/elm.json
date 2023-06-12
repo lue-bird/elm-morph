@@ -16,11 +16,13 @@
             "lue-bird/elm-allowable-state": "1.0.2",
             "lue-bird/elm-bits": "8.0.0",
             "lue-bird/elm-bounded-nat": "33.1.0",
-            "lue-bird/elm-emptiness-typed": "9.2.0",
+            "lue-bird/elm-emptiness-typed": "9.2.1",
             "lue-bird/elm-linear-direction": "11.0.0",
             "lue-bird/elm-no-record-type-alias-constructor-function": "1.0.8",
+            "lue-bird/elm-rosetree-path": "2.0.2",
             "lue-bird/elm-typesafe-array": "30.1.0",
             "mdgriffith/elm-ui": "1.1.8",
+            "miniBill/elm-rope": "1.0.0",
             "zwilias/elm-rosetree": "1.5.0"
         },
         "indirect": {
@@ -30,7 +32,8 @@
             "elm/time": "1.0.0",
             "elm/url": "1.0.0",
             "elm/virtual-dom": "1.0.3",
-            "elm-community/array-extra": "2.6.0"
+            "elm-community/array-extra": "2.6.0",
+            "elm-community/list-extra": "8.7.0"
         }
     },
     "test-dependencies": {

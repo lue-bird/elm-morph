@@ -66,4 +66,4 @@ row contentMorphRow =
         )
         |> Morph.tryRow (\() -> Nothing) (Morph.succeed ())
         |> Morph.tryRow Just contentMorphRow
-        |> Morph.choiceRowFinish
+        |> Morph.choiceFinish

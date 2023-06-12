@@ -1,8 +1,16 @@
-module Decimal.Morph exposing (chars, orException, value)
+module Decimal.Morph exposing
+    ( orException, value
+    , chars
+    )
 
 {-| [`Decimal`](Decimal#Decimal) [`Morph`](Morph#Morph)
 
-@docs chars, orException, value
+@docs orException, value
+
+
+## row
+
+@docs chars
 
 -}
 
@@ -10,32 +18,24 @@ import ArraySized
 import ArraySized.Morph
 import Decimal exposing (Decimal(..), Fraction, SignedAbsolute(..))
 import DecimalOrException exposing (OrException)
-import Emptiable exposing (Emptiable)
-import Integer exposing (Integer)
 import Maybe.Morph
-import Morph exposing (Morph, MorphRow, grab, match, one)
-import N exposing (In, N, N0, N1, N9, n0, n1, n9)
+import Morph exposing (Morph, MorphRow, grab, match, one, translate)
+import N exposing (n0, n1, n9)
 import N.Morph
-import Natural
-import NaturalAtLeast1
 import NaturalAtLeast1.Internal
-import Possibly exposing (Possibly)
-import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
-import Sign exposing (Sign(..))
 import Sign.Morph
-import Stack exposing (Stacked)
 import Stack.Morph
 import String.Morph
 import Value
 
 
 {-| [`Morph`](Morph#Morph)
-a [`Decimal`](#Decimal)
+a [`Decimal`](Decimal#Decimal)
 to an [`OrException Decimal`](DecimalOrException#OrException)
 -}
 orException : Morph Decimal (OrException Decimal)
 orException =
-    Morph.value "Decimal"
+    Morph.custom "Decimal"
         { toNarrow =
             \floatExplicit_ ->
                 case floatExplicit_ of
@@ -89,7 +89,7 @@ orException =
 To allow integers to parse as decimals as well,
 build a [`Morph.choice`](Morph#choice)
 [`Decimal.Morph.chars`](#chars)
-and [`Integer.chars`](Integer#chars)
+and [`Integer.Morph.chars`](Integer-Morph#chars)
 
 For different parsing behavior, spin your own
 using [`Decimal.Morph.chars`](#chars) implementation as a reference
@@ -97,7 +97,7 @@ using [`Decimal.Morph.chars`](#chars) implementation as a reference
 -}
 chars : MorphRow Decimal Char
 chars =
-    Morph.to "decimal"
+    Morph.named "decimal"
         (Morph.choice
             (\signedVariant n0Variant numberNarrow ->
                 case numberNarrow of
@@ -109,7 +109,7 @@ chars =
             )
             |> Morph.tryRow Signed signedChars
             |> Morph.tryRow (\() -> N0) (String.Morph.only "0.")
-            |> Morph.choiceRowFinish
+            |> Morph.choiceFinish
             |> match
                 (Morph.broad (ArraySized.repeat () n0)
                     |> Morph.overRow
@@ -122,7 +122,7 @@ chars =
 
 signedChars : MorphRow Decimal.Signed Char
 signedChars =
-    Morph.to "signed"
+    Morph.named "signed"
         (Morph.succeed
             (\signPart absolutePart ->
                 { sign = signPart
@@ -136,7 +136,7 @@ signedChars =
 
 signedAbsoluteChars : MorphRow Decimal.SignedAbsolute Char
 signedAbsoluteChars =
-    Morph.to "absolute"
+    Morph.named "absolute"
         (Morph.choice
             (\fractionVariant atLeast1Variant absoluteUnion ->
                 case absoluteUnion of
@@ -167,13 +167,13 @@ signedAbsoluteChars =
                     |> match (String.Morph.only ".")
                     |> grab .fraction (Maybe.Morph.row fractionChars)
                 )
-            |> Morph.choiceRowFinish
+            |> Morph.choiceFinish
         )
 
 
 fractionChars : MorphRow Fraction Char
 fractionChars =
-    Morph.to "fraction"
+    Morph.named "fraction"
         (Morph.succeed
             (\beforeLast last ->
                 { beforeLast = beforeLast, last = last }
@@ -183,7 +183,7 @@ fractionChars =
                     |> Morph.over ArraySized.Morph.toList
                     |> Morph.overRow
                         (ArraySized.Morph.atLeast n0
-                            (N.Morph.inOn
+                            (translate N.inToNumber N.inToOn
                                 |> Morph.over (N.Morph.in_ ( n0, n9 ))
                                 |> Morph.over N.Morph.char
                                 |> one
@@ -191,7 +191,7 @@ fractionChars =
                         )
                 )
             |> Morph.grab .last
-                (N.Morph.inOn
+                (translate N.inToNumber N.inToOn
                     |> Morph.over (N.Morph.in_ ( n1, n9 ))
                     |> Morph.over N.Morph.char
                     |> one
@@ -199,7 +199,7 @@ fractionChars =
         )
 
 
-{-| [`Value.Morph`](Value#Morph) from a [`Decimal`](#Decimal)
+{-| [`Value.Morph`](Value#Morph) from a [`Decimal`](Decimal#Decimal)
 
 To get a [`Value.Morph`](Value#Morph) from a `Float`,
 see [`DecimalOrException.value`](DecimalOrException#value)
@@ -207,7 +207,7 @@ see [`DecimalOrException.value`](DecimalOrException#value)
 -}
 value : Value.Morph Decimal
 value =
-    Morph.value "Decimal"
+    Morph.custom "Decimal"
         { toNarrow =
             \atom ->
                 case atom of

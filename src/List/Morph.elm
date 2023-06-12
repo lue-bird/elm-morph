@@ -24,14 +24,15 @@ module List.Morph exposing
 -}
 
 import Array
-import ArraySized
-import Emptiable
+import Emptiable exposing (Emptiable)
 import Linear exposing (Direction(..))
+import List.Linear
 import Morph exposing (MorphIndependently, MorphRow, broad, toBroad, toNarrow)
+import Morph.Internal
+import PartialOrComplete exposing (PartialOrComplete(..))
 import Possibly exposing (Possibly(..))
 import Rope
-import Stack
-import StructureMorph
+import Stack exposing (Stacked)
 import Value
 
 
@@ -95,7 +96,7 @@ Don't try to be clever with this.
 
     "AB"
         |> Morph.toNarrow
-            (Morph.for (Char.Morph.caseNo >> Morph.one) [ 'a', 'b' ]
+            (List.Morph.for (Char.Morph.caseNo >> Morph.one) [ 'a', 'b' ]
                 |> Morph.rowFinish
                 |> Morph.over Stack.Morph.string
             )
@@ -121,8 +122,8 @@ for morphRowByElement elementsToTraverseInSequence =
 
 
 sequence :
-    List (MorphRow narrow broadElement)
-    -> MorphRow (List narrow) broadElement
+    List (MorphRow element broadElement)
+    -> MorphRow (List element) broadElement
 sequence toSequence =
     case toSequence of
         [] ->
@@ -130,52 +131,74 @@ sequence toSequence =
 
         toSequence0 :: toSequence1Up ->
             { description =
-                { custom = Emptiable.empty
-                , inner =
-                    Morph.StructureDescription "sequence"
-                        (Stack.topBelow toSequence0 toSequence1Up
-                            |> Stack.map (\_ -> Morph.description)
-                        )
-                }
+                Morph.Internal.sequenceDescriptionFromStack
+                    (Stack.topBelow toSequence0 toSequence1Up
+                        |> Stack.map (\_ -> Morph.description)
+                    )
             , toNarrow =
                 let
-                    stepFrom index sequenceMorphRow =
+                    step :
+                        MorphRow element broadElement
+                        ->
+                            { broad : Emptiable (Stacked broadElement) Possibly
+                            , narrow : List element
+                            , startsDown : Emptiable (Stacked Int) Never
+                            }
+                        ->
+                            PartialOrComplete
+                                { broad : Emptiable (Stacked broadElement) Possibly
+                                , narrow : List element
+                                , startsDown : Emptiable (Stacked Int) Never
+                                }
+                                { error : Morph.Error
+                                , startsDown : Emptiable (Stacked Int) Never
+                                }
+                    step sequenceMorphRow =
                         \soFar ->
                             case soFar.broad |> toNarrow sequenceMorphRow of
                                 Ok stepParsed ->
                                     { broad = stepParsed.broad
-                                    , toNarrow =
-                                        soFar.toNarrow
-                                            |> (::) stepParsed.toNarrow
+                                    , narrow =
+                                        soFar.narrow |> (::) stepParsed.narrow
+                                    , startsDown =
+                                        soFar.startsDown
+                                            |> Stack.onTopLay (stepParsed.broad |> Stack.length)
                                     }
-                                        |> Ok
+                                        |> Partial
 
                                 Err error ->
-                                    Morph.InStructureError { index = index, error = error }
-                                        |> Err
+                                    { startsDown = soFar.startsDown, error = error }
+                                        |> Complete
                 in
                 \initialInput ->
-                    (toSequence0 :: toSequence1Up)
-                        |> List.foldl
-                            (\sequenceMorphRow soFar ->
-                                { index = soFar.index + 1
-                                , status = soFar.status |> Result.andThen (stepFrom soFar.index sequenceMorphRow)
-                                }
-                            )
-                            { index = 0
-                            , status =
-                                { toNarrow = []
-                                , broad = initialInput
-                                }
-                                    |> Ok
-                            }
-                        |> .status
+                    let
+                        traversed =
+                            (toSequence0 :: toSequence1Up)
+                                |> List.Linear.foldUntilCompleteFrom
+                                    { narrow = []
+                                    , broad = initialInput
+                                    , startsDown = initialInput |> Stack.length |> Stack.one
+                                    }
+                                    Up
+                                    (\sequenceMorphRow statusOk -> statusOk |> step sequenceMorphRow)
+                    in
+                    case traversed of
+                        Partial ok ->
+                            { narrow = ok.narrow, broad = ok.broad } |> Ok
+
+                        Complete error ->
+                            case toSequence0 :: toSequence1Up |> List.length of
+                                1 ->
+                                    error.error |> Err
+
+                                _ ->
+                                    Morph.Internal.inSequenceErrorWith error |> Err
             , toBroad =
-                \narrowSequence ->
+                \beforeToBroadSequence ->
                     List.map2
                         (\morphInSequence narrowElement -> narrowElement |> toBroad morphInSequence)
                         (toSequence0 :: toSequence1Up)
-                        narrowSequence
+                        beforeToBroadSequence
                         |> Rope.fromList
                         |> Rope.concat
             }
@@ -191,7 +214,7 @@ value : Value.Morph element -> Value.Morph (List element)
 value elementMorph =
     each elementMorph
         |> Morph.over
-            (Morph.value "List"
+            (Morph.custom "List"
                 { toNarrow =
                     \broad ->
                         case broad of
@@ -211,7 +234,7 @@ value elementMorph =
         |> Morph.over Value.composed
 
 
-{-| [`Morph`](Morph#Morph) all elements in sequence.
+{-| [`Morph`](Morph#Morph) all elements.
 On the narrowing side all [narrowed](Morph#toNarrow) values must be `Ok`
 for it to not result in a [`Morph.Error`](Morph#Error)
 
@@ -235,28 +258,11 @@ each :
             )
             (List beforeToBroad -> List broad)
 each elementMorph =
-    StructureMorph.for "each" morphEachElement
-        |> StructureMorph.add elementMorph
-        |> StructureMorph.finish
-
-
-morphEachElement :
-    MorphIndependently
-        (beforeToNarrow
-         -> Result (Morph.ErrorWithDeadEnd deadEnd) narrow
-        )
-        (beforeToBroad -> broad)
-    ->
-        { toNarrow :
-            List beforeToNarrow
-            ->
-                Result
-                    (Morph.ErrorWithDeadEnd deadEnd)
-                    (List narrow)
-        , toBroad : List beforeToBroad -> List broad
+    { description =
+        { custom = Stack.one "all"
+        , inner = Morph.ElementsDescription (elementMorph |> Morph.description)
         }
-morphEachElement elementMorph =
-    { toNarrow =
+    , toNarrow =
         \list ->
             list
                 |> List.foldr

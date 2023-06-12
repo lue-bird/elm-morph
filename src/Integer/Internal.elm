@@ -1,8 +1,9 @@
 module Integer.Internal exposing (fromInt, toInt)
 
 import ArraySized
-import Bits
-import Integer exposing (Integer(..))
+import BitArray
+import BitArray.Extra
+import Integer exposing (Integer)
 import Linear exposing (Direction(..))
 import N exposing (n0, n1)
 import N.Local exposing (n32)
@@ -17,11 +18,13 @@ fromInt =
             intBroad
                 |> abs
                 |> N.intToAtLeast n0
-                |> Bits.fromN
-                |> Bits.unpad
-                |> ArraySized.maxTo n32
+                |> BitArray.fromN n32
+                |> BitArray.Extra.unpad
                 |> ArraySized.hasAtLeast n1
         of
+            Err _ ->
+                Integer.N0
+
             Ok absoluteAtLeast1 ->
                 Integer.Signed
                     { sign =
@@ -33,14 +36,11 @@ fromInt =
                     , absolute =
                         { bitsAfterI =
                             absoluteAtLeast1
-                                |> ArraySized.removeMin ( Up, n0 )
+                                |> ArraySized.removeMin ( Up, n1 )
                                 |> ArraySized.minToNumber
                                 |> ArraySized.maxToInfinity
                         }
                     }
-
-            Err _ ->
-                Integer.N0
 
 
 toInt : Integer -> Int

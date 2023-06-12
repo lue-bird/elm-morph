@@ -6,7 +6,7 @@ import Value
 
 value : Value.Morph String
 value =
-    Morph.value "String"
+    Morph.custom "String"
         { toBroad = Value.String
         , toNarrow =
             \valueBroad ->

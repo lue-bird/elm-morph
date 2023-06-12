@@ -30,11 +30,11 @@ some low-level primitives like bools might not be supported etc.
 @docs Morph
 @docs unit
 
-Basically every `module` here has a [`Morph`](#Morph),
+Basically every `module` here has a [`Value.Morph`](#Morph),
 for example
 
-  - [`Integer`](Integer)
-  - [`Decimal`](Decimal)
+  - [`Integer.Morph`](Integer-Morph)
+  - [`Decimal.Morph`](Decimal-Morph)
   - [`DecimalOrException`](DecimalOrException)
   - [`String.Morph`](String-Morph)
   - [`Maybe.Morph`](Maybe-Morph)
@@ -416,7 +416,7 @@ atom :
          -> AtomOrComposed broadAtom broadComposed_
         )
 atom =
-    Morph.value "Atom"
+    Morph.custom "Atom"
         { toBroad = Atom
         , toNarrow =
             \value ->
@@ -440,7 +440,7 @@ composed :
          -> AtomOrComposed broadAtom_ broadComposed
         )
 composed =
-    Morph.value "Composed"
+    Morph.custom "Composed"
         { toBroad = Composed
         , toNarrow =
             \value ->
@@ -496,7 +496,7 @@ with 0 attached values
 -}
 unit : Morph ()
 unit =
-    Morph.value "Unit"
+    Morph.custom "Unit"
         { toBroad = Unit
         , toNarrow =
             \value_ ->
@@ -525,7 +525,7 @@ Continue with [`field`](#part)
         )
         -> Morph ( part0, part1 )
     tuple2 ( part0Morph, part1Morph ) =
-        Morph.to "Tuple2"
+        Morph.named "Tuple2"
             (record
                 (\part0 part1 -> ( part0, part1 ))
                 |> field ( Tuple.first, "part0" ) part0Morph
@@ -545,7 +545,7 @@ Continue with [`field`](#part)
         )
         -> Morph ( part0, part1, part2 )
     tuple3 ( part0Morph, part1Morph, part2Morph ) =
-        Morph.to "Tuple3"
+        Morph.named "Tuple3"
             (record
                 (\part0 part1 part2 -> ( part0, part1, part2 ))
                 |> field ( \( part0, _, _ ) -> part0, "part0" ) part0Morph
@@ -718,7 +718,7 @@ groupFinish =
         groupMorphComplete
             |> partsFinish
             |> Morph.over
-                (Morph.value "Record"
+                (Morph.custom "Record"
                     { toBroad = Record
                     , toNarrow =
                         \composedBroad ->
@@ -819,7 +819,7 @@ variant ( possibilityToChoice, possibilityTag ) possibilityMorph =
     \choiceMorphSoFar ->
         choiceMorphSoFar
             |> Morph.try possibilityToChoice
-                (Morph.to possibilityTag
+                (Morph.named possibilityTag
                     { description = possibilityMorph |> Morph.description
                     , toNarrow =
                         variantStepNarrow
@@ -882,7 +882,7 @@ choiceFinish =
         choiceMorphComplete
             |> Morph.choiceFinish
             |> Morph.over
-                (Morph.value "Variant"
+                (Morph.custom "Variant"
                     { toNarrow =
                         \value ->
                             case value of

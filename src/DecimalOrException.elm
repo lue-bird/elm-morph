@@ -346,7 +346,7 @@ value =
 
 decimalInternalValue : Value.Morph Decimal
 decimalInternalValue =
-    Morph.value "Decimal"
+    Morph.custom "Decimal"
         { toNarrow =
             \atom ->
                 case atom of

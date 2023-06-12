@@ -25,7 +25,6 @@ import Morph exposing (MorphIndependently, translate)
 import Possibly exposing (Possibly(..))
 import Set exposing (Set)
 import Stack
-import StructureMorph
 import Value
 
 
@@ -73,7 +72,7 @@ toList =
 --
 
 
-{-| [`Morph`](Morph#Morph) all elements in sequence.
+{-| [`Morph`](Morph#Morph) all elements.
 On the narrowing side all [narrowed](Morph#toNarrow) values must be `Ok`
 for it to not result in a [`Morph.Error`](Morph#Error)
 
@@ -97,37 +96,20 @@ each :
             )
             (Set comparableBeforeBroaden -> Set comparableBroad)
 each elementMorph =
-    StructureMorph.for "each" morphEachElement
-        |> StructureMorph.add elementMorph
-        |> StructureMorph.finish
-
-
-morphEachElement :
-    MorphIndependently
-        (comparableBeforeNarrow
-         -> Result (Morph.ErrorWithDeadEnd deadEnd) comparableNarrow
-        )
-        (comparableBeforeBroaden -> comparableBroad)
-    ->
-        { toNarrow :
-            Set comparableBeforeNarrow
-            ->
-                Result
-                    (Morph.ErrorWithDeadEnd deadEnd)
-                    (Set comparableNarrow)
-        , toBroad : Set comparableBeforeBroaden -> Set comparableBroad
+    { description =
+        { inner = Morph.ElementsDescription (elementMorph |> Morph.description)
+        , custom = Stack.one "all"
         }
-morphEachElement elementMorph =
-    { toNarrow =
-        \set ->
-            set
+    , toNarrow =
+        \setBeforeToNarrow ->
+            setBeforeToNarrow
                 |> Set.foldl
                     (\element { index, collected } ->
                         { collected =
                             case element |> Morph.toNarrow elementMorph of
                                 Ok elementValue ->
                                     collected
-                                        |> Result.map (\l -> l |> Set.insert elementValue)
+                                        |> Result.map (\collectedSet -> collectedSet |> Set.insert elementValue)
 
                                 Err elementError ->
                                     let
@@ -149,13 +131,13 @@ morphEachElement elementMorph =
                         }
                     )
                     { collected = Set.empty |> Ok
-                    , index = (set |> Set.size) - 1
+                    , index = (setBeforeToNarrow |> Set.size) - 1
                     }
                 |> .collected
                 |> Result.mapError Morph.GroupError
     , toBroad =
-        \set ->
-            set |> Set.map (Morph.toBroad elementMorph)
+        \setBeforeToBroad ->
+            setBeforeToBroad |> Set.map (Morph.toBroad elementMorph)
     }
 
 

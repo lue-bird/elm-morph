@@ -137,7 +137,7 @@ boolean =
         |> Morph.tryRow (\() -> BooleanTrue) (String.Morph.only "true")
         |> Morph.tryRow (\() -> BooleanFalse) (String.Morph.only "false")
         |> Morph.tryRow BooleanOr or
-        |> Morph.choiceRowFinish
+        |> Morph.choiceFinish
 
 or : MorphRow { left : Boolean, right : Boolean } Char
 or =

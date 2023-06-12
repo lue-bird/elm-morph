@@ -1,6 +1,9 @@
 module Sign.Morph exposing (char, maybeMinusChar)
 
 {-| [`Sign`](Sign#Sign) [`Morph`](Morph#Morph)
+
+@docs char, maybeMinusChar
+
 -}
 
 import Char.Morph
@@ -10,11 +13,11 @@ import Sign exposing (Sign(..))
 import String.Morph
 
 
-{-| [`Sign`](#Sign) `'+'` or `'-'`
+{-| [`Sign`](Sign#Sign) `'+'` or `'-'`
 -}
 char : Morph Sign Char
 char =
-    Morph.to "sign"
+    Morph.named "sign"
         (Morph.choice
             (\plus minus signNarrow ->
                 case signNarrow of
@@ -30,12 +33,12 @@ char =
         )
 
 
-{-| An optional `'-'` sign → [`Negative`](#Sign),
-else [narrows to](Morph#toNarrow) [`Positive`](#Sign)
+{-| An optional `'-'` sign → [`Negative`](Sign#Sign),
+else [narrows to](Morph#toNarrow) [`Positive`](Sign#Sign)
 -}
 maybeMinusChar : MorphRow Sign Char
 maybeMinusChar =
-    Morph.to "negation"
+    Morph.named "negation"
         (translate
             (\minusSymbol ->
                 case minusSymbol of

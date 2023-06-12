@@ -1,13 +1,13 @@
-module Bit.Morph exposing (char, n, toN)
+module Bit.Morph exposing (char, n, toN, only)
 
 {-| [`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/) [`Morph`](Morph#Morph)s
 
-@docs char, n, toN
+@docs char, n, toN, only
 
 -}
 
 import Bit exposing (Bit)
-import Char.Morph
+import Char.Morph.Internal
 import Morph exposing (Morph, MorphIndependently)
 import N exposing (In, N, N1, To, Up, Up0, Up1)
 
@@ -45,6 +45,21 @@ char =
                 Bit.I ->
                     i ()
         )
-        |> Morph.try (\() -> Bit.O) (Char.Morph.only '0')
-        |> Morph.try (\() -> Bit.I) (Char.Morph.only '1')
+        |> Morph.try (\() -> Bit.O) (Char.Morph.Internal.only '0')
+        |> Morph.try (\() -> Bit.I) (Char.Morph.Internal.only '1')
         |> Morph.choiceFinish
+
+
+{-| Match a specific given `Bit` and not the other one.
+
+    import Morph
+
+    Bit.O |> Morph.toNarrow (Bit.Morph.only Bit.I)
+    --> Err (Morph.DeadEnd "0")
+
+-}
+only : Bit -> Morph () Bit
+only broadConstant =
+    Morph.only
+        (\bit -> bit |> Morph.toBroad char |> String.fromChar)
+        broadConstant

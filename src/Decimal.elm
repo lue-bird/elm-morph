@@ -15,14 +15,11 @@ without the possibility of [exceptions](DecimalOrException#Exception)
 
 -}
 
-import ArraySized
 import Emptiable exposing (Emptiable)
 import Integer exposing (Integer)
-import N exposing (In, N, N0, N1, N9, n0, n1, n9)
-import N.Morph
+import N exposing (In, N, N0, N1, N9)
 import Natural
 import NaturalAtLeast1
-import NaturalAtLeast1.Internal
 import Possibly exposing (Possibly)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Sign exposing (Sign(..))

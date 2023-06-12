@@ -157,7 +157,7 @@ char =
             (\letter -> { case_ = CaseUpper, letter = letter })
             upperChar
         |> Morph.choiceFinish
-        |> Morph.to "a|..|Z"
+        |> Morph.named "a|..|Z"
 
 
 {-| Match exactly one lowercase letter character.
@@ -288,7 +288,7 @@ lowerChar =
         |> Morph.try (\() -> Y) (Char.Morph.only 'y')
         |> Morph.try (\() -> Z) (Char.Morph.only 'z')
         |> Morph.choiceFinish
-        |> Morph.to "a|..|z"
+        |> Morph.named "a|..|z"
 
 
 {-| Match exactly one uppercase letter character.
@@ -420,7 +420,7 @@ upperChar =
         |> Morph.try (\() -> Y) (Char.Morph.only 'Y')
         |> Morph.try (\() -> Z) (Char.Morph.only 'Z')
         |> Morph.choiceFinish
-        |> Morph.to "A|..|Z"
+        |> Morph.named "A|..|Z"
 
 
 {-| Match only the specific given broad input. See [`Morph.only`](Morph#only)

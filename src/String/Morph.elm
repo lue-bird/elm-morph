@@ -63,6 +63,11 @@ list =
 
 
 {-| [`Translate`](Morph#Translate) each `Char` in a `String`
+
+For fallible transformations etc,
+morph to other structures (but generic ones) like a list first
+and use its `each` morph.
+
 -}
 each :
     Translate Char Char
@@ -75,13 +80,18 @@ each elementCharTranslate =
 --
 
 
-{-| Match a specific text string and nothing else.
+{-| Match a specific given `String` and nothing else.
 This is case sensitive.
 
-    import Morph.Error
+    import Morph
 
     -- match an exact text, case sensitive
-    "abcdef" |> Text.toNarrow (text "abc") --> Ok "abc"
+    "abc" |> Morph.toNarrow (String.Morph.only "abc")
+    --> Ok ()
+
+    -- match an exact text, case sensitive
+    "abcdef" |> Morph.toNarrow (String.Morph.only "abc")
+    --> Err (Morph.DeadEnd "TODO")
 
     -- but anything else makes it fail
     "abCDEF"
@@ -94,7 +104,7 @@ See [`for`](#for), [`forBroad`](#forBroad) to control what to [morph](Morph#Morp
 -}
 only : String -> MorphRow () Char
 only expectedText =
-    Morph.to ([ "\"", expectedText, "\"" ] |> String.concat)
+    Morph.named ([ "\"", expectedText, "\"" ] |> String.concat)
         (forBroad
             (Char.Morph.only >> Morph.one)
             expectedText
@@ -119,12 +129,10 @@ forBroad charMorphRow expectedText =
         (expectedText |> String.toList)
 
 
-{-| Traverse a `String`: See [`Morph.for`](#for)
+{-| Traverse a `String`
 -}
 for :
-    (Char
-     -> MorphRow narrowElement broadElement
-    )
+    (Char -> MorphRow narrowElement broadElement)
     -> String
     -> MorphRow (List narrowElement) broadElement
 for charMorphRow expectedText =

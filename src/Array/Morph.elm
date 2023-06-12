@@ -24,7 +24,6 @@ import Emptiable
 import Morph exposing (MorphIndependently, translate)
 import Possibly exposing (Possibly(..))
 import Stack
-import StructureMorph
 import Value
 
 
@@ -72,7 +71,7 @@ value : Value.Morph element -> Value.Morph (Array element)
 value elementMorph =
     each elementMorph
         |> Morph.over
-            (Morph.value "Array"
+            (Morph.custom "Array"
                 { toNarrow =
                     \broad ->
                         case broad of
@@ -90,7 +89,7 @@ value elementMorph =
         |> Morph.over Value.composed
 
 
-{-| [`Morph`](Morph#Morph) all elements in sequence.
+{-| [`Morph`](Morph#Morph) all elements.
 On the narrowing side all [narrowed](Morph#toNarrow) values must be `Ok`
 for it to not result in a [`Morph.Error`](Morph#Error)
 
@@ -114,28 +113,11 @@ each :
             )
             (Array beforeToBroad -> Array broad)
 each elementMorph =
-    StructureMorph.for "each" morphEachElement
-        |> StructureMorph.add elementMorph
-        |> StructureMorph.finish
-
-
-morphEachElement :
-    MorphIndependently
-        (beforeToNarrow
-         -> Result (Morph.ErrorWithDeadEnd deadEnd) narrow
-        )
-        (beforeToBroad -> broad)
-    ->
-        { toNarrow :
-            Array beforeToNarrow
-            ->
-                Result
-                    (Morph.ErrorWithDeadEnd deadEnd)
-                    (Array narrow)
-        , toBroad : Array beforeToBroad -> Array broad
+    { description =
+        { custom = Stack.one "all"
+        , inner = Morph.ElementsDescription (elementMorph |> Morph.description)
         }
-morphEachElement elementMorph =
-    { toNarrow =
+    , toNarrow =
         \array ->
             array
                 |> Array.foldr
@@ -158,7 +140,7 @@ morphEachElement elementMorph =
                                     in
                                     errorsSoFar
                                         |> Stack.onTopLay
-                                            { index = index
+                                            { location = index |> String.fromInt
                                             , error = elementError
                                             }
                                         |> Err
@@ -170,7 +152,7 @@ morphEachElement elementMorph =
                     }
                 |> .collected
                 |> Result.map Array.fromList
-                |> Result.mapError Morph.GroupError
+                |> Result.mapError Morph.ElementsError
     , toBroad =
         \array ->
             array |> Array.map (Morph.toBroad elementMorph)

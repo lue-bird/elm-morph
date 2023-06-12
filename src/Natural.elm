@@ -1,11 +1,8 @@
-module Natural exposing
-    ( Natural(..)
-    , AtLeast1
-    )
+module Natural exposing (Natural(..), AtLeast1)
 
 {-| Natural number ≥ 0
 
-@docs Natural, Natural.AtLeast1
+@docs Natural, AtLeast1
 
 -}
 

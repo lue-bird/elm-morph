@@ -18,7 +18,7 @@ import String.Morph
 
 chars : MorphRow Email Char
 chars =
-    Morph.to "email"
+    Morph.named "email"
         (Morph.succeed
             (\local_ domain_ ->
                 { local = local_
@@ -33,15 +33,15 @@ chars =
 
 local : MorphRow Local Char
 local =
-    Morph.to "local"
+    Morph.named "local"
         (Morph.succeed
             (\first afterFirst ->
                 ArraySized.one first
                     |> ArraySized.attachMin Up
                         (afterFirst |> ArraySized.minTo n1)
             )
-            |> grab (ArraySized.element ( Up, n0 )) localPart
-            |> grab (ArraySized.removeMin ( Up, n0 ))
+            |> grab (ArraySized.element ( Up, n1 )) localPart
+            |> grab (ArraySized.removeMin ( Up, n1 ))
                 (atLeast n1
                     (Morph.succeed (\part -> part)
                         |> match (String.Morph.only ".")
@@ -62,7 +62,7 @@ localPart =
 
 localSymbol : Morph LocalSymbol Char
 localSymbol =
-    Morph.to "local symbol"
+    Morph.named "local symbol"
         (Morph.choice
             (\printableVariant aToZVariant n0To9Variant localSymbolUnion ->
                 case localSymbolUnion of
@@ -96,7 +96,7 @@ localSymbol =
 
 localSymbolPrintable : Morph LocalSymbolPrintable Char
 localSymbolPrintable =
-    Morph.to "local symbol printable"
+    Morph.named "local symbol printable"
         (Morph.choice
             (\exclamationMark numberSign dollarSign percentSign ampersand asterisk lowLine hyphenMinus tilde verticalLine plusSign equalsSign graveAccent leftCurlyBracket rightCurlyBracket localSymbolPrintableNarrow ->
                 case localSymbolPrintableNarrow of
@@ -166,7 +166,7 @@ localSymbolPrintable =
 
 domain : MorphRow Domain Char
 domain =
-    Morph.to "domain"
+    Morph.named "domain"
         (Morph.succeed
             (\first hostLabels topLevel ->
                 { first = first, hostLabels = hostLabels, topLevel = topLevel }
@@ -186,7 +186,7 @@ domain =
 
 hostLabel : MorphRow HostLabel Char
 hostLabel =
-    Morph.to "host label"
+    Morph.named "host label"
         (Morph.succeed
             (\firstSymbol betweenFirstAndLastSymbols lastSymbol ->
                 { firstSymbol = firstSymbol
@@ -250,7 +250,7 @@ hostLabelSymbol =
 
 domainTopLevel : MorphRow DomainTopLevel Char
 domainTopLevel =
-    Morph.to "domain top-level"
+    Morph.named "domain top-level"
         (Morph.succeed
             (\startDigits firstAToZ afterFirstAToZ ->
                 { startDigits = startDigits

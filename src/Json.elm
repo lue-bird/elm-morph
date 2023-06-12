@@ -51,16 +51,14 @@ from [`elm/http`](https://package.elm-lang.org/packages/elm/http/latest), ...
 Compiler magic. Not `case`able. Elm crashes on `==`.
 Can include functions, proxies, getters, bigInts, anything
 
-and.. of course this can be abused to break elm's promises 🙈
+and.. of course this can be abused to break elm's promises 🙈, see for example
 
-> examples
->
->   - [randomness without `Cmd` ellie](https://ellie-app.com/hpXzJxh4HRda1)
->   - web-audio examples
->       - [`WebAudio.Context.currentTime`](https://package.elm-lang.org/packages/pd-andy/elm-web-audio/latest/WebAudio-Context#currentTime)
->       - [`WebAudio.Context.AudioContext`](https://package.elm-lang.org/packages/pd-andy/elm-web-audio/latest/WebAudio-Context#AudioContext)
->   - [`getBoundingClientRect`](https://github.com/funk-team/funkLang/blob/master/src/domMonkeyPatches.js#L44)
->   - [listening to events outside a given element](https://github.com/funk-team/funkLang/blob/master/src/domMonkeyPatches/eventsOutside.js#L21)
+  - [randomness without `Cmd` ellie](https://ellie-app.com/hpXzJxh4HRda1)
+  - web-audio examples
+      - [`WebAudio.Context.currentTime`](https://package.elm-lang.org/packages/pd-andy/elm-web-audio/latest/WebAudio-Context#currentTime)
+      - [`WebAudio.Context.AudioContext`](https://package.elm-lang.org/packages/pd-andy/elm-web-audio/latest/WebAudio-Context#AudioContext)
+  - [`getBoundingClientRect`](https://github.com/funk-team/funkLang/blob/master/src/domMonkeyPatches.js#L44)
+  - [listening to events outside a given element](https://github.com/funk-team/funkLang/blob/master/src/domMonkeyPatches/eventsOutside.js#L21)
 
 -}
 type alias JsValueMagic =
@@ -104,23 +102,7 @@ decodeErrorToMorph =
     \decodeError ->
         case decodeError of
             Json.Decode.Field fieldName error ->
-                [ "field `"
-                , fieldName
-                , "`:\n"
-                , -- TODO find better error display
-                  Morph.descriptionAndErrorToTree { custom = Emptiable.empty, inner = Morph.CustomDescription }
-                    (error |> decodeErrorToMorph |> Just)
-                    |> Tree.map .text
-                    |> Morph.treeToLines
-                    |> String.join "\n"
-                , "\n\n"
-                , "`Morph` can't turn this into a more structured error"
-                , " because it refers to field errors by their location in the dict/record/object."
-                , "\n"
-                , "When decoding elm-internal json however, the error only preserves names."
-                ]
-                    |> String.concat
-                    |> Morph.DeadEnd
+                Morph.ElementsError ({ location = fieldName, error = error |> decodeErrorToMorph } |> Stack.one)
 
             Json.Decode.Index arrayIndex error ->
                 { index = arrayIndex
@@ -250,7 +232,7 @@ About json numbers...
 -}
 jsValueMagic : Morph (Json String) JsValueMagic
 jsValueMagic =
-    Morph.to "JSON"
+    Morph.named "JSON"
         { description = { custom = Emptiable.empty, inner = Morph.CustomDescription }
         , toNarrow =
             \jsValueMagicBeforeNarrow ->
@@ -276,7 +258,7 @@ string =
 -}
 stringBroadWith : { indentation : Int } -> Morph (Json String) String
 stringBroadWith { indentation } =
-    Morph.to "JSON"
+    Morph.named "JSON"
         { description = { custom = Emptiable.empty, inner = Morph.CustomDescription }
         , toNarrow =
             \jsValueMagicBroad ->

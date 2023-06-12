@@ -97,11 +97,13 @@ import Element.Background as UiBackground
 import Element.Border as UiBorder
 import Element.Font as UiFont
 import Element.Input as UiInput
-import Forest exposing (Forest, ForestPath)
+import Forest.Navigate exposing (Forest)
+import Forest.Path exposing (ForestPath)
 import Html exposing (Html)
 import Html.Attributes as HtmlA
 import Json.Decode as Decode
 import Tree exposing (Tree)
+import Tree.Path
 
 
 {-| State of a tree-view.
@@ -208,7 +210,7 @@ ui toStyle model =
                 (\index ->
                     treeUi
                         { toStyle = toStyle
-                        , path = { index = index, indexPath = [] }
+                        , path = Forest.Path.fromIndex index Tree.Path.atTrunk
                         , baseBefore = []
                         }
                 )
@@ -282,7 +284,7 @@ treeUi context tree =
                 [ onlyChild ] ->
                     treeUi
                         { toStyle = context.toStyle
-                        , path = { path | indexPath = path.indexPath ++ [ 0 ] }
+                        , path = path |> Forest.Path.toChild 0
                         , baseBefore = context.baseBefore ++ [ baseUi ]
                         }
                         onlyChild
@@ -292,7 +294,7 @@ treeUi context tree =
                         [ baseRow
                         , Ui.column
                             [ UiBorder.widthEach { eachSide0 | left = 3 }
-                            , UiBorder.color (colorForDepth (path.indexPath |> List.length))
+                            , UiBorder.color (colorForDepth (path |> Forest.Path.pathIntoTreeAtIndex |> Tree.Path.depth))
                             , Ui.paddingEach { eachSide0 | left = 35 }
                             , Ui.spacing 4
                             ]
@@ -300,7 +302,7 @@ treeUi context tree =
                                 (\index ->
                                     treeUi
                                         { toStyle = context.toStyle
-                                        , path = { path | indexPath = path.indexPath ++ [ index ] }
+                                        , path = path |> Forest.Path.toChild index
                                         , baseBefore = []
                                         }
                                 )

@@ -8,7 +8,7 @@ import Element.Font as UiFont
 import Element.Input as UiInput
 import Email
 import Emptiable exposing (Emptiable)
-import Forest
+import Forest.Navigate
 import Html exposing (Html)
 import Html.Attributes as HtmlA
 import Html.Events as Html
@@ -110,8 +110,8 @@ reactTo event =
             \state ->
                 ( { state
                     | descriptionTreeViewModel =
-                        Forest.alterAt path
-                            TreeUi.labelOpenClosedToggle
+                        Forest.Navigate.alter path
+                            (Tree.mapLabel TreeUi.labelOpenClosedToggle)
                             state.descriptionTreeViewModel
                   }
                 , Cmd.none

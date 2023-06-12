@@ -1,3 +1,8 @@
+## still in consideration
+
+  - for choice, store which path was taken
+  - for while possible, store how many elements were possible
+
 # change log
 
 ## 1.0.0
@@ -15,7 +20,7 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
       - `zeroOrOne` remove
           - in favor of `choice` or `in_ ( n0, n1 )`
       - `atMost max` remove
-          - in favor of `in ( n0, max )`
+          - in favor of `in_ ( n0, max )`
       - `concat` remove
       - `fold`, `foldWhile` remove
           - in favor of `whileAccumulate`
@@ -98,11 +103,11 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
       - `lowercase` name → `caseLower`
       - `uppercase` name → `caseUpper`
       - `alphaNum` remove
-          - in favor of `Choice.between ... |> Choice.tryRow |> Morph.choiceRowFinish`
+          - in favor of `Choice.between ... |> Choice.tryRow |> Morph.choiceFinish`
       - `space` name → `blank`
           - to emphasize it can be any whitespace
       - `except` remove
-          - in favor of `Choice.between ... |> Choice.tryRow |> Morph.choiceRowFinish`
+          - in favor of `Choice.between ... |> Choice.tryRow |> Morph.choiceFinish`
   - `MorphRow`
       - `parse : String -> MorphRow narrow -> Result Error narrow` remove
           - in favor of
@@ -123,6 +128,6 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
       - `until` add
       - `while` add
       - `oneOf` remove
-          - in favor of `Choice.between ... |> Choice.tryRow |> Morph.choiceRowFinish`
+          - in favor of `Choice.between ... |> Choice.tryRow |> Morph.choiceFinish`
       - `possibility` add
       - `choiceFinish` add

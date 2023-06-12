@@ -1,15 +1,16 @@
 module Morph exposing
     ( Morph, Translate, MorphOrError, MorphIndependently
     , Description, DescriptionInner(..)
-    , value, only, validate
+    , toBroadOnly
+    , custom, only, validate
     , translate, broad, toggle, keep, translateOn
-    , lazy
+    , recursive
     , end, one, succeed, grab, match
-    , to
+    , named
     , invert
     , deadEndMap
     , deadEndNever, narrowErrorMap
-    , Error, ErrorWithDeadEnd(..), GroupError
+    , Error, ErrorWithDeadEnd(..), GroupError, InChainPlace(..), InSequencePlace(..)
     , Label, LabelKind(..), descriptionAndErrorToTree
     , description, descriptionToTree
     , treeToLines
@@ -21,9 +22,10 @@ module Morph exposing
     , VariantsMorphEmptiable, variants, variant, variantsFinish
     , choice
     , ChoiceMorphEmptiable, try, choiceFinish
-    , ChoiceMorphRowEmptiable, tryRow, choiceRowFinish
+    , ChoiceMorphRowEmptiable, tryRow
     , MorphRow, MorphRowIndependently, rowFinish
     , before
+    , until, untilFold, whilePossibleFold
     )
 
 {-| Call it Codec, Coder, ParserBuilder, Convert-, Transform-, Shape-, FormReversible, ToFrom, ...
@@ -35,11 +37,11 @@ We call it
 
 ## create
 
-@docs broaden
-@docs value, only, validate
+@docs toBroadOnly
+@docs custom, only, validate
 @docs translate, broad, toggle, keep, translateOn
 
-@docs lazy
+@docs recursive
 
 
 ### create row
@@ -49,7 +51,7 @@ We call it
 
 ## alter
 
-@docs to
+@docs named
 @docs invert
 @docs deadEndMap
 @docs deadEndNever, narrowErrorMap
@@ -57,7 +59,7 @@ We call it
 
 ## error
 
-@docs Error, ErrorWithDeadEnd, GroupError
+@docs Error, ErrorWithDeadEnd, GroupError, InChainPlace, InSequencePlace
 @docs Label, LabelKind, descriptionAndErrorToTree
 
 
@@ -103,7 +105,7 @@ We call it
 
 ## choice [`MorphRow`](#MorphRow)
 
-@docs ChoiceMorphRowEmptiable, tryRow, choiceRowFinish
+@docs ChoiceMorphRowEmptiable, tryRow
 
 
 ## row
@@ -111,7 +113,7 @@ We call it
 @docs MorphRow, MorphRowIndependently, rowFinish
 
 
-### sequence row
+## sequence
 
   - optional → [`Maybe.Morph.row`](Maybe-Morph#row)
   - [`atLeast`](ArraySized-Morph#atLeast)
@@ -120,11 +122,13 @@ We call it
 
 @docs before
 
-`whileAccumulate`, `until` aren't exposed for simplicity.
-Have a need for them? → issue
+
+### advanced sequence
+
+@docs until, untilFold, whilePossibleFold
 
 
-### other art
+### oh look! other projects do similar things
 
   - [`invertible-syntax`](https://hackage.haskell.org/package/invertible-syntax) same idea in the haskell world
   - parse-build an enum over a String: [`jmpavlick/bimap`](https://dark.elm.dmy.fr/packages/jmpavlick/bimap/latest/), [`toastal/select-prism`](https://package.elm-lang.org/packages/toastal/select-prism/latest/), [`Herteby/enum`](https://package.elm-lang.org/packages/Herteby/enum/latest), [`genthaler/elm-enum`](https://package.elm-lang.org/packages/genthaler/elm-enum/latest/), [`the-sett/elm-refine` `Enum`](https://package.elm-lang.org/packages/the-sett/elm-refine/latest/Enum)
@@ -141,17 +145,15 @@ Up for a challenge? implement & PR
 
 -}
 
-import ArraySized exposing (ArraySized)
-import Emptiable exposing (Emptiable, filled)
+import Emptiable exposing (Emptiable)
 import Json.Decode exposing (Error)
 import Linear exposing (Direction(..))
-import N exposing (Min, N2, On)
-import Possibly exposing (Possibly)
+import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Rope exposing (Rope)
 import Stack exposing (Stacked)
 import Tree exposing (Tree)
-import Util exposing (recoverTry)
+import Util exposing (justWhen, maybeWhen, recoverTry)
 
 
 
@@ -310,24 +312,30 @@ type alias Description =
         }
 
 
-{-| Description of a structure
-
-  - chained morphs
-  - narrow group of multiple
-  - narrow Morph.choice between multiple
-
+{-| Structural description of what is being morphed
 -}
-type DescriptionInner
-    = CustomDescription
-    | OnlyDescription String
-    | -- e.g. over, sequence, while, inverse, elements, atLeast exactly, in
-      StructureDescription String (Emptiable (Stacked Description) Possibly)
-    | GroupDescription (ArraySized Description (Min (On N2)))
-    | PartsDescription (Emptiable (Stacked { tag : String, value : Description }) Never)
-    | ChoiceDescription (ArraySized Description (Min (On N2)))
-    | VariantsDescription (Emptiable (Stacked { tag : String, value : Description }) Never)
-      -- row
+type
+    DescriptionInner
+    -- Translate
+    = InverseDescription Description
+    | CustomDescription
+      -- MorphRow
+    | SucceedDescription
     | EndDescription
+    | WhilePossibleDescription Description
+    | UntilDescription { commit : Description, end : Description, element : Description }
+    | SequenceDescription { early : Description, late : Description }
+      -- others
+    | OnlyDescription String
+    | InnerRecursiveDescription String (() -> Description)
+    | ChainDescription { broad : Description, narrow : Description }
+      -- group morph
+    | GroupDescription (Emptiable (Stacked Description) Never)
+    | ElementsDescription Description
+    | PartsDescription (Emptiable (Stacked { tag : String, value : Description }) Never)
+      -- choice morph
+    | ChoiceDescription (Emptiable (Stacked Description) Never)
+    | VariantsDescription (Emptiable (Stacked { tag : String, value : Description }) Never)
 
 
 {-| Create a simple markdown-formatted message from a tree.
@@ -384,14 +392,61 @@ type LabelKind
     | LabelError
 
 
-justWhen : (content -> Bool) -> content -> Maybe content
-justWhen passes =
-    \content ->
-        if content |> passes then
-            Just content
+isDescriptive : Description -> Bool
+isDescriptive =
+    \description_ ->
+        case description_.custom of
+            Emptiable.Filled _ ->
+                True
 
-        else
-            Nothing
+            Emptiable.Empty _ ->
+                case description_.inner of
+                    CustomDescription ->
+                        False
+
+                    EndDescription ->
+                        True
+
+                    SucceedDescription ->
+                        False
+
+                    OnlyDescription _ ->
+                        True
+
+                    InnerRecursiveDescription _ _ ->
+                        True
+
+                    InverseDescription inverseDescription ->
+                        inverseDescription |> isDescriptive
+
+                    WhilePossibleDescription _ ->
+                        True
+
+                    UntilDescription _ ->
+                        True
+
+                    ChainDescription elements ->
+                        [ elements.broad, elements.narrow ] |> List.any isDescriptive
+
+                    SequenceDescription elements ->
+                        [ elements.early, elements.late ] |> List.any isDescriptive
+
+                    GroupDescription descriptionParts ->
+                        descriptionParts |> Stack.toList |> List.any isDescriptive
+
+                    ElementsDescription elementDescription ->
+                        elementDescription |> isDescriptive
+
+                    PartsDescription descriptionParts ->
+                        descriptionParts |> Stack.toList |> List.any (\part_ -> part_.value |> isDescriptive)
+
+                    ChoiceDescription descriptionPossibilities ->
+                        descriptionPossibilities |> Stack.toList |> List.any isDescriptive
+
+                    VariantsDescription descriptionVariants ->
+                        descriptionVariants
+                            |> Stack.toList
+                            |> List.any (\variant_ -> variant_.value |> isDescriptive)
 
 
 {-| Create a tree describing a given [`Error`](#Error) embedded in a given [`Description`](#Description).
@@ -399,88 +454,227 @@ justWhen passes =
 descriptionAndErrorToTree : Description -> Maybe Error -> Tree Label
 descriptionAndErrorToTree description_ maybeError =
     let
-        error =
-            case maybeError of
-                Nothing ->
-                    { always = Nothing, structure = Nothing }
-
-                Just (DeadEnd deadEnd) ->
-                    { always = Tree.singleton { kind = LabelError, text = deadEnd } |> Just
-                    , structure = Nothing
+        startDownLabel : { error_ | startDownInBroadList : Int } -> Tree { kind : LabelKind, text : String }
+        startDownLabel =
+            \rowError ->
+                Tree.singleton
+                    { kind = LabelError
+                    , text = [ "starting at ", rowError.startDownInBroadList |> String.fromInt, " from last" ] |> String.concat
                     }
-
-                Just (RowError rowError) ->
-                    { always =
-                        Tree.singleton
-                            { kind = LabelError
-                            , text = [ "starting at ", rowError.startDown |> String.fromInt, " from last" ] |> String.concat
-                            }
-                            |> Just
-                    , structure = rowError.error |> Just
-                    }
-
-                Just structureError ->
-                    { always = Nothing, structure = structureError |> Just }
 
         structureTree : Tree Label
         structureTree =
             case description_.inner of
                 CustomDescription ->
-                    Tree.singleton { kind = LabelDescriptionStructure, text = "(custom)" }
+                    case maybeError of
+                        Nothing ->
+                            Tree.singleton { kind = LabelDescriptionStructure, text = "(custom)" }
+
+                        Just (DeadEnd deadEnd) ->
+                            Tree.singleton { kind = LabelError, text = deadEnd }
+
+                        Just other ->
+                            Tree.singleton { kind = LabelError, text = other |> Debug.toString }
+
+                EndDescription ->
+                    Tree.singleton { kind = LabelDescriptionStructure, text = "end" }
+
+                InverseDescription inverseDescription ->
+                    Tree.tree { kind = LabelDescriptionStructure, text = "inverse" }
+                        [ descriptionAndErrorToTree inverseDescription maybeError ]
+
+                SucceedDescription ->
+                    Tree.singleton { kind = LabelDescriptionStructure, text = "(always succeeds)" }
 
                 OnlyDescription onlyDescription ->
                     Tree.singleton { kind = LabelDescriptionStructure, text = "only " ++ onlyDescription }
 
-                StructureDescription structureName elementDescriptions ->
+                InnerRecursiveDescription recursiveStructureName lazyDescription ->
+                    case maybeError of
+                        Nothing ->
+                            Tree.singleton { kind = LabelDescriptionStructure, text = "recursive: " ++ recursiveStructureName }
+
+                        Just error ->
+                            descriptionAndErrorToTree
+                                (lazyDescription ()
+                                    |> descriptionCustomNameAlter (\s -> "recursive: " ++ s)
+                                )
+                                (error |> Just)
+
+                WhilePossibleDescription elementDescription ->
+                    Tree.tree { kind = LabelDescriptionStructure, text = "while possible" }
+                        [ descriptionAndErrorToTree elementDescription Nothing ]
+
+                UntilDescription untilDescription ->
+                    Tree.tree { kind = LabelDescriptionStructure, text = "until" }
+                        (case maybeError of
+                            Just (UntilError untilError) ->
+                                [ Tree.tree { kind = LabelDescriptionStructure, text = "commit" }
+                                    [ descriptionAndErrorToTree untilDescription.commit
+                                        (case untilError.breakError of
+                                            UntilEndError _ ->
+                                                Nothing
+
+                                            UntilCommitError commitError ->
+                                                commitError |> Just
+                                        )
+                                    ]
+                                , Tree.tree
+                                    { kind = LabelDescriptionStructure, text = "end" }
+                                    [ descriptionAndErrorToTree untilDescription.end
+                                        (case untilError.breakError of
+                                            UntilCommitError _ ->
+                                                Nothing
+
+                                            UntilEndError endError ->
+                                                endError |> Just
+                                        )
+                                    ]
+                                , Tree.tree { kind = LabelDescriptionStructure, text = "element" }
+                                    [ descriptionAndErrorToTree untilDescription.element (untilError.elementError |> Just)
+                                    , Tree.singleton
+                                        { kind = LabelError
+                                        , text =
+                                            "failed after "
+                                                ++ (untilError.elementCount |> String.fromInt)
+                                                ++ "elements"
+                                        }
+                                    , startDownLabel untilError
+                                    ]
+                                ]
+
+                            Just otherError ->
+                                [ Tree.singleton { kind = LabelError, text = "unexpected error kind: " ++ (otherError |> Debug.toString) } ]
+
+                            Nothing ->
+                                [ Tree.tree { kind = LabelDescriptionStructure, text = "end" }
+                                    [ descriptionAndErrorToTree untilDescription.end Nothing ]
+                                , Tree.tree { kind = LabelDescriptionStructure, text = "element" }
+                                    [ descriptionAndErrorToTree untilDescription.element Nothing ]
+                                ]
+                        )
+
+                SequenceDescription elementDescriptions ->
                     let
-                        maybeInStructureError : Maybe { index : Int, error : Error }
+                        maybeInStructureError :
+                            Maybe
+                                { place : InSequencePlace
+                                , error : Error
+                                , startDownInBroadList : Int
+                                }
                         maybeInStructureError =
-                            case error.structure of
+                            case maybeError of
                                 Nothing ->
                                     Nothing
 
-                                Just (InStructureError inStructureError) ->
-                                    let
-                                        _ =
-                                            Debug.log "located in structure" error.structure
-                                    in
-                                    Just inStructureError
+                                Just (SequenceError inSequence) ->
+                                    Just inSequence
 
                                 Just _ ->
                                     let
                                         _ =
-                                            Debug.log "expected InStructureError but found" error.structure
+                                            Debug.log "expected SequenceError but found" maybeError
                                     in
                                     Nothing
+
+                        informativeElements =
+                            [ ( InSequenceEarly, elementDescriptions.early )
+                            , ( InSequenceLate, elementDescriptions.late )
+                            ]
+                                |> List.filterMap
+                                    (\( place, elementDescription ) ->
+                                        case maybeInStructureError |> maybeWhen (\inSequence -> place == inSequence.place) of
+                                            Just sequenceError ->
+                                                descriptionAndErrorToTree elementDescription
+                                                    (sequenceError.error |> Just)
+                                                    |> Just
+
+                                            Nothing ->
+                                                if elementDescription |> isDescriptive then
+                                                    descriptionAndErrorToTree elementDescription Nothing |> Just
+
+                                                else
+                                                    Nothing
+                                    )
                     in
-                    Tree.tree { kind = LabelDescriptionStructure, text = structureName }
-                        (elementDescriptions
-                            |> Stack.toList
-                            |> List.indexedMap
-                                (\index elementDescription ->
-                                    descriptionAndErrorToTree elementDescription
-                                        (maybeInStructureError |> maybeWhen (\inSequence -> index == inSequence.index) |> Maybe.map .error)
-                                )
-                        )
+                    case informativeElements of
+                        [] ->
+                            Tree.singleton { kind = LabelDescriptionStructure, text = "(empty sequence)" }
+
+                        onlyElement :: [] ->
+                            onlyElement
+
+                        element0 :: element1 :: elements2Up ->
+                            Tree.tree { kind = LabelDescriptionStructure, text = "sequence" }
+                                (element0 :: element1 :: elements2Up)
+
+                ChainDescription elementDescriptions ->
+                    let
+                        maybeInStructureError : Maybe { place : InChainPlace, error : Error }
+                        maybeInStructureError =
+                            case maybeError of
+                                Nothing ->
+                                    Nothing
+
+                                Just (ChainError inChain) ->
+                                    let
+                                        _ =
+                                            Debug.log "located in chain" maybeError
+                                    in
+                                    Just inChain
+
+                                Just _ ->
+                                    let
+                                        _ =
+                                            Debug.log "expected ChainError but found" maybeError
+                                    in
+                                    Nothing
+
+                        informativeElements =
+                            [ ( InChainBroad, elementDescriptions.broad )
+                            , ( InChainNarrow, elementDescriptions.narrow )
+                            ]
+                                |> List.filterMap
+                                    (\( index, elementDescription ) ->
+                                        case maybeInStructureError |> maybeWhen (\inSequence -> index == inSequence.place) of
+                                            Just sequenceError ->
+                                                descriptionAndErrorToTree elementDescription
+                                                    (sequenceError.error |> Just)
+                                                    |> Just
+
+                                            Nothing ->
+                                                if elementDescription |> isDescriptive then
+                                                    descriptionAndErrorToTree elementDescription Nothing |> Just
+
+                                                else
+                                                    Nothing
+                                    )
+                    in
+                    case informativeElements of
+                        [] ->
+                            Tree.singleton { kind = LabelDescriptionStructure, text = "(empty chain)" }
+
+                        onlyElement :: [] ->
+                            onlyElement
+
+                        element0 :: element1 :: elements2Up ->
+                            Tree.tree { kind = LabelDescriptionStructure, text = "chained" }
+                                (element0 :: element1 :: elements2Up)
 
                 ChoiceDescription possibilities ->
                     let
                         maybeChoiceError =
-                            case error.structure of
+                            case maybeError of
                                 Nothing ->
                                     Nothing
 
                                 Just (ChoiceError choiceError) ->
-                                    let
-                                        _ =
-                                            Debug.log "located in choice" error.structure
-                                    in
                                     Just choiceError
 
                                 Just _ ->
                                     let
                                         _ =
-                                            Debug.log "expected ChoiceError but found" error.structure
+                                            Debug.log "expected ChoiceError but found" maybeError
                                     in
                                     Nothing
                     in
@@ -488,7 +682,7 @@ descriptionAndErrorToTree description_ maybeError =
                         (case maybeChoiceError of
                             Nothing ->
                                 possibilities
-                                    |> ArraySized.toList
+                                    |> Stack.toList
                                     |> List.map
                                         (\elementDescription ->
                                             descriptionAndErrorToTree elementDescription Nothing
@@ -500,28 +694,28 @@ descriptionAndErrorToTree description_ maybeError =
                                         descriptionAndErrorToTree elementDescription
                                             (elementError |> Just)
                                     )
-                                    (possibilities |> ArraySized.toList)
+                                    (possibilities |> Stack.toList)
                                     (choiceError |> Stack.toList)
                         )
 
                 GroupDescription elements ->
                     let
                         maybeGroupError =
-                            case error.structure of
+                            case maybeError of
                                 Nothing ->
                                     Nothing
 
                                 Just (GroupError groupError) ->
                                     let
                                         _ =
-                                            Debug.log "located in group" error.structure
+                                            Debug.log "located in group" maybeError
                                     in
                                     Just groupError
 
                                 Just _ ->
                                     let
                                         _ =
-                                            Debug.log "expected GroupError but found" error.structure
+                                            Debug.log "expected GroupError but found" maybeError
                                     in
                                     Nothing
                     in
@@ -529,7 +723,7 @@ descriptionAndErrorToTree description_ maybeError =
                         (case maybeGroupError of
                             Nothing ->
                                 elements
-                                    |> ArraySized.toList
+                                    |> Stack.toList
                                     |> List.map
                                         (\elementDescription ->
                                             descriptionAndErrorToTree elementDescription Nothing
@@ -541,32 +735,42 @@ descriptionAndErrorToTree description_ maybeError =
                                         descriptionAndErrorToTree elementDescription
                                             (elementError |> justWhen (\element -> element.index == index) |> Maybe.map .error)
                                     )
-                                    (List.range 0 ((elements |> ArraySized.length |> N.toInt) - 1))
-                                    (elements |> ArraySized.toList)
+                                    (List.range 0 ((elements |> Stack.length) - 1))
+                                    (elements |> Stack.toList)
                                     (groupError |> Stack.toList)
                         )
 
-                EndDescription ->
-                    Tree.singleton { kind = LabelDescriptionStructure, text = "done" }
+                ElementsDescription elementDescription ->
+                    case maybeError of
+                        Just (ElementsError inCollectionError) ->
+                            Tree.tree { kind = LabelDescriptionStructure, text = "elements" }
+                                (inCollectionError
+                                    |> Stack.toList
+                                    |> List.concatMap
+                                        (\elementError ->
+                                            [ descriptionAndErrorToTree elementDescription (elementError.error |> Just)
+                                            , Tree.singleton { kind = LabelError, text = "at " ++ elementError.location }
+                                            ]
+                                        )
+                                )
+
+                        _ ->
+                            Tree.singleton { kind = LabelError, text = "expected InElementsError but found " ++ Debug.toString maybeError }
 
                 PartsDescription partsDescription ->
                     let
                         maybePartError =
-                            case error.structure of
+                            case maybeError of
                                 Nothing ->
                                     Nothing
 
                                 Just (GroupError groupError) ->
-                                    let
-                                        _ =
-                                            Debug.log "located in group" error.structure
-                                    in
                                     Just (groupError |> Stack.top)
 
                                 Just _ ->
                                     let
                                         _ =
-                                            Debug.log "expected GroupError but found" error.structure
+                                            Debug.log "expected GroupError but found" maybeError
                                     in
                                     Nothing
                     in
@@ -588,21 +792,17 @@ descriptionAndErrorToTree description_ maybeError =
                 VariantsDescription variantsDescription ->
                     let
                         maybeVariantError =
-                            case error.structure of
+                            case maybeError of
                                 Nothing ->
                                     Nothing
 
                                 Just (VariantError variantError) ->
-                                    let
-                                        _ =
-                                            Debug.log "located in variant" error.structure
-                                    in
                                     Just variantError
 
                                 Just _ ->
                                     let
                                         _ =
-                                            Debug.log "expected VariantError but found" error.structure
+                                            Debug.log "expected VariantError but found" maybeError
                                     in
                                     Nothing
                     in
@@ -620,16 +820,16 @@ descriptionAndErrorToTree description_ maybeError =
                                         ]
                                 )
                         )
-
-        treeWithoutErrorAlways =
-            treeWithCustomDescriptionNest description_.custom structureTree
     in
-    case error.always of
-        Nothing ->
-            treeWithoutErrorAlways
+    treeWithCustomDescriptionNest description_.custom structureTree
 
-        Just errorAlways ->
-            treeWithoutErrorAlways |> Tree.prependChild errorAlways
+
+descriptionCustomNameAlter : (String -> String) -> (Description -> Description)
+descriptionCustomNameAlter nameAlter =
+    \description_ ->
+        { description_
+            | custom = description_.custom |> Stack.topAlter nameAlter
+        }
 
 
 treeWithCustomDescriptionNest : Emptiable (Stacked String) Possibly -> Tree Label -> Tree Label
@@ -643,15 +843,32 @@ treeWithCustomDescriptionNest labelsToNest bottom =
                 [ treeWithCustomDescriptionNest (Stack.fromList lines1UpCustom) bottom ]
 
 
-maybeWhen : (content -> Bool) -> Maybe content -> Maybe content
-maybeWhen passes =
-    \maybe ->
-        case maybe of
-            Nothing ->
-                Nothing
+collapseToDescriptive :
+    (DescriptionInner -> Maybe ( Description, Description ))
+    -> (DescriptionInner -> List Description)
+collapseToDescriptive trySplit =
+    \descriptionInner ->
+        descriptionInner
+            |> collapse trySplit
+            |> List.filter isDescriptive
 
-            Just content ->
-                content |> justWhen passes
+
+collapse :
+    (DescriptionInner -> Maybe ( Description, Description ))
+    -> (DescriptionInner -> List Description)
+collapse trySplit =
+    \descriptionInner ->
+        case descriptionInner |> trySplit of
+            Nothing ->
+                []
+
+            Just ( head, tailBeforeCollapse ) ->
+                case tailBeforeCollapse.custom of
+                    Emptiable.Filled _ ->
+                        [ head, tailBeforeCollapse ]
+
+                    Emptiable.Empty _ ->
+                        head :: (tailBeforeCollapse.inner |> collapse trySplit)
 
 
 {-| Where [narrowing](#toNarrow) has failed.
@@ -681,11 +898,51 @@ Have trouble doing so because some API is too strict on errors? → issue
 -}
 type ErrorWithDeadEnd deadEnd
     = DeadEnd deadEnd
-    | RowError { startDown : Int, error : ErrorWithDeadEnd deadEnd }
-    | InStructureError { index : Int, error : ErrorWithDeadEnd deadEnd }
-    | VariantError { index : Int, error : ErrorWithDeadEnd deadEnd }
+    | UntilError (UntilError (ErrorWithDeadEnd deadEnd))
+    | SequenceError
+        { place : InSequencePlace
+        , error : ErrorWithDeadEnd deadEnd
+        , startDownInBroadList : Int
+        }
+    | ChainError { place : InChainPlace, error : ErrorWithDeadEnd deadEnd }
+    | ElementsError
+        (Emptiable
+            (Stacked { location : String, error : ErrorWithDeadEnd deadEnd })
+            Never
+        )
     | GroupError (GroupError (ErrorWithDeadEnd deadEnd))
+    | VariantError { index : Int, error : ErrorWithDeadEnd deadEnd }
     | ChoiceError (Emptiable (Stacked (ErrorWithDeadEnd deadEnd)) Never)
+
+
+{-| Earlier or later in the sequence?
+-}
+type InSequencePlace
+    = InSequenceEarly
+    | InSequenceLate
+
+
+{-| The more narrow or broad morph in an "over" chain?
+-}
+type InChainPlace
+    = InChainBroad
+    | InChainNarrow
+
+
+type alias UntilError partError =
+    RecordWithoutConstructorFunction
+        { breakError : UntilBreakError partError
+        , elementError : partError
+        , startDownInBroadList : Int
+        , elementCount : Int
+        }
+
+
+type UntilBreakError error
+    = -- end parsed successfully but commit failed
+      UntilCommitError error
+    | -- end element failed to parse
+      UntilEndError error
 
 
 {-| A group's part [`Error`](#Error)s, each with their part index
@@ -696,7 +953,11 @@ type alias GroupError partError =
         Never
 
 
-{-| Describe the context to improve error messages.
+{-| Describe what you want to narrow to.
+This will make errors and descriptions easier to understand.
+
+A good rule of thumb is to add a [`Morph.named`](#named) to every morph _declaration_
+or even more often.
 
     import Morph.Error
     import Char.Morph as Char
@@ -705,7 +966,7 @@ type alias GroupError partError =
     -- we can redefine an error message if something goes wrong
     "123"
         |> Text.toNarrow
-            (Morph.to "variable name"
+            (Morph.named "variable name"
                 (atLeast n1 AToZ.char)
             )
         |> Result.mapError Morph.Error.textMessage
@@ -726,7 +987,7 @@ type alias GroupError partError =
     -- we can use `expect` to have more context when an error happens
     point : MorphRow Point
     point =
-        Morph.to "point"
+        Morph.named "point"
             (Morph.succeed (\x y -> { x = x, y = y })
                 |> match (Char.Morph.only '(' |> one)
                 |> grab .x Text.number
@@ -743,25 +1004,25 @@ type alias GroupError partError =
         |> Result.mapError .expected
     --> Err [ ExpectedCustom "point" ]
 
+Especially for [`translate`](#translate) etc,
+adding a description doesn't really add value
+as users often don't need to know that you for example converted a [stack to a list](Stack-Morph#toList)
+
 -}
-to :
+named :
     String
     ->
         (MorphIndependently narrow broaden
          -> MorphIndependently narrow broaden
         )
-to expectationCustomDescription morphToDescribe =
+named expectationCustomDescription morphToDescribe =
     { morphToDescribe
         | description =
-            morphToDescribe.description
-                |> (\description_ ->
-                        { description_
-                            | custom =
-                                description_.custom
-                                    |> Stack.onTopLay
-                                        expectationCustomDescription
-                        }
-                   )
+            { inner = morphToDescribe.description.inner
+            , custom =
+                morphToDescribe.description.custom
+                    |> Stack.onTopLay expectationCustomDescription
+            }
     }
 
 
@@ -771,7 +1032,7 @@ to expectationCustomDescription morphToDescribe =
 
 {-| The morph's [`Description`](#Description).
 
-Add custom ones via [`Morph.to`](#to)
+Add custom ones via [`Morph.named`](#named)
 
 -}
 description : MorphIndependently narrow_ broaden_ -> Description
@@ -882,7 +1143,7 @@ validate :
             (narrow -> Result (ErrorWithDeadEnd deadEnd) narrow)
             (broad -> broad)
 validate descriptionCustom narrowConvert =
-    value descriptionCustom
+    custom descriptionCustom
         { toNarrow = narrowConvert
         , toBroad = identity
         }
@@ -964,12 +1225,11 @@ Any possible input stays, remains the same. A no-op.
 
 Same as writing:
 
-  - [`map`](#mapTo)`identity`
   - [`toBroad`](#toBroad)`identity`
-  - [`validate`](#validate)`Ok`
   - [`translate`](#translate)`identity identity`
-  - `{ toBroad = identity, toNarrow = Ok }`
   - [`toggle`](#toggle)`identity` when broad and narrow types match
+  - [`validate`](#validate)`Ok`
+  - `custom ... { toBroad = identity, toNarrow = Ok }`
 
 -}
 keep :
@@ -982,8 +1242,8 @@ keep =
 
 {-| Create a [`Translate`](#Translate)
 
-    stringToListMorph : Morph (List Char) String error_
-    stringToListMorph =
+    String.Morph.toList : MorphOrError (List Char) String error_
+    String.Morph.toList =
         Morph.translate String.toList String.fromList
 
 See the type's documentation for more detail
@@ -999,13 +1259,13 @@ translate :
 translate map unmap =
     { description =
         { custom = Emptiable.empty, inner = CustomDescription }
-    , toNarrow = map >> Ok
+    , toNarrow = \beforeMap -> beforeMap |> map |> Ok
     , toBroad = unmap
     }
 
 
 {-| Only broadens (unmaps), doesn't narrow.
-What comes out as the broad thing will be transformed but input doesn't.
+What comes out as the broad result will be transformed.
 
 What is great is using this to make inputs more "user-usable":
 
@@ -1022,19 +1282,22 @@ However! This can also often be an anti-pattern. See [`validate`](#validate).
 
     "WOW"
         |> Morph.toBroad
-            (Morph.toBroad String.toLower
+            (Morph.toBroadOnly String.toLower
                 |> Morph.over stringValidation
             )
     --→ "wow"
 
+The fact that the name "only" already exists [in a different context](#only) is unfortunate,
+suggestions welcome!
+
 -}
-broaden :
+toBroadOnly :
     (beforeToBroad -> broad)
     ->
         MorphIndependently
             (narrow -> Result error_ narrow)
             (beforeToBroad -> broad)
-broaden broadenFromNarrow =
+toBroadOnly broadenFromNarrow =
     translate identity broadenFromNarrow
 
 
@@ -1087,11 +1350,11 @@ only broadConstantToString broadConstant =
 {-| Create a custom morph for a value by explicitly specifying
 
   - a `String` description
-  - `narrow`: a transformation that can fail with a `String` error
+  - `toNarrow`: a transformation that can fail with any error consistent with your other errors (so most likely a string)
   - `toBroad`: a transformation that can build the parsed value back to what a value that can be parsed
 
 -}
-value :
+custom :
     String
     ->
         { toNarrow : beforeToNarrow -> Result deadEnd narrow
@@ -1101,7 +1364,7 @@ value :
         MorphIndependently
             (beforeToNarrow -> Result (ErrorWithDeadEnd deadEnd) narrow)
             (beforeToBroad -> broad)
-value descriptionCustom morphTransformations =
+custom descriptionCustom morphTransformations =
     { description =
         { custom = Stack.one descriptionCustom
         , inner = CustomDescription
@@ -1119,94 +1382,143 @@ value descriptionCustom morphTransformations =
 --
 
 
-{-| To reference a [`Morph`](#Morph) in recursive definitions
+{-| Define a [`Morph`](#Morph) recursively
 
     import Morph exposing (grab, match, one)
+    import Integer exposing (Integer)
     import Integer.Morph
     import String.Morph
 
-    type LazyList
+    type IntList
         = End
-        | Next ( Int, LazyList )
+        | Next { head : Integer, tail : IntList }
 
-    lazyList : MorphRow LazyList
-    lazyList =
-        Morph.choice
-            (\endVariant nextVariant lazyListNarrow ->
-                case lazyListNarrow of
-                    End ->
-                        endVariant ()
-                    Next next ->
-                        nextVariant next
+    intList : MorphRow IntList
+    intList =
+        Morph.recursive "int list"
+            (\innerIntList ->
+                Morph.choice
+                    (\endVariant nextVariant intListChoice ->
+                        case intListChoice of
+                            End ->
+                                endVariant ()
+                            Next next ->
+                                nextVariant next
+                    )
+                    |> Morph.tryRow (\() -> End) (String.Morph.only "[]")
+                    |> Morph.tryRow Next
+                        (Morph.succeed (\h t -> { head = h, tail = t })
+                            |> grab .head Integer.Morph.rowChar
+                            |> match
+                                (broad (ArraySized.one ())
+                                    |> Morph.overRow
+                                        (atLeast n1 (String.Morph.only " "))
+                                )
+                            |> match (String.Morph.only "::")
+                            |> match
+                                (broad (ArraySized.one ())
+                                    |> Morph.overRow
+                                        (atLeast n1 (String.Morph.only " "))
+                                )
+                            |> grab .tail innerIntList
+                        )
             )
-            |> Morph.try (\() -> End)
-                (String.Morph.only "[]")
-            |> Morph.try Next
-                (Morph.succeed Tuple.pair
-                    |> grab
-                        (Integer.Morph.toInt
-                            |> Morph.overRow Integer.Morph.text
-                        )
-                    |> match
-                        (broad [ () ]
-                            |> Morph.overRow
-                                (atLeast n1 (String.Morph.only " "))
-                        )
-                    |> match (String.Morph.only "::")
-                    |> match
-                        (broad [ () ]
-                            |> Morph.overRow
-                                (atLeast n1 (String.Morph.only " "))
-                        )
-                    |> grab (Morph.lazy (\() -> lazyList))
-                )
 
-    "[]" |> Text.toNarrow lazyList
+    "[]" |> Text.toNarrow intList
     --> Ok End
 
-    "a :: []" |> Text.toNarrow lazyList
-    --> Ok (Next 'a' End)
+    "a :: []" |> Text.toNarrow intList
+    --> Ok (Next { head = 'a', tail = End })
 
-    "a :: b :: []" |> Text.toNarrow lazyList
-    --> Ok (Next 'a' (Next 'b' End))
+    "a :: b :: []" |> Text.toNarrow intList
+    --> Ok (Next { head = 'a', tail = Next { head = 'b', tail = End })
 
-Without `lazy`, you would get an error like:
+Without `recursive`, you would get an error like:
 
->     The `lazyList` definition is causing a very tricky infinite loop.
+>     The `intList` definition is causing a very tricky infinite loop.
 >
->     The `lazyList` value depends on itself through the following chain of
->     definitions:
->
->           ┌─────┐
->           │    lazyList
->           │     ↓
->           │    lazyListNext
->           └─────┘
+>     The `intList` value depends on itself
 
 Read more about why this limitation exists
 in [compiler hint "bad recursion"](https://github.com/elm/compiler/blob/master/hints/bad-recursion.md#tricky-recursion)
 up until the end
 
+Note: in this example you can also simply use [`Morph.before`](#before)
+
+More notes:
+
+  - This would compile:
+
+        intList : () -> MorphRow IntList
+        intList =
+            Morph.choice ...
+                |> Morph.tryRow (\() -> End) ...
+                |> Morph.tryRow Next
+                    (...
+                        |> grab .tail (intList ())
+                    )
+
+    This makes the compiler happy, but once we call `intList ()` somewhere in our code,
+    the Morph expands itself infinitely leading to a compiler crash 😱
+
+    > RangeError: Maximum call stack size exceeded
+
+  - Other packages like json decoders solve this problem by introducing `lazy`:
+
+        lazy :
+            (() -> MorphIndependently toNarrow toBroad)
+            -> MorphIndependently toNarrow toBroad
+        lazy morphLazy =
+            { description = morphLazy () |> description
+            , toNarrow = toNarrow (morphLazy ())
+            , toBroad = toBroad (morphLazy ())
+            }
+
+    This one doesn't crash when we call `intList` or `lazy (\() -> intList)`
+
+    The only reason this really doesn't work with `Morph`s is that we'll get an infinitely nested
+    [`description`](#description). Using [`Morph.recursive`](#recursive),
+    each inner recursion step just refers back to the outer one.
+
 -}
-lazy :
-    (()
-     ->
-        MorphIndependently
-            (beforeToNarrow -> Result error narrow)
-            (beforeToBroad -> broad)
-    )
+recursive :
+    String
     ->
-        MorphIndependently
-            (beforeToNarrow -> Result error narrow)
-            (beforeToBroad -> broad)
-lazy morphLazy =
-    { description = morphLazy () |> description
-    , toNarrow =
-        \broadValue ->
-            broadValue |> toNarrow (morphLazy ())
-    , toBroad =
-        \narrowValue ->
-            narrowValue |> toBroad (morphLazy ())
+        (MorphIndependently toNarrow toBroad
+         -> MorphIndependently toNarrow toBroad
+        )
+    -> MorphIndependently toNarrow toBroad
+recursive structureName morphLazy =
+    let
+        innerRecursive : () -> MorphIndependently toNarrow toBroad
+        innerRecursive () =
+            recursive structureName
+                (\step ->
+                    { description =
+                        { inner =
+                            InnerRecursiveDescription structureName
+                                (\() -> morphLazy (innerRecursive ()) |> description)
+                        , custom = Emptiable.empty
+                        }
+                    , toNarrow = toNarrow step
+                    , toBroad = toBroad step
+                    }
+                )
+
+        recursiveMorph : MorphIndependently toNarrow toBroad
+        recursiveMorph =
+            morphLazy (innerRecursive ())
+    in
+    { description =
+        { inner = recursiveMorph |> description |> .inner
+        , custom =
+            recursiveMorph
+                |> description
+                |> .custom
+                |> Stack.onTopLay structureName
+        }
+    , toNarrow = toNarrow recursiveMorph
+    , toBroad = toBroad recursiveMorph
     }
 
 
@@ -1295,7 +1607,7 @@ part :
             (groupBroad
              ->
                 Result
-                    { index : Int, error : partError }
+                    (GroupError partError)
                     (partNarrow -> groupNarrowFurther)
             )
             (groupNarrow -> (partBroad -> groupBroadenFurther))
@@ -1305,7 +1617,7 @@ part :
                 (groupBroad
                  ->
                     Result
-                        { index : Int, error : partError }
+                        (GroupError partError)
                         groupNarrowFurther
                 )
                 (groupNarrow -> groupBroadenFurther)
@@ -1352,36 +1664,37 @@ narrowPart :
         ((groupBroad
           ->
             Result
-                { index : Int, error : partError }
+                (GroupError partError)
                 (partNarrow -> groupNarrowFurther)
          )
          ->
             (groupBroad
              ->
                 Result
-                    { index : Int, error : partError }
+                    (GroupError partError)
                     groupNarrowFurther
             )
         )
 narrowPart index broadPartAccess narrowPartMorph =
     \groupMorphSoFarNarrow ->
         \groupBroad ->
-            case groupBroad |> groupMorphSoFarNarrow of
-                Err partsSoFarError ->
-                    partsSoFarError |> Err
-
-                Ok groupMorphSoFarEat ->
-                    case
-                        groupBroad
-                            |> broadPartAccess
-                            |> narrowPartMorph
-                    of
-                        Ok partNarrow ->
-                            groupMorphSoFarEat partNarrow |> Ok
-
-                        Err partError ->
+            case groupBroad |> broadPartAccess |> narrowPartMorph of
+                Err partError ->
+                    case groupBroad |> groupMorphSoFarNarrow of
+                        Ok _ ->
                             { index = index, error = partError }
+                                |> Stack.one
                                 |> Err
+
+                        Err partsSoFarError ->
+                            partsSoFarError
+                                |> Stack.onTopLay { index = index, error = partError }
+                                |> Err
+
+                Ok partNarrow ->
+                    groupBroad
+                        |> groupMorphSoFarNarrow
+                        |> Result.map (\eat -> eat partNarrow)
 
 
 {-| Conclude a [`Group.build`](#group) |> [`Group.part`](#part) chain
@@ -1392,16 +1705,16 @@ partsFinish :
         (beforeToNarrow
          ->
             Result
-                { index : Int, error : ErrorWithDeadEnd deadEnd }
-                narrowed
+                (GroupError (ErrorWithDeadEnd deadEnd))
+                narrow
         )
-        (beforeToBroad -> broadened)
+        (beforeToBroad -> broad)
     ->
         MorphIndependently
             (beforeToNarrow
-             -> Result (ErrorWithDeadEnd deadEnd) narrowed
+             -> Result (ErrorWithDeadEnd deadEnd) narrow
             )
-            (beforeToBroad -> broadened)
+            (beforeToBroad -> broad)
 partsFinish =
     \groupMorphInProgress ->
         { description =
@@ -1412,7 +1725,7 @@ partsFinish =
             \broad_ ->
                 broad_
                     |> groupMorphInProgress.toNarrow
-                    |> Result.mapError (\error -> error |> Stack.one |> GroupError)
+                    |> Result.mapError GroupError
         , toBroad = groupMorphInProgress.toBroad
         }
 
@@ -1444,41 +1757,33 @@ over :
                 (beforeBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) narrow)
                 (beforeBeforeBroaden -> broad)
         )
-over morphNarrowBroad =
-    \morph ->
-        chained morphOver morph morphNarrowBroad
-
-
-morphOver :
-    MorphIndependently
-        (beforeToNarrow -> Result (ErrorWithDeadEnd deadEnd) narrow)
-        (beforeBeforeToBroad -> beforeToBroad)
-    ->
-        MorphIndependently
-            (beforeBeforeToNarrow -> Result (ErrorWithDeadEnd deadEnd) beforeToNarrow)
-            (beforeToBroad -> broad)
-    ->
-        { toNarrow : beforeBeforeToNarrow -> Result (ErrorWithDeadEnd deadEnd) narrow
-        , toBroad : beforeBeforeToBroad -> broad
+over morphBroad =
+    \narrowMorph ->
+        { description =
+            { inner =
+                ChainDescription
+                    { broad = morphBroad |> description
+                    , narrow = narrowMorph |> description
+                    }
+            , custom = Emptiable.empty
+            }
+        , toBroad =
+            \beforeToBroad ->
+                beforeToBroad
+                    |> toBroad narrowMorph
+                    |> toBroad morphBroad
+        , toNarrow =
+            \beforeToNarrow ->
+                beforeToNarrow
+                    |> toNarrow morphBroad
+                    |> Result.mapError (\error -> ChainError { place = InChainBroad, error = error })
+                    |> Result.andThen
+                        (\beforeNarrowNarrow ->
+                            beforeNarrowNarrow
+                                |> toNarrow narrowMorph
+                                |> Result.mapError (\error -> ChainError { place = InChainNarrow, error = error })
+                        )
         }
-morphOver morph morphNarrowBroad =
-    { toBroad =
-        \beforeToBroad ->
-            beforeToBroad
-                |> toBroad morph
-                |> toBroad morphNarrowBroad
-    , toNarrow =
-        \beforeToNarrow ->
-            beforeToNarrow
-                |> toNarrow morphNarrowBroad
-                |> Result.mapError (\error -> InStructureError { index = 1, error = error })
-                |> Result.andThen
-                    (\beforeNarrowNarrow ->
-                        beforeNarrowNarrow
-                            |> toNarrow morph
-                            |> Result.mapError (\error -> InStructureError { index = 0, error = error })
-                    )
-    }
 
 
 {-| `Translate a <-> b`
@@ -1531,25 +1836,15 @@ invert :
             (beforeMap -> mapped)
 invert =
     \translate_ ->
-        structure "invert" translateInvert
-            |> structureAdd translate_
-            |> structureFinish
-
-
-translateInvert :
-    MorphIndependently
-        (beforeMap -> Result (ErrorWithDeadEnd Never) mapped)
-        (beforeUnmap -> unmapped)
-    ->
-        { toNarrow : beforeUnmap -> Result error unmapped
-        , toBroad : beforeMap -> mapped
+        { toNarrow =
+            \beforeMap ->
+                beforeMap |> toBroad translate_ |> Ok
+        , toBroad = mapTo translate_
+        , description =
+            { inner = InverseDescription (translate_ |> description)
+            , custom = Emptiable.empty
+            }
         }
-translateInvert translate_ =
-    { toNarrow =
-        \unmapped ->
-            unmapped |> toBroad translate_ |> Ok
-    , toBroad = mapTo translate_
-    }
 
 
 {-| Change all [`DeadEnd`](#ErrorWithDeadEnd)s based on their current values.
@@ -1575,17 +1870,32 @@ deadEndMap deadEndChange =
             DeadEnd deadEnd ->
                 deadEnd |> deadEndChange |> DeadEnd
 
-            RowError row ->
-                { startDown = row.startDown
-                , error = row.error |> deadEndMap deadEndChange
-                }
-                    |> RowError
+            UntilError untilError ->
+                { elementCount = untilError.elementCount
+                , startDownInBroadList = untilError.startDownInBroadList
+                , breakError =
+                    case untilError.breakError of
+                        UntilEndError untilEndError ->
+                            untilEndError |> deadEndMap deadEndChange |> UntilEndError
 
-            InStructureError inStructureError ->
-                { index = inStructureError.index
-                , error = inStructureError.error |> deadEndMap deadEndChange
+                        UntilCommitError untilCommitError ->
+                            untilCommitError |> deadEndMap deadEndChange |> UntilCommitError
+                , elementError = untilError.elementError |> deadEndMap deadEndChange
                 }
-                    |> InStructureError
+                    |> UntilError
+
+            SequenceError inSequence ->
+                SequenceError
+                    { place = inSequence.place
+                    , startDownInBroadList = inSequence.startDownInBroadList
+                    , error = inSequence.error |> deadEndMap deadEndChange
+                    }
+
+            ChainError inChain ->
+                ChainError
+                    { place = inChain.place
+                    , error = inChain.error |> deadEndMap deadEndChange
+                    }
 
             GroupError parts_ ->
                 parts_
@@ -1596,6 +1906,16 @@ deadEndMap deadEndChange =
                             }
                         )
                     |> GroupError
+
+            ElementsError inElementsError ->
+                inElementsError
+                    |> Stack.map
+                        (\_ elementError ->
+                            { location = elementError.location
+                            , error = elementError.error |> deadEndMap deadEndChange
+                            }
+                        )
+                    |> ElementsError
 
             ChoiceError possibilities ->
                 possibilities
@@ -1610,7 +1930,9 @@ deadEndMap deadEndChange =
                     |> VariantError
 
 
-{-| An [`Error`](#ErrorWithDeadEnd) where running into a dead end is impossible can't be created.
+{-| An [`Error`](#ErrorWithDeadEnd) where running into a dead end is impossible.
+
+Because each kind of error needs at least one dead end, tho, no such error can be created.
 Therefore, you can treat it as _any_ value.
 
 Under the hood, only [`Basics.never`](https://dark.elm.dmy.fr/packages/elm/core/latest/Basics#never)
@@ -1624,11 +1946,17 @@ deadEndNever =
             DeadEnd deadEnd ->
                 deadEnd |> never
 
-            RowError row ->
-                row.error |> deadEndNever
+            UntilError untilError ->
+                untilError.elementError |> deadEndNever
 
-            InStructureError inStructureError ->
-                inStructureError.error |> deadEndNever
+            SequenceError inSequence ->
+                inSequence.error |> deadEndNever
+
+            ChainError inChain ->
+                inChain.error |> deadEndNever
+
+            ElementsError inElementsError ->
+                inElementsError |> Stack.top |> .error |> deadEndNever
 
             GroupError parts_ ->
                 parts_
@@ -1759,7 +2087,7 @@ type alias MorphText narrow =
 
     point : MorphRow Point Char
     point =
-        Morph.to "point"
+        Morph.named "point"
             (Morph.succeed (\x y -> { x = x, y = y })
                 |> match (String.Morph.only "(")
                 |> match
@@ -1825,7 +2153,7 @@ type alias MorphRow narrow broadElement =
          ->
             Result
                 Error
-                { toNarrow : narrow
+                { narrow : narrow
                 , broad : Emptiable (Stacked broadElement) Possibly
                 }
         )
@@ -1840,13 +2168,13 @@ type alias MorphRow narrow broadElement =
 {-| Incomplete [`MorphRow`](#MorphRow) for a thing composed of multiple parts = group.
 It's what you supply during a [`Morph.succeed`](Morph#succeed)`|>`[`grab`](#grab)/[`match`](#match) build
 -}
-type alias MorphRowIndependently beforeToBroad narrowed broadElement =
+type alias MorphRowIndependently beforeToBroad narrow broadElement =
     MorphIndependently
         (Emptiable (Stacked broadElement) Possibly
          ->
             Result
                 Error
-                { toNarrow : narrowed
+                { narrow : narrow
                 , broad : Emptiable (Stacked broadElement) Possibly
                 }
         )
@@ -1894,11 +2222,7 @@ one =
             \broad_ ->
                 case broad_ of
                     Emptiable.Empty _ ->
-                        { error = "end of input" |> DeadEnd
-                        , startDown = 0
-                        }
-                            |> RowError
-                            |> Err
+                        "end of input" |> DeadEnd |> Err
 
                     Emptiable.Filled (Stack.TopBelow ( nextBroadElement, afterNextBroadElement )) ->
                         case
@@ -1906,7 +2230,7 @@ one =
                                 |> toNarrow morph
                         of
                             Ok narrowNarrow ->
-                                { toNarrow = narrowNarrow
+                                { narrow = narrowNarrow
                                 , broad =
                                     afterNextBroadElement
                                         |> Stack.fromList
@@ -1914,11 +2238,7 @@ one =
                                     |> Ok
 
                             Err error ->
-                                { error = error
-                                , startDown = broad_ |> Stack.length
-                                }
-                                    |> RowError
-                                    |> Err
+                                error |> Err
         , toBroad =
             \beforeToBroad ->
                 beforeToBroad
@@ -1991,17 +2311,79 @@ succeed :
     narrowConstant
     -> MorphRowIndependently beforeBroaden_ narrowConstant broadElement_
 succeed narrowConstant =
-    structure "sequence"
-        { toNarrow =
+    { description = { inner = SucceedDescription, custom = Emptiable.empty }
+    , toNarrow =
+        \broad_ ->
+            { narrow = narrowConstant
+            , broad = broad_
+            }
+                |> Ok
+    , toBroad =
+        \_ -> Rope.empty
+    }
+
+
+{-| See `match` and `grab` implementation
+-}
+next :
+    (groupNarrow -> partNextNarrow)
+    -> (partNextNarrow -> (groupNarrowConstruct -> groupNarrowConstructChanged))
+    -> MorphRow partNextNarrow broadElement
+    ->
+        (MorphRowIndependently
+            groupNarrow
+            groupNarrowConstruct
+            broadElement
+         ->
+            MorphRowIndependently
+                groupNarrow
+                groupNarrowConstructChanged
+                broadElement
+        )
+next partAccess partChange nextMorphRow =
+    \groupMorphRowSoFar ->
+        { description =
+            { custom = Emptiable.empty
+            , inner =
+                SequenceDescription
+                    { early = groupMorphRowSoFar |> description
+                    , late = nextMorphRow |> description
+                    }
+            }
+        , toNarrow =
             \broad_ ->
-                { toNarrow = narrowConstant
-                , broad = broad_
-                }
-                    |> Ok
+                case broad_ |> toNarrow groupMorphRowSoFar of
+                    Err earlyError ->
+                        SequenceError
+                            { place = InSequenceEarly
+                            , error = earlyError
+                            , startDownInBroadList = broad_ |> Stack.length
+                            }
+                            |> Err
+
+                    Ok result ->
+                        case result.broad |> toNarrow nextMorphRow of
+                            Ok nextParsed ->
+                                { narrow = result.narrow |> partChange nextParsed.narrow
+                                , broad = nextParsed.broad
+                                }
+                                    |> Ok
+
+                            Err lateError ->
+                                SequenceError
+                                    { place = InSequenceLate
+                                    , error = lateError
+                                    , startDownInBroadList = result.broad |> Stack.length
+                                    }
+                                    |> Err
         , toBroad =
-            \_ -> Rope.empty
+            \groupNarrow ->
+                groupNarrow
+                    |> partAccess
+                    |> toBroad nextMorphRow
+                    |> Rope.appendTo
+                        (groupNarrow |> toBroad groupMorphRowSoFar)
         }
-        |> structureFinish
 
 
 {-| Take what we get from [converting](#MorphRow) the next section
@@ -2061,83 +2443,6 @@ match :
 match ignoredNextMorphRow =
     \groupMorphRowSoFar ->
         groupMorphRowSoFar |> next (\_ -> ()) (\() -> identity) ignoredNextMorphRow
-
-
-{-| See `match` and `grab` implementation
--}
-next :
-    (groupNarrow -> partNextNarrow)
-    -> (partNextNarrow -> (groupNarrowConstruct -> groupNarrowConstructChanged))
-    -> MorphRow partNextNarrow broadElement
-    ->
-        (MorphRowIndependently
-            groupNarrow
-            groupNarrowConstruct
-            broadElement
-         ->
-            MorphRowIndependently
-                groupNarrow
-                groupNarrowConstructChanged
-                broadElement
-        )
-next partAccess partChange nextMorphRow =
-    \groupMorphRowSoFar ->
-        structureBinaryExtension "sequence"
-            (morphNext partAccess partChange)
-            groupMorphRowSoFar
-            nextMorphRow
-
-
-morphNext :
-    (groupNarrow -> partNextNarrow)
-    -> (partNextNarrow -> (groupNarrowConstruct -> groupNarrowConstructChanged))
-    ->
-        MorphRowIndependently
-            groupNarrow
-            groupNarrowConstruct
-            broadElement
-    -> MorphRow partNextNarrow broadElement
-    ->
-        { toNarrow :
-            Emptiable (Stacked broadElement) Possibly
-            ->
-                Result
-                    Error
-                    { toNarrow : groupNarrowConstructChanged
-                    , broad : Emptiable (Stacked broadElement) Possibly
-                    }
-        , toBroad :
-            groupNarrow
-            -> Rope broadElement
-        }
-morphNext partAccess partChange groupMorphRowSoFar nextMorphRow =
-    { toNarrow =
-        \broad_ ->
-            broad_
-                |> toNarrow groupMorphRowSoFar
-                |> Result.andThen
-                    (\result ->
-                        case result.broad |> toNarrow nextMorphRow of
-                            Ok nextParsed ->
-                                { toNarrow = result.toNarrow |> partChange nextParsed.toNarrow
-                                , broad = nextParsed.broad
-                                }
-                                    |> Ok
-
-                            Err nextError ->
-                                nextError
-                                    |> Err
-                    )
-    , toBroad =
-        \groupNarrow ->
-            groupNarrow
-                |> partAccess
-                |> toBroad nextMorphRow
-                |> Rope.appendTo
-                    (groupNarrow
-                        |> toBroad groupMorphRowSoFar
-                    )
-    }
 
 
 
@@ -2206,123 +2511,36 @@ overRow :
         )
 overRow morphRowBeforeMorph =
     \narrowMorph ->
-        chained morphOverRow morphRowBeforeMorph narrowMorph
-
-
-morphOverRow :
-    MorphRowIndependently beforeToBroad beforeToNarrow broadElement
-    ->
-        (MorphIndependently
-            (beforeToNarrow -> Result Error narrow)
-            (beforeBeforeBroaden -> beforeToBroad)
-         ->
-            { toNarrow :
-                Emptiable (Stacked broadElement) Possibly
-                ->
-                    Result
-                        Error
-                        { toNarrow : narrow
-                        , broad : Emptiable (Stacked broadElement) Possibly
-                        }
-            , toBroad :
-                beforeBeforeBroaden
-                -> Rope broadElement
-            }
-        )
-morphOverRow morphRowBeforeMorph narrowMorph =
-    { toNarrow =
-        \broad_ ->
-            broad_
-                |> toNarrow morphRowBeforeMorph
-                |> Result.andThen
-                    (\narrowed ->
-                        narrowed.toNarrow
-                            |> toNarrow narrowMorph
-                            |> Result.map
-                                (\narrowNarrow ->
-                                    { toNarrow = narrowNarrow
-                                    , broad = narrowed.broad
-                                    }
-                                )
-                            |> Result.mapError
-                                (\error ->
-                                    { error = error
-                                    , startDown = broad_ |> Stack.length
-                                    }
-                                        |> RowError
-                                )
-                    )
-    , toBroad =
-        \beforeToNarrow ->
-            beforeToNarrow
-                |> toBroad narrowMorph
-                |> toBroad morphRowBeforeMorph
-    }
-
-
-structureBinaryExtension :
-    String
-    ->
-        (MorphIndependently (soFarBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) soFarNarrow) soFarBroaden
-         -> MorphIndependently (nextBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) nextNarrow) nextBroaden
-         -> { a | toNarrow : toNarrow, toBroad : toBroad }
-        )
-    -> MorphIndependently (soFarBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) soFarNarrow) soFarBroaden
-    -> MorphIndependently (nextBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) nextNarrow) nextBroaden
-    -> MorphIndependently toNarrow toBroad
-structureBinaryExtension structureName morphExtend soFarMorph nextMorph =
-    let
-        newStructure () =
-            structure structureName morphExtend
-                |> structureAdd soFarMorph
-                |> structureAdd nextMorph
-                |> structureFinish
-    in
-    case soFarMorph |> description |> .inner of
-        StructureDescription soFarStructure soFar ->
-            if soFarStructure == structureName then
-                let
-                    morphExtendedStructure =
-                        morphExtend
-                            soFarMorph
-                            (nextMorph
-                                |> narrowErrorMap
-                                    (\error ->
-                                        InStructureError
-                                            { index = (soFar |> Stack.length) + 1
-                                            , error = error
-                                            }
-                                    )
-                            )
-                in
-                { description =
-                    { custom = Emptiable.empty
-                    , inner =
-                        soFar
-                            |> Stack.attach Up (Stack.one (nextMorph |> description))
-                            |> StructureDescription structureName
+        { description =
+            { custom = Emptiable.empty
+            , inner =
+                ChainDescription
+                    { broad = morphRowBeforeMorph |> description
+                    , narrow = narrowMorph |> description
                     }
-                , toNarrow = morphExtendedStructure.toNarrow
-                , toBroad = morphExtendedStructure.toBroad
-                }
+            }
+        , toNarrow =
+            \broad_ ->
+                case broad_ |> toNarrow morphRowBeforeMorph of
+                    Err beforeError ->
+                        ChainError { place = InChainBroad, error = beforeError } |> Err
 
-            else
-                newStructure ()
+                    Ok beforeToNarrow ->
+                        case beforeToNarrow.narrow |> toNarrow narrowMorph of
+                            Err error ->
+                                ChainError { place = InChainNarrow, error = error } |> Err
 
-        _ ->
-            newStructure ()
-
-
-chained :
-    (MorphIndependently (soFarBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) soFarNarrow) soFarBroaden
-     -> MorphIndependently (nextBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) nextNarrow) nextBroaden
-     -> { a | toNarrow : toNarrow, toBroad : toBroad }
-    )
-    -> MorphIndependently (soFarBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) soFarNarrow) soFarBroaden
-    -> MorphIndependently (nextBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) nextNarrow) nextBroaden
-    -> MorphIndependently toNarrow toBroad
-chained morphChained morphBeforeMorph narrowMorph =
-    structureBinaryExtension "chained" morphChained morphBeforeMorph narrowMorph
+                            Ok ok ->
+                                { narrow = ok
+                                , broad = beforeToNarrow.broad
+                                }
+                                    |> Ok
+        , toBroad =
+            \beforeToNarrow ->
+                beforeToNarrow
+                    |> toBroad narrowMorph
+                    |> toBroad morphRowBeforeMorph
+        }
 
 
 
@@ -2361,7 +2579,7 @@ We never reach the necessary [`match`](#match)ped things.
 -}
 before :
     { end : MorphRow () broadElement
-    , goOn : MorphRow goOnElement broadElement
+    , element : MorphRow goOnElement broadElement
     }
     -> MorphRow (Emptiable (Stacked goOnElement) Possibly) broadElement
 before untilStep =
@@ -2370,33 +2588,170 @@ before untilStep =
             translate .before
                 (\before_ -> { before = before_, end = () })
         , end = untilStep.end
-        , goOn = untilStep.goOn
+        , element = untilStep.element
         }
 
 
-{-| How are [`ArraySized.Morph.in_`](ArraySized-Morph#in_), ... defined?
+untilAsFold :
+    { commit :
+        Morph
+            commitResult
+            { end : endElement
+            , before : Emptiable folded Possibly
+            }
+    , element :
+        Emptiable folded Possibly -> MorphRow element broadElement
+    , end : MorphRow endElement broadElement
+    , fold : Translate folded ( element, Emptiable folded Possibly )
+    }
+    -> MorphRow commitResult broadElement
+untilAsFold config =
+    { description =
+        { inner =
+            UntilDescription
+                { commit = config.commit |> description
+                , element = config.element Emptiable.empty |> description
+                , end = config.commit |> description
+                }
+        , custom = Emptiable.empty
+        }
+    , toBroad =
+        let
+            step :
+                { previous : Emptiable folded Possibly
+                , rest : Emptiable folded Possibly
+                }
+                -> Rope broadElement
+            step state =
+                case state.rest of
+                    Emptiable.Empty _ ->
+                        Rope.empty
+
+                    Emptiable.Filled folded ->
+                        let
+                            ( element, rest ) =
+                                folded |> toBroad config.fold
+
+                            previousWithElement =
+                                ( element, state.previous ) |> mapTo config.fold
+                        in
+                        step { previous = previousWithElement |> Emptiable.filled, rest = rest }
+                            |> Rope.prependTo
+                                (element
+                                    |> toBroad
+                                        (config.element
+                                            (previousWithElement |> Emptiable.filled)
+                                        )
+                                )
+        in
+        \beforeToBroad ->
+            let
+                uncommitted =
+                    beforeToBroad |> toBroad config.commit
+            in
+            step { previous = Emptiable.empty, rest = uncommitted.before }
+                |> Rope.prependTo
+                    (uncommitted.end
+                        |> toBroad config.end
+                    )
+    , toNarrow =
+        let
+            stepFrom :
+                Emptiable folded Possibly
+                ->
+                    (Emptiable (Stacked broadElement) Possibly
+                     ->
+                        Result
+                            (UntilError Error)
+                            { broad : Emptiable (Stacked broadElement) Possibly
+                            , narrow : commitResult
+                            }
+                    )
+            stepFrom state =
+                \beforeToNarrow ->
+                    let
+                        continue element =
+                            let
+                                foldedWithStepped =
+                                    case state of
+                                        Emptiable.Empty _ ->
+                                            ( element.narrow, Emptiable.empty ) |> mapTo config.fold
+
+                                        Emptiable.Filled folded ->
+                                            ( element.narrow, folded |> Emptiable.filled ) |> mapTo config.fold
+                            in
+                            case element.broad |> stepFrom (foldedWithStepped |> Emptiable.filled) of
+                                Err error ->
+                                    { error | elementCount = error.elementCount + 1 }
+                                        |> Err
+
+                                Ok result ->
+                                    result |> Ok
+                    in
+                    case beforeToNarrow |> toNarrow config.end of
+                        Err endError ->
+                            case beforeToNarrow |> toNarrow (config.element state) of
+                                Err elementError ->
+                                    { elementCount = 0
+                                    , elementError = elementError
+                                    , breakError = UntilEndError endError
+                                    , startDownInBroadList = beforeToNarrow |> Stack.length
+                                    }
+                                        |> Err
+
+                                Ok element ->
+                                    continue element
+
+                        Ok endElement ->
+                            case
+                                { end = endElement.narrow, before = state }
+                                    |> toNarrow config.commit
+                            of
+                                Ok committed ->
+                                    { narrow = committed, broad = endElement.broad } |> Ok
+
+                                Err commitError ->
+                                    case beforeToNarrow |> toNarrow (config.element state) of
+                                        Err elementError ->
+                                            { elementCount = 0
+                                            , elementError = elementError
+                                            , breakError = UntilCommitError commitError
+                                            , startDownInBroadList = beforeToNarrow |> Stack.length
+                                            }
+                                                |> Err
+
+                                        Ok element ->
+                                            continue element
+        in
+        \beforeToNarrow ->
+            beforeToNarrow
+                |> stepFrom Emptiable.empty
+                |> Result.mapError UntilError
+    }
+
+
+{-| How could one define `atMost 3 elements`, `until "Decoder" ...`, ...?
 
     decoderNameSubject : MorphRow String Char
     decoderNameSubject =
         Stack.string
             |> Morph.over
-                (translate .before
-                    (\before -> { before = before, end = () })
-                )
-            |> Morph.overRow
                 (MorphRow.until
                     { end =
                         Morph.succeed ()
                             |> match (String.Morph.only "Decoder")
                             |> match Morph.end
-                    , goOn = Morph.keep |> Morph.one
+                    , element = Morph.keep |> Morph.one
+                    , commit =
+                        translate .before
+                            (\before -> { before = before, end = () })
                     }
                 )
 
 ↑ can be simplified with [`before`](#before)
 
-Any kind of structure validation that if it fails should proceed to `goOn`
-must be in `commit`
+_Any kind of structure check that if it fails should proceed to go on parsing `element`s
+must be in `commit`_
 
 -}
 until :
@@ -2404,123 +2759,286 @@ until :
         Morph
             commitResult
             { end : endElement
-            , before : Emptiable (Stacked goOnElement) Possibly
+            , before : Emptiable (Stacked element) Possibly
             }
     , end : MorphRow endElement broadElement
-    , goOn : MorphRow goOnElement broadElement
+    , element : MorphRow element broadElement
     }
     -> MorphRow commitResult broadElement
-until untilStep =
-    structure "repeating" morphUntil
-        |> structureAdd
-            (structure "until" untilStep.commit
-                |> structureFinish
-            )
-        |> structureAdd
-            (structure "end" untilStep.end
-                |> structureFinish
-            )
-        |> structureAdd
-            (structure "go on" untilStep.goOn
-                |> structureFinish
-            )
-        |> structureFinish
+until config =
+    untilAsFold
+        { commit =
+            config.commit
+                |> over
+                    (translate
+                        (\beforeAndEnd ->
+                            { beforeAndEnd | before = beforeAndEnd.before |> Stack.reverse }
+                        )
+                        identity
+                    )
+        , element = \_ -> config.element
+        , end = config.end
+        , fold =
+            translate (\( top, below ) -> below |> Stack.onTopLay top |> Emptiable.fill)
+                (\stacked ->
+                    let
+                        stackFilled =
+                            stacked |> Emptiable.filled
+                    in
+                    ( stackFilled |> Stack.top, stackFilled |> Stack.removeTop )
+                )
+        }
 
 
-morphUntil :
-    Morph
-        commitResult
-        { end : endElement
-        , before : Emptiable (Stacked goOnElement) Possibly
+{-| Keep on parsing `element`s until you encounter an `end` element that doesn't fail `commit`ting.
+This behavior is just like [`until`](#until).
+
+In addition, [`untilFold`](#untilFold) carries accumulated "status" information
+to the next element morph where you can decide how to proceed.
+
+If that sounds complicated, then you don't need it.
+Sadly some formats like midi want to save space by making you remember stuff about past events.
+
+The fact that a morph for this case exist is pretty neat.
+But because a few functions are involved,
+its [description](#description) can be less nice than you're used to from other structures.
+Maybe add some more context via [`Morph.named`](#named) to the whole thing and or the `commit` morph :)
+
+If you want to use this but feel like you need
+the accumulated state in `commit` and or `end`, please open an issue :).
+Implementing it is straightforward but it would clutter the API a bit.
+
+-}
+untilFold :
+    { commit :
+        Morph
+            commitResult
+            { end : endElement
+            , before : Emptiable (Stacked element) Possibly
+            }
+    , end : MorphRow endElement broadElement
+    , element : folded -> MorphRow element broadElement
+    , initial : folded
+    , fold : element -> (folded -> folded)
+    }
+    -> MorphRow commitResult broadElement
+untilFold config =
+    untilAsFold
+        { commit =
+            config.commit
+                |> over
+                    (translate
+                        (\beforeAndEnd ->
+                            { end = beforeAndEnd.end
+                            , before = beforeAndEnd.before |> Emptiable.map .stack |> Stack.reverse
+                            }
+                        )
+                        (\beforeAndEnd ->
+                            { before =
+                                beforeAndEnd.before
+                                    |> Emptiable.map (\before_ -> { stack = before_, folded = config.initial })
+                            , end = beforeAndEnd.end
+                            }
+                        )
+                    )
+        , element =
+            \state ->
+                case state of
+                    Emptiable.Empty _ ->
+                        config.initial |> config.element
+
+                    Emptiable.Filled folded ->
+                        folded.folded |> config.element
+        , end = config.end
+        , fold =
+            translate
+                (\( top, state ) ->
+                    case state of
+                        Emptiable.Empty _ ->
+                            { folded = config.initial
+                            , stack = Stack.one top |> Emptiable.fill
+                            }
+
+                        Emptiable.Filled folded ->
+                            { folded = folded.folded |> config.fold top
+                            , stack = folded.stack |> Emptiable.filled |> Stack.onTopLay top |> Emptiable.fill
+                            }
+                )
+                (\state ->
+                    let
+                        stackFilled =
+                            state.stack |> Emptiable.filled
+                    in
+                    ( stackFilled |> Stack.top
+                    , stackFilled
+                        |> Stack.removeTop
+                        |> Emptiable.map
+                            (\stacked ->
+                                { folded = state.folded |> config.fold (stackFilled |> Stack.top)
+                                , stack = stacked
+                                }
+                            )
+                    )
+                )
         }
-    -> MorphRow endElement broadElement
-    -> MorphRow goOnElement broadElement
-    ->
-        { toBroad : commitResult -> Rope broadElement
-        , toNarrow :
-            Emptiable (Stacked broadElement) Possibly
-            ->
-                Result
-                    Error
-                    { toNarrow : commitResult
-                    , broad : Emptiable (Stacked broadElement) Possibly
-                    }
+
+
+{-| Keep going until an element fails, just like [`atLeast n0`](ArraySized-Morph#atLeast).
+In addition, [`whilePossibleFold`](#whilePossibleFold) carries accumulated status information
+to the next element morph where you can decide how to proceed.
+
+If that sounds complicated, then you don't need it.
+Sadly some formats like midi want to save space by making you remember stuff about past events.
+
+The fact that a morph for this case exist is pretty neat.
+But because a few functions are involved,
+its [description](#description) can be less nice than you're used to from other structures.
+Maybe add some more context via [`Morph.named`](#named) :)
+
+-}
+whilePossibleFold :
+    { element : folded -> MorphRow element broadElement
+    , fold : element -> (folded -> folded)
+    , initial : folded
+    }
+    -> MorphRow (Emptiable (Stacked element) Possibly) broadElement
+whilePossibleFold config =
+    translate
+        (\state ->
+            state
+                |> Emptiable.mapFlat
+                    (\folded ->
+                        folded
+                            |> .stack
+                            |> Emptiable.emptyAdapt (\_ -> Possible)
+                            |> Stack.reverse
+                    )
+        )
+        (\stack ->
+            stack
+                |> Emptiable.map
+                    (\stacked ->
+                        { stack = stacked |> Emptiable.filled
+                        , status = config.initial
+                        }
+                    )
+        )
+        |> overRow
+            (whilePossibleAsFold
+                { element =
+                    \state ->
+                        state
+                            |> Emptiable.map .status
+                            |> Emptiable.fillElseOnEmpty (\_ -> config.initial)
+                            |> config.element
+                , fold =
+                    translate
+                        (\( top, below ) ->
+                            case below of
+                                Emptiable.Empty _ ->
+                                    { status = config.initial |> config.fold top
+                                    , stack = top |> Stack.one
+                                    }
+
+                                Emptiable.Filled belowFolded ->
+                                    { status = belowFolded.status |> config.fold top
+                                    , stack = belowFolded.stack |> Stack.onTopLay top
+                                    }
+                        )
+                        (\state ->
+                            ( state.stack |> Stack.top
+                            , case state.stack |> Stack.removeTop of
+                                Emptiable.Empty _ ->
+                                    Emptiable.empty
+
+                                Emptiable.Filled belowStacked ->
+                                    { status = state.status |> config.fold (state.stack |> Stack.top)
+                                    , stack = belowStacked |> Emptiable.filled
+                                    }
+                                        |> Emptiable.filled
+                            )
+                        )
+                }
+            )
+
+
+whilePossibleAsFold :
+    { element : Emptiable folded Possibly -> MorphRow element broadElement
+    , fold : Translate folded ( element, Emptiable folded Possibly )
+    }
+    -> MorphRow (Emptiable folded Possibly) broadElement
+whilePossibleAsFold config =
+    { description =
+        { inner =
+            WhilePossibleDescription
+                (config.element Emptiable.empty |> description)
+        , custom = Emptiable.empty
         }
-morphUntil commit endStep goOn =
-    { toBroad =
-        \commitResultNarrow ->
-            let
-                committedBack :
-                    { end : endElement
-                    , before : Emptiable (Stacked goOnElement) Possibly
-                    }
-                committedBack =
-                    commitResultNarrow |> toBroad commit
-            in
-            committedBack.before
-                |> Stack.toList
-                |> List.reverse
-                |> Rope.fromList
-                |> Rope.concatMap (toBroad goOn)
-                |> Rope.appendTo
-                    (committedBack.end |> toBroad endStep)
+    , toBroad =
+        let
+            step :
+                { previous : Emptiable folded Possibly
+                , rest : Emptiable folded Possibly
+                }
+                -> Rope broadElement
+            step state =
+                case state.rest of
+                    Emptiable.Empty _ ->
+                        Rope.empty
+
+                    Emptiable.Filled folded ->
+                        let
+                            ( element, rest ) =
+                                folded |> toBroad config.fold
+
+                            previousWithElement =
+                                ( element, state.previous ) |> mapTo config.fold
+                        in
+                        step { previous = previousWithElement |> Emptiable.filled, rest = rest }
+                            |> Rope.prependTo
+                                (element
+                                    |> toBroad
+                                        (config.element
+                                            (previousWithElement |> Emptiable.filled)
+                                        )
+                                )
+        in
+        \beforeToBroad ->
+            step { previous = Emptiable.empty, rest = beforeToBroad }
     , toNarrow =
         let
-            loopStep beforeSoFar =
-                choice
-                    (\variantCommit variantGoOn loopStepNarrow ->
-                        case loopStepNarrow of
-                            Commit commitElement ->
-                                variantCommit commitElement
-
-                            GoOn goOnELement ->
-                                variantGoOn goOnELement
-                    )
-                    |> tryRow Commit
-                        (commit
-                            |> over (translate (\end_ -> { end = end_, before = beforeSoFar }) .end)
-                            |> overRow endStep
-                        )
-                    |> tryRow GoOn goOn
-                    |> choiceRowFinish
-
-            loopNarrowStep :
-                Emptiable (Stacked goOnElement) Possibly
+            stepFrom :
+                Emptiable folded Possibly
                 ->
                     (Emptiable (Stacked broadElement) Possibly
                      ->
-                        Result
-                            Error
-                            { toNarrow : commitResult
-                            , broad : Emptiable (Stacked broadElement) Possibly
-                            }
+                        { broad : Emptiable (Stacked broadElement) Possibly
+                        , narrow : Emptiable folded Possibly
+                        }
                     )
-            loopNarrowStep beforeSoFar =
-                \broadElements ->
-                    broadElements
-                        |> toNarrow (loopStep beforeSoFar)
-                        |> Result.andThen
-                            (\stepped ->
-                                case stepped.toNarrow of
-                                    Commit committed ->
-                                        { toNarrow = committed, broad = stepped.broad } |> Ok
+            stepFrom previousElement =
+                \beforeToNarrow ->
+                    case beforeToNarrow |> toNarrow (config.element previousElement) of
+                        Err _ ->
+                            { broad = beforeToNarrow, narrow = Emptiable.empty }
 
-                                    GoOn goOnElement ->
-                                        stepped.broad
-                                            |> loopNarrowStep
-                                                (beforeSoFar |> Stack.onTopLay goOnElement)
-                            )
+                        Ok stepped ->
+                            let
+                                foldedWithStepped =
+                                    case previousElement of
+                                        Emptiable.Empty _ ->
+                                            ( stepped.narrow, Emptiable.empty ) |> mapTo config.fold
+
+                                        Emptiable.Filled folded ->
+                                            ( stepped.narrow, folded |> Emptiable.filled ) |> mapTo config.fold
+                            in
+                            stepped.broad |> stepFrom (foldedWithStepped |> Emptiable.filled)
         in
-        loopNarrowStep Emptiable.empty
+        \beforeToNarrow ->
+            beforeToNarrow
+                |> stepFrom Emptiable.empty
+                |> Ok
     }
-
-
-{-| How to continue a loop.
-Either continue with a partial result or return with a complete value
--}
-type LoopStep partial complete
-    = GoOn partial
-    | Commit complete
 
 
 
@@ -2560,17 +3078,13 @@ end =
         \broad_ ->
             case broad_ of
                 Emptiable.Empty _ ->
-                    { toNarrow = ()
+                    { narrow = ()
                     , broad = Emptiable.empty
                     }
                         |> Ok
 
-                Emptiable.Filled stacked ->
-                    { startDown = stacked |> filled |> Stack.length
-                    , error = "remaining input" |> DeadEnd
-                    }
-                        |> RowError
-                        |> Err
+                Emptiable.Filled _ ->
+                    "remaining input" |> DeadEnd |> Err
     , toBroad =
         \() -> Rope.empty
     }
@@ -2601,8 +3115,7 @@ rowFinish =
                         (\result ->
                             result.broad
                                 |> toNarrow end
-                                |> Result.map
-                                    (\_ -> result.toNarrow)
+                                |> Result.map (\_ -> result.narrow)
                         )
         , toBroad =
             \narrow -> narrow |> toBroad morphRow |> Rope.toList |> Stack.fromList
@@ -2644,7 +3157,7 @@ type alias ChoiceMorphEmptiable noTryPossiblyOrNever choiceNarrow choiceBeforeNa
 
     blankChar : Morph Blank Char (Morph.Error Char)
     blankChar =
-        Morph.to "blank"
+        Morph.named "blank"
             (Morph.choice
                 (\spaceVariant tabVariant returnVariant formFeedVariant blankNarrow ->
                     case blankNarrow of
@@ -2741,7 +3254,7 @@ type alias ChoiceMorphEmptiable noTryPossiblyOrNever choiceNarrow choiceBeforeNa
                 (returnChar |> Morph.one)
             |> Morph.tryRow (\() -> InputEnd)
                 Morph.end
-            |> Morph.choiceRowFinish
+            |> Morph.choiceFinish
 
 -}
 choice :
@@ -2762,29 +3275,36 @@ choice choiceBroadenDiscriminatedByPossibility =
     }
 
 
-{-| Offer alternative [`Morph`](Morph#Morph) possibilities to a given preferred one.
+{-| Offer multiple [`Morph`](Morph#Morph) possibilities based on a given list of elements.
+Within the possibilities tried earlier and later,
+the one labelled `broad` will be preferred when calling [`Morph.toBroad`](#toBroad)
 
 Usually, you'll be better off with a [`Morph.choice`](#choice)
-an explicit custom tagged union
+for an explicit tagged union `type`
 because you'll have the option to preserve what was [narrowed](Morph#toNarrow).
 (Remember: you can always discard that info and set a preferred option with [`Morph.broad`](Morph#broad))
 
-Use [`choiceEquivalent`](#choiceEquivalent) if you have a dynamic list of aliases/morphs to treat equally.
+Use [`choiceEquivalent`](#choiceEquivalent) if you have a "dynamic" list of aliases/morphs to treat equally.
 An example is defined variable names
 
+    -- use it with plain Morphs
     Morph.choiceEquivalent Char.Morph.only
-        { broad = '∨'
-        , alternatives = [ '|' ]
+        { tryEarly = []
+        , broad = '∨'
+        , tryLate = [ '⋁', '|', 'ᚖ' ]
+        }
+
+    -- use it with MorphRows
+    Morph.choiceEquivalent String.Morph.only
+        { tryEarly = []
+        , broad = "∨"
+        , alternatives = [ "||", "|", "or" ]
         }
 
     Morph.choiceEquivalent String.Morph.only
-        { broad = "∨"
-        , alternatives = [ "|", "or" ]
-        }
-
-    Morph.choiceEquivalent String.Morph.only
-        { broad = "±"
-        , alternatives = [ "pm", "plusminus" ]
+        { tryEarly = []
+        , broad = = "±"
+        , tryLate = [ "pm", "plusminus" ]
         }
 
 Performance note: This could be optimized
@@ -2810,8 +3330,9 @@ choiceEquivalent :
             broaden
     )
     ->
-        { broad : broadPossibility
-        , alternatives : List broadPossibility
+        { tryEarly : List broadPossibility
+        , broad : broadPossibility
+        , tryLate : List broadPossibility
         }
     ->
         MorphIndependently
@@ -2820,33 +3341,30 @@ choiceEquivalent :
             )
             broaden
 choiceEquivalent traversePossibility possibilities =
-    case possibilities.alternatives of
-        [] ->
-            traversePossibility possibilities.broad
-
-        alternative0 :: alternatives1Up ->
-            { description =
-                { custom = Emptiable.empty
-                , inner =
-                    ArraySized.l2 possibilities.broad alternative0
-                        |> ArraySized.attachMin Up (alternatives1Up |> ArraySized.fromList)
-                        |> ArraySized.map traversePossibility
-                        |> ArraySized.map description
-                        |> ChoiceDescription
-                }
-            , toNarrow =
-                \beforeToNarrow ->
-                    beforeToNarrow
-                        |> choiceEquivalentTryNarrow traversePossibility
-                            (Stack.topBelow possibilities.broad
-                                (alternative0 :: alternatives1Up)
-                            )
-            , toBroad =
-                (traversePossibility possibilities.broad).toBroad
-            }
+    let
+        possibilitiesStack : Emptiable (Stacked broadPossibility) never_
+        possibilitiesStack =
+            Stack.fromList possibilities.tryEarly
+                |> Stack.attachAdapt Up
+                    (Stack.topBelow possibilities.broad possibilities.tryLate)
+    in
+    { description =
+        { custom = Emptiable.empty
+        , inner =
+            possibilitiesStack
+                |> Stack.map (\_ possibility -> possibility |> traversePossibility |> description)
+                |> ChoiceDescription
+        }
+    , toNarrow =
+        \beforeToNarrow ->
+            beforeToNarrow
+                |> choiceEquivalentToNarrow traversePossibility possibilitiesStack
+    , toBroad =
+        (traversePossibility possibilities.broad).toBroad
+    }
 
 
-choiceEquivalentTryNarrow :
+choiceEquivalentToNarrow :
     (element
      ->
         MorphIndependently
@@ -2860,15 +3378,14 @@ choiceEquivalentTryNarrow :
         (beforeToNarrow
          -> Result (ErrorWithDeadEnd deadEnd) narrow
         )
-choiceEquivalentTryNarrow traverseTry tries =
+choiceEquivalentToNarrow traverseTry possibilities =
     \beforeToNarrow ->
-        tries
-            |> Stack.removeTop
-            |> Stack.foldFrom
-                (beforeToNarrow
-                    |> toNarrow
-                        (traverseTry (tries |> Stack.top))
-                    |> Result.mapError Stack.one
+        possibilities
+            |> Stack.foldFromOne
+                (\top ->
+                    beforeToNarrow
+                        |> toNarrow (traverseTry top)
+                        |> Result.mapError Stack.one
                 )
                 Up
                 (\elementForMorph resultSoFar ->
@@ -3167,7 +3684,7 @@ variantsFinish =
 
 
 {-| Possibly incomplete [`MorphRow`](#MorphRow) to and from a Morph.choice.
-See [`Morph.choice`](Morph#choice), [`Morph.tryRow`](#try), [`Morph.choiceRowFinish`](#choiceFinish)
+See [`Morph.choice`](Morph#choice), [`Morph.tryRow`](#try), [`Morph.choiceFinish`](#choiceFinish)
 -}
 type alias ChoiceMorphRowEmptiable noTryPossiblyOrNever choiceNarrow choiceBroaden broadElement =
     { description :
@@ -3179,7 +3696,7 @@ type alias ChoiceMorphRowEmptiable noTryPossiblyOrNever choiceNarrow choiceBroad
                 (-- tries
                  Emptiable (Stacked Error) noTryPossiblyOrNever
                 )
-                { toNarrow : choiceNarrow
+                { narrow : choiceNarrow
                 , broad : Emptiable (Stacked broadElement) Possibly
                 }
     , toBroad : choiceBroaden
@@ -3258,7 +3775,7 @@ try this [`MorphRow`](#MorphRow).
                 )
             |> Morph.tryRow Digit
                 (atLeast n1 Digit.n0To9)
-            |> Morph.choiceRowFinish
+            |> Morph.choiceFinish
 
     -- try letters, or else give me some digits
     "abc"
@@ -3309,8 +3826,8 @@ tryRow possibilityToChoice possibilityMorph =
                             case choiceBroad |> toNarrow possibilityMorph of
                                 Ok possibilityParsed ->
                                     { broad = possibilityParsed.broad
-                                    , toNarrow =
-                                        possibilityParsed.toNarrow |> possibilityToChoice
+                                    , narrow =
+                                        possibilityParsed.narrow |> possibilityToChoice
                                     }
                                         |> Ok
 
@@ -3325,46 +3842,7 @@ tryRow possibilityToChoice possibilityMorph =
         }
 
 
-{-| Always the last step in a [`Morph.choice`](#choice) `|>` [`Morph.tryRow`](#tryRow) build process
--}
-choiceRowFinish :
-    ChoiceMorphRowEmptiable
-        Never
-        choiceNarrow
-        (choiceNarrow -> Rope broadElement)
-        broadElement
-    -> MorphRow choiceNarrow broadElement
-choiceRowFinish =
-    \choiceMorphRowComplete ->
-        { description =
-            case choiceMorphRowComplete.description |> Emptiable.fill of
-                Stack.TopBelow ( descriptionOnly, [] ) ->
-                    descriptionOnly
-
-                Stack.TopBelow ( description0, description1 :: description2Up ) ->
-                    { custom = Emptiable.empty
-                    , inner =
-                        ArraySized.l2 description0 description1
-                            |> ArraySized.attachMin Up
-                                (description2Up |> ArraySized.fromList)
-                            |> ChoiceDescription
-                    }
-        , toNarrow =
-            \broad_ ->
-                broad_
-                    |> choiceMorphRowComplete.toNarrow
-                    |> Result.mapError
-                        (\errorPossibilities ->
-                            { startDown = broad_ |> Stack.length
-                            , error = errorPossibilities |> ChoiceError
-                            }
-                                |> RowError
-                        )
-        , toBroad = choiceMorphRowComplete.toBroad
-        }
-
-
-{-| Conclude a [`Morph.choice`](Morph#choice) `|>` [`Morph.try`](Morph#try) builder
+{-| Always the last step of a [`Morph.choice`](Morph#choice) `|>` [`Morph.try`](Morph#try) or `|>` [`Morph.tryRow`](#tryRow) builder.
 -}
 choiceFinish :
     ChoiceMorphEmptiable
@@ -3382,18 +3860,10 @@ choiceFinish :
 choiceFinish =
     \choiceMorphComplete ->
         { description =
-            case choiceMorphComplete.description |> Emptiable.fill of
-                Stack.TopBelow ( variantOnly, [] ) ->
-                    variantOnly
-
-                Stack.TopBelow ( variant0, variant1 :: variants2Up ) ->
-                    { custom = Emptiable.empty
-                    , inner =
-                        ArraySized.l2 variant0 variant1
-                            |> ArraySized.attachMin Up
-                                (variants2Up |> ArraySized.fromList)
-                            |> ChoiceDescription
-                    }
+            { custom = Emptiable.empty
+            , inner =
+                choiceMorphComplete.description |> ChoiceDescription
+            }
         , toNarrow =
             \beforeToNarrow ->
                 beforeToNarrow
@@ -3401,83 +3871,4 @@ choiceFinish =
                     |> Result.mapError ChoiceError
         , toBroad =
             choiceMorphComplete.toBroad
-        }
-
-
-
--- copied from StructureMorph to avoid import cycles with DescriptionInner :(
--- should not be exposed
-
-
-type alias StructureMorph morph =
-    { description :
-        { structure : String
-        , inner : Emptiable (Stacked Description) Possibly
-        }
-    , morph : morph
-    }
-
-
-structure :
-    String
-    -> morph
-    -> StructureMorph morph
-structure structureName morph =
-    { description = { structure = structureName, inner = Emptiable.empty }
-    , morph = morph
-    }
-
-
-structureAdd :
-    MorphIndependently
-        (partBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) partNarrow)
-        partToBroad
-    ->
-        StructureMorph
-            (MorphIndependently
-                (partBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) partNarrow)
-                partToBroad
-             -> morph
-            )
-    -> StructureMorph morph
-structureAdd partMorph =
-    \structureCreatorSoFar ->
-        { description =
-            { structure = structureCreatorSoFar.description.structure
-            , inner =
-                structureCreatorSoFar.description.inner
-                    |> Stack.onTopLay (partMorph |> description)
-            }
-        , morph =
-            structureCreatorSoFar.morph
-                { partMorph
-                    | toNarrow =
-                        \beforeToNarrow ->
-                            beforeToNarrow
-                                |> toNarrow partMorph
-                                |> Result.mapError
-                                    (\error ->
-                                        InStructureError
-                                            { index = structureCreatorSoFar.description.inner |> Stack.length
-                                            , error = error
-                                            }
-                                    )
-                }
-        }
-
-
-structureFinish :
-    StructureMorph { morph_ | toNarrow : toNarrow, toBroad : toBroad }
-    -> MorphIndependently toNarrow toBroad
-structureFinish =
-    \structureCreator ->
-        { description =
-            { custom = Emptiable.empty
-            , inner =
-                StructureDescription
-                    structureCreator.description.structure
-                    (structureCreator.description.inner |> Stack.reverse)
-            }
-        , toNarrow = structureCreator.morph.toNarrow
-        , toBroad = structureCreator.morph.toBroad
         }

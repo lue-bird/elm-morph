@@ -15,7 +15,6 @@ module Integer exposing
 -}
 
 import Natural exposing (Natural)
-import NaturalAtLeast1
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Sign exposing (Sign)
 
