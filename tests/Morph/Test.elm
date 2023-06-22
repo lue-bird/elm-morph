@@ -2,9 +2,9 @@ module Morph.Test exposing (tests)
 
 import Email
 import Expect
+import List.Morph
 import Morph exposing (toBroad, toNarrow)
 import Point
-import Stack.Morph
 import Test exposing (Test, test)
 import Tree
 
@@ -12,7 +12,7 @@ import Tree
 tests : Test
 tests =
     Test.describe
-        "Morph to row"
+        "MorphRow"
         [ pointTest
         , emailTest
         ]
@@ -25,19 +25,7 @@ tests =
 pointTest : Test
 pointTest =
     Test.describe "point"
-        [ test "fail"
-            (\() ->
-                Expect.fail """
-What could have gone wrong in case of an overflow?
-
-Maybe the lossy conversion
-hasn't been set up properly (see DecimalOrException.float).
-
-Another option is a potentially missed chance to do TCO.
-This could have happened in many places, maybe because `|>` is used.
-"""
-            )
-        , test "toNarrow |> toBroad"
+        [ test "toNarrow |> toBroad"
             (\() ->
                 let
                     narrowResult =
@@ -45,13 +33,12 @@ This could have happened in many places, maybe because `|>` is used.
                             |> toNarrow
                                 (Point.chars
                                     |> Morph.rowFinish
-                                    |> Morph.over Stack.Morph.string
+                                    |> Morph.over List.Morph.string
                                 )
                 in
                 case narrowResult of
                     Err error ->
-                        Morph.descriptionAndErrorToTree (Point.chars |> Morph.description)
-                            (error |> Just)
+                        Morph.descriptionAndErrorToTree (Point.chars |> Morph.description) error
                             |> Tree.map .text
                             |> Morph.treeToLines
                             |> String.join "\n"
@@ -62,7 +49,7 @@ This could have happened in many places, maybe because `|>` is used.
                             |> toBroad
                                 (Point.chars
                                     |> Morph.rowFinish
-                                    |> Morph.over Stack.Morph.string
+                                    |> Morph.over List.Morph.string
                                 )
                             |> Expect.equal "( 3., -9999.124 )"
             )
@@ -73,7 +60,7 @@ emailTest : Test
 emailTest =
     let
         emailToText =
-            Email.chars |> Morph.rowFinish |> Morph.over Stack.Morph.string
+            Email.chars |> Morph.rowFinish |> Morph.over List.Morph.string
     in
     Test.describe
         "email"

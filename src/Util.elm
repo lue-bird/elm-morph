@@ -1,10 +1,10 @@
-module Util exposing (recoverTry, justWhen, maybeWhen)
+module Util exposing (recoverTry)
 
 {-| Helpers
 
 Putting them in a separate `module` helps with testing as well as preventing import cycles
 
-@docs recoverTry, justWhen, maybeWhen
+@docs recoverTry
 
 -}
 
@@ -25,24 +25,3 @@ recoverTry errorMapToResult =
 
             Err error ->
                 error |> errorMapToResult
-
-
-justWhen : (content -> Bool) -> content -> Maybe content
-justWhen passes =
-    \content ->
-        if content |> passes then
-            content |> Just
-
-        else
-            Nothing
-
-
-maybeWhen : (content -> Bool) -> Maybe content -> Maybe content
-maybeWhen passes =
-    \maybe ->
-        case maybe of
-            Nothing ->
-                Nothing
-
-            Just content ->
-                content |> justWhen passes

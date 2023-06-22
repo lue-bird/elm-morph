@@ -28,7 +28,7 @@ import Decimal.Morph
 import Integer exposing (Integer)
 import Integer.Internal
 import Linear exposing (Direction(..))
-import Morph exposing (Morph, MorphRow, Translate)
+import Morph exposing (Morph, MorphRow, OneToOne)
 import N exposing (Add1, In, N, On, To, Up, n1)
 import Natural
 import Natural.Internal
@@ -116,24 +116,24 @@ value =
     decimal |> Morph.over Decimal.Morph.value
 
 
-{-| [`Translate`](Morph#Translate) between an `Int` and a [decimal representation](Integer#Integer).
+{-| [`OneToOne`](Morph#OneToOne) between an `Int` and a [decimal representation](Integer#Integer).
 
 Keep in mind that `Integer -> Int` can overflow
 since `Int` is fixed in bit size while [`Integer`](Integer#Integer) is not.
 
 -}
-int : Translate Integer Int
+int : OneToOne Integer Int
 int =
-    Morph.translate Integer.Internal.fromInt Integer.Internal.toInt
+    Morph.oneToOne Integer.Internal.fromInt Integer.Internal.toInt
 
 
-{-| [`Translate`](Morph#Translate) between an `Int` and a [decimal representation](Integer#Integer).
+{-| [`OneToOne`](Morph#OneToOne) between an `Int` and a [decimal representation](Integer#Integer).
 
 Keep in mind that `Integer -> Int` can overflow
 since `Int` is fixed in bit size while [`Integer`](Integer#Integer) is not.
 
 -}
-toInt : Translate Int Integer
+toInt : OneToOne Int Integer
 toInt =
     Morph.invert int
 
@@ -208,7 +208,7 @@ bits endianness bitCount =
 
                 Bytes.LE ->
                     Morph.over
-                        (Morph.translate BitArray.Extra.reverseEndian BitArray.Extra.reverseEndian)
+                        (Morph.oneToOne BitArray.Extra.reverseEndian BitArray.Extra.reverseEndian)
            )
         |> Morph.overRow
             (ArraySized.Morph.exactly bitCount (Morph.keep |> Morph.one))
@@ -228,7 +228,7 @@ bitArrayOfSize :
                     (In (On (Add1 minFrom1)) (Up maxX To (Add1 maxFrom1PlusX)))
             )
 bitArrayOfSize bitCount =
-    Morph.translate
+    Morph.oneToOne
         fromBitArray
         (toBitArrayOfSize bitCount)
 

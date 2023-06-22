@@ -126,7 +126,7 @@ bits =
 codeUtf8 : MorphOrError Int Utf8CodePoint error_
 codeUtf8 =
     -- Granted this is far from elegant
-    Morph.translate
+    Morph.oneToOne
         (\utf8CodePointChoice ->
             case utf8CodePointChoice of
                 Utf8CodePoint.OneByte oneByte ->

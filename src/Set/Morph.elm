@@ -21,14 +21,14 @@ module Set.Morph exposing
 
 import Emptiable
 import List.Morph
-import Morph exposing (MorphIndependently, translate)
+import Morph exposing (MorphIndependently, oneToOne)
 import Possibly exposing (Possibly(..))
 import Set exposing (Set)
 import Stack
 import Value
 
 
-{-| [`Translate`](Morph#Translate) from `List` to `Set`
+{-| [`OneToOne`](Morph#OneToOne) from `List` to `Set`
 
     import Set
 
@@ -44,10 +44,10 @@ list :
         )
         (Set broadElement -> List broadElement)
 list =
-    translate Set.fromList Set.toList
+    oneToOne Set.fromList Set.toList
 
 
-{-| [`Translate`](Morph#Translate) from `Set` to `List`
+{-| [`OneToOne`](Morph#OneToOne) from `Set` to `List`
 
     import Set
 
@@ -65,7 +65,7 @@ toList :
          -> Set comparableBroadElement
         )
 toList =
-    translate Set.toList Set.fromList
+    oneToOne Set.toList Set.fromList
 
 
 
@@ -76,7 +76,7 @@ toList =
 On the narrowing side all [narrowed](Morph#toNarrow) values must be `Ok`
 for it to not result in a [`Morph.Error`](Morph#Error)
 
-If the given element [`Morph`](Morph#Morph) is a [`Translate`](Morph#Translate),
+If the given element [`Morph`](Morph#Morph) is a [`OneToOne`](Morph#OneToOne),
 `each` will always succeed with the type knowing it does
 
 -}
@@ -134,7 +134,7 @@ each elementMorph =
                     , index = (setBeforeToNarrow |> Set.size) - 1
                     }
                 |> .collected
-                |> Result.mapError Morph.GroupError
+                |> Result.mapError Morph.PartsError
     , toBroad =
         \setBeforeToBroad ->
             setBeforeToBroad |> Set.map (Morph.toBroad elementMorph)

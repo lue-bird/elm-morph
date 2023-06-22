@@ -21,13 +21,13 @@ module Array.Morph exposing
 
 import Array exposing (Array)
 import Emptiable
-import Morph exposing (MorphIndependently, translate)
+import Morph exposing (MorphIndependently, oneToOne)
 import Possibly exposing (Possibly(..))
 import Stack
 import Value
 
 
-{-| [`Translate`](Morph#Translate) from `List` to `Array`
+{-| [`OneToOne`](Morph#OneToOne) from `List` to `Array`
 
     import Array
 
@@ -41,10 +41,10 @@ list :
         (List narrowElement -> Result error_ (Array narrowElement))
         (Array broadElement -> List broadElement)
 list =
-    translate Array.fromList Array.toList
+    oneToOne Array.fromList Array.toList
 
 
-{-| [`Translate`](Morph#Translate) from `Array` to `List`
+{-| [`OneToOne`](Morph#OneToOne) from `Array` to `List`
 
     import Array
 
@@ -58,7 +58,7 @@ toList :
         (Array narrowElement -> Result error_ (List narrowElement))
         (List element -> Array element)
 toList =
-    translate Array.toList Array.fromList
+    oneToOne Array.toList Array.fromList
 
 
 
@@ -93,7 +93,7 @@ value elementMorph =
 On the narrowing side all [narrowed](Morph#toNarrow) values must be `Ok`
 for it to not result in a [`Morph.Error`](Morph#Error)
 
-If the element [`Morph`](Morph#Morph) is a [`Translate`](Morph#Translate),
+If the element [`Morph`](Morph#Morph) is a [`OneToOne`](Morph#OneToOne),
 `each` will always succeed with the type knowing it does
 
 -}

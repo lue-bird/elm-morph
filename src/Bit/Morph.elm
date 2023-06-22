@@ -19,7 +19,7 @@ n :
         (N (In min_ (Up maxTo1_ To N1)) -> Result error_ Bit)
         (Bit -> N (In (Up0 minX_) (Up1 maxX_)))
 n =
-    Morph.translate Bit.fromN Bit.toN
+    Morph.oneToOne Bit.fromN Bit.toN
 
 
 {-| `O` ↔ `n0`, `I` ↔ `n1`

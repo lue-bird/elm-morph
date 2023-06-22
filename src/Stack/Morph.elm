@@ -30,7 +30,7 @@ import Bytes.Encode
 import Emptiable exposing (Emptiable, filled)
 import Linear exposing (Direction(..))
 import List.Linear
-import Morph exposing (MorphIndependently, MorphOrError, translate)
+import Morph exposing (MorphIndependently, MorphOrError, oneToOne)
 import N exposing (n0, n8)
 import Possibly exposing (Possibly(..))
 import Stack exposing (Stacked)
@@ -42,8 +42,8 @@ import Stack exposing (Stacked)
 
 {-| [`Morph`](Morph#Morph) each stacked element
 
-If the given [`Morph`](Morph#Morph) is a [`Translate`](Morph#Translate),
-[`each`](#each) will also be a [`Translate`](Morph#Translate)
+If the given [`Morph`](Morph#Morph) is a [`OneToOne`](Morph#OneToOne),
+[`each`](#each) will also be a [`OneToOne`](Morph#OneToOne)
 
 -}
 each :
@@ -128,7 +128,7 @@ each elementMorph =
                                 }
                             )
                         |> .collected
-                        |> Result.mapError Morph.GroupError
+                        |> Result.mapError Morph.PartsError
     , toBroad =
         Stack.map (\_ -> Morph.toBroad elementMorph)
     }
@@ -138,7 +138,7 @@ each elementMorph =
 -- transform
 
 
-{-| [`Translate`](Morph#Translate) from a stack to a `List`
+{-| [`OneToOne`](Morph#OneToOne) from a stack to a `List`
 
     import Stack
     import Stack.Morph
@@ -161,7 +161,7 @@ toList =
     Morph.invert list
 
 
-{-| [`Translate`](Morph#Translate) from `List` to a stack.
+{-| [`OneToOne`](Morph#OneToOne) from `List` to a stack.
 
     import Stack
     import Stack.Morph
@@ -185,10 +185,10 @@ list :
          -> List narrowElement
         )
 list =
-    translate Stack.fromList Stack.toList
+    oneToOne Stack.fromList Stack.toList
 
 
-{-| [`Translate`](Morph#Translate) from a stack of `Char`s to a `String`.
+{-| [`OneToOne`](Morph#OneToOne) from a stack of `Char`s to a `String`.
 
     import Stack
     import Morph
@@ -207,7 +207,7 @@ toString =
     Morph.invert string
 
 
-{-| [`Translate`](Morph#Translate) from `String` to a stack of `Char`s.
+{-| [`OneToOne`](Morph#OneToOne) from `String` to a stack of `Char`s.
 
     import Stack
     import Morph
@@ -222,16 +222,16 @@ string :
         String
         error_
 string =
-    translate Stack.fromString Stack.toString
+    oneToOne Stack.fromString Stack.toString
 
 
-{-| [Translate](Morph#Translate) [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/)
+{-| [OneToOne](Morph#OneToOne) [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/)
 to a stack of single bits.
 Now you can [morph them as a row](Morph#MorphRow)!
 -}
 bytes : MorphOrError (Emptiable (Stacked Bit) Possibly) Bytes error_
 bytes =
-    Morph.translate
+    Morph.oneToOne
         (\bytes_ ->
             bytes_
                 |> Bytes.Decode.decode (byteList (bytes_ |> Bytes.width))

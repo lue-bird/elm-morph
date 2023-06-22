@@ -70,7 +70,7 @@ bits endianness bitCount =
 
                 Bytes.LE ->
                     Morph.over
-                        (Morph.translate BitArray.Extra.reverseEndian BitArray.Extra.reverseEndian)
+                        (Morph.oneToOne BitArray.Extra.reverseEndian BitArray.Extra.reverseEndian)
            )
         |> Morph.overRow
             (ArraySized.Morph.exactly bitCount (Morph.keep |> Morph.one))
@@ -92,7 +92,7 @@ bitArrayOfSize :
             )
             (Natural -> ArraySized Bit (In (Up minX To minPlusX) max))
 bitArrayOfSize bitCount =
-    Morph.translate
+    Morph.oneToOne
         fromBitArray
         (toBitArrayOfSize bitCount)
 

@@ -19,7 +19,7 @@ import ArraySized.Morph
 import Decimal exposing (Decimal(..), Fraction, SignedAbsolute(..))
 import DecimalOrException exposing (OrException)
 import Maybe.Morph
-import Morph exposing (Morph, MorphRow, grab, match, one, translate)
+import Morph exposing (Morph, MorphRow, grab, match, one, oneToOne)
 import N exposing (n0, n1, n9)
 import N.Morph
 import NaturalAtLeast1.Internal
@@ -183,7 +183,7 @@ fractionChars =
                     |> Morph.over ArraySized.Morph.toList
                     |> Morph.overRow
                         (ArraySized.Morph.atLeast n0
-                            (translate N.inToNumber N.inToOn
+                            (oneToOne N.inToNumber N.inToOn
                                 |> Morph.over (N.Morph.in_ ( n0, n9 ))
                                 |> Morph.over N.Morph.char
                                 |> one
@@ -191,7 +191,7 @@ fractionChars =
                         )
                 )
             |> Morph.grab .last
-                (translate N.inToNumber N.inToOn
+                (oneToOne N.inToNumber N.inToOn
                     |> Morph.over (N.Morph.in_ ( n1, n9 ))
                     |> Morph.over N.Morph.char
                     |> one

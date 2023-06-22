@@ -35,7 +35,7 @@ import DecimalOrException
 import Emptiable exposing (Emptiable)
 import Json.Decode
 import Json.Encode
-import Morph exposing (Morph, MorphIndependently, translate)
+import Morph exposing (Morph, MorphIndependently, oneToOne)
 import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Stack exposing (Stacked)
@@ -109,7 +109,7 @@ decodeErrorToMorph =
                 , error = error |> decodeErrorToMorph
                 }
                     |> Stack.one
-                    |> Morph.GroupError
+                    |> Morph.PartsError
 
             Json.Decode.OneOf possibilities ->
                 case possibilities |> Stack.fromList of
@@ -195,8 +195,7 @@ jsonAtomDecoder =
                         Number decimal |> Json.Decode.succeed
 
                     Err exception ->
-                        Morph.descriptionAndErrorToTree (decimalFloatMorph |> Morph.description)
-                            (exception |> Just)
+                        Morph.descriptionAndErrorToTree (decimalFloatMorph |> Morph.description) exception
                             |> Tree.map .text
                             |> Morph.treeToLines
                             |> String.join "\n"
@@ -391,7 +390,7 @@ value :
          -> Value.Value Value.IndexAndName
         )
 value =
-    translate fromValueImplementation toValue
+    oneToOne fromValueImplementation toValue
 
 
 composedToValue :
@@ -444,7 +443,7 @@ composedFromValue =
 -- Decimal
 
 
-{-| [`Translate`](Morph#Translate) [`Json`](#Json) by calling [`tagMap`](#tagMap) in both directions
+{-| [`OneToOne`](Morph#OneToOne) [`Json`](#Json) by calling [`tagMap`](#tagMap) in both directions
 
     ...
         |> Morph.over (Json.eachTag Value.compact)
@@ -467,9 +466,7 @@ eachTag :
             )
             (Json tagBeforeUnmap -> Json tagUnmapped)
 eachTag tagTranslate_ =
-    translate
-        (tagMap (Morph.mapTo tagTranslate_))
-        (tagMap (Morph.toBroad tagTranslate_))
+    Morph.oneToOneOn ( tagMap, tagMap ) tagTranslate_
 
 
 {-| Reduce the amount of tag information.

@@ -135,7 +135,7 @@ float =
         )
         |> Morph.variant "Number"
             ( Number, identity )
-            (Morph.translate
+            (Morph.oneToOne
                 (\float_ ->
                     if float_ == 0 then
                         Decimal.N0
@@ -200,10 +200,10 @@ float =
                             numberSigned.absolute |> signedAbsoluteToFloat |> toSigned
                 )
             )
-        |> Morph.variant "NaN" ( \() -> Exception NaN, identity ) (Morph.translate identity (\() -> floatNaN))
+        |> Morph.variant "NaN" ( \() -> Exception NaN, identity ) (Morph.oneToOne identity (\() -> floatNaN))
         |> Morph.variant "Infinity"
             ( \sign -> Exception (Infinity sign), identity )
-            (Morph.translate identity
+            (Morph.oneToOne identity
                 (\sign ->
                     let
                         toSigned =

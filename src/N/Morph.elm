@@ -79,7 +79,7 @@ rangeDescription =
 -}
 natural : MorphIndependently (N range_ -> Result error_ Natural) (Natural -> N (Min (Up0 minX_)))
 natural =
-    Morph.translate toNaturalImplementation fromNatural
+    Morph.oneToOne toNaturalImplementation fromNatural
 
 
 toNaturalImplementation : N range_ -> Natural

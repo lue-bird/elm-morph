@@ -33,7 +33,7 @@ import ArraySized.Morph
 import Bit exposing (Bit)
 import Linear
 import List.Linear
-import Morph exposing (MorphRow, grab, one, translate)
+import Morph exposing (MorphRow, grab, one, oneToOne)
 import N exposing (Add1, In, N, N0, N1, N9, On, Up0, Up9, n0, n1, n10, n2, n9)
 import N.Morph
 import Natural
@@ -290,7 +290,7 @@ chars =
     Morph.named "natural >= 1"
         (Morph.succeed (\first afterFirst -> { first = first, afterFirst = afterFirst })
             |> grab .first
-                (translate N.inToNumber N.inToOn
+                (oneToOne N.inToNumber N.inToOn
                     |> Morph.over (N.Morph.in_ ( n1, n9 ))
                     |> Morph.over N.Morph.char
                     |> one
@@ -299,7 +299,7 @@ chars =
                 (ArraySized.Morph.toArray
                     |> Morph.overRow
                         (ArraySized.Morph.atLeast n0
-                            (translate N.inToNumber N.inToOn
+                            (oneToOne N.inToNumber N.inToOn
                                 |> Morph.over N.Morph.char
                                 |> one
                             )

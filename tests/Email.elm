@@ -5,7 +5,7 @@ import ArraySized exposing (ArraySized)
 import ArraySized.Morph exposing (atLeast)
 import Char.Morph
 import Linear exposing (Direction(..))
-import Morph exposing (Morph, MorphRow, MorphRowIndependently, grab, match, one, translate)
+import Morph exposing (Morph, MorphRow, MorphRowIndependently, grab, match, one, oneToOne)
 import N exposing (In, Min, N, N0, N1, N2, N9, On, n0, n1, n9)
 import N.Morph
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
@@ -78,7 +78,7 @@ localSymbol =
             |> Morph.try LocalSymbolPrintable
                 localSymbolPrintable
             |> Morph.try LocalSymbolAToZ
-                (translate .letter
+                (oneToOne .letter
                     (\letter -> { letter = letter, case_ = AToZ.CaseLower })
                     |> Morph.over AToZ.char
                 )

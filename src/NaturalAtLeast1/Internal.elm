@@ -28,7 +28,7 @@ toN =
 
 chars : MorphRow Natural.AtLeast1 Char
 chars =
-    Morph.translate NaturalAtLeast1Base10.toBase2 NaturalAtLeast1Base10.fromBase2
+    Morph.oneToOne NaturalAtLeast1Base10.toBase2 NaturalAtLeast1Base10.fromBase2
         |> Morph.overRow NaturalAtLeast1Base10.chars
 
 

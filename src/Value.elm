@@ -76,7 +76,7 @@ build on existing ones
     -}
     posixValue : Value.Morph Posix
     posixValue =
-        Morph.translate
+        Morph.oneToOne
             Time.posixToMillis
             Time.millisToPosix
             |> Morph.over Int.Morph.value
@@ -132,7 +132,7 @@ Motivated? Explore, PR ↓
 import Array exposing (Array)
 import Decimal exposing (Decimal)
 import Emptiable exposing (Emptiable)
-import Morph exposing (ChoiceMorphEmptiable, ErrorWithDeadEnd(..), Morph, MorphIndependently, translate)
+import Morph exposing (ChoiceMorphEmptiable, ErrorWithDeadEnd(..), Morph, MorphIndependently, oneToOne)
 import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Stack exposing (Stacked)
@@ -255,7 +255,7 @@ descriptive :
         (Name -> Result error_ IndexOrName)
         (IndexAndName -> Name)
 descriptive =
-    translate
+    oneToOne
         (\tag -> tag.name |> Name)
         (\tag -> { name = tag.name })
 
@@ -273,12 +273,12 @@ compact :
         (Index -> Result error_ IndexOrName)
         (IndexAndName -> Index)
 compact =
-    translate
+    oneToOne
         (\tag -> tag.index |> Index)
         (\tag -> { index = tag.index })
 
 
-{-| [`Translate`](Morph#Translate) a [`Value`](#Value)
+{-| [`OneToOne`](Morph#OneToOne) a [`Value`](#Value)
 by reducing the amount of tag information in both directions
 
 For [`Value`](#Value), it's
@@ -304,9 +304,7 @@ eachTag :
             )
             (Value tagBeforeUnmap -> Value tagUnmapped)
 eachTag tagTranslate_ =
-    translate
-        (tagMap (Morph.mapTo tagTranslate_))
-        (tagMap (Morph.toBroad tagTranslate_))
+    Morph.oneToOneOn ( tagMap, tagMap ) tagTranslate_
 
 
 {-| Reduce the amount of tag information of the [`Value`](#Value)
@@ -761,7 +759,7 @@ partsFinish =
                                         |> DeadEnd
 
                                 ValueError valueError ->
-                                    valueError |> Stack.one |> Morph.GroupError
+                                    valueError |> Stack.one |> Morph.PartsError
                         )
         , toBroad = groupMorphInProgress.toBroad
         }

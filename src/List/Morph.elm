@@ -1,7 +1,7 @@
 module List.Morph exposing
     ( each
     , for, forBroad
-    , value
+    , string, toString, value
     )
 
 {-| [`Morph`](Morph#Morph) to and from a `List`
@@ -19,7 +19,7 @@ module List.Morph exposing
 
 ## transform
 
-@docs value
+@docs string, toString, value
 
 -}
 
@@ -27,7 +27,7 @@ import Array
 import Emptiable exposing (Emptiable)
 import Linear exposing (Direction(..))
 import List.Linear
-import Morph exposing (MorphIndependently, MorphRow, broad, toBroad, toNarrow)
+import Morph exposing (MorphIndependently, MorphOrError, MorphRow, broad, toBroad, toNarrow)
 import Morph.Internal
 import PartialOrComplete exposing (PartialOrComplete(..))
 import Possibly exposing (Possibly(..))
@@ -140,13 +140,13 @@ sequence toSequence =
                     step :
                         MorphRow element broadElement
                         ->
-                            { broad : Emptiable (Stacked broadElement) Possibly
+                            { broad : List broadElement
                             , narrow : List element
                             , startsDown : Emptiable (Stacked Int) Never
                             }
                         ->
                             PartialOrComplete
-                                { broad : Emptiable (Stacked broadElement) Possibly
+                                { broad : List broadElement
                                 , narrow : List element
                                 , startsDown : Emptiable (Stacked Int) Never
                                 }
@@ -162,7 +162,7 @@ sequence toSequence =
                                         soFar.narrow |> (::) stepParsed.narrow
                                     , startsDown =
                                         soFar.startsDown
-                                            |> Stack.onTopLay (stepParsed.broad |> Stack.length)
+                                            |> Stack.onTopLay (stepParsed.broad |> List.length)
                                     }
                                         |> Partial
 
@@ -177,7 +177,7 @@ sequence toSequence =
                                 |> List.Linear.foldUntilCompleteFrom
                                     { narrow = []
                                     , broad = initialInput
-                                    , startsDown = initialInput |> Stack.length |> Stack.one
+                                    , startsDown = initialInput |> List.length |> Stack.one
                                     }
                                     Up
                                     (\sequenceMorphRow statusOk -> statusOk |> step sequenceMorphRow)
@@ -206,6 +206,20 @@ sequence toSequence =
 
 
 --
+
+
+{-| Morph from a `String` to a `List` of `Char`s
+-}
+string : MorphOrError (List Char) String error_
+string =
+    Morph.oneToOne String.toList String.fromList
+
+
+{-| Morph from a `List` of `Char`s to a `String`
+-}
+toString : MorphOrError String (List Char) error_
+toString =
+    Morph.invert string
 
 
 {-| `List` [`Value.Morph`](Value#Morph)
@@ -238,7 +252,7 @@ value elementMorph =
 On the narrowing side all [narrowed](Morph#toNarrow) values must be `Ok`
 for it to not result in a [`Morph.Error`](Morph#Error)
 
-If the element [`Morph`](Morph#Morph) is a [`Translate`](Morph#Translate),
+If the element [`Morph`](Morph#Morph) is a [`OneToOne`](Morph#OneToOne),
 `each` will always succeed with the type knowing it does
 
 -}
@@ -296,7 +310,7 @@ each elementMorph =
                     , index = (list |> List.length) - 1
                     }
                 |> .collected
-                |> Result.mapError Morph.GroupError
+                |> Result.mapError Morph.PartsError
     , toBroad =
         \list ->
             list |> List.map (Morph.toBroad elementMorph)

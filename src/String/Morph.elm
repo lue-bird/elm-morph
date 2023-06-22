@@ -27,12 +27,12 @@ module String.Morph exposing
 
 import Char.Morph
 import List.Morph
-import Morph exposing (MorphOrError, MorphRow, Translate, translate, translateOn)
+import Morph exposing (MorphOrError, MorphRow, OneToOne, oneToOne, oneToOneOn)
 import String.Morph.Internal
 import Value
 
 
-{-| [`Translate`](Morph#Translate) from a `String` to a `List Char`.
+{-| [`OneToOne`](Morph#OneToOne) from a `String` to a `List Char`.
 
     "0123" |> (String.Morph.toList |> Morph.map)
     --> [ '0', '1', '2', '3' ]
@@ -40,10 +40,10 @@ import Value
 -}
 toList : MorphOrError (List Char) String error_
 toList =
-    translate String.toList String.fromList
+    oneToOne String.toList String.fromList
 
 
-{-| [`Translate`](Morph#Translate) from `List Char` to a `String`.
+{-| [`OneToOne`](Morph#OneToOne) from `List Char` to a `String`.
 
     "0123" |> Morph.mapTo String.Morph.list
     --> [ '0', '1', '2', '3' ]
@@ -55,14 +55,14 @@ with [`Morph.rowFinish`](Morph#rowFinish) `|> over` [`String.Morph.List`](#list)
 -}
 list : MorphOrError String (List Char) error_
 list =
-    translate String.fromList String.toList
+    oneToOne String.fromList String.toList
 
 
 
 -- transform
 
 
-{-| [`Translate`](Morph#Translate) each `Char` in a `String`
+{-| [`OneToOne`](Morph#OneToOne) each `Char` in a `String`
 
 For fallible transformations etc,
 morph to other structures (but generic ones) like a list first
@@ -70,10 +70,10 @@ and use its `each` morph.
 
 -}
 each :
-    Translate Char Char
+    OneToOne Char Char
     -> MorphOrError String String error_
 each elementCharTranslate =
-    translateOn ( String.map, String.map ) elementCharTranslate
+    oneToOneOn ( String.map, String.map ) elementCharTranslate
 
 
 

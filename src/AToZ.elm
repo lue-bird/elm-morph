@@ -60,7 +60,7 @@ type Case
 
 {-| [`Morph`](Morph#Morph) that when calling [`toBroad`](Morph#toBroad) always returns a letter with a given [`Case`](#Case).
 
-For any more complex [`toBroad`](Morph#toBroad) process, use [`translate`](Morph#translate)
+For any more complex [`toBroad`](Morph#toBroad) process, use [`oneToOne`](Morph#oneToOne)
 
 For the general idea, check out [`Morph.broad`](Morph#broad)
 
@@ -71,13 +71,13 @@ Example: We want to format it as lowercase but also accept uppercase:
 
 which would be equivalent to
 
-    Morph.translate .letter (\letter -> { letter = letter, case_ = AToZ.CaseLower })
+    Morph.oneToOne .letter (\letter -> { letter = letter, case_ = AToZ.CaseLower })
         |> Morph.over AToZ.char
 
 -}
 caseBroad : Case -> Morph AToZ { case_ : Case, letter : AToZ }
 caseBroad caseSeed =
-    Morph.translate .letter (\letter -> { letter = letter, case_ = caseSeed })
+    Morph.oneToOne .letter (\letter -> { letter = letter, case_ = caseSeed })
 
 
 {-| Parses exactly 1 lower or upper case [`AToZ`](#AToZ).

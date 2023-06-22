@@ -5,7 +5,7 @@ module ArraySized.Morph exposing
     , stack, toStack
     , string, toString
     , for, forBroad
-    , exactly, atLeast, in_
+    , exactly, exactlyWith, atLeast, in_
     )
 
 {-| [`Morph`](Morph) on an `Array`
@@ -27,7 +27,7 @@ module ArraySized.Morph exposing
 ## row
 
 @docs for, forBroad
-@docs exactly, atLeast, in_
+@docs exactly, exactlyWith, atLeast, in_
 
 -}
 
@@ -35,15 +35,14 @@ import Array exposing (Array)
 import ArraySized exposing (ArraySized)
 import Emptiable exposing (Emptiable)
 import Linear exposing (Direction(..))
-import Morph exposing (ErrorWithDeadEnd, MorphIndependently, MorphRow, MorphRowIndependently, broad, grab, toBroad, toNarrow, translate)
+import Morph exposing (ErrorWithDeadEnd, MorphIndependently, MorphRow, MorphRowIndependently, broad, grab, oneToOne, toBroad, toNarrow)
 import Morph.Internal
 import N exposing (Exactly, In, Min, N, N0, N0OrAdd1, On, To, Up, Up0, n0)
-import Possibly exposing (Possibly)
 import Rope
 import Stack exposing (Stacked)
 
 
-{-| [`Translate`](Morph#Translate) from `Array` to `ArraySized`
+{-| [`OneToOne`](Morph#OneToOne) from `Array` to `ArraySized`
 
     import ArraySized
     import Array
@@ -65,10 +64,10 @@ array :
          -> Array broadElement
         )
 array =
-    translate ArraySized.fromArray ArraySized.toArray
+    oneToOne ArraySized.fromArray ArraySized.toArray
 
 
-{-| [`Translate`](Morph#Translate) from `ArraySized` to `Array`
+{-| [`OneToOne`](Morph#OneToOne) from `ArraySized` to `Array`
 
     import ArraySized
     import Array
@@ -90,7 +89,7 @@ toArray =
     Morph.invert array
 
 
-{-| [`Translate`](Morph#Translate) from `List` to `ArraySized`
+{-| [`OneToOne`](Morph#OneToOne) from `List` to `ArraySized`
 
     import ArraySized
 
@@ -111,10 +110,10 @@ list :
          -> List broadElement
         )
 list =
-    translate ArraySized.fromList ArraySized.toList
+    oneToOne ArraySized.fromList ArraySized.toList
 
 
-{-| [`Translate`](Morph#Translate) from `ArraySized` to `List`
+{-| [`OneToOne`](Morph#OneToOne) from `ArraySized` to `List`
 
     import ArraySized
 
@@ -135,7 +134,7 @@ toList =
     Morph.invert list
 
 
-{-| [`Translate`](Morph#Translate) from `String` to `ArraySized`
+{-| [`OneToOne`](Morph#OneToOne) from `String` to `ArraySized`
 
     import ArraySized
 
@@ -156,10 +155,10 @@ string :
          -> String
         )
 string =
-    translate ArraySized.fromString ArraySized.toString
+    oneToOne ArraySized.fromString ArraySized.toString
 
 
-{-| [`Translate`](Morph#Translate) from `ArraySized` to `String`
+{-| [`OneToOne`](Morph#OneToOne) from `ArraySized` to `String`
 
     import ArraySized
 
@@ -180,7 +179,7 @@ toString =
     Morph.invert string
 
 
-{-| [`Translate`](Morph#Translate) from `Emptiable (Stacked ...) ...` to `ArraySized`
+{-| [`OneToOne`](Morph#OneToOne) from `Emptiable (Stacked ...) ...` to `ArraySized`
 
     import ArraySized
 
@@ -201,10 +200,10 @@ stack :
          -> Emptiable (Stacked broadElement) broadPossiblyOrNever
         )
 stack =
-    translate ArraySized.fromStack ArraySized.toStack
+    oneToOne ArraySized.fromStack ArraySized.toStack
 
 
-{-| [`Translate`](Morph#Translate) from `ArraySized` to `Emptiable (Stacked ...) ...`
+{-| [`OneToOne`](Morph#OneToOne) from `ArraySized` to `Emptiable (Stacked ...) ...`
 
     import ArraySized
 
@@ -339,7 +338,7 @@ sequence :
 sequence toSequence =
     -- this implementation looks a bit... unfortunate
     -- it could be simplified by either
-    --     - allowing empty and singleton sequence, group, choice etc (this is a bit ugly)
+    --     - allowing empty and singleton sequence (this is a bit ugly)
     --     - developing a better mechanism for ArraySized length matching (this might be hard)
     { description =
         case toSequence |> ArraySized.toList of
@@ -355,7 +354,7 @@ sequence toSequence =
                 traversed =
                     toSequence
                         |> ArraySized.mapFoldFrom
-                            { broad = initialInput, startsDown = initialInput |> Stack.length |> Stack.one }
+                            { broad = initialInput, startsDown = initialInput |> List.length |> Stack.one }
                             Up
                             (\state ->
                                 case state.folded.broad |> toNarrow state.element of
@@ -365,7 +364,7 @@ sequence toSequence =
                                             { broad = parsed.broad
                                             , startsDown =
                                                 state.folded.startsDown
-                                                    |> Stack.onTopLay (parsed.broad |> Stack.length)
+                                                    |> Stack.onTopLay (parsed.broad |> List.length)
                                             }
                                         }
 
@@ -477,6 +476,141 @@ exactly :
 exactly repeatCount repeatedMorphRow =
     Morph.named ([ "repeating ", repeatCount |> N.toString ] |> String.concat)
         (sequence (ArraySized.repeat repeatedMorphRow repeatCount))
+
+
+{-| Depending on the number parsed by a given morph,
+morph exactly that amount of elements.
+
+To for example morph string bits
+where the first 16 bits represent the amount of code points that follow:
+
+    ArraySized.Morph.exactlyWith
+        (N.Morph.natural |> Morph.overRow (Natural.Morph.bits n16 Bytes.BE))
+        Char.Morph.bits
+
+The name is pretty horrible, so suggestions are welcome!
+
+If you need to parse a format like
+
+    [ length ] [ other necessary data you want to grab ] [ elements ]
+
+Please open an issue and I'll add a version for it.
+This isn't exposed currently because the API for this would be jAnKy and the use-case kinda obscure.
+
+
+#### 🐦 Developer's note: Why there is no generic version like
+
+    using :
+        (complete -> toDecide)
+        -> MorphRow toDecide broadElement
+        -> (toDecide -> MorphRow complete broadElement)
+        -> MorphRow complete broadElement
+
+This might look like the happy "andThen" that you love
+but it's more evil than that!
+
+For example, you'd typically use "andThen" for versioning etc. – not with morphs.
+Use [`Morph.choice`](Morph#choice) where each possibility expects a specific number.
+
+`using` is only unavoidable
+when certain data that tells you how to proceed can have infinite possibilities.
+
+Here's some ugly consequences if we use `using` instead of a less generic `exactlyWith`:
+
+  - Its [`description`](Morph#description) can barely tell users anything,
+    as our main morph is hidden behind a function :(
+
+    Adding [`Morph.named`](Morph#named) to the whole `using` morph helps but the quality is still notably lower.
+
+  - Instead of recursively using `using`, you should use [`until`](Morph#until), [`untilFold`](Morph#untilFold)
+    to not blow the stack and get a nicer [`description`](Morph#description)
+
+  - Its harder to reason about
+
+  - It's less composable / less "independent"
+
+  - It's easier than ever to get your [`toBroad`](Morph#toBroad) and [`toNarrow`](Morph#toNarrow)
+    functions out of sync
+
+-}
+exactlyWith :
+    MorphRow (N range) broadElement
+    -> MorphRow element broadElement
+    -> MorphRow (ArraySized element range) broadElement
+exactlyWith lengthMorphRow elementMorphRow =
+    { description =
+        { inner =
+            Morph.SequenceDescription
+                { early =
+                    lengthMorphRow |> Morph.description
+                , late = elementMorphRow |> Morph.description
+                }
+        , custom = Emptiable.empty
+        }
+    , toBroad =
+        \beforeToBroad ->
+            (beforeToBroad |> ArraySized.length)
+                |> Morph.toBroad lengthMorphRow
+                |> Rope.prependTo
+                    (beforeToBroad
+                        |> ArraySized.toList
+                        |> List.map (Morph.toBroad elementMorphRow)
+                        |> Rope.fromList
+                        |> Rope.concat
+                    )
+    , toNarrow =
+        \initialBeforeToNarrow ->
+            (case initialBeforeToNarrow |> Morph.toNarrow lengthMorphRow of
+                Err lengthError ->
+                    Morph.CountError lengthError |> Err
+
+                Ok length ->
+                    let
+                        traversed :
+                            { mapped : ArraySized (Result Morph.Error element) range
+                            , folded : { broad : List broadElement, startsDown : Emptiable (Stacked Int) never_ }
+                            }
+                        traversed =
+                            ArraySized.repeat elementMorphRow length.narrow
+                                |> ArraySized.mapFoldFrom
+                                    { broad = length.broad
+                                    , startsDown = length.broad |> List.length |> Stack.one
+                                    }
+                                    Up
+                                    (\state ->
+                                        case state.folded.broad |> toNarrow state.element of
+                                            Ok parsed ->
+                                                { element = parsed.narrow |> Ok
+                                                , folded =
+                                                    { broad = parsed.broad
+                                                    , startsDown =
+                                                        state.folded.startsDown
+                                                            |> Stack.onTopLay (parsed.broad |> List.length)
+                                                    }
+                                                }
+
+                                            Err error ->
+                                                { element = error |> Err
+                                                , folded =
+                                                    { broad = state.folded.broad
+                                                    , startsDown = state.folded.startsDown
+                                                    }
+                                                }
+                                    )
+                    in
+                    case traversed.mapped |> ArraySized.allOk of
+                        Err error ->
+                            { startsDownInBroadList = traversed.folded.startsDown
+                            , error = error |> Stack.top
+                            }
+                                |> Morph.ExactlyCountElementSequenceError
+                                |> Err
+
+                        Ok sequenceArraySized ->
+                            { narrow = sequenceArraySized, broad = traversed.folded.broad } |> Ok
+            )
+                |> Result.mapError Morph.CountAndExactlyElementSequenceError
+    }
 
 
 {-| Match a value at least a given number of times
@@ -645,7 +779,7 @@ atLeast :
 atLeast minimum elementStepMorphRow =
     Morph.named
         ([ "repeating ≥ ", minimum |> N.toString ] |> String.concat)
-        (Morph.translate identity ArraySized.maxToInfinity
+        (Morph.oneToOne identity ArraySized.maxToInfinity
             |> Morph.overRow
                 (Morph.succeed
                     (\minimumArraySized overMinimum ->
@@ -656,55 +790,10 @@ atLeast minimum elementStepMorphRow =
                         (ArraySized.take Up { atLeast = minimum } minimum)
                         (exactly minimum elementStepMorphRow)
                     |> grab
-                        (\arr -> arr |> ArraySized.dropMin Up minimum |> ArraySized.minTo n0)
-                        (list |> Morph.overRow (whilePossible elementStepMorphRow))
+                        (\arr -> arr |> ArraySized.dropMin Up minimum |> ArraySized.minTo0)
+                        (list |> Morph.overRow (Morph.whilePossible elementStepMorphRow))
                 )
         )
-
-
-whilePossible :
-    MorphRow element broadElement
-    -> MorphRow (List element) broadElement
-whilePossible element =
-    { description =
-        { custom = Emptiable.empty
-        , inner =
-            Morph.WhilePossibleDescription (element |> Morph.description)
-        }
-    , toBroad =
-        \list_ ->
-            list_
-                |> Rope.fromList
-                |> Rope.concatMap (toBroad element)
-    , toNarrow =
-        let
-            loopNarrowStep :
-                Emptiable (Stacked broadElement) Possibly
-                ->
-                    { narrow : List element
-                    , broad : Emptiable (Stacked broadElement) Possibly
-                    }
-            loopNarrowStep broad_ =
-                case broad_ |> toNarrow element of
-                    Err _ ->
-                        { broad = broad_, narrow = [] }
-
-                    Ok stepped ->
-                        let
-                            tail :
-                                { narrow : List element
-                                , broad : Emptiable (Stacked broadElement) Possibly
-                                }
-                            tail =
-                                stepped.broad |> loopNarrowStep
-                        in
-                        { broad = tail.broad
-                        , narrow = tail.narrow |> (::) stepped.narrow
-                        }
-        in
-        \initialBroad ->
-            initialBroad |> loopNarrowStep |> Ok
-    }
 
 
 {-| Match a value between a minimum and maximum number of times
@@ -800,7 +889,7 @@ in_ ( lowerLimit, upperLimit ) repeatedElementMorphRow =
          ]
             |> String.concat
         )
-        (translate identity (ArraySized.minTo lowerLimit)
+        (oneToOne identity (ArraySized.minTo lowerLimit)
             |> Morph.overRow
                 (Morph.succeed
                     (\minimumList overMinimum ->
@@ -850,7 +939,7 @@ atMost upperLimit element =
         ([ "repeating ≤", upperLimit |> N.toInt |> String.fromInt ]
             |> String.concat
         )
-        (Morph.translate identity ArraySized.minTo0
+        (Morph.oneToOne identity ArraySized.minTo0
             |> Morph.overRow
                 (let
                     possibleCounts : List (N (In (Up0 nMinX_) (Up maxX To maxPlusX)))

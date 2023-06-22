@@ -8,7 +8,7 @@ module Sign.Morph exposing (char, maybeMinusChar)
 
 import Char.Morph
 import Maybe.Morph
-import Morph exposing (Morph, MorphRow, translate)
+import Morph exposing (Morph, MorphRow, oneToOne)
 import Sign exposing (Sign(..))
 import String.Morph
 
@@ -39,7 +39,7 @@ else [narrows to](Morph#toNarrow) [`Positive`](Sign#Sign)
 maybeMinusChar : MorphRow Sign Char
 maybeMinusChar =
     Morph.named "negation"
-        (translate
+        (oneToOne
             (\minusSymbol ->
                 case minusSymbol of
                     Nothing ->
