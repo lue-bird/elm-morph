@@ -100,12 +100,9 @@ Like [`Morph`](Morph#Morph), [`MorphRow`](Morph#MorphRow) makes the process simp
 
 Here a 1:1 port of [an example from `elm/parser`](https://dark.elm.dmy.fr/packages/elm/parser/latest/Parser#lazy):
 ```elm
-import Morph exposing (MorphRow, broad, toNarrow, one, match, grab)
-import Char.Morph
+import Morph exposing (MorphRow, broad, match, grab)
+import List.Morph
 import String.Morph
-import N exposing (n0)
-import ArraySized
-import ArraySized.Morph
 
 type Boolean
     = BooleanTrue
@@ -113,10 +110,10 @@ type Boolean
     | BooleanOr { left : Boolean, right : Boolean }
 
 "((true || false) || false)"
-    |> toNarrow
+    |> Morph.toNarrow
         (boolean
             |> Morph.rowFinish
-            |> Morph.over Stack.Morph.string
+            |> Morph.over List.Morph.string
         )
 --> Ok (BooleanOr { left = BooleanOr { left = BooleanTrue, right = BooleanFalse }, right = BooleanFalse })
 
@@ -141,27 +138,29 @@ boolean =
 
 or : MorphRow { left : Boolean, right : Boolean } Char
 or =
-    let 
+    let
+        spaces : MorphRow (List ()) Char
         spaces =
-            ArraySized.Morph.atLeast n0 (String.Morph.only " ")
+            Morph.whilePossible (String.Morph.only " ")
     in
     Morph.succeed
         (\left right -> { left = left, right = right })
         |> match (String.Morph.only "(")
-        |> match (broad ArraySized.empty |> Morph.overRow spaces)
+        |> match (broad [] |> Morph.overRow spaces)
         |> grab .left boolean
-        |> match (broad (ArraySized.one ()) |> Morph.overRow spaces)
+        |> match (broad [ () ] |> Morph.overRow spaces)
         |> match (String.Morph.only "||")
-        |> match (broad (ArraySized.one ()) |> Morph.overRow spaces)
+        |> match (broad [ () ] |> Morph.overRow spaces)
         |> grab .right boolean
-        |> match (broad ArraySized.empty |> Morph.overRow spaces)
+        |> match (broad [] |> Morph.overRow spaces)
         |> match (String.Morph.only ")")
 ```
 
 What's different from writing a parser?
 
-  - [`Morph.broad ...`](Morph#broad) provides defaults for generated broad values
+  - [`broad ...`](Morph#broad) provides a "default value" for the builder
   - [`Morph.choice (\... -> case ... of ...)`](Morph#choice) exhaustively matches narrow possibilities
   - [`grab ... ...`](Morph#grab) also shows how to access the morphed positional part
+  - no `loop`! Instead we have atLeast, between, exactly, optional, while possible, until, ... See [section sequence in the `Morph` module documentation](Morph#sequence)
 
 Confused? Hyped? Hit @lue up on anything on slack!
