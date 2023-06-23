@@ -1,7 +1,7 @@
-## still in consideration
+## TODO
 
-  - for choice, store which path was taken
-  - for while possible, store how many elements were possible
+  - add `Value.bits`
+  - add more tests
 
 # change log
 
