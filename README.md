@@ -15,42 +15,13 @@ There's a lot of shiny applications of these ["morph"](Morph)s!
 Serialize from and to elm values the easy way.
 Independent of output format
 
-### example translated from [`elm/json`](https://dark.elm.dmy.fr/packages/elm/json/latest/)
-
+Here's an example adapted from [elm guide on custom types](https://guide.elm-lang.org/types/custom_types.html)
 ```elm
-import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
-import Value
-import Decimal exposing (Decimal)
-import Decimal.Morph
-import String.Morph
-
-type alias Cause =
-    RecordWithoutConstructorFunction
-        { name : String
-        , percent : Decimal
-        , per100k : Decimal
-        }
-
-
-value : Value.Morph Cause
-value =
-    Value.group
-        (\name percent per100k ->
-            { name = name, percent = percent, per100k = per100k }
-        )
-        |> Value.part ( .name, "name" ) String.Morph.value
-        |> Value.part ( .percent, "percent" ) Decimal.Morph.value
-        |> Value.part ( .per100k, "per100k" ) Decimal.Morph.value
-        |> Value.groupFinish
-```
-surprisingly easy!
-
-### Another example adapted from [elm guide on custom types](https://guide.elm-lang.org/types/custom_types.html)
-```elm
-import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Value
 import Morph
 import String.Morph
+-- from lue-bird/elm-no-record-type-alias-constructor-function
+import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 
 type User
     = Anonymous
@@ -85,7 +56,7 @@ signedInValue =
         |> Value.part ( .statue, "status" ) String.Morph.value
         |> Value.groupFinish
 ```
-clean
+surprisingly easy and clean!
 
 ## [`MorphRow`](Morph#MorphRow)
 

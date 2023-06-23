@@ -512,6 +512,34 @@ unit =
 
 Continue with [`field`](#part)
 
+An example translated from [`elm/json`](https://dark.elm.dmy.fr/packages/elm/json/latest/)
+
+    import Decimal exposing (Decimal)
+    import Decimal.Morph
+    import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
+    import String.Morph
+    import Value
+
+    type alias Cause =
+        RecordWithoutConstructorFunction
+            { name : String
+            , percent : Decimal
+            , per100k : Decimal
+            }
+
+    value : Value.Morph Cause
+    value =
+        Value.group
+            (\name percent per100k ->
+                { name = name, percent = percent, per100k = per100k }
+            )
+            |> Value.part ( .name, "name" ) String.Morph.value
+            |> Value.part ( .percent, "percent" ) Decimal.Morph.value
+            |> Value.part ( .per100k, "per100k" ) Decimal.Morph.value
+            |> Value.groupFinish
+
+Another example for tuples
+
     {-| `( ..., ... )` `Morph`
 
     Just use a record with descriptive names instead!
