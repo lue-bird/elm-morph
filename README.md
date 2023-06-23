@@ -80,14 +80,6 @@ type Boolean
     | BooleanFalse
     | BooleanOr { left : Boolean, right : Boolean }
 
-"((true || false) || false)"
-    |> Morph.toNarrow
-        (boolean
-            |> Morph.rowFinish
-            |> Morph.over List.Morph.string
-        )
---> Ok (BooleanOr { left = BooleanOr { left = BooleanTrue, right = BooleanFalse }, right = BooleanFalse })
-
 boolean : MorphRow Boolean Char
 boolean =
     Morph.choice
@@ -125,6 +117,14 @@ or =
         |> grab .right boolean
         |> match (broad [] |> Morph.overRow spaces)
         |> match (String.Morph.only ")")
+
+"((true || false) || false)"
+    |> Morph.toNarrow
+        (boolean
+            |> Morph.rowFinish
+            |> Morph.over List.Morph.string
+        )
+--> Ok (BooleanOr { left = BooleanOr { left = BooleanTrue, right = BooleanFalse }, right = BooleanFalse })
 ```
 
 What's different from writing a parser?
