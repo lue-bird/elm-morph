@@ -630,7 +630,12 @@ descriptionToTree description_ =
 
         NamedDescription namedDescription ->
             Tree.tree { kind = DescriptionNameKind, text = namedDescription.name }
-                [ descriptionToTree namedDescription.description ]
+                (if isDescriptive namedDescription.description then
+                    [ descriptionToTree namedDescription.description ]
+
+                 else
+                    []
+                )
 
 
 groupDescriptionTreesAs : String -> List (Tree { kind : DescriptionKind, text : String }) -> Tree { kind : DescriptionKind, text : String }
