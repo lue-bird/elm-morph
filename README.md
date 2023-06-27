@@ -2,13 +2,11 @@
 
 a parser-builder: developer-friendly, general-purpose, great errors
 
-> build one to convert between narrow ⇄ broad types
-
   - 📻 related: ["codecs" elm-radio episode](https://elm-radio.com/episode/codecs/)
   - 🎧 while reading: ["Morphable", microtonal electronic music by Sevish](https://www.youtube.com/watch?v=J-JZhCWsk3M&t=330s)
 
-There's a lot of shiny applications of these ["morph"](Morph)s!
-↓ some appetizers. Click headers for documentation
+One ["morph"](Morph) can convert between narrow ⇄ broad types which is surprisingly useful!
+Below some appetizers
 
 ## [`Value`](Value)
 
@@ -63,7 +61,8 @@ surprisingly easy and clean!
 Know `Parser`s? [`MorphRow`](Morph#MorphRow) simply always creates a builder alongside. Think
 
   - `Email/Id/Time/Path/Url.fromString` ⇄ `Email/Id/Time/Path/Url.toString`
-  - concrete syntax tree parser ⇄ pretty formatter
+  - `Midi.fromBitList` ⇄ `Midi.toBitList`
+  - (concrete syntax tree parser ⇄ syntax token builder) over (tokenization ⇄ pretty formatter) (or without intermediate tokens)
   - decompiler ⇄ code generation
   - ...
 
