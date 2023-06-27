@@ -5,7 +5,7 @@ import ArraySized exposing (ArraySized)
 import ArraySized.Morph exposing (atLeast)
 import Char.Morph
 import Linear exposing (Direction(..))
-import Morph exposing (Morph, MorphRow, MorphRowIndependently, grab, match, one, oneToOne)
+import Morph exposing (Morph, MorphRow, MorphRowIndependently, grab, match, one, oneToOne, whilePossible)
 import N exposing (In, Min, N, N0, N1, N2, N9, On, n0, n1, n9)
 import N.Morph
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
@@ -172,14 +172,14 @@ domain =
                 { first = first, hostLabels = hostLabels, topLevel = topLevel }
             )
             |> Morph.grab .first hostLabel
-            |> Morph.match (String.Morph.only ".")
             |> Morph.grab .hostLabels
-                (atLeast n0
+                (whilePossible
                     (Morph.succeed (\label -> label)
-                        |> Morph.grab (\label -> label) hostLabel
                         |> Morph.match (String.Morph.only ".")
+                        |> Morph.grab (\label -> label) hostLabel
                     )
                 )
+            |> Morph.match (String.Morph.only ".")
             |> Morph.grab .topLevel domainTopLevel
         )
 
@@ -197,7 +197,7 @@ hostLabel =
             |> grab .firstSymbol
                 (hostLabelSideSymbol |> one)
             |> grab .betweenFirstAndLastSymbols
-                (atLeast n0 (hostLabelSymbol |> one))
+                (whilePossible (hostLabelSymbol |> one))
             |> grab .lastSymbol
                 (hostLabelSideSymbol |> one)
         )
@@ -259,17 +259,12 @@ domainTopLevel =
                 }
             )
             |> grab .startDigits
-                (atLeast n0
-                    (N.Morph.in_ ( n0, n9 )
-                        |> Morph.over N.Morph.char
-                        |> one
-                    )
-                )
+                (whilePossible (N.Morph.char |> one))
             |> -- guarantees it can't be numeric only
                grab .firstAToZ
                 (AToZ.char |> one)
             |> grab .afterFirstAToZ
-                (atLeast n0 (domainTopLevelAfterFirstAToZSymbol |> one))
+                (whilePossible (domainTopLevelAfterFirstAToZSymbol |> one))
         )
 
 
@@ -339,7 +334,7 @@ type LocalSymbolPrintable
 type alias Domain =
     RecordWithoutConstructorFunction
         { first : HostLabel
-        , hostLabels : ArraySized HostLabel (Min (On N0))
+        , hostLabels : List HostLabel
         , topLevel : DomainTopLevel
         }
 
@@ -347,8 +342,7 @@ type alias Domain =
 type alias HostLabel =
     RecordWithoutConstructorFunction
         { firstSymbol : HostLabelSideSymbol
-        , betweenFirstAndLastSymbols :
-            ArraySized HostLabelSymbol (Min (On N0))
+        , betweenFirstAndLastSymbols : List HostLabelSymbol
         , lastSymbol : HostLabelSideSymbol
         }
 
@@ -368,11 +362,9 @@ type HostLabelSymbol
 -}
 type alias DomainTopLevel =
     RecordWithoutConstructorFunction
-        { startDigits :
-            ArraySized (N (In (On N0) (On N9))) (Min (On N0))
+        { startDigits : List (N (In (On N0) (On N9)))
         , firstAToZ : { case_ : AToZ.Case, letter : AToZ }
-        , afterFirstAToZ :
-            ArraySized DomainTopLevelAfterFirstAToZSymbol (Min (On N0))
+        , afterFirstAToZ : List DomainTopLevelAfterFirstAToZSymbol
         }
 
 
