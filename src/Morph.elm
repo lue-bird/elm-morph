@@ -518,52 +518,52 @@ descriptionToTree description_ =
     case description_ of
         CustomDescription ->
             Tree.singleton
-                { kind = LabelDescriptionStructure
+                { kind = DescriptionStructureKind
                 , text = "(custom)"
                 }
 
         EndDescription ->
-            Tree.singleton { kind = LabelDescriptionStructure, text = "end" }
+            Tree.singleton { kind = DescriptionStructureKind, text = "end" }
 
         InverseDescription inverseDescription ->
-            Tree.tree { kind = LabelDescriptionStructure, text = "inverse" }
+            Tree.tree { kind = DescriptionStructureKind, text = "inverse" }
                 [ descriptionToTree inverseDescription ]
 
         SucceedDescription ->
             Tree.singleton
-                { kind = LabelDescriptionStructure
+                { kind = DescriptionStructureKind
                 , text = "(always succeeds)"
                 }
 
         OnlyDescription onlyDescription ->
             Tree.singleton
-                { kind = LabelDescriptionStructure
+                { kind = DescriptionStructureKind
                 , text = "only " ++ onlyDescription
                 }
 
         InnerRecursiveDescription recursiveStructureName _ ->
             Tree.singleton
-                { kind = LabelDescriptionStructure
+                { kind = DescriptionStructureKind
                 , text = "recursive: " ++ recursiveStructureName
                 }
 
         WhilePossibleDescription elementDescription ->
             Tree.tree
-                { kind = LabelDescriptionStructure
+                { kind = DescriptionStructureKind
                 , text = "while possible"
                 }
                 [ descriptionToTree elementDescription ]
 
         UntilDescription untilDescription ->
-            Tree.tree { kind = LabelDescriptionStructure, text = "until" }
+            Tree.tree { kind = DescriptionStructureKind, text = "until" }
                 ([ if not (isDescriptive untilDescription.commit) then
                     Nothing
 
                    else
-                    Tree.tree { kind = LabelDescriptionStructure, text = "end" }
+                    Tree.tree { kind = DescriptionStructureKind, text = "end" }
                         [ descriptionToTree untilDescription.end ]
                         |> Just
-                 , Tree.tree { kind = LabelDescriptionStructure, text = "element" }
+                 , Tree.tree { kind = DescriptionStructureKind, text = "element" }
                     [ descriptionToTree untilDescription.element ]
                     |> Just
                  ]
@@ -583,31 +583,31 @@ descriptionToTree description_ =
                 |> groupDescriptionTreesAs "chained"
 
         ChoiceDescription possibilities ->
-            Tree.tree { kind = LabelDescriptionStructure, text = "choice between" }
+            Tree.tree { kind = DescriptionStructureKind, text = "choice between" }
                 (possibilities
                     |> Stack.toList
                     |> List.map descriptionToTree
                 )
 
         GroupDescription elements ->
-            Tree.tree { kind = LabelDescriptionStructure, text = "parts" }
+            Tree.tree { kind = DescriptionStructureKind, text = "parts" }
                 (elements
                     |> Stack.toList
                     |> List.map descriptionToTree
                 )
 
         ElementsDescription elementDescription ->
-            Tree.tree { kind = LabelDescriptionStructure, text = "elements" }
+            Tree.tree { kind = DescriptionStructureKind, text = "elements" }
                 [ elementDescription |> descriptionToTree ]
 
         PartsDescription partsDescription ->
-            Tree.tree { kind = LabelDescriptionStructure, text = "parts" }
+            Tree.tree { kind = DescriptionStructureKind, text = "parts" }
                 (partsDescription
                     |> Stack.toList
                     |> List.map
                         (\partDescription ->
                             Tree.tree
-                                { kind = LabelDescriptionStructure
+                                { kind = DescriptionStructureKind
                                 , text = partDescription.tag
                                 }
                                 [ partDescription.value |> descriptionToTree ]
@@ -615,13 +615,13 @@ descriptionToTree description_ =
                 )
 
         VariantsDescription variantsDescription ->
-            Tree.tree { kind = LabelDescriptionStructure, text = "variants" }
+            Tree.tree { kind = DescriptionStructureKind, text = "variants" }
                 (variantsDescription
                     |> Stack.toList
                     |> List.map
                         (\variantDescription ->
                             Tree.tree
-                                { kind = LabelDescriptionStructure
+                                { kind = DescriptionStructureKind
                                 , text = variantDescription.tag
                                 }
                                 [ variantDescription.value |> descriptionToTree ]
@@ -629,7 +629,7 @@ descriptionToTree description_ =
                 )
 
         NamedDescription namedDescription ->
-            Tree.tree { kind = LabelDescriptionCustom, text = namedDescription.name }
+            Tree.tree { kind = DescriptionNameKind, text = namedDescription.name }
                 [ descriptionToTree namedDescription.description ]
 
 
@@ -639,7 +639,7 @@ groupDescriptionTreesAs structureName =
         case informativeElements of
             [] ->
                 Tree.singleton
-                    { kind = LabelDescriptionStructure
+                    { kind = DescriptionStructureKind
                     , text = "(empty " ++ structureName ++ ")"
                     }
 
@@ -647,7 +647,7 @@ groupDescriptionTreesAs structureName =
                 onlyElement
 
             element0 :: element1 :: elements2Up ->
-                Tree.tree { kind = LabelDescriptionStructure, text = structureName }
+                Tree.tree { kind = DescriptionStructureKind, text = structureName }
                     (element0 :: element1 :: elements2Up)
 
 
@@ -655,16 +655,17 @@ groupDescriptionTreesAs structureName =
 Is it from an error, a [structure description or custom description](#DescriptionKind)?
 -}
 type DescriptionOrErrorKind
-    = LabelDescription DescriptionKind
-    | LabelError
+    = DescriptionKind DescriptionKind
+    | ErrorKind
 
 
 {-| What does the label in a [description tree](#descriptionToTree) describe?
-Is it from a structure description → internal or custom description → [`Morph.named`](#named)?
+Is it a description from some internal control structure
+or a custom description from [`Morph.named`](#named)?
 -}
 type DescriptionKind
-    = LabelDescriptionCustom
-    | LabelDescriptionStructure
+    = DescriptionNameKind
+    | DescriptionStructureKind
 
 
 errorToLabelTree : Error -> Tree { text : String, kind : DescriptionOrErrorKind }
@@ -672,7 +673,7 @@ errorToLabelTree =
     \error ->
         error
             |> errorToTree
-            |> Tree.map (\labelString -> { kind = LabelError, text = labelString })
+            |> Tree.map (\labelString -> { kind = ErrorKind, text = labelString })
 
 
 startDownMessage : { startDownInBroadList : Int } -> String
@@ -819,7 +820,7 @@ inSequencePlaceToString =
 unexpectedErrorToTree : Error -> Tree { kind : DescriptionOrErrorKind, text : String }
 unexpectedErrorToTree =
     \unexpectedError ->
-        Tree.tree { kind = LabelError, text = "unexpected error kind" }
+        Tree.tree { kind = ErrorKind, text = "unexpected error kind" }
             [ unexpectedError |> errorToLabelTree ]
 
 
@@ -830,7 +831,7 @@ descriptionToLabelTree =
             |> descriptionToTree
             |> Tree.map
                 (\labelString ->
-                    { kind = labelString.kind |> LabelDescription, text = labelString.text }
+                    { kind = labelString.kind |> DescriptionKind, text = labelString.text }
                 )
 
 
@@ -842,27 +843,27 @@ descriptionAndErrorToTree description_ error =
         CustomDescription ->
             case error of
                 DeadEnd deadEnd ->
-                    Tree.singleton { kind = LabelError, text = deadEnd }
+                    Tree.singleton { kind = ErrorKind, text = deadEnd }
 
                 otherError ->
                     otherError |> errorToLabelTree
 
         EndDescription ->
-            Tree.singleton { kind = LabelDescriptionStructure |> LabelDescription, text = "end" }
+            Tree.singleton { kind = DescriptionStructureKind |> DescriptionKind, text = "end" }
 
         InverseDescription inverseDescription ->
-            Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "inverse" }
+            Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "inverse" }
                 [ descriptionAndErrorToTree inverseDescription error ]
 
         SucceedDescription ->
             Tree.singleton
-                { kind = LabelDescriptionStructure |> LabelDescription
+                { kind = DescriptionStructureKind |> DescriptionKind
                 , text = "(always succeeds)"
                 }
 
         OnlyDescription onlyDescription ->
             Tree.singleton
-                { kind = LabelDescriptionStructure |> LabelDescription
+                { kind = DescriptionStructureKind |> DescriptionKind
                 , text = "only " ++ onlyDescription
                 }
 
@@ -875,7 +876,7 @@ descriptionAndErrorToTree description_ error =
 
         WhilePossibleDescription elementDescription ->
             Tree.tree
-                { kind = LabelDescriptionStructure |> LabelDescription
+                { kind = DescriptionStructureKind |> DescriptionKind
                 , text = "while possible"
                 }
                 [ descriptionToLabelTree elementDescription ]
@@ -883,12 +884,12 @@ descriptionAndErrorToTree description_ error =
         UntilDescription untilDescription ->
             case error of
                 UntilError untilError ->
-                    Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "until" }
+                    Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "until" }
                         (([ if not (isDescriptive untilDescription.commit) then
                                 Nothing
 
                             else
-                                Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "commit" }
+                                Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "commit" }
                                     [ case untilError.breakError of
                                         UntilEndError _ ->
                                             descriptionToLabelTree untilDescription.commit
@@ -898,7 +899,7 @@ descriptionAndErrorToTree description_ error =
                                     ]
                                     |> Just
                           , Tree.tree
-                                { kind = LabelDescriptionStructure |> LabelDescription, text = "end" }
+                                { kind = DescriptionStructureKind |> DescriptionKind, text = "end" }
                                 [ case untilError.breakError of
                                     UntilCommitError _ ->
                                         descriptionToLabelTree untilDescription.end
@@ -916,13 +917,13 @@ descriptionAndErrorToTree description_ error =
                                     |> List.reverse
                                     |> List.map
                                         (\startDown ->
-                                            Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "element" }
+                                            Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "element" }
                                                 [ startDownLabel { startDownInBroadList = startDown }
                                                 , untilDescription.element |> descriptionToLabelTree
                                                 ]
                                         )
                                )
-                            ++ [ Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "element" }
+                            ++ [ Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "element" }
                                     [ descriptionAndErrorToTree untilDescription.element untilError.elementError
                                     , startDownLabel { startDownInBroadList = untilError.startsDownInBroadList |> Stack.top }
                                     ]
@@ -953,7 +954,7 @@ descriptionAndErrorToTree description_ error =
         ChoiceDescription possibilities ->
             case error of
                 ChoiceError choiceError ->
-                    Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "choice between" }
+                    Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "choice between" }
                         (List.map2
                             (\elementDescription elementError ->
                                 descriptionAndErrorToTree elementDescription elementError
@@ -968,7 +969,7 @@ descriptionAndErrorToTree description_ error =
         GroupDescription elements ->
             case error of
                 PartsError groupError ->
-                    Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "parts" }
+                    Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "parts" }
                         (List.map3
                             (\index elementDescription elementError ->
                                 if elementError.index == index then
@@ -988,13 +989,13 @@ descriptionAndErrorToTree description_ error =
         ElementsDescription elementDescription ->
             case error of
                 ElementsError inCollectionError ->
-                    Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "elements" }
+                    Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "elements" }
                         (inCollectionError
                             |> Stack.toList
                             |> List.concatMap
                                 (\elementError ->
                                     [ descriptionAndErrorToTree elementDescription elementError.error
-                                    , Tree.singleton { kind = LabelError, text = "at " ++ elementError.location }
+                                    , Tree.singleton { kind = ErrorKind, text = "at " ++ elementError.location }
                                     ]
                                 )
                         )
@@ -1005,13 +1006,13 @@ descriptionAndErrorToTree description_ error =
         PartsDescription partsDescription ->
             case error of
                 PartsError partsError ->
-                    Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "parts" }
+                    Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "parts" }
                         (partsDescription
                             |> Stack.toList
                             |> List.indexedMap
                                 (\index partDescription ->
                                     Tree.tree
-                                        { kind = LabelDescriptionStructure |> LabelDescription
+                                        { kind = DescriptionStructureKind |> DescriptionKind
                                         , text = partDescription.tag
                                         }
                                         [ case partsError |> Stack.toList |> List.filter (\partError -> partError.index == index) of
@@ -1030,13 +1031,13 @@ descriptionAndErrorToTree description_ error =
         VariantsDescription variantsDescription ->
             case error of
                 VariantError variantError ->
-                    Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "variants" }
+                    Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "variants" }
                         (variantsDescription
                             |> Stack.toList
                             |> List.indexedMap
                                 (\index variantDescription ->
                                     Tree.tree
-                                        { kind = LabelDescriptionStructure |> LabelDescription
+                                        { kind = DescriptionStructureKind |> DescriptionKind
                                         , text = variantDescription.tag
                                         }
                                         [ if variantError.index == index then
@@ -1053,7 +1054,7 @@ descriptionAndErrorToTree description_ error =
 
         NamedDescription namedDescription ->
             Tree.tree
-                { kind = LabelDescriptionStructure |> LabelDescription
+                { kind = DescriptionStructureKind |> DescriptionKind
                 , text = namedDescription.name
                 }
                 [ descriptionAndErrorToTree description_ error ]
@@ -1171,7 +1172,7 @@ startDownLabel : { startDownInBroadList : Int } -> Tree { kind : DescriptionOrEr
 startDownLabel =
     \rowError ->
         Tree.singleton
-            { kind = LabelError
+            { kind = ErrorKind
             , text = rowError |> startDownMessage
             }
 
@@ -1182,7 +1183,7 @@ groupTreesAs structureName =
         case informativeElements of
             [] ->
                 Tree.singleton
-                    { kind = LabelDescriptionStructure |> LabelDescription
+                    { kind = DescriptionStructureKind |> DescriptionKind
                     , text = "(empty " ++ structureName ++ ")"
                     }
 
@@ -1190,7 +1191,7 @@ groupTreesAs structureName =
                 onlyElement
 
             element0 :: element1 :: elements2Up ->
-                Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = structureName }
+                Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = structureName }
                     (element0 :: element1 :: elements2Up)
 
 
