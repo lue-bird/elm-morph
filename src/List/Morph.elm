@@ -272,46 +272,45 @@ each :
             )
             (List beforeToBroad -> List broad)
 each elementMorph =
-    { description =
-        { custom = Stack.one "all"
-        , inner = Morph.ElementsDescription (elementMorph |> Morph.description)
-        }
-    , toNarrow =
-        \list ->
-            list
-                |> List.foldr
-                    (\element { index, collected } ->
-                        { collected =
-                            case element |> Morph.toNarrow elementMorph of
-                                Ok elementValue ->
-                                    collected
-                                        |> Result.map (\l -> l |> (::) elementValue)
+    Morph.named "all"
+        { description =
+            Morph.ElementsDescription (elementMorph |> Morph.description)
+        , toNarrow =
+            \list ->
+                list
+                    |> List.foldr
+                        (\element { index, collected } ->
+                            { collected =
+                                case element |> Morph.toNarrow elementMorph of
+                                    Ok elementValue ->
+                                        collected
+                                            |> Result.map (\l -> l |> (::) elementValue)
 
-                                Err elementError ->
-                                    let
-                                        errorsSoFar =
-                                            case collected of
-                                                Ok _ ->
-                                                    Emptiable.empty
+                                    Err elementError ->
+                                        let
+                                            errorsSoFar =
+                                                case collected of
+                                                    Ok _ ->
+                                                        Emptiable.empty
 
-                                                Err elementsAtIndexes ->
-                                                    elementsAtIndexes |> Emptiable.emptyAdapt (\_ -> Possible)
-                                    in
-                                    errorsSoFar
-                                        |> Stack.onTopLay
-                                            { index = index
-                                            , error = elementError
-                                            }
-                                        |> Err
-                        , index = index - 1
+                                                    Err elementsAtIndexes ->
+                                                        elementsAtIndexes |> Emptiable.emptyAdapt (\_ -> Possible)
+                                        in
+                                        errorsSoFar
+                                            |> Stack.onTopLay
+                                                { index = index
+                                                , error = elementError
+                                                }
+                                            |> Err
+                            , index = index - 1
+                            }
+                        )
+                        { collected = [] |> Ok
+                        , index = (list |> List.length) - 1
                         }
-                    )
-                    { collected = [] |> Ok
-                    , index = (list |> List.length) - 1
-                    }
-                |> .collected
-                |> Result.mapError Morph.PartsError
-    , toBroad =
-        \list ->
-            list |> List.map (Morph.toBroad elementMorph)
-    }
+                    |> .collected
+                    |> Result.mapError Morph.PartsError
+        , toBroad =
+            \list ->
+                list |> List.map (Morph.toBroad elementMorph)
+        }

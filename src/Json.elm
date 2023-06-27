@@ -232,7 +232,7 @@ About json numbers...
 jsValueMagic : Morph (Json String) JsValueMagic
 jsValueMagic =
     Morph.named "JSON"
-        { description = { custom = Emptiable.empty, inner = Morph.CustomDescription }
+        { description = Morph.CustomDescription
         , toNarrow =
             \jsValueMagicBeforeNarrow ->
                 jsValueMagicBeforeNarrow
@@ -258,7 +258,7 @@ string =
 stringBroadWith : { indentation : Int } -> Morph (Json String) String
 stringBroadWith { indentation } =
     Morph.named "JSON"
-        { description = { custom = Emptiable.empty, inner = Morph.CustomDescription }
+        { description = Morph.CustomDescription
         , toNarrow =
             \jsValueMagicBroad ->
                 jsValueMagicBroad

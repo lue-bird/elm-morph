@@ -113,47 +113,46 @@ each :
             )
             (Array beforeToBroad -> Array broad)
 each elementMorph =
-    { description =
-        { custom = Stack.one "all"
-        , inner = Morph.ElementsDescription (elementMorph |> Morph.description)
-        }
-    , toNarrow =
-        \array ->
-            array
-                |> Array.foldr
-                    (\element { index, collected } ->
-                        { collected =
-                            case element |> Morph.toNarrow elementMorph of
-                                Ok elementValue ->
-                                    collected
-                                        |> Result.map (\l -> l |> (::) elementValue)
+    Morph.named "all"
+        { description =
+            Morph.ElementsDescription (elementMorph |> Morph.description)
+        , toNarrow =
+            \array ->
+                array
+                    |> Array.foldr
+                        (\element { index, collected } ->
+                            { collected =
+                                case element |> Morph.toNarrow elementMorph of
+                                    Ok elementValue ->
+                                        collected
+                                            |> Result.map (\l -> l |> (::) elementValue)
 
-                                Err elementError ->
-                                    let
-                                        errorsSoFar =
-                                            case collected of
-                                                Ok _ ->
-                                                    Emptiable.empty
+                                    Err elementError ->
+                                        let
+                                            errorsSoFar =
+                                                case collected of
+                                                    Ok _ ->
+                                                        Emptiable.empty
 
-                                                Err elementsAtIndexes ->
-                                                    elementsAtIndexes |> Emptiable.emptyAdapt (\_ -> Possible)
-                                    in
-                                    errorsSoFar
-                                        |> Stack.onTopLay
-                                            { location = index |> String.fromInt
-                                            , error = elementError
-                                            }
-                                        |> Err
-                        , index = index - 1
+                                                    Err elementsAtIndexes ->
+                                                        elementsAtIndexes |> Emptiable.emptyAdapt (\_ -> Possible)
+                                        in
+                                        errorsSoFar
+                                            |> Stack.onTopLay
+                                                { location = index |> String.fromInt
+                                                , error = elementError
+                                                }
+                                            |> Err
+                            , index = index - 1
+                            }
+                        )
+                        { collected = [] |> Ok
+                        , index = (array |> Array.length) - 1
                         }
-                    )
-                    { collected = [] |> Ok
-                    , index = (array |> Array.length) - 1
-                    }
-                |> .collected
-                |> Result.map Array.fromList
-                |> Result.mapError Morph.ElementsError
-    , toBroad =
-        \array ->
-            array |> Array.map (Morph.toBroad elementMorph)
-    }
+                    |> .collected
+                    |> Result.map Array.fromList
+                    |> Result.mapError Morph.ElementsError
+        , toBroad =
+            \array ->
+                array |> Array.map (Morph.toBroad elementMorph)
+        }

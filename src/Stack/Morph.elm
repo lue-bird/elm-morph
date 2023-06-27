@@ -64,74 +64,73 @@ each :
              -> Emptiable (Stacked broad) narrowPossiblyOrNever
             )
 each elementMorph =
-    { description =
-        { inner = Morph.ElementsDescription (elementMorph |> Morph.description)
-        , custom = Stack.one "all"
-        }
-    , toNarrow =
-        \stack ->
-            case stack of
-                Emptiable.Empty emptyPossiblyOrNever ->
-                    Emptiable.Empty emptyPossiblyOrNever
-                        |> Ok
+    Morph.named "all"
+        { description =
+            Morph.ElementsDescription (elementMorph |> Morph.description)
+        , toNarrow =
+            \stack ->
+                case stack of
+                    Emptiable.Empty emptyPossiblyOrNever ->
+                        Emptiable.Empty emptyPossiblyOrNever
+                            |> Ok
 
-                Emptiable.Filled stacked ->
-                    let
-                        reversed =
-                            stacked |> filled |> Stack.reverse
+                    Emptiable.Filled stacked ->
+                        let
+                            reversed =
+                                stacked |> filled |> Stack.reverse
 
-                        lastIndex =
-                            (reversed |> Stack.length) - 1
-                    in
-                    reversed
-                        |> Stack.removeTop
-                        |> Stack.foldFrom
-                            { collected =
-                                case reversed |> Stack.top |> Morph.toNarrow elementMorph of
-                                    Err topError ->
-                                        { index = lastIndex, error = topError }
-                                            |> Stack.one
-                                            |> Err
-
-                                    Ok topNarrow ->
-                                        topNarrow
-                                            |> Stack.one
-                                            |> Ok
-                            , index = lastIndex
-                            }
-                            Up
-                            (\element { index, collected } ->
+                            lastIndex =
+                                (reversed |> Stack.length) - 1
+                        in
+                        reversed
+                            |> Stack.removeTop
+                            |> Stack.foldFrom
                                 { collected =
-                                    case element |> Morph.toNarrow elementMorph of
-                                        Ok elementValue ->
-                                            collected
-                                                |> Result.map
-                                                    (\l -> l |> Stack.onTopLay elementValue)
-
-                                        Err elementError ->
-                                            let
-                                                errorsSoFar =
-                                                    case collected of
-                                                        Ok _ ->
-                                                            Emptiable.empty
-
-                                                        Err elementsAtIndexes ->
-                                                            elementsAtIndexes |> Emptiable.emptyAdapt (\_ -> Possible)
-                                            in
-                                            errorsSoFar
-                                                |> Stack.onTopLay
-                                                    { index = index
-                                                    , error = elementError
-                                                    }
+                                    case reversed |> Stack.top |> Morph.toNarrow elementMorph of
+                                        Err topError ->
+                                            { index = lastIndex, error = topError }
+                                                |> Stack.one
                                                 |> Err
-                                , index = index - 1
+
+                                        Ok topNarrow ->
+                                            topNarrow
+                                                |> Stack.one
+                                                |> Ok
+                                , index = lastIndex
                                 }
-                            )
-                        |> .collected
-                        |> Result.mapError Morph.PartsError
-    , toBroad =
-        Stack.map (\_ -> Morph.toBroad elementMorph)
-    }
+                                Up
+                                (\element { index, collected } ->
+                                    { collected =
+                                        case element |> Morph.toNarrow elementMorph of
+                                            Ok elementValue ->
+                                                collected
+                                                    |> Result.map
+                                                        (\l -> l |> Stack.onTopLay elementValue)
+
+                                            Err elementError ->
+                                                let
+                                                    errorsSoFar =
+                                                        case collected of
+                                                            Ok _ ->
+                                                                Emptiable.empty
+
+                                                            Err elementsAtIndexes ->
+                                                                elementsAtIndexes |> Emptiable.emptyAdapt (\_ -> Possible)
+                                                in
+                                                errorsSoFar
+                                                    |> Stack.onTopLay
+                                                        { index = index
+                                                        , error = elementError
+                                                        }
+                                                    |> Err
+                                    , index = index - 1
+                                    }
+                                )
+                            |> .collected
+                            |> Result.mapError Morph.PartsError
+        , toBroad =
+            Stack.map (\_ -> Morph.toBroad elementMorph)
+        }
 
 
 

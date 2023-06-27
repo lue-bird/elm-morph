@@ -16,13 +16,10 @@ sequenceDescriptionFromStack =
                 stack |> Stack.top
 
             Emptiable.Filled stacked ->
-                { custom = Emptiable.empty
-                , inner =
-                    Morph.SequenceDescription
-                        { early = stack |> Stack.top
-                        , late = stacked |> Emptiable.filled |> sequenceDescriptionFromStack
-                        }
-                }
+                Morph.SequenceDescription
+                    { early = stack |> Stack.top
+                    , late = stacked |> Emptiable.filled |> sequenceDescriptionFromStack
+                    }
 
 
 inSequenceErrorWith :

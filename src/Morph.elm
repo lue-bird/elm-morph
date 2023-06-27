@@ -11,7 +11,7 @@ module Morph exposing
     , deadEndNever, narrowErrorMap
     , Error, ErrorWithDeadEnd(..), PartsError, InChainPlace(..), InSequencePlace(..), UntilBreakError(..), UntilError, CountAndExactlyElementSequenceError(..)
     , description
-    , Description, DescriptionInner(..)
+    , Description(..), ChainDescription, SequenceDescription
     , LabelKind(..), LabelDescriptionKind(..), descriptionToTree, descriptionAndErrorToTree
     , treeToLines
     , toBroad, toNarrow, mapTo
@@ -65,7 +65,7 @@ We call it
 ## describe
 
 @docs description
-@docs Description, DescriptionInner
+@docs Description, ChainDescription, SequenceDescription
 
 
 ## error and description visualization
@@ -311,22 +311,10 @@ type alias MorphOrError narrow broad error =
 
 
 {-| Describing what the Morph [narrows to](#toNarrow) and [broadens from](#toBroad)
-
-  - custom description of the context
-  - maybe [a description depending on structure](#DescriptionInner)
-
--}
-type alias Description =
-    RecordWithoutConstructorFunction
-        { custom : Emptiable (Stacked String) Possibly
-        , inner : DescriptionInner
-        }
-
-
-{-| Structural description of what is being morphed
+in a neatly structured way.
 -}
 type
-    DescriptionInner
+    Description
     -- OneToOne
     = InverseDescription Description
     | CustomDescription
@@ -335,11 +323,12 @@ type
     | EndDescription
     | WhilePossibleDescription Description
     | UntilDescription { commit : Description, end : Description, element : Description }
-    | SequenceDescription { early : Description, late : Description }
+    | SequenceDescription SequenceDescription
       -- others
+    | NamedDescription { name : String, description : Description }
     | OnlyDescription String
     | InnerRecursiveDescription String (() -> Description)
-    | ChainDescription { broad : Description, narrow : Description }
+    | ChainDescription ChainDescription
       -- group morph
     | GroupDescription (Emptiable (Stacked Description) Never)
     | ElementsDescription Description
@@ -347,6 +336,23 @@ type
       -- choice morph
     | ChoiceDescription (Emptiable (Stacked Description) Never)
     | VariantsDescription (Emptiable (Stacked { tag : String, value : Description }) Never)
+
+
+{-| [Description](#Description) specific to
+[`MorphRow`](#MorphRow)s following one after the other
+like with [`|> grab`](#grab), [`|> match`](#match) etc.
+-}
+type alias SequenceDescription =
+    RecordWithoutConstructorFunction
+        { early : Description, late : Description }
+
+
+{-| [Description](#Description) specific to
+[`narrow |> Morph.overRow broad`](#overRow) and [`narrow |> Morph.over broad`](#over)
+-}
+type alias ChainDescription =
+    RecordWithoutConstructorFunction
+        { broad : Description, narrow : Description }
 
 
 {-| Create a simple markdown-formatted message from a tree.
@@ -381,209 +387,211 @@ indent =
 isDescriptive : Description -> Bool
 isDescriptive =
     \description_ ->
-        case description_.custom of
-            Emptiable.Filled _ ->
+        case description_ of
+            NamedDescription _ ->
                 True
 
-            Emptiable.Empty _ ->
-                case description_.inner of
-                    CustomDescription ->
-                        False
+            CustomDescription ->
+                False
 
-                    EndDescription ->
-                        True
+            EndDescription ->
+                True
 
-                    SucceedDescription ->
-                        False
+            SucceedDescription ->
+                False
 
-                    OnlyDescription _ ->
-                        True
+            OnlyDescription _ ->
+                True
 
-                    InnerRecursiveDescription _ _ ->
-                        True
+            InnerRecursiveDescription _ _ ->
+                True
 
-                    InverseDescription inverseDescription ->
-                        inverseDescription |> isDescriptive
+            InverseDescription inverseDescription ->
+                inverseDescription |> isDescriptive
 
-                    WhilePossibleDescription _ ->
-                        True
+            WhilePossibleDescription _ ->
+                True
 
-                    UntilDescription _ ->
-                        True
+            UntilDescription _ ->
+                True
 
-                    ChainDescription elements ->
-                        [ elements.broad, elements.narrow ] |> List.any isDescriptive
+            ChainDescription elements ->
+                [ elements.broad, elements.narrow ] |> List.any isDescriptive
 
-                    SequenceDescription elements ->
-                        [ elements.early, elements.late ] |> List.any isDescriptive
+            SequenceDescription elements ->
+                [ elements.early, elements.late ] |> List.any isDescriptive
 
-                    GroupDescription descriptionParts ->
-                        descriptionParts |> Stack.toList |> List.any isDescriptive
+            GroupDescription descriptionParts ->
+                descriptionParts |> Stack.toList |> List.any isDescriptive
 
-                    ElementsDescription elementDescription ->
-                        elementDescription |> isDescriptive
+            ElementsDescription elementDescription ->
+                elementDescription |> isDescriptive
 
-                    PartsDescription descriptionParts ->
-                        descriptionParts |> Stack.toList |> List.any (\part_ -> part_.value |> isDescriptive)
+            PartsDescription descriptionParts ->
+                descriptionParts |> Stack.toList |> List.any (\part_ -> part_.value |> isDescriptive)
 
-                    ChoiceDescription descriptionPossibilities ->
-                        descriptionPossibilities |> Stack.toList |> List.any isDescriptive
+            ChoiceDescription descriptionPossibilities ->
+                descriptionPossibilities |> Stack.toList |> List.any isDescriptive
 
-                    VariantsDescription descriptionVariants ->
-                        descriptionVariants
-                            |> Stack.toList
-                            |> List.any (\variant_ -> variant_.value |> isDescriptive)
+            VariantsDescription descriptionVariants ->
+                descriptionVariants
+                    |> Stack.toList
+                    |> List.any (\variant_ -> variant_.value |> isDescriptive)
 
 
 {-| Create a tree from the structured [`Description`](#Description)
 -}
 descriptionToTree : Description -> Tree { kind : LabelDescriptionKind, text : String }
 descriptionToTree description_ =
-    let
-        structureTree : Tree { kind : LabelDescriptionKind, text : String }
-        structureTree =
-            case description_.inner of
-                CustomDescription ->
-                    Tree.singleton
-                        { kind = LabelDescriptionStructure
-                        , text = "(custom)"
-                        }
+    case description_ of
+        CustomDescription ->
+            Tree.singleton
+                { kind = LabelDescriptionStructure
+                , text = "(custom)"
+                }
 
-                EndDescription ->
-                    Tree.singleton { kind = LabelDescriptionStructure, text = "end" }
+        EndDescription ->
+            Tree.singleton { kind = LabelDescriptionStructure, text = "end" }
 
-                InverseDescription inverseDescription ->
-                    Tree.tree { kind = LabelDescriptionStructure, text = "inverse" }
-                        [ descriptionToTree inverseDescription ]
+        InverseDescription inverseDescription ->
+            Tree.tree { kind = LabelDescriptionStructure, text = "inverse" }
+                [ descriptionToTree inverseDescription ]
 
-                SucceedDescription ->
-                    Tree.singleton
-                        { kind = LabelDescriptionStructure
-                        , text = "(always succeeds)"
-                        }
+        SucceedDescription ->
+            Tree.singleton
+                { kind = LabelDescriptionStructure
+                , text = "(always succeeds)"
+                }
 
-                OnlyDescription onlyDescription ->
-                    Tree.singleton
-                        { kind = LabelDescriptionStructure
-                        , text = "only " ++ onlyDescription
-                        }
+        OnlyDescription onlyDescription ->
+            Tree.singleton
+                { kind = LabelDescriptionStructure
+                , text = "only " ++ onlyDescription
+                }
 
-                InnerRecursiveDescription recursiveStructureName _ ->
-                    Tree.singleton
-                        { kind = LabelDescriptionStructure
-                        , text = "recursive: " ++ recursiveStructureName
-                        }
+        InnerRecursiveDescription recursiveStructureName _ ->
+            Tree.singleton
+                { kind = LabelDescriptionStructure
+                , text = "recursive: " ++ recursiveStructureName
+                }
 
-                WhilePossibleDescription elementDescription ->
-                    Tree.tree
-                        { kind = LabelDescriptionStructure
-                        , text = "while possible"
-                        }
-                        [ descriptionToTree elementDescription ]
+        WhilePossibleDescription elementDescription ->
+            Tree.tree
+                { kind = LabelDescriptionStructure
+                , text = "while possible"
+                }
+                [ descriptionToTree elementDescription ]
 
-                UntilDescription untilDescription ->
-                    Tree.tree { kind = LabelDescriptionStructure, text = "until" }
-                        ([ if not (isDescriptive untilDescription.commit) then
+        UntilDescription untilDescription ->
+            Tree.tree { kind = LabelDescriptionStructure, text = "until" }
+                ([ if not (isDescriptive untilDescription.commit) then
+                    Nothing
+
+                   else
+                    Tree.tree { kind = LabelDescriptionStructure, text = "end" }
+                        [ descriptionToTree untilDescription.end ]
+                        |> Just
+                 , Tree.tree { kind = LabelDescriptionStructure, text = "element" }
+                    [ descriptionToTree untilDescription.element ]
+                    |> Just
+                 ]
+                    |> List.filterMap identity
+                )
+
+        SequenceDescription elementDescriptions ->
+            let
+                collapseSequence : SequenceDescription -> List Description
+                collapseSequence sequenceDescription =
+                    let
+                        tailCollapsed : List Description
+                        tailCollapsed =
+                            if isDescriptive sequenceDescription.late then
+                                case sequenceDescription.late of
+                                    NamedDescription _ ->
+                                        [ sequenceDescription.late ]
+
+                                    SequenceDescription lateSequenceDescription ->
+                                        collapseSequence lateSequenceDescription
+
+                                    _ ->
+                                        [ sequenceDescription.late ]
+
+                            else
+                                []
+                    in
+                    if isDescriptive sequenceDescription.early then
+                        sequenceDescription.early :: tailCollapsed
+
+                    else
+                        []
+            in
+            elementDescriptions
+                |> collapseSequence
+                |> List.map descriptionToTree
+                |> groupDescriptionTreesAs "sequence"
+
+        ChainDescription elementDescriptions ->
+            -- TODO collapse
+            [ elementDescriptions.broad, elementDescriptions.narrow ]
+                |> List.filterMap
+                    (\elementDescription ->
+                        if elementDescription |> isDescriptive then
+                            descriptionToTree elementDescription |> Just
+
+                        else
                             Nothing
+                    )
+                |> groupDescriptionTreesAs "chained"
 
-                           else
-                            Tree.tree { kind = LabelDescriptionStructure, text = "end" }
-                                [ descriptionToTree untilDescription.end ]
-                                |> Just
-                         , Tree.tree { kind = LabelDescriptionStructure, text = "element" }
-                            [ descriptionToTree untilDescription.element ]
-                            |> Just
-                         ]
-                            |> List.filterMap identity
+        ChoiceDescription possibilities ->
+            Tree.tree { kind = LabelDescriptionStructure, text = "choice between" }
+                (possibilities
+                    |> Stack.toList
+                    |> List.map descriptionToTree
+                )
+
+        GroupDescription elements ->
+            Tree.tree { kind = LabelDescriptionStructure, text = "parts" }
+                (elements
+                    |> Stack.toList
+                    |> List.map descriptionToTree
+                )
+
+        ElementsDescription elementDescription ->
+            Tree.tree { kind = LabelDescriptionStructure, text = "elements" }
+                [ elementDescription |> descriptionToTree ]
+
+        PartsDescription partsDescription ->
+            Tree.tree { kind = LabelDescriptionStructure, text = "parts" }
+                (partsDescription
+                    |> Stack.toList
+                    |> List.map
+                        (\partDescription ->
+                            Tree.tree
+                                { kind = LabelDescriptionStructure
+                                , text = partDescription.tag
+                                }
+                                [ partDescription.value |> descriptionToTree ]
                         )
+                )
 
-                SequenceDescription elementDescriptions ->
-                    -- TODO collapse
-                    [ elementDescriptions.early, elementDescriptions.late ]
-                        |> List.filterMap
-                            (\elementDescription ->
-                                if elementDescription |> isDescriptive then
-                                    descriptionToTree elementDescription |> Just
-
-                                else
-                                    Nothing
-                            )
-                        |> groupDescriptionTreesAs "sequence"
-
-                ChainDescription elementDescriptions ->
-                    -- TODO collapse
-                    [ elementDescriptions.broad, elementDescriptions.narrow ]
-                        |> List.filterMap
-                            (\elementDescription ->
-                                if elementDescription |> isDescriptive then
-                                    descriptionToTree elementDescription |> Just
-
-                                else
-                                    Nothing
-                            )
-                        |> groupDescriptionTreesAs "chained"
-
-                ChoiceDescription possibilities ->
-                    Tree.tree { kind = LabelDescriptionStructure, text = "choice between" }
-                        (possibilities
-                            |> Stack.toList
-                            |> List.map descriptionToTree
+        VariantsDescription variantsDescription ->
+            Tree.tree { kind = LabelDescriptionStructure, text = "variants" }
+                (variantsDescription
+                    |> Stack.toList
+                    |> List.map
+                        (\variantDescription ->
+                            Tree.tree
+                                { kind = LabelDescriptionStructure
+                                , text = variantDescription.tag
+                                }
+                                [ variantDescription.value |> descriptionToTree ]
                         )
+                )
 
-                GroupDescription elements ->
-                    Tree.tree { kind = LabelDescriptionStructure, text = "parts" }
-                        (elements
-                            |> Stack.toList
-                            |> List.map descriptionToTree
-                        )
-
-                ElementsDescription elementDescription ->
-                    Tree.tree { kind = LabelDescriptionStructure, text = "elements" }
-                        [ elementDescription |> descriptionToTree ]
-
-                PartsDescription partsDescription ->
-                    Tree.tree { kind = LabelDescriptionStructure, text = "parts" }
-                        (partsDescription
-                            |> Stack.toList
-                            |> List.map
-                                (\partDescription ->
-                                    Tree.tree
-                                        { kind = LabelDescriptionStructure
-                                        , text = partDescription.tag
-                                        }
-                                        [ partDescription.value |> descriptionToTree ]
-                                )
-                        )
-
-                VariantsDescription variantsDescription ->
-                    Tree.tree { kind = LabelDescriptionStructure, text = "variants" }
-                        (variantsDescription
-                            |> Stack.toList
-                            |> List.map
-                                (\variantDescription ->
-                                    Tree.tree
-                                        { kind = LabelDescriptionStructure
-                                        , text = variantDescription.tag
-                                        }
-                                        [ variantDescription.value |> descriptionToTree ]
-                                )
-                        )
-    in
-    descriptionTreeWithCustomDescriptionNest description_.custom structureTree
-
-
-descriptionTreeWithCustomDescriptionNest :
-    Emptiable (Stacked String) Possibly
-    -> Tree { kind : LabelDescriptionKind, text : String }
-    -> Tree { kind : LabelDescriptionKind, text : String }
-descriptionTreeWithCustomDescriptionNest labelsToNest bottom =
-    case labelsToNest of
-        Emptiable.Empty _ ->
-            bottom
-
-        Emptiable.Filled (Stack.TopBelow ( line0Custom, lines1UpCustom )) ->
-            Tree.tree { kind = LabelDescriptionCustom, text = line0Custom }
-                [ descriptionTreeWithCustomDescriptionNest (Stack.fromList lines1UpCustom) bottom ]
+        NamedDescription namedDescription ->
+            Tree.tree { kind = LabelDescriptionCustom, text = namedDescription.name }
+                [ descriptionToTree namedDescription.description ]
 
 
 groupDescriptionTreesAs : String -> List (Tree { kind : LabelDescriptionKind, text : String }) -> Tree { kind : LabelDescriptionKind, text : String }
@@ -629,253 +637,256 @@ descriptionAndErrorToTree description_ error =
             \unexpectedError ->
                 Tree.tree { kind = LabelError, text = "unexpected error kind" }
                     [ unexpectedError |> errorToLabelTree ]
-
-        structureTree : Tree { text : String, kind : LabelKind }
-        structureTree =
-            case description_.inner of
-                CustomDescription ->
-                    case error of
-                        DeadEnd deadEnd ->
-                            Tree.singleton { kind = LabelError, text = deadEnd }
-
-                        otherError ->
-                            otherError |> errorToLabelTree
-
-                EndDescription ->
-                    Tree.singleton { kind = LabelDescriptionStructure |> LabelDescription, text = "end" }
-
-                InverseDescription inverseDescription ->
-                    Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "inverse" }
-                        [ descriptionAndErrorToTree inverseDescription error ]
-
-                SucceedDescription ->
-                    Tree.singleton
-                        { kind = LabelDescriptionStructure |> LabelDescription
-                        , text = "(always succeeds)"
-                        }
-
-                OnlyDescription onlyDescription ->
-                    Tree.singleton
-                        { kind = LabelDescriptionStructure |> LabelDescription
-                        , text = "only " ++ onlyDescription
-                        }
-
-                InnerRecursiveDescription _ lazyDescription ->
-                    descriptionAndErrorToTree
-                        (lazyDescription ()
-                            |> descriptionCustomNameAlter (\s -> "recursive: " ++ s)
-                        )
-                        error
-
-                WhilePossibleDescription elementDescription ->
-                    Tree.tree
-                        { kind = LabelDescriptionStructure |> LabelDescription
-                        , text = "while possible"
-                        }
-                        [ descriptionToLabelTree elementDescription ]
-
-                UntilDescription untilDescription ->
-                    case error of
-                        UntilError untilError ->
-                            Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "until" }
-                                (([ if not (isDescriptive untilDescription.commit) then
-                                        Nothing
-
-                                    else
-                                        Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "commit" }
-                                            [ case untilError.breakError of
-                                                UntilEndError _ ->
-                                                    descriptionToLabelTree untilDescription.commit
-
-                                                UntilCommitError commitError ->
-                                                    descriptionAndErrorToTree untilDescription.commit commitError
-                                            ]
-                                            |> Just
-                                  , Tree.tree
-                                        { kind = LabelDescriptionStructure |> LabelDescription, text = "end" }
-                                        [ case untilError.breakError of
-                                            UntilCommitError _ ->
-                                                descriptionToLabelTree untilDescription.end
-
-                                            UntilEndError endError ->
-                                                descriptionAndErrorToTree untilDescription.end endError
-                                        ]
-                                        |> Just
-                                  ]
-                                    |> List.filterMap identity
-                                 )
-                                    ++ (untilError.startsDownInBroadList
-                                            |> Stack.removeTop
-                                            |> Stack.toList
-                                            |> List.reverse
-                                            |> List.map
-                                                (\startDown ->
-                                                    Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "element" }
-                                                        [ startDownLabel { startDownInBroadList = startDown }
-                                                        , untilDescription.element |> descriptionToLabelTree
-                                                        ]
-                                                )
-                                       )
-                                    ++ [ Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "element" }
-                                            [ descriptionAndErrorToTree untilDescription.element untilError.elementError
-                                            , startDownLabel { startDownInBroadList = untilError.startsDownInBroadList |> Stack.top }
-                                            ]
-                                       ]
-                                )
-
-                        unexpectedError ->
-                            unexpectedError |> unexpectedErrorToTree
-
-                SequenceDescription elementDescriptions ->
-                    -- TODO collapse
-                    case error of
-                        SequenceError inSequence ->
-                            [ ( InSequenceEarly, elementDescriptions.early )
-                            , ( InSequenceLate, elementDescriptions.late )
-                            ]
-                                |> List.filterMap
-                                    (\( place, elementDescription ) ->
-                                        if place == inSequence.place then
-                                            descriptionAndErrorToTree elementDescription inSequence.error
-                                                |> Just
-
-                                        else if elementDescription |> isDescriptive then
-                                            descriptionToLabelTree elementDescription |> Just
-
-                                        else
-                                            Nothing
-                                    )
-                                |> groupTreesAs "sequence"
-
-                        unexpectedError ->
-                            unexpectedError |> unexpectedErrorToTree
-
-                ChainDescription elementDescriptions ->
-                    -- TODO collapse
-                    case error of
-                        ChainError inChain ->
-                            [ ( InChainBroad, elementDescriptions.broad )
-                            , ( InChainNarrow, elementDescriptions.narrow )
-                            ]
-                                |> List.filterMap
-                                    (\( index, elementDescription ) ->
-                                        if index == inChain.place then
-                                            descriptionAndErrorToTree elementDescription inChain.error
-                                                |> Just
-
-                                        else if elementDescription |> isDescriptive then
-                                            descriptionToLabelTree elementDescription |> Just
-
-                                        else
-                                            Nothing
-                                    )
-                                |> groupTreesAs "chained"
-
-                        unexpectedError ->
-                            unexpectedError |> unexpectedErrorToTree
-
-                ChoiceDescription possibilities ->
-                    case error of
-                        ChoiceError choiceError ->
-                            Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "choice between" }
-                                (List.map2
-                                    (\elementDescription elementError ->
-                                        descriptionAndErrorToTree elementDescription elementError
-                                    )
-                                    (possibilities |> Stack.toList)
-                                    (choiceError |> Stack.toList)
-                                )
-
-                        unexpectedError ->
-                            unexpectedError |> unexpectedErrorToTree
-
-                GroupDescription elements ->
-                    case error of
-                        PartsError groupError ->
-                            Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "parts" }
-                                (List.map3
-                                    (\index elementDescription elementError ->
-                                        if elementError.index == index then
-                                            descriptionAndErrorToTree elementDescription elementError.error
-
-                                        else
-                                            descriptionToLabelTree elementDescription
-                                    )
-                                    (List.range 0 ((elements |> Stack.length) - 1))
-                                    (elements |> Stack.toList)
-                                    (groupError |> Stack.toList)
-                                )
-
-                        unexpectedError ->
-                            unexpectedError |> unexpectedErrorToTree
-
-                ElementsDescription elementDescription ->
-                    case error of
-                        ElementsError inCollectionError ->
-                            Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "elements" }
-                                (inCollectionError
-                                    |> Stack.toList
-                                    |> List.concatMap
-                                        (\elementError ->
-                                            [ descriptionAndErrorToTree elementDescription elementError.error
-                                            , Tree.singleton { kind = LabelError, text = "at " ++ elementError.location }
-                                            ]
-                                        )
-                                )
-
-                        unexpectedError ->
-                            unexpectedError |> unexpectedErrorToTree
-
-                PartsDescription partsDescription ->
-                    case error of
-                        PartsError partsError ->
-                            Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "parts" }
-                                (partsDescription
-                                    |> Stack.toList
-                                    |> List.indexedMap
-                                        (\index partDescription ->
-                                            Tree.tree
-                                                { kind = LabelDescriptionStructure |> LabelDescription
-                                                , text = partDescription.tag
-                                                }
-                                                [ case partsError |> Stack.toList |> List.filter (\partError -> partError.index == index) of
-                                                    [] ->
-                                                        descriptionToLabelTree partDescription.value
-
-                                                    partError :: _ ->
-                                                        descriptionAndErrorToTree partDescription.value partError.error
-                                                ]
-                                        )
-                                )
-
-                        unexpectedError ->
-                            unexpectedError |> unexpectedErrorToTree
-
-                VariantsDescription variantsDescription ->
-                    case error of
-                        VariantError variantError ->
-                            Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "variants" }
-                                (variantsDescription
-                                    |> Stack.toList
-                                    |> List.indexedMap
-                                        (\index variantDescription ->
-                                            Tree.tree
-                                                { kind = LabelDescriptionStructure |> LabelDescription
-                                                , text = variantDescription.tag
-                                                }
-                                                [ if variantError.index == index then
-                                                    descriptionAndErrorToTree variantDescription.value variantError.error
-
-                                                  else
-                                                    descriptionToLabelTree variantDescription.value
-                                                ]
-                                        )
-                                )
-
-                        unexpectedError ->
-                            unexpectedError |> unexpectedErrorToTree
     in
-    treeWithCustomDescriptionNest description_.custom structureTree
+    case description_ of
+        CustomDescription ->
+            case error of
+                DeadEnd deadEnd ->
+                    Tree.singleton { kind = LabelError, text = deadEnd }
+
+                otherError ->
+                    otherError |> errorToLabelTree
+
+        EndDescription ->
+            Tree.singleton { kind = LabelDescriptionStructure |> LabelDescription, text = "end" }
+
+        InverseDescription inverseDescription ->
+            Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "inverse" }
+                [ descriptionAndErrorToTree inverseDescription error ]
+
+        SucceedDescription ->
+            Tree.singleton
+                { kind = LabelDescriptionStructure |> LabelDescription
+                , text = "(always succeeds)"
+                }
+
+        OnlyDescription onlyDescription ->
+            Tree.singleton
+                { kind = LabelDescriptionStructure |> LabelDescription
+                , text = "only " ++ onlyDescription
+                }
+
+        InnerRecursiveDescription _ lazyDescription ->
+            descriptionAndErrorToTree
+                (lazyDescription ()
+                    |> descriptionCustomNameAlter (\s -> "recursive: " ++ s)
+                )
+                error
+
+        WhilePossibleDescription elementDescription ->
+            Tree.tree
+                { kind = LabelDescriptionStructure |> LabelDescription
+                , text = "while possible"
+                }
+                [ descriptionToLabelTree elementDescription ]
+
+        UntilDescription untilDescription ->
+            case error of
+                UntilError untilError ->
+                    Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "until" }
+                        (([ if not (isDescriptive untilDescription.commit) then
+                                Nothing
+
+                            else
+                                Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "commit" }
+                                    [ case untilError.breakError of
+                                        UntilEndError _ ->
+                                            descriptionToLabelTree untilDescription.commit
+
+                                        UntilCommitError commitError ->
+                                            descriptionAndErrorToTree untilDescription.commit commitError
+                                    ]
+                                    |> Just
+                          , Tree.tree
+                                { kind = LabelDescriptionStructure |> LabelDescription, text = "end" }
+                                [ case untilError.breakError of
+                                    UntilCommitError _ ->
+                                        descriptionToLabelTree untilDescription.end
+
+                                    UntilEndError endError ->
+                                        descriptionAndErrorToTree untilDescription.end endError
+                                ]
+                                |> Just
+                          ]
+                            |> List.filterMap identity
+                         )
+                            ++ (untilError.startsDownInBroadList
+                                    |> Stack.removeTop
+                                    |> Stack.toList
+                                    |> List.reverse
+                                    |> List.map
+                                        (\startDown ->
+                                            Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "element" }
+                                                [ startDownLabel { startDownInBroadList = startDown }
+                                                , untilDescription.element |> descriptionToLabelTree
+                                                ]
+                                        )
+                               )
+                            ++ [ Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "element" }
+                                    [ descriptionAndErrorToTree untilDescription.element untilError.elementError
+                                    , startDownLabel { startDownInBroadList = untilError.startsDownInBroadList |> Stack.top }
+                                    ]
+                               ]
+                        )
+
+                unexpectedError ->
+                    unexpectedError |> unexpectedErrorToTree
+
+        SequenceDescription elementDescriptions ->
+            -- TODO collapse
+            case error of
+                SequenceError inSequence ->
+                    [ ( InSequenceEarly, elementDescriptions.early )
+                    , ( InSequenceLate, elementDescriptions.late )
+                    ]
+                        |> List.filterMap
+                            (\( place, elementDescription ) ->
+                                if place == inSequence.place then
+                                    descriptionAndErrorToTree elementDescription inSequence.error
+                                        |> Just
+
+                                else if elementDescription |> isDescriptive then
+                                    descriptionToLabelTree elementDescription |> Just
+
+                                else
+                                    Nothing
+                            )
+                        |> groupTreesAs "sequence"
+
+                unexpectedError ->
+                    unexpectedError |> unexpectedErrorToTree
+
+        ChainDescription elementDescriptions ->
+            -- TODO collapse
+            case error of
+                ChainError inChain ->
+                    [ ( InChainBroad, elementDescriptions.broad )
+                    , ( InChainNarrow, elementDescriptions.narrow )
+                    ]
+                        |> List.filterMap
+                            (\( index, elementDescription ) ->
+                                if index == inChain.place then
+                                    descriptionAndErrorToTree elementDescription inChain.error
+                                        |> Just
+
+                                else if elementDescription |> isDescriptive then
+                                    descriptionToLabelTree elementDescription |> Just
+
+                                else
+                                    Nothing
+                            )
+                        |> groupTreesAs "chained"
+
+                unexpectedError ->
+                    unexpectedError |> unexpectedErrorToTree
+
+        ChoiceDescription possibilities ->
+            case error of
+                ChoiceError choiceError ->
+                    Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "choice between" }
+                        (List.map2
+                            (\elementDescription elementError ->
+                                descriptionAndErrorToTree elementDescription elementError
+                            )
+                            (possibilities |> Stack.toList)
+                            (choiceError |> Stack.toList)
+                        )
+
+                unexpectedError ->
+                    unexpectedError |> unexpectedErrorToTree
+
+        GroupDescription elements ->
+            case error of
+                PartsError groupError ->
+                    Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "parts" }
+                        (List.map3
+                            (\index elementDescription elementError ->
+                                if elementError.index == index then
+                                    descriptionAndErrorToTree elementDescription elementError.error
+
+                                else
+                                    descriptionToLabelTree elementDescription
+                            )
+                            (List.range 0 ((elements |> Stack.length) - 1))
+                            (elements |> Stack.toList)
+                            (groupError |> Stack.toList)
+                        )
+
+                unexpectedError ->
+                    unexpectedError |> unexpectedErrorToTree
+
+        ElementsDescription elementDescription ->
+            case error of
+                ElementsError inCollectionError ->
+                    Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "elements" }
+                        (inCollectionError
+                            |> Stack.toList
+                            |> List.concatMap
+                                (\elementError ->
+                                    [ descriptionAndErrorToTree elementDescription elementError.error
+                                    , Tree.singleton { kind = LabelError, text = "at " ++ elementError.location }
+                                    ]
+                                )
+                        )
+
+                unexpectedError ->
+                    unexpectedError |> unexpectedErrorToTree
+
+        PartsDescription partsDescription ->
+            case error of
+                PartsError partsError ->
+                    Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "parts" }
+                        (partsDescription
+                            |> Stack.toList
+                            |> List.indexedMap
+                                (\index partDescription ->
+                                    Tree.tree
+                                        { kind = LabelDescriptionStructure |> LabelDescription
+                                        , text = partDescription.tag
+                                        }
+                                        [ case partsError |> Stack.toList |> List.filter (\partError -> partError.index == index) of
+                                            [] ->
+                                                descriptionToLabelTree partDescription.value
+
+                                            partError :: _ ->
+                                                descriptionAndErrorToTree partDescription.value partError.error
+                                        ]
+                                )
+                        )
+
+                unexpectedError ->
+                    unexpectedError |> unexpectedErrorToTree
+
+        VariantsDescription variantsDescription ->
+            case error of
+                VariantError variantError ->
+                    Tree.tree { kind = LabelDescriptionStructure |> LabelDescription, text = "variants" }
+                        (variantsDescription
+                            |> Stack.toList
+                            |> List.indexedMap
+                                (\index variantDescription ->
+                                    Tree.tree
+                                        { kind = LabelDescriptionStructure |> LabelDescription
+                                        , text = variantDescription.tag
+                                        }
+                                        [ if variantError.index == index then
+                                            descriptionAndErrorToTree variantDescription.value variantError.error
+
+                                          else
+                                            descriptionToLabelTree variantDescription.value
+                                        ]
+                                )
+                        )
+
+                unexpectedError ->
+                    unexpectedError |> unexpectedErrorToTree
+
+        NamedDescription namedDescription ->
+            Tree.tree
+                { kind = LabelDescriptionStructure |> LabelDescription
+                , text = namedDescription.name
+                }
+                [ descriptionAndErrorToTree description_ error ]
 
 
 startDownMessage : { error_ | startDownInBroadList : Int } -> String
@@ -1068,51 +1079,13 @@ inSequencePlaceToString =
 descriptionCustomNameAlter : (String -> String) -> (Description -> Description)
 descriptionCustomNameAlter nameAlter =
     \description_ ->
-        { description_
-            | custom = description_.custom |> Stack.topAlter nameAlter
-        }
+        case description_ of
+            NamedDescription namedDescription ->
+                { namedDescription | name = namedDescription.name |> nameAlter }
+                    |> NamedDescription
 
-
-treeWithCustomDescriptionNest :
-    Emptiable (Stacked String) Possibly
-    -> Tree { text : String, kind : LabelKind }
-    -> Tree { text : String, kind : LabelKind }
-treeWithCustomDescriptionNest labelsToNest bottom =
-    case labelsToNest of
-        Emptiable.Empty _ ->
-            bottom
-
-        Emptiable.Filled (Stack.TopBelow ( line0Custom, lines1UpCustom )) ->
-            Tree.tree { kind = LabelDescriptionCustom |> LabelDescription, text = line0Custom }
-                [ treeWithCustomDescriptionNest (Stack.fromList lines1UpCustom) bottom ]
-
-
-collapseToDescriptive :
-    (DescriptionInner -> Maybe ( Description, Description ))
-    -> (DescriptionInner -> List Description)
-collapseToDescriptive trySplit =
-    \descriptionInner ->
-        descriptionInner
-            |> collapse trySplit
-            |> List.filter isDescriptive
-
-
-collapse :
-    (DescriptionInner -> Maybe ( Description, Description ))
-    -> (DescriptionInner -> List Description)
-collapse trySplit =
-    \descriptionInner ->
-        case descriptionInner |> trySplit of
-            Nothing ->
-                []
-
-            Just ( head, tailBeforeCollapse ) ->
-                case tailBeforeCollapse.custom of
-                    Emptiable.Filled _ ->
-                        [ head, tailBeforeCollapse ]
-
-                    Emptiable.Empty _ ->
-                        head :: (tailBeforeCollapse.inner |> collapse trySplit)
+            notNamedDescription ->
+                notNamedDescription
 
 
 {-| Where [narrowing](#toNarrow) has failed.
@@ -1273,14 +1246,13 @@ named :
         (MorphIndependently narrow broaden
          -> MorphIndependently narrow broaden
         )
-named expectationCustomDescription morphToDescribe =
+named narrowExpectationCustomDescription morphToDescribe =
     { morphToDescribe
         | description =
-            { inner = morphToDescribe.description.inner
-            , custom =
-                morphToDescribe.description.custom
-                    |> Stack.onTopLay expectationCustomDescription
-            }
+            NamedDescription
+                { description = morphToDescribe.description
+                , name = narrowExpectationCustomDescription
+                }
     }
 
 
@@ -1515,8 +1487,7 @@ oneToOne :
             (beforeMap -> Result error_ mapped)
             (beforeUnmap -> unmapped)
 oneToOne map unmap =
-    { description =
-        { custom = Emptiable.empty, inner = CustomDescription }
+    { description = CustomDescription
     , toNarrow = \beforeMap -> beforeMap |> map |> Ok
     , toBroad = unmap
     }
@@ -1587,10 +1558,7 @@ only :
     -> broadConstant
     -> Morph () broadConstant
 only broadConstantToString broadConstant =
-    { description =
-        { custom = Emptiable.empty
-        , inner = OnlyDescription (broadConstant |> broadConstantToString)
-        }
+    { description = OnlyDescription (broadConstant |> broadConstantToString)
     , toNarrow =
         \broadValue ->
             if broadValue == broadConstant then
@@ -1623,17 +1591,15 @@ custom :
             (beforeToNarrow -> Result (ErrorWithDeadEnd deadEnd) narrow)
             (beforeToBroad -> broad)
 custom descriptionCustom morphTransformations =
-    { description =
-        { custom = Stack.one descriptionCustom
-        , inner = CustomDescription
+    named descriptionCustom
+        { description = CustomDescription
+        , toNarrow =
+            \beforeToNarrow ->
+                beforeToNarrow
+                    |> morphTransformations.toNarrow
+                    |> Result.mapError DeadEnd
+        , toBroad = morphTransformations.toBroad
         }
-    , toNarrow =
-        \beforeToNarrow ->
-            beforeToNarrow
-                |> morphTransformations.toNarrow
-                |> Result.mapError DeadEnd
-    , toBroad = morphTransformations.toBroad
-    }
 
 
 
@@ -1753,11 +1719,8 @@ recursive structureName morphLazy =
             recursive structureName
                 (\step ->
                     { description =
-                        { inner =
-                            InnerRecursiveDescription structureName
-                                (\() -> morphLazy (innerRecursive ()) |> description)
-                        , custom = Emptiable.empty
-                        }
+                        InnerRecursiveDescription structureName
+                            (\() -> morphLazy (innerRecursive ()) |> description)
                     , toNarrow = toNarrow step
                     , toBroad = toBroad step
                     }
@@ -1768,13 +1731,10 @@ recursive structureName morphLazy =
             morphLazy (innerRecursive ())
     in
     { description =
-        { inner = recursiveMorph |> description |> .inner
-        , custom =
-            recursiveMorph
-                |> description
-                |> .custom
-                |> Stack.onTopLay structureName
-        }
+        NamedDescription
+            { description = recursiveMorph |> description
+            , name = structureName
+            }
     , toNarrow = toNarrow recursiveMorph
     , toBroad = toBroad recursiveMorph
     }
@@ -1975,10 +1935,7 @@ partsFinish :
             (beforeToBroad -> broad)
 partsFinish =
     \groupMorphInProgress ->
-        { description =
-            { custom = Emptiable.empty
-            , inner = groupMorphInProgress.description |> PartsDescription
-            }
+        { description = groupMorphInProgress.description |> PartsDescription
         , toNarrow =
             \broad_ ->
                 broad_
@@ -2018,13 +1975,10 @@ over :
 over morphBroad =
     \narrowMorph ->
         { description =
-            { inner =
-                ChainDescription
-                    { broad = morphBroad |> description
-                    , narrow = narrowMorph |> description
-                    }
-            , custom = Emptiable.empty
-            }
+            ChainDescription
+                { broad = morphBroad |> description
+                , narrow = narrowMorph |> description
+                }
         , toBroad =
             \beforeToBroad ->
                 beforeToBroad
@@ -2099,9 +2053,7 @@ invert =
                 beforeMap |> toBroad translate_ |> Ok
         , toBroad = mapTo translate_
         , description =
-            { inner = InverseDescription (translate_ |> description)
-            , custom = Emptiable.empty
-            }
+            InverseDescription (translate_ |> description)
         }
 
 
@@ -2305,10 +2257,7 @@ oneToOneOn :
                 (structureBeforeUnmap -> structureUnmapped)
         )
 oneToOneOn ( structureMap, structureUnmap ) elementTranslate =
-    { description =
-        { custom = Emptiable.empty
-        , inner = CustomDescription
-        }
+    { description = CustomDescription
     , toNarrow =
         \broad_ ->
             broad_
@@ -2583,7 +2532,7 @@ succeed :
     narrowConstant
     -> MorphRowIndependently beforeBroaden_ narrowConstant broadElement_
 succeed narrowConstant =
-    { description = { inner = SucceedDescription, custom = Emptiable.empty }
+    { description = SucceedDescription
     , toNarrow =
         \broad_ ->
             { narrow = narrowConstant
@@ -2615,13 +2564,10 @@ next :
 next partAccess partChange nextMorphRow =
     \groupMorphRowSoFar ->
         { description =
-            { custom = Emptiable.empty
-            , inner =
-                SequenceDescription
-                    { early = groupMorphRowSoFar |> description
-                    , late = nextMorphRow |> description
-                    }
-            }
+            SequenceDescription
+                { early = groupMorphRowSoFar |> description
+                , late = nextMorphRow |> description
+                }
         , toNarrow =
             \broad_ ->
                 case broad_ |> toNarrow groupMorphRowSoFar of
@@ -2756,13 +2702,10 @@ overRow :
 overRow morphRowBeforeMorph =
     \narrowMorph ->
         { description =
-            { custom = Emptiable.empty
-            , inner =
-                ChainDescription
-                    { broad = morphRowBeforeMorph |> description
-                    , narrow = narrowMorph |> description
-                    }
-            }
+            ChainDescription
+                { broad = morphRowBeforeMorph |> description
+                , narrow = narrowMorph |> description
+                }
         , toNarrow =
             \broad_ ->
                 case broad_ |> toNarrow morphRowBeforeMorph of
@@ -2851,14 +2794,11 @@ untilAsFold :
     -> MorphRow commitResult broadElement
 untilAsFold config =
     { description =
-        { inner =
-            UntilDescription
-                { commit = config.commit |> description
-                , element = config.element Emptiable.empty |> description
-                , end = config.commit |> description
-                }
-        , custom = Emptiable.empty
-        }
+        UntilDescription
+            { commit = config.commit |> description
+            , element = config.element Emptiable.empty |> description
+            , end = config.commit |> description
+            }
     , toBroad =
         let
             step :
@@ -3252,11 +3192,8 @@ whilePossibleAsFold :
     -> MorphRow (Emptiable folded Possibly) broadElement
 whilePossibleAsFold config =
     { description =
-        { inner =
-            WhilePossibleDescription
-                (config.element Emptiable.empty |> description)
-        , custom = Emptiable.empty
-        }
+        WhilePossibleDescription
+            (config.element Emptiable.empty |> description)
     , toBroad =
         let
             step :
@@ -3352,10 +3289,7 @@ It can, however simplify checking for specific endings:
 -}
 end : MorphRow () broadElement_
 end =
-    { description =
-        { custom = Emptiable.empty
-        , inner = EndDescription
-        }
+    { description = EndDescription
     , toNarrow =
         \broad_ ->
             case broad_ of
@@ -3631,12 +3565,9 @@ choiceEquivalent traversePossibility possibilities =
                     (Stack.topBelow possibilities.broad possibilities.tryLate)
     in
     { description =
-        { custom = Emptiable.empty
-        , inner =
-            possibilitiesStack
-                |> Stack.map (\_ possibility -> possibility |> traversePossibility |> description)
-                |> ChoiceDescription
-        }
+        possibilitiesStack
+            |> Stack.map (\_ possibility -> possibility |> traversePossibility |> description)
+            |> ChoiceDescription
     , toNarrow =
         \beforeToNarrow ->
             beforeToNarrow
@@ -3947,11 +3878,8 @@ variantsFinish :
 variantsFinish =
     \choiceMorphComplete ->
         { description =
-            { custom = Emptiable.empty
-            , inner =
-                choiceMorphComplete.description
-                    |> VariantsDescription
-            }
+            choiceMorphComplete.description
+                |> VariantsDescription
         , toNarrow =
             \beforeToNarrow ->
                 beforeToNarrow
@@ -4142,10 +4070,7 @@ choiceFinish :
 choiceFinish =
     \choiceMorphComplete ->
         { description =
-            { custom = Emptiable.empty
-            , inner =
-                choiceMorphComplete.description |> ChoiceDescription
-            }
+            choiceMorphComplete.description |> ChoiceDescription
         , toNarrow =
             \beforeToNarrow ->
                 beforeToNarrow

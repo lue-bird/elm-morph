@@ -251,38 +251,37 @@ each :
              -> ArraySized broadUnmapped broadRange
             )
 each elementMorph =
-    { description =
-        { custom = Stack.one "all"
-        , inner = Morph.ElementsDescription (elementMorph |> Morph.description)
+    Morph.named "all"
+        { description =
+            Morph.ElementsDescription (elementMorph |> Morph.description)
+        , toNarrow =
+            \arraySized ->
+                arraySized
+                    |> ArraySized.minToOn
+                    |> ArraySized.andIndexes
+                    |> ArraySized.map
+                        (\el ->
+                            el.element
+                                |> Morph.toNarrow elementMorph
+                                |> Result.mapError (\err -> { index = el.index, error = err })
+                        )
+                    |> ArraySized.minToNumber
+                    |> ArraySized.allOk
+                    |> Result.mapError
+                        (\elements ->
+                            elements
+                                |> Stack.map
+                                    (\_ element ->
+                                        { location = element.index |> N.toInt |> String.fromInt
+                                        , error = element.error
+                                        }
+                                    )
+                                |> Morph.ElementsError
+                        )
+        , toBroad =
+            \arraySized ->
+                arraySized |> ArraySized.map (Morph.toBroad elementMorph)
         }
-    , toNarrow =
-        \arraySized ->
-            arraySized
-                |> ArraySized.minToOn
-                |> ArraySized.andIndexes
-                |> ArraySized.map
-                    (\el ->
-                        el.element
-                            |> Morph.toNarrow elementMorph
-                            |> Result.mapError (\err -> { index = el.index, error = err })
-                    )
-                |> ArraySized.minToNumber
-                |> ArraySized.allOk
-                |> Result.mapError
-                    (\elements ->
-                        elements
-                            |> Stack.map
-                                (\_ element ->
-                                    { location = element.index |> N.toInt |> String.fromInt
-                                    , error = element.error
-                                    }
-                                )
-                            |> Morph.ElementsError
-                    )
-    , toBroad =
-        \arraySized ->
-            arraySized |> ArraySized.map (Morph.toBroad elementMorph)
-    }
 
 
 
@@ -539,14 +538,11 @@ exactlyWith :
     -> MorphRow (ArraySized element range) broadElement
 exactlyWith lengthMorphRow elementMorphRow =
     { description =
-        { inner =
-            Morph.SequenceDescription
-                { early =
-                    lengthMorphRow |> Morph.description
-                , late = elementMorphRow |> Morph.description
-                }
-        , custom = Emptiable.empty
-        }
+        Morph.SequenceDescription
+            { early =
+                lengthMorphRow |> Morph.description
+            , late = elementMorphRow |> Morph.description
+            }
     , toBroad =
         \beforeToBroad ->
             (beforeToBroad |> ArraySized.length)

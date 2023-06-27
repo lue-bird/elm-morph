@@ -771,9 +771,7 @@ partsFinish :
 partsFinish =
     \groupMorphInProgress ->
         { description =
-            { custom = Emptiable.empty
-            , inner = groupMorphInProgress.description |> Morph.PartsDescription
-            }
+            groupMorphInProgress.description |> Morph.PartsDescription
         , toNarrow =
             \broad_ ->
                 broad_

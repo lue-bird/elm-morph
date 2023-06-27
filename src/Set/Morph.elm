@@ -96,49 +96,48 @@ each :
             )
             (Set comparableBeforeBroaden -> Set comparableBroad)
 each elementMorph =
-    { description =
-        { inner = Morph.ElementsDescription (elementMorph |> Morph.description)
-        , custom = Stack.one "all"
-        }
-    , toNarrow =
-        \setBeforeToNarrow ->
-            setBeforeToNarrow
-                |> Set.foldl
-                    (\element { index, collected } ->
-                        { collected =
-                            case element |> Morph.toNarrow elementMorph of
-                                Ok elementValue ->
-                                    collected
-                                        |> Result.map (\collectedSet -> collectedSet |> Set.insert elementValue)
+    Morph.named "all"
+        { description =
+            Morph.ElementsDescription (elementMorph |> Morph.description)
+        , toNarrow =
+            \setBeforeToNarrow ->
+                setBeforeToNarrow
+                    |> Set.foldl
+                        (\element { index, collected } ->
+                            { collected =
+                                case element |> Morph.toNarrow elementMorph of
+                                    Ok elementValue ->
+                                        collected
+                                            |> Result.map (\collectedSet -> collectedSet |> Set.insert elementValue)
 
-                                Err elementError ->
-                                    let
-                                        errorsSoFar =
-                                            case collected of
-                                                Ok _ ->
-                                                    Emptiable.empty
+                                    Err elementError ->
+                                        let
+                                            errorsSoFar =
+                                                case collected of
+                                                    Ok _ ->
+                                                        Emptiable.empty
 
-                                                Err elementsAtIndexes ->
-                                                    elementsAtIndexes |> Emptiable.emptyAdapt (\_ -> Possible)
-                                    in
-                                    errorsSoFar
-                                        |> Stack.onTopLay
-                                            { index = index
-                                            , error = elementError
-                                            }
-                                        |> Err
-                        , index = index - 1
+                                                    Err elementsAtIndexes ->
+                                                        elementsAtIndexes |> Emptiable.emptyAdapt (\_ -> Possible)
+                                        in
+                                        errorsSoFar
+                                            |> Stack.onTopLay
+                                                { index = index
+                                                , error = elementError
+                                                }
+                                            |> Err
+                            , index = index - 1
+                            }
+                        )
+                        { collected = Set.empty |> Ok
+                        , index = (setBeforeToNarrow |> Set.size) - 1
                         }
-                    )
-                    { collected = Set.empty |> Ok
-                    , index = (setBeforeToNarrow |> Set.size) - 1
-                    }
-                |> .collected
-                |> Result.mapError Morph.PartsError
-    , toBroad =
-        \setBeforeToBroad ->
-            setBeforeToBroad |> Set.map (Morph.toBroad elementMorph)
-    }
+                    |> .collected
+                    |> Result.mapError Morph.PartsError
+        , toBroad =
+            \setBeforeToBroad ->
+                setBeforeToBroad |> Set.map (Morph.toBroad elementMorph)
+        }
 
 
 
