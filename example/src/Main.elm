@@ -6,14 +6,14 @@ import Element.Background as UiBackground
 import Element.Border as UiBorder
 import Element.Font as UiFont
 import Element.Input as UiInput
-import Email
+import Email exposing (Email)
 import Emptiable exposing (Emptiable)
 import Forest.Navigate
 import Html exposing (Html)
 import Html.Attributes as HtmlA
 import Html.Events as Html
 import List.Morph
-import Morph
+import Morph exposing (Morph)
 import Stack exposing (Stacked)
 import Stack.Morph
 import Tree exposing (Tree)
@@ -57,8 +57,8 @@ initialStateForInput textInput =
     { textInput = textInput
     , descriptionTreeViewModel =
         Morph.descriptionAndErrorToTree
-            (Email.chars |> Morph.description)
-            (case textInput |> Morph.toNarrow (Email.chars |> Morph.rowFinish |> Morph.over List.Morph.string) of
+            (emailString |> Morph.description)
+            (case textInput |> Morph.toNarrow emailString of
                 Err error ->
                     error
 
@@ -68,6 +68,11 @@ initialStateForInput textInput =
             )
             |> treeToTreeViewModel
     }
+
+
+emailString : Morph Email String
+emailString =
+    Email.chars |> Morph.rowFinish |> Morph.over List.Morph.string
 
 
 treeToTreeViewModel :
@@ -166,7 +171,7 @@ ui =
 
                 -- , Ui.column []
                 --     (List.map treeLinesUi (state.descriptionTreeViewModel |> Forest.map .text))
-                , case state.textInput |> Morph.toNarrow (Email.chars |> Morph.rowFinish |> Morph.over List.Morph.string) of
+                , case state.textInput |> Morph.toNarrow emailString of
                     Err error ->
                         [ Ui.text
                             (Debug.toString error
