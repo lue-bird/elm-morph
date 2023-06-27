@@ -2743,10 +2743,12 @@ next partAccess partChange nextMorphRow =
         , toBroad =
             \groupNarrow ->
                 groupNarrow
-                    |> partAccess
-                    |> toBroad nextMorphRow
-                    |> Rope.appendTo
-                        (groupNarrow |> toBroad groupMorphRowSoFar)
+                    |> toBroad groupMorphRowSoFar
+                    |> Rope.prependTo
+                        (groupNarrow
+                            |> partAccess
+                            |> toBroad nextMorphRow
+                        )
         }
 
 
