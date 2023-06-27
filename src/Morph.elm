@@ -9,7 +9,7 @@ module Morph exposing
     , invert
     , deadEndMap
     , deadEndNever, narrowErrorMap
-    , Error, ErrorWithDeadEnd(..), PartsError, SequenceError, InSequencePlace(..), ChainError, InChainPlace(..), UntilBreakError(..), UntilError, CountAndExactlyElementSequenceError(..)
+    , Error, ErrorWithDeadEnd(..), PartsError, SequenceError, SequencePlace(..), ChainError, ChainPlace(..), UntilBreakError(..), UntilError, CountAndExactlyElementSequenceError(..)
     , description
     , Description(..), ChainDescription, SequenceDescription, UntilDescription
     , descriptionToTree, DescriptionKind(..)
@@ -60,7 +60,7 @@ We call it
 
 ## error
 
-@docs Error, ErrorWithDeadEnd, PartsError, SequenceError, InSequencePlace, ChainError, InChainPlace, UntilBreakError, UntilError, CountAndExactlyElementSequenceError
+@docs Error, ErrorWithDeadEnd, PartsError, SequenceError, SequencePlace, ChainError, ChainPlace, UntilBreakError, UntilError, CountAndExactlyElementSequenceError
 
 
 ## describe
@@ -795,25 +795,25 @@ errorToTree =
                     )
 
 
-inChainPlaceToString : InChainPlace -> String
+inChainPlaceToString : ChainPlace -> String
 inChainPlaceToString =
     \inChainPlace ->
         case inChainPlace of
-            InChainBroad ->
+            ChainPlaceBroad ->
                 "broad"
 
-            InChainNarrow ->
+            ChainPlaceNarrow ->
                 "narrow"
 
 
-inSequencePlaceToString : InSequencePlace -> String
+inSequencePlaceToString : SequencePlace -> String
 inSequencePlaceToString =
     \inChainPlace ->
         case inChainPlace of
-            InSequenceEarly ->
+            SequencePlaceEarly ->
                 "early"
 
-            InSequenceLate ->
+            SequencePlaceLate ->
                 "late"
 
 
@@ -1057,7 +1057,7 @@ descriptionAndErrorToTree description_ error =
                 { kind = DescriptionStructureKind |> DescriptionKind
                 , text = namedDescription.name
                 }
-                [ descriptionAndErrorToTree description_ error ]
+                [ descriptionAndErrorToTree namedDescription.description error ]
 
 
 collapseSequenceDescriptionAndError :
@@ -1066,7 +1066,7 @@ collapseSequenceDescriptionAndError :
     -> List (Tree { text : String, kind : DescriptionOrErrorKind })
 collapseSequenceDescriptionAndError sequenceDescription sequenceError =
     case sequenceError.place of
-        InSequenceEarly ->
+        SequencePlaceEarly ->
             let
                 laterCollapsed : List (Tree { text : String, kind : DescriptionOrErrorKind })
                 laterCollapsed =
@@ -1085,7 +1085,7 @@ collapseSequenceDescriptionAndError sequenceDescription sequenceError =
             descriptionAndErrorToTree sequenceDescription.early sequenceError.error
                 :: laterCollapsed
 
-        InSequenceLate ->
+        SequencePlaceLate ->
             let
                 laterCollapsed : List (Tree { text : String, kind : DescriptionOrErrorKind })
                 laterCollapsed =
@@ -1120,7 +1120,7 @@ collapseChainDescriptionAndError :
     -> List (Tree { text : String, kind : DescriptionOrErrorKind })
 collapseChainDescriptionAndError sequenceDescription sequenceError =
     case sequenceError.place of
-        InChainNarrow ->
+        ChainPlaceNarrow ->
             let
                 broaderCollapsed : List (Tree { text : String, kind : DescriptionOrErrorKind })
                 broaderCollapsed =
@@ -1139,7 +1139,7 @@ collapseChainDescriptionAndError sequenceDescription sequenceError =
             descriptionAndErrorToTree sequenceDescription.narrow sequenceError.error
                 :: broaderCollapsed
 
-        InChainBroad ->
+        ChainPlaceBroad ->
             let
                 broaderCollapsed : List (Tree { text : String, kind : DescriptionOrErrorKind })
                 broaderCollapsed =
@@ -1265,12 +1265,12 @@ type CountAndExactlyElementSequenceError error
 [`MorphRow`](#MorphRow)s following one after the other
 like with [`|> grab`](#grab), [`|> match`](#match) etc.
 
-Since this is a sequence, failure can happen [at the first section or after that](#InSequencePlace)
+Since this is a sequence, failure can happen [at the first section or after that](#SequencePlace)
 
 -}
 type alias SequenceError error =
     RecordWithoutConstructorFunction
-        { place : InSequencePlace
+        { place : SequencePlace
         , error : error
         , startDownInBroadList : Int
         }
@@ -1278,29 +1278,29 @@ type alias SequenceError error =
 
 {-| At the first section (early) or after that (late) in the sequence?
 -}
-type InSequencePlace
-    = InSequenceEarly
-    | InSequenceLate
+type SequencePlace
+    = SequencePlaceEarly
+    | SequencePlaceLate
 
 
 {-| [Error](#Error) specific to
 [`narrow |> Morph.overRow broad`](#overRow) and [`narrow |> Morph.over broad`](#over)
 
-Since this is a sequence, failure can happen [at the broader transformation or the narrower transformation](#InChainPlace)
+Since this is a sequence, failure can happen [at the broader transformation or the narrower transformation](#ChainPlace)
 
 -}
 type alias ChainError error =
     RecordWithoutConstructorFunction
-        { place : InChainPlace
+        { place : ChainPlace
         , error : error
         }
 
 
 {-| The more narrow or broad morph in an `narrow |> Morph.over... broad` chain?
 -}
-type InChainPlace
-    = InChainBroad
-    | InChainNarrow
+type ChainPlace
+    = ChainPlaceBroad
+    | ChainPlaceNarrow
 
 
 {-| [`until`](#until) and [`untilFold`](#untilFold) specific [`Error`])#Error
@@ -2134,12 +2134,12 @@ over morphBroad =
             \beforeToNarrow ->
                 beforeToNarrow
                     |> toNarrow morphBroad
-                    |> Result.mapError (\error -> ChainError { place = InChainBroad, error = error })
+                    |> Result.mapError (\error -> ChainError { place = ChainPlaceBroad, error = error })
                     |> Result.andThen
                         (\beforeNarrowNarrow ->
                             beforeNarrowNarrow
                                 |> toNarrow narrowMorph
-                                |> Result.mapError (\error -> ChainError { place = InChainNarrow, error = error })
+                                |> Result.mapError (\error -> ChainError { place = ChainPlaceNarrow, error = error })
                         )
         }
 
@@ -2719,7 +2719,7 @@ next partAccess partChange nextMorphRow =
                 case broad_ |> toNarrow groupMorphRowSoFar of
                     Err earlyError ->
                         SequenceError
-                            { place = InSequenceEarly
+                            { place = SequencePlaceEarly
                             , error = earlyError
                             , startDownInBroadList = broad_ |> List.length
                             }
@@ -2735,7 +2735,7 @@ next partAccess partChange nextMorphRow =
 
                             Err lateError ->
                                 SequenceError
-                                    { place = InSequenceLate
+                                    { place = SequencePlaceLate
                                     , error = lateError
                                     , startDownInBroadList = result.broad |> List.length
                                     }
@@ -2856,12 +2856,12 @@ overRow morphRowBeforeMorph =
             \broad_ ->
                 case broad_ |> toNarrow morphRowBeforeMorph of
                     Err beforeError ->
-                        ChainError { place = InChainBroad, error = beforeError } |> Err
+                        ChainError { place = ChainPlaceBroad, error = beforeError } |> Err
 
                     Ok beforeToNarrow ->
                         case beforeToNarrow.narrow |> toNarrow narrowMorph of
                             Err error ->
-                                ChainError { place = InChainNarrow, error = error } |> Err
+                                ChainError { place = ChainPlaceNarrow, error = error } |> Err
 
                             Ok ok ->
                                 { narrow = ok

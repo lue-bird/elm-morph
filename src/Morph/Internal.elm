@@ -31,14 +31,14 @@ inSequenceErrorWith { startsDown, error } =
     case startsDown |> Stack.removeTop of
         Emptiable.Empty _ ->
             Morph.SequenceError
-                { place = Morph.InSequenceEarly
+                { place = Morph.SequencePlaceEarly
                 , startDownInBroadList = startsDown |> Stack.top
                 , error = error
                 }
 
         Emptiable.Filled startsDownStacked ->
             Morph.SequenceError
-                { place = Morph.InSequenceLate
+                { place = Morph.SequencePlaceLate
                 , startDownInBroadList = startsDown |> Stack.top
                 , error =
                     inSequenceErrorWith
