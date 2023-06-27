@@ -12,6 +12,7 @@ import Forest.Navigate
 import Html exposing (Html)
 import Html.Attributes as HtmlA
 import Html.Events as Html
+import List.Morph
 import Morph
 import Stack exposing (Stacked)
 import Stack.Morph
@@ -25,7 +26,7 @@ type alias InitialJsInfo =
 
 type alias State =
     { textInput : String
-    , descriptionTreeViewModel : TreeUi.State Morph.LabelKind
+    , descriptionTreeViewModel : TreeUi.State Morph.DescriptionOrErrorKind
     }
 
 
@@ -57,25 +58,29 @@ initialStateForInput textInput =
     , descriptionTreeViewModel =
         Morph.descriptionAndErrorToTree
             (Email.chars |> Morph.description)
-            (case textInput |> Morph.toNarrow (Email.chars |> Morph.rowFinish |> Morph.over Stack.Morph.string) of
+            (case textInput |> Morph.toNarrow (Email.chars |> Morph.rowFinish |> Morph.over List.Morph.string) of
                 Err error ->
-                    Just error
+                    error
 
                 -- Just (Morph.DeadEnd "email is error")
                 Ok _ ->
-                    Just (Morph.DeadEnd "email is ok")
+                    Morph.DeadEnd "email is ok"
             )
             |> treeToTreeViewModel
     }
 
 
-treeToTreeViewModel : Tree Morph.Label -> TreeUi.State Morph.LabelKind
+treeToTreeViewModel :
+    Tree { text : String, kind : Morph.DescriptionOrErrorKind }
+    -> TreeUi.State Morph.DescriptionOrErrorKind
 treeToTreeViewModel =
     \tree ->
         tree |> treeToTreeViewNode |> List.singleton
 
 
-treeToTreeViewNode : Tree Morph.Label -> Tree (TreeUi.Label Morph.LabelKind)
+treeToTreeViewNode :
+    Tree { text : String, kind : Morph.DescriptionOrErrorKind }
+    -> Tree (TreeUi.Label Morph.DescriptionOrErrorKind)
 treeToTreeViewNode tree =
     let
         label =
@@ -90,7 +95,7 @@ treeToTreeViewNode tree =
         , open =
             if
                 (childrenViewNodes |> List.any (\child -> (child |> Tree.label |> .open) == TreeUi.Open))
-                    || (label.kind == Morph.LabelError)
+                    || (label.kind == Morph.ErrorKind)
             then
                 TreeUi.Open
 
@@ -161,7 +166,7 @@ ui =
 
                 -- , Ui.column []
                 --     (List.map treeLinesUi (state.descriptionTreeViewModel |> Forest.map .text))
-                , case state.textInput |> Morph.toNarrow (Email.chars |> Morph.rowFinish |> Morph.over Stack.Morph.string) of
+                , case state.textInput |> Morph.toNarrow (Email.chars |> Morph.rowFinish |> Morph.over List.Morph.string) of
                     Err error ->
                         [ Ui.text
                             (Debug.toString error
@@ -193,17 +198,17 @@ eachSide0 =
     { left = 0, right = 0, top = 0, bottom = 0 }
 
 
-toStyle : Morph.LabelKind -> TreeUi.Style
+toStyle : Morph.DescriptionOrErrorKind -> TreeUi.Style
 toStyle =
     \styleKind ->
         case styleKind of
-            Morph.LabelDescriptionCustom ->
+            Morph.DescriptionKind Morph.DescriptionNameKind ->
                 { attributes = [], icon = Just (TreeUi.iconAlways "fa fa-info") }
 
-            Morph.LabelDescriptionStructure ->
+            Morph.DescriptionKind Morph.DescriptionStructureKind ->
                 { attributes = [], icon = Just (TreeUi.iconAlways "fa fa-cog") }
 
-            Morph.LabelError ->
+            Morph.ErrorKind ->
                 { attributes = [], icon = Just (TreeUi.iconAlways "fa fa-exclamation") }
 
 
