@@ -648,6 +648,12 @@ and return them as an [`ArraySized`](https://package.elm-lang.org/packages/lue-b
     "123abc" |> Text.toNarrow (atLeast n0 AToZ.char)
     --> Ok []
 
+If you want a to morph a `List` instead of an `ArraySized ... (Min (On N0))`,
+you might as well use [`Morph.whilePossible`](Morph#whilePossible) instead of
+
+    ArraySized.toList
+        |> Morph.overRow (ArraySized.Morph.atLeast n0)
+
 
 ### `atLeast n1`
 
@@ -675,13 +681,14 @@ and return them as an [`ArraySized`](https://package.elm-lang.org/packages/lue-b
 ### example: interspersed separators
 
     import Stack
-    import Morph exposing (separatedBy, atLeast, one)
+    import Morph
+    import ArraySized.Morph exposing (atLeast)
     import String.Morph as Text exposing (text)
     import Char.Morph as Char
 
 
     tag =
-        atLeast n0 (Morph.AToZ.caseAnyLower |> one)
+        atLeast n0 (Morph.AToZ.caseAnyLower |> Morph.one)
 
     tags =
         Morph.succeed Stack.onTopLay
@@ -701,12 +708,11 @@ and return them as an [`ArraySized`](https://package.elm-lang.org/packages/lue-b
     "a,bc,def"
         |> Text.toNarrow tags
     --> Ok
-    -->     { first = [ 'a' ]
-    -->     , afterFirst =
-    -->         [ { separator = (), part = [ 'b', 'c' ] }
-    -->         , { separator = (), part = [ 'd', 'e', 'f' ] }
+    -->     (Stack.topBelow [ 'a' ]
+    -->         [ [ 'b', 'c' ]
+    -->         , [ 'd', 'e', 'f' ]
     -->         ]
-    -->     }
+    -->     )
 
     ",a,,"
         |> Text.toNarrow tags
@@ -722,13 +728,13 @@ and return them as an [`ArraySized`](https://package.elm-lang.org/packages/lue-b
     -- an empty input text gives a single element from an empty string
     ""
         |> Text.toNarrow tags
-    --> Ok (topDown [] [])
+    --> Ok (Stack.topBelow [] [])
 
 
 ### anti-example: parsing infinitely
 
     Morph.succeed ...
-        |> grab (atLeast n0 (Morph.keep |> Morph.one))
+        |> grab ... (atLeast n0 (Morph.keep |> Morph.one))
         |> grab ...
 
 would only parse the first part until the end

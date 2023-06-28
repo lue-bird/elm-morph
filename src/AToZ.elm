@@ -104,36 +104,33 @@ caseBroad caseSeed =
 
 > ℹ️ Equivalent regular expression: `[a-zA-Z]+`
 
-    import Morph exposing (atLeast)
+    import Morph
     import Morph.Error
-    import String.Morph as Text
+    import List.Morph
 
     -- match many letters, case insensitive
     "aBcEY"
         |> Morph.toNarrow
-            (ArraySized.Morph.toString
-                |> Morph.overRow (atLeast n0 (AToZ.char |> Morph.one))
+            (Morph.whilePossible (AToZ.char |> Morph.one)
                 |> Morph.rowFinish
-                |> Morph.over Stack.Morph.string
+                |> Morph.over List.Morph.string
             )
     --> Ok "aBcEY"
 
     "π123abc"
         |> Morph.toNarrow
-            (ArraySized.Morph.toString
-                |> Morph.overRow (atLeast n0 (AToZ.char |> Morph.one))
+            (Morph.whilePossible (AToZ.char |> Morph.one)
                 |> Morph.rowFinish
-                |> Morph.over Stack.Morph.string
+                |> Morph.over List.Morph.string
             )
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting at least 1 letters [a-zA-Z]+. I got stuck when I got 'π'."
 
     "abc-efg"
         |> Morph.toNarrow
-            (ArraySized.Morph.toString
-                |> Morph.overRow (atLeast n0 (AToZ.char |> Morph.one))
+            (Morph.whilePossible (AToZ.char |> Morph.one)
                 |> Morph.rowFinish
-                |> Morph.over Stack.Morph.string
+                |> Morph.over List.Morph.string
             )
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting at least 1 letters [a-zA-Z]+. I got stuck when I got '-'."

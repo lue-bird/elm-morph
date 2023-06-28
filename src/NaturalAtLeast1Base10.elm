@@ -31,7 +31,7 @@ import Array.Linear
 import ArraySized
 import ArraySized.Morph
 import Bit exposing (Bit)
-import Linear
+import Linear exposing (Direction(..))
 import List.Linear
 import Morph exposing (MorphRow, grab, one, oneToOne)
 import N exposing (Add1, In, N, N0, N1, N9, On, Up0, Up9, n0, n1, n10, n2, n9)
@@ -41,7 +41,7 @@ import Natural
 
 type alias NaturalAtLeast1Base10 =
     { first : N (In N1 N9)
-    , afterFirst : Array (N (In N0 N9))
+    , afterFirst : List (N (In N0 N9))
     }
 
 
@@ -51,7 +51,7 @@ toBase2 =
         let
             base2Digits =
                 (naturalAtLeast1Base10.first |> N.minToOn |> N.minTo n0 |> N.minToNumber)
-                    :: (naturalAtLeast1Base10.afterFirst |> Array.toList)
+                    :: naturalAtLeast1Base10.afterFirst
                     |> digitsToBase2
         in
         base2Digits
@@ -159,7 +159,7 @@ add toAdd =
                     |> N.add (toAdd.first |> digitToUp ( n1, n9 ))
 
             digitsAfterFirstSum :
-                { inRange : Array (N (In N0 N9))
+                { inRange : List (N (In N0 N9))
                 , overflow : N (In (On N0) (On N1))
                 }
             digitsAfterFirstSum =
@@ -169,8 +169,8 @@ add toAdd =
             Ok firstDigitSumAtLeast10 ->
                 { first = n1 |> N.minTo n1 |> N.maxTo n9 |> N.inToNumber
                 , afterFirst =
-                    Array.Linear.insert ( Linear.Up, 0 )
-                        (\() -> firstDigitSumAtLeast10 |> N.remainderBy n10 |> N.inToNumber)
+                    (::)
+                        (firstDigitSumAtLeast10 |> N.remainderBy n10 |> N.inToNumber)
                         digitsAfterFirstSum.inRange
                 }
 
@@ -181,11 +181,11 @@ add toAdd =
 
 
 addDigits :
-    Array (N (In N0 N9))
+    List (N (In N0 N9))
     ->
-        (Array (N (In N0 N9))
+        (List (N (In N0 N9))
          ->
-            { inRange : Array (N (In N0 N9))
+            { inRange : List (N (In N0 N9))
             , overflow : N (In (On N0) (On N1))
             }
         )
@@ -195,27 +195,35 @@ addDigits toAdd =
             lengthMaximum : Int
             lengthMaximum =
                 Basics.max
-                    (digits |> Array.length)
-                    (toAdd |> Array.length)
+                    (digits |> List.length)
+                    (toAdd |> List.length)
 
-            addResult : { mapped : Array (N (In N0 N9)), folded : N (In (On N0) (On N1)) }
+            toAddPadded =
+                toAdd
+                    |> List.Linear.padToAtLeast Down
+                        lengthMaximum
+                        (\l -> List.repeat l (n0 |> N.maxTo n9 |> N.inToNumber))
+
+            digitsPadded =
+                digits
+                    |> List.Linear.padToAtLeast Down
+                        lengthMaximum
+                        (\l -> List.repeat l (n0 |> N.maxTo n9 |> N.inToNumber))
+
+            addResult : { mapped : List (N (In N0 N9)), folded : N (In (On N0) (On N1)) }
             addResult =
-                Array.initialize lengthMaximum identity
-                    |> Array.Linear.mapFoldFrom (n0 |> N.maxTo n1)
+                List.map2 Tuple.pair digitsPadded toAddPadded
+                    |> List.Linear.mapFoldFrom (n0 |> N.maxTo n1)
                         Linear.Down
                         (\step ->
                             let
-                                digit : Array (N (In N0 N9)) -> N (In (Up0 minX_) (Up9 maxX_))
-                                digit =
-                                    \digitArray ->
-                                        case digitArray |> Array.Linear.element ( Linear.Up, step.element ) of
-                                            Nothing ->
-                                                n0 |> N.maxTo n9
+                                ( digit, digitToAdd ) =
+                                    step.element
 
-                                            Just digitFound ->
-                                                digitFound |> digitToUp ( n0, n9 )
+                                stepSum =
+                                    step.folded |> N.add (digit |> digitToUp ( n0, n9 )) |> N.add (digitToAdd |> digitToUp ( n0, n9 ))
                             in
-                            case step.folded |> N.add (digits |> digit) |> N.add (toAdd |> digit) |> N.isAtLeast n10 of
+                            case stepSum |> N.isAtLeast n10 of
                                 Ok digitSumAtLeast10 ->
                                     { element = digitSumAtLeast10 |> N.remainderBy n10 |> N.inToNumber
                                     , folded = n1 |> N.minTo n0
@@ -247,10 +255,10 @@ fromBase2 =
                 )
 
 
-fromDigit : N (In (On (Add1 maxX_)) (N.Up maxTo9_ N.To N9)) -> { first : N (In N1 N9), afterFirst : Array (N (In N0 N9)) }
+fromDigit : N (In (On (Add1 maxX_)) (N.Up maxTo9_ N.To N9)) -> NaturalAtLeast1Base10
 fromDigit digit =
     { first = digit |> digitToNumber ( n1, n9 )
-    , afterFirst = Array.empty
+    , afterFirst = []
     }
 
 
@@ -270,8 +278,8 @@ fromIntPositive =
         in
         { first = int |> digitFor10Exponent highest10Exponent |> N.toIn ( n1, n9 ) |> N.inToNumber
         , afterFirst =
-            Array.initialize highest10Exponent identity
-                |> Array.map
+            List.range 0 highest10Exponent
+                |> List.map
                     (\n10Exponent ->
                         int |> digitFor10Exponent n10Exponent |> N.inToNumber
                     )
@@ -296,13 +304,10 @@ chars =
                     |> one
                 )
             |> grab .afterFirst
-                (ArraySized.Morph.toArray
-                    |> Morph.overRow
-                        (ArraySized.Morph.atLeast n0
-                            (oneToOne N.inToNumber N.inToOn
-                                |> Morph.over N.Morph.char
-                                |> one
-                            )
-                        )
+                (Morph.whilePossible
+                    (oneToOne N.inToNumber N.inToOn
+                        |> Morph.over N.Morph.char
+                        |> one
+                    )
                 )
         )

@@ -20,15 +20,12 @@ module DecimalOrException exposing
 -}
 
 import Decimal exposing (Decimal, Fraction)
-import Emptiable exposing (Emptiable)
-import Linear exposing (Direction(..))
 import Morph exposing (MorphOrError)
 import N exposing (In, N, N0, N9, n0, n1, n9)
 import NaturalAtLeast1.Internal
 import NaturalAtLeast1Base10
-import Possibly exposing (Possibly)
 import Sign exposing (Sign(..))
-import Stack exposing (Stacked)
+import Stack
 import Value
 
 
@@ -255,34 +252,34 @@ signedAbsoluteToFloat =
 fractionToFloat : Fraction -> Float
 fractionToFloat =
     \fraction_ ->
-        Stack.one (fraction_.last |> N.inToOn |> N.minTo n0 |> N.inToNumber)
-            |> Stack.attach Down fraction_.beforeLast
-            |> Stack.map
+        fraction_.beforeLast
+            ++ [ fraction_.last |> N.inToOn |> N.minTo n0 |> N.inToNumber ]
+            |> List.indexedMap
                 (\decimal digit ->
                     (digit |> N.toFloat)
-                        * (10 ^ -(1 + (decimal.index |> Basics.toFloat)))
+                        * (10 ^ -(1 + (decimal |> Basics.toFloat)))
                 )
-            |> Stack.sum
+            |> List.sum
 
 
 floatToFraction : Float -> Fraction
 floatToFraction =
     \float_ ->
         case float_ |> floatFractionToBase10 of
-            Emptiable.Empty _ ->
-                { beforeLast = Emptiable.empty, last = n1 |> N.maxTo n9 |> N.inToNumber }
+            [] ->
+                { beforeLast = [], last = n1 |> N.maxTo n9 |> N.inToNumber }
 
-            Emptiable.Filled stacked ->
+            first :: afterFirst ->
                 let
                     digitsReverse =
-                        stacked |> Emptiable.filled |> Stack.reverse
+                        Stack.topBelow first afterFirst |> Stack.reverse
                 in
-                { beforeLast = digitsReverse |> Stack.removeTop |> Stack.reverse
+                { beforeLast = digitsReverse |> Stack.removeTop |> Stack.toList |> List.reverse
                 , last = digitsReverse |> Stack.top |> N.inToOn |> N.toIn ( n1, n9 ) |> N.inToNumber
                 }
 
 
-floatFractionToBase10 : Float -> Emptiable (Stacked (N (In N0 N9))) Possibly
+floatFractionToBase10 : Float -> List (N (In N0 N9))
 floatFractionToBase10 =
     \float_ ->
         let
@@ -297,7 +294,7 @@ floatFractionToBase10 =
                 identity
 
             Ok decimal ->
-                Stack.onTopLay (decimal |> N.inToNumber)
+                (::) (decimal |> N.inToNumber)
         )
             ((floatShifted1Decimal - (decimalInt |> Basics.toFloat))
                 |> floatFractionToBase10

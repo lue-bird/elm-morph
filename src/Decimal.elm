@@ -15,15 +15,12 @@ without the possibility of [exceptions](DecimalOrException#Exception)
 
 -}
 
-import Emptiable exposing (Emptiable)
 import Integer exposing (Integer)
 import N exposing (In, N, N0, N1, N9)
 import Natural
 import NaturalAtLeast1
-import Possibly exposing (Possibly)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Sign exposing (Sign(..))
-import Stack exposing (Stacked)
 
 
 {-| A decimal number that can have a floating point
@@ -47,7 +44,7 @@ type Decimal
 -}
 type alias Fraction =
     RecordWithoutConstructorFunction
-        { beforeLast : Emptiable (Stacked (N (In N0 N9))) Possibly
+        { beforeLast : List (N (In N0 N9))
         , last : N (In N1 N9)
         }
 

@@ -14,17 +14,14 @@ module Decimal.Morph exposing
 
 -}
 
-import ArraySized
-import ArraySized.Morph
 import Decimal exposing (Decimal(..), Fraction, SignedAbsolute(..))
 import DecimalOrException exposing (OrException)
 import Maybe.Morph
 import Morph exposing (Morph, MorphRow, grab, match, one, oneToOne)
-import N exposing (n0, n1, n9)
+import N exposing (n1, n9)
 import N.Morph
 import NaturalAtLeast1.Internal
 import Sign.Morph
-import Stack.Morph
 import String.Morph
 import Value
 
@@ -111,9 +108,9 @@ chars =
             |> Morph.tryRow (\() -> N0) (String.Morph.only "0.")
             |> Morph.choiceFinish
             |> match
-                (Morph.broad (ArraySized.repeat () n0)
+                (Morph.broad []
                     |> Morph.overRow
-                        (ArraySized.Morph.atLeast n0
+                        (Morph.whilePossible
                             (String.Morph.only "0")
                         )
                 )
@@ -179,16 +176,11 @@ fractionChars =
                 { beforeLast = beforeLast, last = last }
             )
             |> Morph.grab .beforeLast
-                (Stack.Morph.list
-                    |> Morph.over ArraySized.Morph.toList
-                    |> Morph.overRow
-                        (ArraySized.Morph.atLeast n0
-                            (oneToOne N.inToNumber N.inToOn
-                                |> Morph.over (N.Morph.in_ ( n0, n9 ))
-                                |> Morph.over N.Morph.char
-                                |> one
-                            )
-                        )
+                (Morph.whilePossible
+                    (oneToOne N.inToNumber N.inToOn
+                        |> Morph.over N.Morph.char
+                        |> one
+                    )
                 )
             |> Morph.grab .last
                 (oneToOne N.inToNumber N.inToOn

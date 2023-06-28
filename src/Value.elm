@@ -196,7 +196,7 @@ type alias Tagged tag =
 {-| The [structure](#Composed) of a record which can hold multiple [tagged field](#Tagged) [value](#Value)s
 -}
 type alias Record tag =
-    Emptiable (Stacked (Tagged tag)) Possibly
+    List (Tagged tag)
 
 
 {-| EIther [`Index`](#Index) or [`Name`](#Name)
@@ -338,7 +338,7 @@ composedTagMap tagChange =
 
             Record fields ->
                 fields
-                    |> Stack.map (\_ -> taggedAnyTagMap tagChange)
+                    |> List.map (taggedAnyTagMap tagChange)
                     |> Record
 
             Variant tagged ->
@@ -585,7 +585,7 @@ group :
     groupNarrowAssemble
     -> GroupMorphEmptiable Possibly groupNarrow_ groupNarrowAssemble
 group groupNarrowAssemble =
-    Morph.parts ( groupNarrowAssemble, Emptiable.empty )
+    Morph.parts ( groupNarrowAssemble, [] )
 
 
 {-| possibly incomplete step from and to a [`Record`](Value#Record)
@@ -667,7 +667,7 @@ part ( accessFieldValue, fieldName ) fieldValueMorph =
                 in
                 wholeNarrow
                     |> groupMorphSoFar.toBroad
-                    |> Stack.onTopLay fieldBroad
+                    |> (::) fieldBroad
         }
 
 
@@ -675,11 +675,11 @@ partValueNarrow :
     IndexAndName
     -> Morph fieldValueNarrow
     ->
-        (Emptiable (Stacked (Tagged IndexOrName)) possiblyOrNever
+        (List (Tagged IndexOrName)
          -> Result PartsError (fieldValueNarrow -> groupNarrowFurther)
         )
     ->
-        (Emptiable (Stacked (Tagged IndexOrName)) possiblyOrNever
+        (List (Tagged IndexOrName)
          -> Result PartsError groupNarrowFurther
         )
 partValueNarrow tag fieldValueMorph groupSoFarNarrow =
@@ -703,7 +703,7 @@ partValueNarrow tag fieldValueMorph groupSoFarNarrow =
             wholeAssemblyResult =
                 groupBroad |> groupSoFarNarrow
         in
-        case groupBroad |> Stack.toList |> List.filter (.tag >> matches) of
+        case groupBroad |> List.filter (.tag >> matches) of
             partBroad :: _ ->
                 case partBroad.value |> Morph.toNarrow fieldValueMorph of
                     Ok partNarrow ->

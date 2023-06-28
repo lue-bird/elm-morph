@@ -32,13 +32,13 @@ import Array
 import Decimal exposing (Decimal)
 import Decimal.Morph
 import DecimalOrException
-import Emptiable exposing (Emptiable)
+import Emptiable
 import Json.Decode
 import Json.Encode
 import Morph exposing (Morph, MorphIndependently, oneToOne)
 import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
-import Stack exposing (Stacked)
+import Stack
 import Tree
 import Value exposing (AtomOrComposed(..))
 
@@ -85,7 +85,7 @@ type Atom
 -}
 type Composed tag
     = Array (Array.Array (Json tag))
-    | Object (Emptiable (Stacked (Tagged tag)) Possibly)
+    | Object (List (Tagged tag))
 
 
 {-| tag-[value](#Json) pair used to represent a field
@@ -282,13 +282,12 @@ composedJsValueMagicEncode () =
 
             Object objectAny ->
                 objectAny
-                    |> Stack.map
-                        (\_ field ->
+                    |> List.map
+                        (\field ->
                             ( field.tag
                             , field.value |> jsValueMagicEncode ()
                             )
                         )
-                    |> Stack.toList
                     |> Json.Encode.object
 
 
@@ -306,7 +305,6 @@ jsonComposedDecoder =
                                 keyValuePairs
                                     |> List.map
                                         (\( tag, v ) -> { tag = tag, value = v })
-                                    |> Stack.fromList
                             )
                     )
                 ]
@@ -404,8 +402,8 @@ composedToValue =
 
             Object object ->
                 object
-                    |> Stack.map
-                        (\_ tagged ->
+                    |> List.map
+                        (\tagged ->
                             { tag = tagged.tag
                             , value = tagged.value |> toValue
                             }
@@ -425,8 +423,8 @@ composedFromValue =
 
             Value.Record record ->
                 record
-                    |> Stack.map
-                        (\_ field ->
+                    |> List.map
+                        (\field ->
                             { tag = field.tag
                             , value = field.value |> fromValueImplementation
                             }
@@ -435,7 +433,7 @@ composedFromValue =
 
             Value.Variant variant ->
                 { tag = variant.tag, value = variant.value |> fromValueImplementation }
-                    |> Stack.one
+                    |> List.singleton
                     |> Object
 
 
@@ -488,7 +486,7 @@ composedTagMap tagChange =
                 array |> Array.map (tagMap tagChange) |> Array
 
             Object object ->
-                object |> Stack.map (\_ -> taggedTagMap tagChange) |> Object
+                object |> List.map (taggedTagMap tagChange) |> Object
 
 
 taggedTagMap : (tag -> tagMapped) -> (Tagged tag -> Tagged tagMapped)

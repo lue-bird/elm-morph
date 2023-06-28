@@ -39,7 +39,7 @@
         "lue-bird/elm-bits": "9.0.0 <= v < 10.0.0",
         "lue-bird/elm-bounded-nat": "34.0.0 <= v < 35.0.0",
         "lue-bird/elm-emptiness-typed": "9.2.1 <= v < 10.0.0",
-        "lue-bird/elm-linear-direction": "11.0.0 <= v < 12.0.0",
+        "lue-bird/elm-linear-direction": "11.2.0 <= v < 12.0.0",
         "lue-bird/elm-no-record-type-alias-constructor-function": "1.0.0 <= v < 2.0.0",
         "lue-bird/elm-partial-or-complete": "1.0.1 <= v < 2.0.0",
         "lue-bird/elm-typesafe-array": "33.1.0 <= v < 34.0.0",

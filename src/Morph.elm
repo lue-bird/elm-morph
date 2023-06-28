@@ -2446,10 +2446,11 @@ type alias MorphText narrow =
     import Char.Morph as Char
     import String.Morph as Text exposing (number)
     import Morph.Error
+    -- from lue-bird/elm-no-record-type-alias-constructor-function
+    import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 
     type alias Point =
-        -- makes `Point` function unavailable:
-        -- https://dark.elm.dmy.fr/packages/lue-bird/elm-no-record-type-alias-constructor-function/latest/
+        -- makes `Point` constructor function unavailable
         RecordWithoutConstructorFunction
             { x : Float
             , y : Float
@@ -2465,30 +2466,28 @@ type alias MorphText narrow =
 
     point : MorphRow Point Char
     point =
-        Morph.named "point"
-            (Morph.succeed (\x y -> { x = x, y = y })
-                |> match (String.Morph.only "(")
-                |> match
-                    (broad (ArraySIzed.one ())
-                        |> Morph.overRow (atLeast n0 (String.Morph.only " "))
-                    )
-                |> grab number
-                |> match
-                    (broad ArraySIzed.empty
-                        |> Morph.overRow (atLeast n0 (String.Morph.only " "))
-                    )
-                |> match (String.Morph.only ",")
-                |> match
-                    (broad (ArraySIzed.one ())
-                        |> Morph.overRow (atLeast n0 (String.Morph.only " "))
-                    )
-                |> grab .x Number.Morph.text
-                |> match
-                    (broad (ArraySIzed.one ())
-                        |> Morph.overRow (atLeast n0 (String.Morph.only " "))
-                    )
-                |> match (String.Morph.only ")")
-            )
+        Morph.succeed (\x y -> { x = x, y = y })
+            |> match (String.Morph.only "(")
+            |> match
+                (broad [ () ]
+                    |> Morph.overRow (Morph.whilePossible (String.Morph.only " "))
+                )
+            |> grab .x Decimal.Morph.chars
+            |> match
+                (broad []
+                    |> Morph.overRow (Morph.whilePossible (String.Morph.only " "))
+                )
+            |> match (String.Morph.only ",")
+            |> match
+                (broad [ () ]
+                    |> Morph.overRow (Morph.whilePossible (String.Morph.only " "))
+                )
+            |> grab .y Decimal.Morph.chars
+            |> match
+                (broad [ () ]
+                    |> Morph.overRow (Morph.whilePossible (String.Morph.only " "))
+                )
+            |> match (String.Morph.only ")")
 
     -- we can get a nice error message if it fails
     "(2.71, x)"
@@ -2651,10 +2650,10 @@ then [grabbing (taking)](#grab) and [matching (dropping/skipping)](#match) what 
 
 ### example: infix-separated elements
 
-    Morph.succeed (\first separatedElements -> { first = first, separatedElements = separatedElements })
-        |> grab .first element
-        |> grab .separatedElements
-            (ArraySized.Morph.atLeast n0
+    Morph.succeed Stack.onTopLay
+        |> grab Stack.top element
+        |> grab (Stack.removeTop >> Stack.toList)
+            (ArraySized.Morph.whilePossible
                 (Morph.succeed (\separator element -> { element = element, separator = separator })
                     |> grab .separator separator
                     |> grab .element element
@@ -2906,22 +2905,20 @@ You might think: Why not use
 
     decoderNameSubject : MorphRow String Char expectationCustom
     decoderNameSubject =
-        Morph.succeed (\subject -> subject)
-            |> grab (\subject -> subject)
-                (atLeast n0 (Morph.keep |> Morph.one))
+        Morph.whilePossible (Morph.keep |> Morph.one)
             |> match (String.Morph.only "Decoder")
             |> match Morph.end
 
 Problem is: This will never (Morph.)succeed.
-`atLeast n0 (Morph.keep |> Morph.one)` always goes on.
-We never reach the necessary [`match`](#match)ped things.
+`whilePossible (Morph.keep |> Morph.one)` always goes on.
+We never reach the necessary [`match`](#match)ed sections.
 
 -}
 before :
     { end : MorphRow () broadElement
     , element : MorphRow goOnElement broadElement
     }
-    -> MorphRow (Emptiable (Stacked goOnElement) Possibly) broadElement
+    -> MorphRow (List goOnElement) broadElement
 before untilStep =
     until
         { commit =
@@ -3108,7 +3105,7 @@ until :
         Morph
             commitResult
             { end : endElement
-            , before : Emptiable (Stacked element) Possibly
+            , before : List element
             }
     , end : MorphRow endElement broadElement
     , element : MorphRow element broadElement
@@ -3121,9 +3118,15 @@ until config =
                 |> over
                     (oneToOne
                         (\beforeAndEnd ->
-                            { beforeAndEnd | before = beforeAndEnd.before |> Stack.reverse }
+                            { end = beforeAndEnd.end
+                            , before = beforeAndEnd.before |> Stack.toList |> List.reverse
+                            }
                         )
-                        identity
+                        (\beforeAndEnd ->
+                            { end = beforeAndEnd.end
+                            , before = beforeAndEnd.before |> Stack.fromList
+                            }
+                        )
                     )
         , element = \_ -> config.element
         , end = config.end
@@ -3257,7 +3260,7 @@ whilePossible element =
         }
 
 
-{-| Keep going until an element fails, just like [`atLeast n0`](ArraySized-Morph#atLeast).
+{-| Keep going until an element fails, just like [`whilePossible`](#whilePossible)/[`atLeast n0`](ArraySized-Morph#atLeast).
 In addition, [`whilePossibleFold`](#whilePossibleFold) carries accumulated status information
 to the next element morph where you can decide how to proceed.
 
