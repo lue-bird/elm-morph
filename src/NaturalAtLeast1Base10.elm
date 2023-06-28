@@ -26,10 +26,7 @@ module NaturalAtLeast1Base10 exposing
 
 -}
 
-import Array exposing (Array)
-import Array.Linear
 import ArraySized
-import ArraySized.Morph
 import Bit exposing (Bit)
 import Linear exposing (Direction(..))
 import List.Linear
@@ -37,12 +34,14 @@ import Morph exposing (MorphRow, grab, one, oneToOne)
 import N exposing (Add1, In, N, N0, N1, N9, On, Up0, Up9, n0, n1, n10, n2, n9)
 import N.Morph
 import Natural
+import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 
 
 type alias NaturalAtLeast1Base10 =
-    { first : N (In N1 N9)
-    , afterFirst : List (N (In N0 N9))
-    }
+    RecordWithoutConstructorFunction
+        { first : N (In N1 N9)
+        , afterFirst : List (N (In N0 N9))
+        }
 
 
 toBase2 : NaturalAtLeast1Base10 -> Natural.AtLeast1
@@ -169,9 +168,8 @@ add toAdd =
             Ok firstDigitSumAtLeast10 ->
                 { first = n1 |> N.minTo n1 |> N.maxTo n9 |> N.inToNumber
                 , afterFirst =
-                    (::)
-                        (firstDigitSumAtLeast10 |> N.remainderBy n10 |> N.inToNumber)
-                        digitsAfterFirstSum.inRange
+                    (firstDigitSumAtLeast10 |> N.remainderBy n10 |> N.inToNumber)
+                        :: digitsAfterFirstSum.inRange
                 }
 
             Err firstDigitSumAtMost9 ->
