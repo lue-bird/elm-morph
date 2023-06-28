@@ -4053,36 +4053,37 @@ variantsFinish =
 See [`Morph.choice`](Morph#choice), [`Morph.tryRow`](#try), [`Morph.choiceFinish`](#choiceFinish)
 -}
 type alias ChoiceMorphRowEmptiable noTryPossiblyOrNever choiceNarrow choiceBroaden broadElement =
-    { description :
-        Emptiable (Stacked Description) noTryPossiblyOrNever
-    , toNarrow :
-        List broadElement
-        ->
-            Result
-                (-- tries
-                 Emptiable (Stacked Error) noTryPossiblyOrNever
-                )
-                { narrow : choiceNarrow
-                , broad : List broadElement
-                }
-    , toBroad : choiceBroaden
-    }
+    RecordWithoutConstructorFunction
+        { description :
+            Emptiable (Stacked Description) noTryPossiblyOrNever
+        , toNarrow :
+            List broadElement
+            ->
+                Result
+                    (-- tries
+                     Emptiable (Stacked Error) noTryPossiblyOrNever
+                    )
+                    { narrow : choiceNarrow
+                    , broad : List broadElement
+                    }
+        , toBroad : choiceBroaden
+        }
 
 
-{-| If the previous [`possibility`](#try) fails
+{-| If the previous [`possibility`](#tryRow) fails
 try this [`MorphRow`](#MorphRow).
 
 > ℹ️ Equivalent regular expression: `|`
 
     import Morph
-    import Char.Morph as Char
-    import Morph.Error
+    import AToZ exposing (AToZ(..))
+    import Char.Morph
 
     type UnderscoreOrLetter
         = Underscore
-        | Letter Char
+        | Letter AToZ
 
-    underscoreOrLetter : MorphRow Char UnderscoreOrLetter
+    underscoreOrLetter : MorphRow UnderscoreOrLetter Char
     underscoreOrLetter =
         Morph.choice
             (\underscoreVariant letterVariant underscoreOrLetterNarrow ->
@@ -4093,36 +4094,42 @@ try this [`MorphRow`](#MorphRow).
                     Letter letter ->
                         letterVariant letter
             )
-            |> Morph.try (\() -> Underscore) (Char.Morph.only '_')
-            |> Morph.try Letter AToZ.caseAny
+            |> Morph.tryRow (\() -> Underscore) (Char.Morph.only '_')
+            |> Morph.tryRow Letter
+                (Morph.oneToOne .letter (\l -> { letter = l, case_ = AToZ.CaseLower })
+                    |> Morph.over AToZ.char
+                    |> Morph.one
+                )
             |> Morph.choiceFinish
 
     -- try the first possibility
-    "_"
-        |> Text.toNarrow underscoreOrLetter
+    "_" |> Morph.toNarrow (underscoreOrLetter |> Morph.rowFinish |> Morph.over List.Morph.string)
     --> Ok Underscore
 
     -- if it fails, try the next
-    "a"
-        |> Text.toNarrow underscoreOrLetter
-    --> Ok 'a'
+    "a" |> Morph.toNarrow (underscoreOrLetter |> Morph.rowFinish |> Morph.over List.Morph.string)
+    --> Ok A
 
-    -- if none work, we get the error from all possible steps
+    -- if none work, records what failed for each possibility in the error
     "1"
-        |> Text.toNarrow (onFailDown [ one '_', AToZ.char ])
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '1'."
+        |> Morph.toNarrow (underscoreOrLetter |> Morph.rowFinish |> Morph.over List.Morph.string)
+        |> Result.toMaybe
+    --> Nothing
 
 
 ### example: fallback step if the previous step fails
 
     import Morph
-    import Char.Morph as Char
-    import Morph.Error
+    import N.Morph
+    import ArraySized.Morph exposing (atLeast)
+    import ArraySized exposing (ArraySized)
+    import N exposing (n0, n1, n2, n3, n9, N, Min, On)
+    import AToZ exposing (AtoZ(..))
+    import List.Morph
 
     type AlphaNum
-        = Digits (List (N (In N0 N9)))
-        | Letters String
+        = Digits (ArraySized (N (In N0 N9)) (Min (On N1)))
+        | Letters (ArraySized AtoZ (Min (On N1)))
 
     alphaNum : MorphRow Char AlphaNum
     alphaNum =
@@ -4136,28 +4143,24 @@ try this [`MorphRow`](#MorphRow).
                         letter char
             )
             |> Morph.tryRow Letter
-                (map String.Morph.list
-                    (atLeast n1 AToZ.char)
-                )
+                (atLeast n1 AToZ.lowerChar)
             |> Morph.tryRow Digit
-                (atLeast n1 Digit.n0To9)
+                (atLeast n1 N.Morph.char)
             |> Morph.choiceFinish
 
     -- try letters, or else give me some digits
-    "abc"
-        |> Text.toNarrow alphaNum
-    --> Ok "abc"
+    "abc" |> Morph.toNarrow (alphaNum |> Morph.rowFinish |> Morph.over List.Morph.string)
+    --> Ok (ArraySized.l3 A B C |> ArraySized.minTo n1)
 
     -- we didn't get letters, but we still got digits
-    "123"
-        |> Text.toNarrow alphaNum
-    --> Ok "123"
+    "123" |> Morph.toNarrow (alphaNum |> Morph.rowFinish |> Morph.over List.Morph.string)
+    --> Ok (ArraySized.l3 (n1 |> N.minTo n0 |> N.maxTo n9) (n2 |> N.minTo n0 |> N.maxTo n9) (n3 |> N.minTo n0 |> N.maxTo n9) |> ArraySized.minTo n1)
 
-    -- but if we still fail, give the expectations of all steps
+    -- but if we still fail, records what failed for each possibility in the error
     "_"
-        |> Text.toNarrow alphaNum
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting at least 1 digit [0-9]. I got stuck when I got the character '_'."
+        |> Morph.toNarrow (alphaNum |> Morph.rowFinish |> Morph.over List.Morph.string)
+        |> Result.toMaybe
+    --> Nothing
 
 -}
 tryRow :
