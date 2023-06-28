@@ -3,6 +3,12 @@
   - add `Value.bits`
   - add more tests
 
+## to consider
+
+  - splitting off `Value.Morph`, `Json-Morph`, `AToZ.Morph`
+      - improve consistency
+      - increase verboseness
+
 # change log
 
 ## 1.0.0
@@ -12,56 +18,34 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
 
   - `Parser` → `MorphRow` that can also build
   - `Parser.Expression` remove
-  - `Parser.Sequence` merge → `MorphRow`
+  - `Parser.Sequence` merge into `MorphRow`
       - `zeroOrMore` remove
-          - in favor of `atLeast n0`
+          - in favor of `atLeast n0`/`whilePossible`
       - `oneOrMore` remove
           - in favor of `atLeast n1`
       - `zeroOrOne` remove
-          - in favor of `choice` or `in_ ( n0, n1 )`
+          - in favor of `choice` or `Maybe.Morph.row` or `in_ ( n0, n1 )`
       - `atMost max` remove
           - in favor of `in_ ( n0, max )`
       - `concat` remove
       - `fold`, `foldWhile` remove
           - in favor of `whileAccumulate`
       - `atLeast`, `in_`, `exactly` return `typesafe-array`
-      - `until` changed
+      - replaced
         ```elm
         until :
             Parser delimiter
             -> Parser a
             -> Parser ( List a, delimiter )
         ```
-        →
-        ```elm
-        until :
-            { commit :
-                Morph
-                    commitResult
-                    { end : endElement
-                    , before : List goOnElement
-                    }
-                    (Morph.Error broadElement expectedCustom)
-            , end : MorphRow broadElement endElement expectedCustom
-            , goOn : MorphRow broadElement goOnElement expectedCustom
-            }
-            -> MorphRow broadElement commitResult expectedCustom
-        ```
-        and its simpler version
-        ```elm
-        before :
-            { end : MorphRow broadElement () expectedCustom
-            , goOn : MorphRow broadElement goOnElement expectedCustom
-            }
-            -> MorphRow broadElement (List goOnElement) expectedCustom
-        ```
+        → `before` to ignore the end and `until` to only commit conditionally
       - `split`, `splitIncluding` remove
           - in favor of
             ```elm
             Morph.succeed (\first separatedElements -> { first = first, separatedElements = separatedElements })
                 |> grab .first element
                 |> grab .separatedElements
-                    (atLeast n0
+                    (Morph.whilePossible
                         (Morph.succeed (\separator element -> { element = element, separator = separator })
                             |> grab .separator separator
                             |> grab .element element
