@@ -29,6 +29,7 @@ module Decimal.Morph exposing
 -}
 
 import Decimal exposing (Decimal(..), Exception(..), Fraction, OrException(..), SignedAbsolute(..))
+import Emptiable exposing (Emptiable)
 import Maybe.Morph
 import Morph exposing (Morph, MorphOrError, MorphRow, grab, match, one, oneToOne)
 import N exposing (In, N, N0, N9, n0, n1, n9)
@@ -37,7 +38,7 @@ import NaturalAtLeast1.Internal
 import NaturalAtLeast1Base10
 import Sign exposing (Sign(..))
 import Sign.Morph
-import Stack
+import Stack exposing (Stacked)
 import String.Morph
 import Value
 
@@ -449,12 +450,13 @@ fractionToFloat =
 floatToFraction : Float -> Fraction
 floatToFraction =
     \float_ ->
-        case float_ |> floatFractionToBase10 of
+        case float_ |> floatFractionToBase10 |> unpadLeading0Digits of
             [] ->
                 { beforeLast = [], last = n1 |> N.maxTo n9 |> N.inToNumber }
 
             first :: afterFirst ->
                 let
+                    digitsReverse : Emptiable (Stacked (N (In N0 N9))) never_
                     digitsReverse =
                         Stack.topBelow first afterFirst |> Stack.reverse
                 in
@@ -463,26 +465,42 @@ floatToFraction =
                 }
 
 
+unpadLeading0Digits : List (N (In N0 N9)) -> List (N (In N0 N9))
+unpadLeading0Digits =
+    \digits ->
+        case digits of
+            [] ->
+                []
+
+            digit0 :: digits1Up ->
+                case N.toInt digit0 of
+                    0 ->
+                        unpadLeading0Digits digits1Up
+
+                    _ ->
+                        digit0 :: digits1Up
+
+
 floatFractionToBase10 : Float -> List (N (In N0 N9))
 floatFractionToBase10 =
     \float_ ->
-        let
-            floatShifted1Decimal =
-                float_ * 10
+        if float_ == 0 then
+            []
 
-            decimalInt =
-                floatShifted1Decimal |> floor
-        in
-        (case decimalInt |> N.intIsIn ( n0, n9 ) of
-            Err _ ->
-                identity
+        else
+            let
+                floatShifted1Digit : Float
+                floatShifted1Digit =
+                    float_ * 10
 
-            Ok decimal ->
-                (::) (decimal |> N.inToNumber)
-        )
-            ((floatShifted1Decimal - (decimalInt |> Basics.toFloat))
-                |> floatFractionToBase10
-            )
+                digit : Int
+                digit =
+                    floatShifted1Digit |> floor
+            in
+            (digit |> N.intToIn ( n0, n9 ) |> N.inToNumber)
+                :: ((floatShifted1Digit - (digit |> Basics.toFloat))
+                        |> floatFractionToBase10
+                   )
 
 
 {-| [`Morph`](Morph#Morph)
