@@ -1,12 +1,14 @@
 module Decimal exposing
     ( Decimal(..), Signed, SignedAbsolute(..), Fraction
+    , OrException(..), Exception(..)
     , ceiling, floor, truncate
     )
 
 {-| safe and explicit floating point number
-without the possibility of [exceptions](DecimalOrException#Exception)
+without the possibility of [exceptions](Decimal#Exception)
 
 @docs Decimal, Signed, SignedAbsolute, Fraction
+@docs OrException, Exception
 
 
 ## alter
@@ -32,7 +34,7 @@ Don't shy away from spinning your own version of this if needed, like
         | Infinity Sign
         | Decimal Decimal
 
-See also [`OrException Decimal`](DecimalOrException#OrException)
+See also [`OrException Decimal`](Decimal#OrException)
 
 -}
 type Decimal
@@ -66,6 +68,27 @@ type SignedAbsolute
         { whole : Natural.AtLeast1
         , fraction : Maybe Fraction
         }
+
+
+{-| Number where [IEEE 754 number exception states](#Exception) are possible
+
+`OrException Decimal` for example is like an [`elm/core` `Float`](https://dark.elm.dmy.fr/packages/elm/core/latest/Basics#Float)
+except
+
+  - [`Exception`](#Exception)s are an explicit case so you can easily extract a [`Decimal`](Decimal#Decimal)
+  - it can have arbitrary decimal points, see [`Decimal`](Decimal#Decimal)
+
+-}
+type OrException aNumber
+    = Number aNumber
+    | Exception Exception
+
+
+{-| Non-number calculation result
+-}
+type Exception
+    = NaN
+    | Infinity Sign
 
 
 

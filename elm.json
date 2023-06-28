@@ -17,7 +17,6 @@
         "Integer.Morph",
         "Decimal",
         "Decimal.Morph",
-        "DecimalOrException",
         "N.Morph",
         "Maybe.Morph",
         "String.Morph",

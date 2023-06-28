@@ -31,7 +31,6 @@ module Json exposing
 import Array
 import Decimal exposing (Decimal)
 import Decimal.Morph
-import DecimalOrException
 import Emptiable
 import Json.Decode
 import Json.Encode
@@ -160,7 +159,7 @@ atomJsValueMagicEncode =
             Number floatAtom ->
                 floatAtom
                     |> Morph.toBroad
-                        (Decimal.Morph.orException |> Morph.over DecimalOrException.float)
+                        (Decimal.Morph.orException |> Morph.over Decimal.Morph.orExceptionFloat)
                     |> Json.Encode.float
 
             String stringAtom ->
@@ -209,7 +208,7 @@ jsonAtomDecoder =
 decimalFloatMorph : Morph Decimal Float
 decimalFloatMorph =
     Decimal.Morph.orException
-        |> Morph.over DecimalOrException.float
+        |> Morph.over Decimal.Morph.orExceptionFloat
 
 
 {-| [Morph](Morph#Morph) to valid [`Json` value](#Json) format from [`JsValueMagic`](#JsValueMagic)

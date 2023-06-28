@@ -35,7 +35,6 @@ for example
 
   - [`Integer.Morph`](Integer-Morph)
   - [`Decimal.Morph`](Decimal-Morph)
-  - [`DecimalOrException`](DecimalOrException)
   - [`String.Morph`](String-Morph)
   - [`Maybe.Morph`](Maybe-Morph)
   - [`List.Morph`](List-Morph)

@@ -20,7 +20,6 @@
     "Integer.Morph",
     "Decimal",
     "Decimal.Morph",
-    "DecimalOrException",
     "List.Morph",
     "Stack.Morph",
     "Array.Morph",
