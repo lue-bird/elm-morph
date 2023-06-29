@@ -19,14 +19,15 @@ import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFuncti
 import Sign exposing (Sign)
 
 
-{-| Arbitrary-precision `Int`, constructable from bits
+{-| Arbitrary-precision integer, constructable from bits
 -}
 type Integer
     = N0
     | Signed Signed
 
 
-{-| Arbitrary-precision signed [`Integer`](#Integer), constructable from bits
+{-| Arbitrary-precision signed [`Integer`](#Integer), constructable from a [`Sign`](Sign#Sign)
+and [`Natural.AtLeast1` bits](Natural#AtLeast1)
 -}
 type alias Signed =
     RecordWithoutConstructorFunction
