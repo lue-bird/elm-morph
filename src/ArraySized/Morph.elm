@@ -42,7 +42,7 @@ import Rope
 import Stack exposing (Stacked)
 
 
-{-| [`OneToOne`](Morph#OneToOne) from `Array` to `ArraySized`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `Array` to `ArraySized`
 
     import ArraySized
     import Array
@@ -67,7 +67,7 @@ array =
     oneToOne ArraySized.fromArray ArraySized.toArray
 
 
-{-| [`OneToOne`](Morph#OneToOne) from `ArraySized` to `Array`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `ArraySized` to `Array`
 
     import ArraySized
     import Array
@@ -89,7 +89,7 @@ toArray =
     Morph.invert array
 
 
-{-| [`OneToOne`](Morph#OneToOne) from `List` to `ArraySized`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `List` to `ArraySized`
 
     import ArraySized
 
@@ -113,7 +113,7 @@ list =
     oneToOne ArraySized.fromList ArraySized.toList
 
 
-{-| [`OneToOne`](Morph#OneToOne) from `ArraySized` to `List`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `ArraySized` to `List`
 
     import ArraySized
 
@@ -134,7 +134,7 @@ toList =
     Morph.invert list
 
 
-{-| [`OneToOne`](Morph#OneToOne) from `String` to `ArraySized`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `String` to `ArraySized`
 
     import ArraySized
 
@@ -158,7 +158,7 @@ string =
     oneToOne ArraySized.fromString ArraySized.toString
 
 
-{-| [`OneToOne`](Morph#OneToOne) from `ArraySized` to `String`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `ArraySized` to `String`
 
     import ArraySized
 
@@ -179,7 +179,7 @@ toString =
     Morph.invert string
 
 
-{-| [`OneToOne`](Morph#OneToOne) from `Emptiable (Stacked ...) ...` to `ArraySized`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `Emptiable (Stacked ...) ...` to `ArraySized`
 
     import ArraySized
 
@@ -203,7 +203,7 @@ stack =
     oneToOne ArraySized.fromStack ArraySized.toStack
 
 
-{-| [`OneToOne`](Morph#OneToOne) from `ArraySized` to `Emptiable (Stacked ...) ...`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `ArraySized` to `Emptiable (Stacked ...) ...`
 
     import ArraySized
 
@@ -938,7 +938,7 @@ atMost :
             broadElement
 atMost upperLimit element =
     Morph.named
-        ([ "repeating ≤", upperLimit |> N.toInt |> String.fromInt ]
+        ([ "repeating ≤", upperLimit |> N.toString ]
             |> String.concat
         )
         (Morph.oneToOne identity ArraySized.minTo0

@@ -32,7 +32,7 @@ import String.Morph.Internal
 import Value.Morph exposing (MorphValue)
 
 
-{-| [`OneToOne`](Morph#OneToOne) from a `String` to a `List Char`.
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a `String` to a `List Char`.
 
     "0123" |> (String.Morph.toList |> Morph.map)
     --> [ '0', '1', '2', '3' ]
@@ -43,7 +43,7 @@ toList =
     oneToOne String.toList String.fromList
 
 
-{-| [`OneToOne`](Morph#OneToOne) from `List Char` to a `String`.
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `List Char` to a `String`.
 
     "0123" |> Morph.mapTo String.Morph.list
     --> [ '0', '1', '2', '3' ]
@@ -62,7 +62,7 @@ list =
 -- transform
 
 
-{-| [`OneToOne`](Morph#OneToOne) each `Char` in a `String`
+{-| [`Morph.OneToOne`](Morph#OneToOne) each `Char` in a `String`
 
 For fallible transformations etc,
 morph to other structures (but generic ones) like a list first

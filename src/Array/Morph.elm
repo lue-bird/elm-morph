@@ -28,7 +28,7 @@ import Value
 import Value.Morph exposing (MorphValue)
 
 
-{-| [`OneToOne`](Morph#OneToOne) from `List` to `Array`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `List` to `Array`
 
     import Array
 
@@ -45,7 +45,7 @@ list =
     oneToOne Array.fromList Array.toList
 
 
-{-| [`OneToOne`](Morph#OneToOne) from `Array` to `List`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `Array` to `List`
 
     import Array
 
@@ -94,7 +94,7 @@ value elementMorph =
 On the narrowing side all [narrowed](Morph#toNarrow) values must be `Ok`
 for it to not result in a [`Morph.Error`](Morph#Error)
 
-If the element [`Morph`](Morph#Morph) is a [`OneToOne`](Morph#OneToOne),
+If the element [`Morph`](Morph#Morph) is [`OneToOne`](Morph#OneToOne),
 `each` will always succeed with the type knowing it does
 
 -}

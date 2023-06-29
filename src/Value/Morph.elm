@@ -158,7 +158,7 @@ composedMap composedChange =
                     |> Composed
 
 
-{-| [`OneToOne`](Morph#OneToOne) a [`Value`](Value#Value)
+{-| [`Morph.OneToOne`](Morph#OneToOne) a [`Value`](Value#Value)
 by reducing the amount of tag information in both directions
 
 For [`Value`](Value#Value), it's

@@ -30,9 +30,9 @@ import Stack exposing (Stacked)
 -- alter
 
 
-{-| [`Morph`](Morph#Morph) each stacked element
+{-| [`Morph`](Morph#Morph) all stacked elements
 
-If the given [`Morph`](Morph#Morph) is a [`OneToOne`](Morph#OneToOne),
+If the given [`Morph`](Morph#Morph) is [`OneToOne`](Morph#OneToOne),
 [`each`](#each) will also be a [`OneToOne`](Morph#OneToOne)
 
 -}
@@ -127,7 +127,7 @@ each elementMorph =
 -- transform
 
 
-{-| [`OneToOne`](Morph#OneToOne) from a stack to a `List`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a stack to a `List`
 
     import Stack
     import Stack.Morph
@@ -150,7 +150,7 @@ toList =
     Morph.invert list
 
 
-{-| [`OneToOne`](Morph#OneToOne) from `List` to a stack.
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `List` to a stack.
 
     import Stack
     import Stack.Morph
@@ -177,7 +177,7 @@ list =
     oneToOne Stack.fromList Stack.toList
 
 
-{-| [`OneToOne`](Morph#OneToOne) from a stack of `Char`s to a `String`.
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a stack of `Char`s to a `String`.
 
     import Stack
     import Morph
@@ -196,7 +196,7 @@ toString =
     Morph.invert string
 
 
-{-| [`OneToOne`](Morph#OneToOne) from `String` to a stack of `Char`s.
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `String` to a stack of `Char`s.
 
     import Stack
     import Morph

@@ -116,7 +116,7 @@ value =
     decimal |> Morph.over Decimal.Morph.value
 
 
-{-| [`OneToOne`](Morph#OneToOne) between an `Int` and a [decimal representation](Integer#Integer).
+{-| [`Morph.OneToOne`](Morph#OneToOne) between an `Int` and a [decimal representation](Integer#Integer).
 
 Keep in mind that `Integer -> Int` can overflow
 since `Int` is fixed in bit size while [`Integer`](Integer#Integer) is not.
@@ -127,7 +127,7 @@ int =
     Morph.oneToOne Integer.Internal.fromInt Integer.Internal.toInt
 
 
-{-| [`OneToOne`](Morph#OneToOne) between an `Int` and a [decimal representation](Integer#Integer).
+{-| [`Morph.OneToOne`](Morph#OneToOne) between an `Int` and a [decimal representation](Integer#Integer).
 
 Keep in mind that `Integer -> Int` can overflow
 since `Int` is fixed in bit size while [`Integer`](Integer#Integer) is not.

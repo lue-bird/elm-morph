@@ -21,11 +21,11 @@ module Dict.Morph exposing
 
 import Dict exposing (Dict)
 import List.Morph
-import Morph exposing (ErrorWithDeadEnd, MorphIndependently, oneToOne, oneToOneOn)
+import Morph exposing (ErrorWithDeadEnd, MorphIndependently)
 import Value.Morph exposing (MorphValue)
 
 
-{-| [`OneToOne`](Morph#OneToOne) from a `List { key : key, value : value }` to a `Dict key value`.
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a `List { key : key, value : value }` to a `Dict key value`.
 
     import Dict
     import Dict.Morph
@@ -47,7 +47,7 @@ list :
          -> List { key : broadKey, value : broadValue }
         )
 list =
-    oneToOne
+    Morph.oneToOne
         (\dict ->
             dict
                 |> List.foldl
@@ -62,7 +62,7 @@ list =
         )
 
 
-{-| [`OneToOne`](Morph#OneToOne) from a `Dict key value` to a `List { key : key, value : value }`.
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a `Dict key value` to a `List { key : key, value : value }`.
 
     import Dict
     import Dict.Morph
@@ -89,7 +89,7 @@ toList =
 --
 
 
-{-| [`OneToOne`](Morph#OneToOne) each value in a `Dict`
+{-| [`Morph.OneToOne`](Morph#OneToOne) each value in a `Dict`
 -}
 eachValue :
     MorphIndependently
@@ -104,7 +104,7 @@ eachValue :
              -> Dict broadKey unmappedValue
             )
 eachValue entryValueTranslate =
-    oneToOneOn ( eachValueMap, eachValueMap ) entryValueTranslate
+    Morph.oneToOneOn ( eachValueMap, eachValueMap ) entryValueTranslate
 
 
 eachValueMap :

@@ -216,14 +216,14 @@ sequence toSequence =
 --
 
 
-{-| Morph from a `String` to a `List` of `Char`s
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a `String` to a `List` of `Char`s
 -}
 string : MorphOrError (List Char) String error_
 string =
     Morph.oneToOne String.toList String.fromList
 
 
-{-| Morph from a `List` of `Char`s to a `String`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a `List` of `Char`s to a `String`
 -}
 toString : MorphOrError String (List Char) error_
 toString =
@@ -260,7 +260,7 @@ value elementMorph =
 On the narrowing side all [narrowed](Morph#toNarrow) values must be `Ok`
 for it to not result in a [`Morph.Error`](Morph#Error)
 
-If the element [`Morph`](Morph#Morph) is a [`OneToOne`](Morph#OneToOne),
+If the element [`Morph`](Morph#Morph) is [`OneToOne`](Morph#OneToOne),
 `each` will always succeed with the type knowing it does
 
 -}
@@ -324,8 +324,8 @@ each elementMorph =
         }
 
 
-{-| [OneToOne](Morph#OneToOne) [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/)
-to a stack of single bits.
+{-| [`Morph.OneToOne`](Morph#OneToOne) [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/)
+to a list of individual bits.
 Now you can [morph them as a row](Morph#MorphRow)!
 -}
 bytes : MorphOrError (Emptiable (Stacked Bit) Possibly) Bytes error_

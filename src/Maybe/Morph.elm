@@ -1,11 +1,11 @@
-module Maybe.Morph exposing (row, value)
+module Maybe.Morph exposing (value, row)
 
 {-| [`Morph`](Morph#Morph) a `Maybe`
 
 
 ## transform
 
-@docs row, value
+@docs value, row
 
 -}
 

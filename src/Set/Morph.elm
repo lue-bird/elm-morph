@@ -28,7 +28,7 @@ import Stack
 import Value.Morph exposing (MorphValue)
 
 
-{-| [`OneToOne`](Morph#OneToOne) from `List` to `Set`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `List` to `Set`
 
     import Set
 
@@ -47,7 +47,7 @@ list =
     oneToOne Set.fromList Set.toList
 
 
-{-| [`OneToOne`](Morph#OneToOne) from `Set` to `List`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `Set` to `List`
 
     import Set
 
@@ -76,7 +76,7 @@ toList =
 On the narrowing side all [narrowed](Morph#toNarrow) values must be `Ok`
 for it to not result in a [`Morph.Error`](Morph#Error)
 
-If the given element [`Morph`](Morph#Morph) is a [`OneToOne`](Morph#OneToOne),
+If the given element [`Morph`](Morph#Morph) is [`OneToOne`](Morph#OneToOne),
 `each` will always succeed with the type knowing it does
 
 -}

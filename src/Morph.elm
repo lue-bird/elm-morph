@@ -145,7 +145,7 @@ try [`ArraySized.Morph.exactlyWith`](ArraySized-Morph#exactlyWith).
 
   - [`invertible-syntax`](https://hackage.haskell.org/package/invertible-syntax) same idea in the haskell world
   - parse-build an enum over a String: [`jmpavlick/bimap`](https://dark.elm.dmy.fr/packages/jmpavlick/bimap/latest/), [`toastal/select-prism`](https://package.elm-lang.org/packages/toastal/select-prism/latest/), [`Herteby/enum`](https://package.elm-lang.org/packages/Herteby/enum/latest), [`genthaler/elm-enum`](https://package.elm-lang.org/packages/genthaler/elm-enum/latest/), [`the-sett/elm-refine` `Enum`](https://package.elm-lang.org/packages/the-sett/elm-refine/latest/Enum)
-  - equivalent to [`OneToOne`](#OneToOne): [`arturopala/elm-monocle` `Monocle.Iso`](https://package.elm-lang.org/packages/arturopala/elm-monocle/latest/Monocle-Iso), [`Heimdell/elm-optics` `Optics.Core.Iso`](https://package.elm-lang.org/packages/Heimdell/elm-optics/latest/Optics-Core#Iso), [`erlandsona/elm-accessors` `Accessors.Iso`](https://dark.elm.dmy.fr/packages/erlandsona/elm-accessors/latest/Accessors#Iso), [`fujiy/elm-json-convert` `Json.Convert.Iso`](https://package.elm-lang.org/packages/fujiy/elm-json-convert/latest/Json-Convert#Iso)
+  - equivalent to [`Morph.OneToOne`](#OneToOne): [`arturopala/elm-monocle` `Monocle.Iso`](https://package.elm-lang.org/packages/arturopala/elm-monocle/latest/Monocle-Iso), [`Heimdell/elm-optics` `Optics.Core.Iso`](https://package.elm-lang.org/packages/Heimdell/elm-optics/latest/Optics-Core#Iso), [`erlandsona/elm-accessors` `Accessors.Iso`](https://dark.elm.dmy.fr/packages/erlandsona/elm-accessors/latest/Accessors#Iso), [`fujiy/elm-json-convert` `Json.Convert.Iso`](https://package.elm-lang.org/packages/fujiy/elm-json-convert/latest/Json-Convert#Iso)
 
 ---
 
@@ -1602,7 +1602,7 @@ Examples:
         Morph.oneToOne .before
             (\before_ -> { before = before_, end = () })
 
-Only use [`OneToOne`](#OneToOne) to annotate arguments. For results,
+Only use [`Morph.OneToOne`](#OneToOne) to annotate arguments. For results,
 
     MorphOrError (List Char) String error_
 
@@ -1671,7 +1671,7 @@ keep =
     oneToOne identity identity
 
 
-{-| Create a [`OneToOne`](#OneToOne)
+{-| Create a [`Morph.OneToOne`](#OneToOne)
 
     String.Morph.toList : MorphOrError (List Char) String error_
     String.Morph.toList =
@@ -2155,7 +2155,7 @@ Chaining
 
 This can be used to, for example
 
-  - [`OneToOne`](#OneToOne) what was [narrowed](#toNarrow)
+  - [`Morph.OneToOne`](#OneToOne) what was [narrowed](#toNarrow)
   - narrow only one variant,
     then of that variant's value type one of their variants
 
