@@ -6,8 +6,8 @@ import ArraySized exposing (ArraySized)
 import ArraySized.Morph exposing (atLeast)
 import Char.Morph
 import Linear exposing (Direction(..))
-import Morph exposing (Morph, MorphRow, MorphRowIndependently, grab, match, one, oneToOne, whilePossible)
-import N exposing (In, Min, N, N0, N1, N2, N9, On, n0, n1, n9)
+import Morph exposing (Morph, MorphRow, MorphRowIndependently, grab, match, one, whilePossible)
+import N exposing (In, Min, N, N0, N1, N2, N9, On, n1)
 import N.Morph
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import String.Morph
@@ -76,17 +76,12 @@ localSymbol =
                     LocalSymbol0To9 n0To9Value ->
                         n0To9Variant n0To9Value
             )
-            |> Morph.try LocalSymbolPrintable
-                localSymbolPrintable
+            |> Morph.try LocalSymbolPrintable localSymbolPrintable
             |> Morph.try LocalSymbolAToZ
-                (oneToOne .letter
-                    (\letter -> { letter = letter, case_ = AToZ.CaseLower })
+                (AToZ.Morph.caseBroad AToZ.CaseLower
                     |> Morph.over AToZ.Morph.char
                 )
-            |> Morph.try LocalSymbol0To9
-                (N.Morph.in_ ( n0, n9 )
-                    |> Morph.over N.Morph.char
-                )
+            |> Morph.try LocalSymbol0To9 N.Morph.char
             |> Morph.choiceFinish
         )
 
@@ -215,12 +210,8 @@ hostLabelSideSymbol =
                 HostLabelSideSymbol0To9 n0To9Value ->
                     n0To9Variant n0To9Value
         )
-        |> Morph.try HostLabelSideSymbolAToZ
-            AToZ.Morph.char
-        |> Morph.try HostLabelSideSymbol0To9
-            (N.Morph.in_ ( n0, n9 )
-                |> Morph.over N.Morph.char
-            )
+        |> Morph.try HostLabelSideSymbolAToZ AToZ.Morph.char
+        |> Morph.try HostLabelSideSymbol0To9 N.Morph.char
         |> Morph.choiceFinish
 
 
@@ -243,9 +234,7 @@ hostLabelSymbol =
         |> Morph.try HostLabelSymbolAToZ
             AToZ.Morph.char
         |> Morph.try HostLabelSymbol0To9
-            (N.Morph.in_ ( n0, n9 )
-                |> Morph.over N.Morph.char
-            )
+            N.Morph.char
         |> Morph.choiceFinish
 
 
@@ -287,9 +276,7 @@ domainTopLevelAfterFirstAToZSymbol =
         |> Morph.try DomainTopLevelSymbolAToZ
             AToZ.Morph.char
         |> Morph.try DomainTopLevelSymbol0To9
-            (N.Morph.in_ ( n0, n9 )
-                |> Morph.over N.Morph.char
-            )
+            N.Morph.char
         |> Morph.choiceFinish
 
 
