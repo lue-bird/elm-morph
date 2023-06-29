@@ -127,9 +127,9 @@ or =
 
 What's different from writing a parser?
 
-  - [`broad ...`](Morph#broad) provides a "default value" for the builder
-  - [`Morph.choice (\... -> case ... of ...)`](Morph#choice) exhaustively matches narrow possibilities
+  - [`Morph.choice (\... -> case ... of ...)`](Morph#choice) matches possibilities exhaustively
   - [`grab ... ...`](Morph#grab) also shows how to access the morphed positional part
+  - [`broad ...`](Morph#broad) provides a "default value" for the builder
   - no `loop`! Instead we have atLeast, between, exactly, optional, while possible, until, ... See [section sequence in the `Morph` module documentation](Morph#sequence)
 
 ## [`Morph.OneToOne`](Morph#OneToOne)
@@ -148,5 +148,7 @@ The parent of `MorphRow`, `MorphValue`, `Morph.OneToOne` etc.: convert between a
   - accepting numbers only in a specific range
   - failing for NaN and infinity
   - allowing only specific printable characters here
+
+-------
 
 Confused? Hyped? Hit @lue up on anything on slack!
