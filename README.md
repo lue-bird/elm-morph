@@ -134,16 +134,16 @@ What's different from writing a parser?
 
 ## [`Morph.OneToOne`](Morph#OneToOne)
 
-The simplest of them all, convert between any two types where nothing can fail. Think
+The simplest of them all: convert between any two types where nothing can fail. Think
 
   - [`List Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bit) ⇄ [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/), see [`List.Morph.bytes`](List-Morph#bytes)
-  - case-able [`Value`](Value) ⇄ [`Json`](Json) – both just elm union `type`s
+  - case-able [`Value`](Value) ⇄ [`Json`](Json) – both just elm union `type`s, see [`Json.Morph.value`](Json-Morph#value)
   - package-facing type ⇄ package-internal type
   - decompiled AST ⇄ generated code
 
-## [`Morph`](Morph)
+## [`Morph`](Morph#Morph)
 
-The parent of `MorphRow`, `MorphValue`, `Morph.OneToOne` etc. allows converting between any two types. Think
+The parent of `MorphRow`, `MorphValue`, `Morph.OneToOne` etc.: convert between any two types. Think
 
   - accepting numbers only in a specific range
   - failing for NaN and infinity
