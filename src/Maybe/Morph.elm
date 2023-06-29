@@ -41,13 +41,13 @@ value contentMorph =
     -- maybe we get `Just` a letter
     "a"
         |> Text.toNarrow
-            (Maybe.Morph.row (AToZ.char |> Morph.one))
+            (Maybe.Morph.row (AToZ.Morph.char |> Morph.one))
     --> Ok (Just 'a')
 
     -- maybe we get `Nothing`
     "123abc"
         |> Text.toNarrow
-            (Maybe.Morph.row (AToZ.char |> Morph.one))
+            (Maybe.Morph.row (AToZ.Morph.char |> Morph.one))
     --> Ok Nothing
 
 -}

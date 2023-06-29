@@ -5,6 +5,8 @@
     "Maybe.Morph",
     "Char.Morph",
     "Bit.Morph",
+    "AToZ",
+    "AToZ.Morph",
     "String.Morph",
     "N.Morph",
     "Sign",

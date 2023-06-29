@@ -455,12 +455,12 @@ and return them as an [`ArraySized`](https://package.elm-lang.org/packages/lue-b
     import N exposing (n3)
 
     -- we want `exactly 3` letters
-    "abcdef" |> narrow (map Text.fromList (exactly n3 AToZ.char))
+    "abcdef" |> narrow (map Text.fromList (exactly n3 AToZ.Morph.char))
     --> Ok [ 'a', 'b', 'c' ]
 
     -- not 2 or 4, we want 3
     "ab_def"
-        |> narrow (map Text.fromList (exactly n3 AToZ.char))
+        |> narrow (map Text.fromList (exactly n3 AToZ.Morph.char))
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:3: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '_'."
 
@@ -620,12 +620,12 @@ and return them as an [`ArraySized`](https://package.elm-lang.org/packages/lue-b
 
     -- we want at least three letters, we are okay with more than three
     "abcdef"
-        |> Text.toNarrow (atLeast n3 AToZ.char)
+        |> Text.toNarrow (atLeast n3 AToZ.Morph.char)
     --> Ok [ 'a', 'b', 'c', 'd', 'e', 'f' ]
 
     -- but not two, that's sacrilegious
     "ab_def"
-        |> Text.toNarrow (atLeast n3 AToZ.char)
+        |> Text.toNarrow (atLeast n3 AToZ.Morph.char)
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:3: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '_'."
 
@@ -638,14 +638,14 @@ and return them as an [`ArraySized`](https://package.elm-lang.org/packages/lue-b
     import String.Morph as Text
 
     -- We want as many letters as there are.
-    "abc" |> Text.toNarrow (atLeast n0 AToZ.char)
+    "abc" |> Text.toNarrow (atLeast n0 AToZ.Morph.char)
     --> Ok [ 'a', 'b', 'c' ]
 
-    "abc123" |> Text.toNarrow (atLeast n0 AToZ.char)
+    "abc123" |> Text.toNarrow (atLeast n0 AToZ.Morph.char)
     --> Ok [ 'a', 'b', 'c' ]
 
     -- even zero letters is okay
-    "123abc" |> Text.toNarrow (atLeast n0 AToZ.char)
+    "123abc" |> Text.toNarrow (atLeast n0 AToZ.Morph.char)
     --> Ok []
 
 If you want a to morph a `List` instead of an `ArraySized ... (Min (On N0))`,
@@ -665,15 +665,15 @@ you might as well use [`Morph.whilePossible`](Morph#whilePossible) instead of
     import String.Morph as Text
 
     -- we want as many letters as there are
-    "abc" |> Text.toNarrow (atLeast n1 AToZ.char)
+    "abc" |> Text.toNarrow (atLeast n1 AToZ.Morph.char)
     --> Ok [ 'a', 'b', 'c' ]
 
-    "abc123" |> Text.toNarrow (atLeast n1 AToZ.char)
+    "abc123" |> Text.toNarrow (atLeast n1 AToZ.Morph.char)
     --> Ok [ 'a', 'b', 'c' ]
 
     -- but we want at least one
     "123abc"
-        |> Text.toNarrow (atLeast n1 AToZ.char)
+        |> Text.toNarrow (atLeast n1 AToZ.Morph.char)
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:1: I was expecting a letter a|..|z or A|...|Z. I got stuck when I got the character '1'."
 
@@ -808,13 +808,13 @@ and return them as an [`ArraySized`](https://package.elm-lang.org/packages/lue-b
     import String.Morph as Text
 
     -- we want between two and four letters
-    "abcdef" |> Text.toNarrow (in_ ( n2, n4 ) AToZ.char)
+    "abcdef" |> Text.toNarrow (in_ ( n2, n4 ) AToZ.Morph.char)
     --> Ok [ 'a', 'b', 'c', 'd' ]
 
-    "abc_ef" |> Text.toNarrow (in_ ( n2, n4 ) AToZ.char)
+    "abc_ef" |> Text.toNarrow (in_ ( n2, n4 ) AToZ.Morph.char)
     --> Ok [ 'a', 'b', 'c' ]
 
-    "ab_def" |> Text.toNarrow (in_ ( n2, n4 ) AToZ.char)
+    "ab_def" |> Text.toNarrow (in_ ( n2, n4 ) AToZ.Morph.char)
     --> Ok [ 'a', 'b' ]
 
 
@@ -835,11 +835,11 @@ Alternative to [`Maybe.Morph.row`](Maybe-Morph#row) which instead returns a `Lis
     import String.Morph as Text
 
     -- we want one letter, optionally
-    "abc" |> Text.toNarrow (in_ ( n0, n1 ) AToZ.char)
+    "abc" |> Text.toNarrow (in_ ( n0, n1 ) AToZ.Morph.char)
     --> Ok [ 'a' ]
 
     -- if we don't get any, that's still okay
-    "123abc" |> Text.toNarrow (in_ ( n0, n1 ) AToZ.char)
+    "123abc" |> Text.toNarrow (in_ ( n0, n1 ) AToZ.Morph.char)
     --> Ok []
 
 
@@ -852,22 +852,22 @@ Alternative to [`Maybe.Morph.row`](Maybe-Morph#row) which instead returns a `Lis
     import String.Morph as Text
 
     -- we want a maximum of three letters
-    "abcdef" |> Text.toNarrow (in_ ( n0, n3 ) AToZ.char)
+    "abcdef" |> Text.toNarrow (in_ ( n0, n3 ) AToZ.Morph.char)
     --> Ok [ 'a', 'b', 'c' ]
 
     -- less than that is also okay
-    "ab_def" |> Text.toNarrow (in_ ( n0, n3 ) AToZ.char)
+    "ab_def" |> Text.toNarrow (in_ ( n0, n3 ) AToZ.Morph.char)
     --> Ok [ 'a', 'b' ]
 
     -- even zero letters are fine
-    "_underscore" |> Text.toNarrow (in_ ( n0, n3 ) AToZ.char)
+    "_underscore" |> Text.toNarrow (in_ ( n0, n3 ) AToZ.Morph.char)
     --> Ok []
 
     -- make sure we don't consume more than three letters
     "abcdef"
         |> Text.toNarrow
             (Morph.succeed (\letters -> letters)
-                |> grab (in_ ( n0, n3 ) AToZ.char)
+                |> grab (in_ ( n0, n3 ) AToZ.Morph.char)
                 |> match (one 'd')
             )
     --> Ok [ 'a', 'b', 'c' ]

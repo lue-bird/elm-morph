@@ -1341,29 +1341,35 @@ This will make errors and descriptions easier to understand.
 A good rule of thumb is to add a [`Morph.named`](#named) to every morph _declaration_
 or even more often.
 
-    import Morph.Error
-    import Char.Morph as Char
-    import String.Morph as Text
+    import Morph
+    import List.Morph
+    import String.Morph
+    import Decimal.Morph
+    import Decimal exposing (Decimal)
+    import AToZ.Morph
+    import ArraySized.Morph exposing (atLeast)
+    import N exposing (n1)
 
-    -- we can redefine an error message if something goes wrong
     "123"
         |> Text.toNarrow
             (Morph.named "variable name"
-                (atLeast n1 AToZ.char)
+                (atLeast n1 AToZ.Morph.char)
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
             )
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting a name consisting of letters. I got stuck when I got '1'."
+        |> Result.toMaybe
+    --> Nothing
 
 
-    import Morph exposing (take, drop, Morph.succeed, expect, one)
+    import Morph exposing (match, grab)
     import String.Morph as Text
 
     type alias Point =
         -- makes `Point` function unavailable:
         -- https://dark.elm.dmy.fr/packages/lue-bird/elm-no-record-type-alias-constructor-function/latest/
         RecordWithoutConstructorFunction
-            { x : Float
-            , y : Float
+            { x : Decimal
+            , y : Decimal
             }
 
     -- we can use `expect` to have more context when an error happens
@@ -1371,11 +1377,11 @@ or even more often.
     point =
         Morph.named "point"
             (Morph.succeed (\x y -> { x = x, y = y })
-                |> match (Char.Morph.only '(' |> one)
-                |> grab .x Text.number
-                |> match (Char.Morph.only ',' |> one)
-                |> grab .y Text.number
-                |> match (Char.Morph.only ')' |> one)
+                |> match (String.Morph.only "(")
+                |> grab .x Decimal.Morph.chars
+                |> match (Char.Morph.only ",")
+                |> grab .y Decimal.Morph.chars
+                |> match (String.Morph.only ")")
             )
 
     "(12,34)" |> narrow (map Text.fromList point)
@@ -2819,28 +2825,40 @@ match ignoredNextMorphRow =
 -- chain
 
 
-{-| Describe how to reach an even broader type.
+{-| Describe how to reach an even broader list type.
 
-  - try to keep [`Morph.overRow`](#over) filters/validations to a minimum to get
-      - a better error description out of the box
-      - a more descriptive and correct type
-      - building invalid values becomes impossible
+Try to keep [`Morph.overRow`](#overRow) filters/validations to a minimum to get
 
-↓
+  - a better error description out of the box
+  - a more descriptive and correct type
+  - building invalid values becomes impossible
+  - a morph that actually, constructively describes the format
 
-    import Morph exposing (toggle)
-    import Morph exposing (map, atLeast)
-    import Char.Morph as Char
-    import Text
+```
+import Morph
+import N exposing (n0, n9)
+import String.Morph
+import List.Morph
 
-    -- get some letters, make them lowercase
-    "ABC"
-        |> Text.toNarrow
-            (atLeast n1 AToZ.char
-                |> map Text.fromList
-                |> map (toggle String.toLower)
-            )
-    --> Ok "abc"
+"2-2"
+    |> Morph.toNarrow
+        -- two digits should be at most 9
+        -- and we're only interested in the sum
+        (N.Morph.in_ ( n0, n9 )
+            |> Morph.overRow
+                (Morph.succeed (\a b -> a |> N.add b)
+                    |> Morph.grab (\_ -> n0 |> N.maxTo n9) N.Morph.char
+                    |> Morph.match (String.Morph.only "-")
+                    |> Morph.grab identity N.Morph.char
+                )
+            |> Morph.rowFinish
+            |> Morph.over List.Morph.string
+        )
+--> Ok (n4 |> N.minTo n0 |> N.maxTo n9)
+```
+
+If this example seems really obscure then I can only agree with you.
+Have a better example showing a valid use-case? → PR
 
 -}
 overRow :
@@ -3815,7 +3833,7 @@ try this [`Morph`](#Morph).
                         letter aToZ
             )
             |> try Underscore (Char.Morph.only '_')
-            |> try Letter AToZ.char
+            |> try Letter AToZ.Morph.char
 
     -- try the first possibility
     "_" |> Text.toNarrow (underscoreOrLetter |> one)
@@ -4097,7 +4115,7 @@ try this [`MorphRow`](#MorphRow).
             |> Morph.tryRow (\() -> Underscore) (Char.Morph.only '_')
             |> Morph.tryRow Letter
                 (Morph.oneToOne .letter (\l -> { letter = l, case_ = AToZ.CaseLower })
-                    |> Morph.over AToZ.char
+                    |> Morph.over AToZ.Morph.char
                     |> Morph.one
                 )
             |> Morph.choiceFinish
@@ -4143,7 +4161,7 @@ try this [`MorphRow`](#MorphRow).
                         letter char
             )
             |> Morph.tryRow Letter
-                (atLeast n1 AToZ.lowerChar)
+                (atLeast n1 AToZ.Morph.lowerChar)
             |> Morph.tryRow Digit
                 (atLeast n1 N.Morph.char)
             |> Morph.choiceFinish

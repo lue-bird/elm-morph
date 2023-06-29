@@ -1,6 +1,7 @@
 module Email exposing (Email, chars)
 
 import AToZ exposing (AToZ)
+import AToZ.Morph
 import ArraySized exposing (ArraySized)
 import ArraySized.Morph exposing (atLeast)
 import Char.Morph
@@ -80,7 +81,7 @@ localSymbol =
             |> Morph.try LocalSymbolAToZ
                 (oneToOne .letter
                     (\letter -> { letter = letter, case_ = AToZ.CaseLower })
-                    |> Morph.over AToZ.char
+                    |> Morph.over AToZ.Morph.char
                 )
             |> Morph.try LocalSymbol0To9
                 (N.Morph.in_ ( n0, n9 )
@@ -215,7 +216,7 @@ hostLabelSideSymbol =
                     n0To9Variant n0To9Value
         )
         |> Morph.try HostLabelSideSymbolAToZ
-            AToZ.char
+            AToZ.Morph.char
         |> Morph.try HostLabelSideSymbol0To9
             (N.Morph.in_ ( n0, n9 )
                 |> Morph.over N.Morph.char
@@ -240,7 +241,7 @@ hostLabelSymbol =
         |> Morph.try (\() -> HostLabelHyphenMinus)
             (Char.Morph.only '-')
         |> Morph.try HostLabelSymbolAToZ
-            AToZ.char
+            AToZ.Morph.char
         |> Morph.try HostLabelSymbol0To9
             (N.Morph.in_ ( n0, n9 )
                 |> Morph.over N.Morph.char
@@ -262,7 +263,7 @@ domainTopLevel =
                 (whilePossible (N.Morph.char |> one))
             |> -- guarantees it can't be numeric only
                grab .firstAToZ
-                (AToZ.char |> one)
+                (AToZ.Morph.char |> one)
             |> grab .afterFirstAToZ
                 (whilePossible (domainTopLevelAfterFirstAToZSymbol |> one))
         )
@@ -284,7 +285,7 @@ domainTopLevelAfterFirstAToZSymbol =
                     n0To9Variant n0To9Value
         )
         |> Morph.try DomainTopLevelSymbolAToZ
-            AToZ.char
+            AToZ.Morph.char
         |> Morph.try DomainTopLevelSymbol0To9
             (N.Morph.in_ ( n0, n9 )
                 |> Morph.over N.Morph.char
