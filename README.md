@@ -8,7 +8,7 @@ a parser-builder: developer-friendly, general-purpose, great errors
 One ["morph"](Morph) can convert between narrow ⇄ broad types which is surprisingly useful!
 Below some appetizers
 
-## [`Value`](Value)
+## [`MorphValue`](Value-Morph)
 
 Easily serialize from and to elm values independent of output format.
 
