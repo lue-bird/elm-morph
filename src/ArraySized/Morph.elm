@@ -335,10 +335,6 @@ sequence :
             (ArraySized elementNarrow (In min max))
             broadElement
 sequence toSequence =
-    -- this implementation looks a bit... unfortunate
-    -- it could be simplified by either
-    --     - allowing empty and singleton sequence (this is a bit ugly)
-    --     - developing a better mechanism for ArraySized length matching (this might be hard)
     { description =
         case toSequence |> ArraySized.toList of
             [] ->
@@ -473,8 +469,7 @@ exactly :
             (ArraySized element (In min max))
             broadElement
 exactly repeatCount repeatedMorphRow =
-    Morph.named ([ "repeating ", repeatCount |> N.toString ] |> String.concat)
-        (sequence (ArraySized.repeat repeatedMorphRow repeatCount))
+    sequence (ArraySized.repeat repeatedMorphRow repeatCount)
 
 
 {-| Depending on the number parsed by a given morph,
@@ -779,23 +774,20 @@ atLeast :
             (ArraySized narrow (Min (On lowerLimit)))
             broadElement
 atLeast minimum elementStepMorphRow =
-    Morph.named
-        ([ "repeating ≥ ", minimum |> N.toString ] |> String.concat)
-        (Morph.oneToOne identity ArraySized.maxToInfinity
-            |> Morph.overRow
-                (Morph.succeed
-                    (\minimumArraySized overMinimum ->
-                        minimumArraySized
-                            |> ArraySized.attachMin Up overMinimum
-                    )
-                    |> grab
-                        (ArraySized.take Up { atLeast = minimum } minimum)
-                        (exactly minimum elementStepMorphRow)
-                    |> grab
-                        (\arr -> arr |> ArraySized.dropMin Up minimum |> ArraySized.minTo0)
-                        (list |> Morph.overRow (Morph.whilePossible elementStepMorphRow))
+    Morph.oneToOne identity ArraySized.maxToInfinity
+        |> Morph.overRow
+            (Morph.succeed
+                (\minimumArraySized overMinimum ->
+                    minimumArraySized
+                        |> ArraySized.attachMin Up overMinimum
                 )
-        )
+                |> grab
+                    (ArraySized.take Up { atLeast = minimum } minimum)
+                    (exactly minimum elementStepMorphRow)
+                |> grab
+                    (\arr -> arr |> ArraySized.dropMin Up minimum |> ArraySized.minTo0)
+                    (list |> Morph.overRow (Morph.whilePossible elementStepMorphRow))
+            )
 
 
 {-| Match a value between a minimum and maximum number of times
@@ -883,44 +875,35 @@ in_ :
             (ArraySized element (In (On min) (On max)))
             broadElement
 in_ ( lowerLimit, upperLimit ) repeatedElementMorphRow =
-    Morph.named
-        ([ "repeating "
-         , lowerLimit |> N.toString
-         , ".."
-         , upperLimit |> N.toString
-         ]
-            |> String.concat
-        )
-        (oneToOne identity (ArraySized.minTo lowerLimit)
-            |> Morph.overRow
-                (Morph.succeed
-                    (\minimumList overMinimum ->
-                        minimumList
-                            |> ArraySized.attachMin Up
-                                (overMinimum |> ArraySized.minTo n0)
-                            |> ArraySized.minTo lowerLimit
-                            |> ArraySized.take Up { atLeast = lowerLimit } upperLimit
-                    )
-                    |> grab
-                        (ArraySized.take Up { atLeast = lowerLimit } lowerLimit)
-                        (exactly lowerLimit repeatedElementMorphRow)
-                    |> grab
-                        (\arraySized ->
-                            arraySized
-                                |> ArraySized.dropMin Up lowerLimit
-                                |> ArraySized.maxToInfinity
-                                |> ArraySized.maxToOn
-                        )
-                        (atMost
-                            ((upperLimit |> N.toInt)
-                                - (lowerLimit |> N.toInt)
-                                |> N.intToAtLeast n0
-                                |> N.maxToOn
-                            )
-                            repeatedElementMorphRow
-                        )
+    oneToOne identity (ArraySized.minTo lowerLimit)
+        |> Morph.overRow
+            (Morph.succeed
+                (\minimumList overMinimum ->
+                    minimumList
+                        |> ArraySized.attachMin Up
+                            (overMinimum |> ArraySized.minTo n0)
+                        |> ArraySized.minTo lowerLimit
+                        |> ArraySized.take Up { atLeast = lowerLimit } upperLimit
                 )
-        )
+                |> grab
+                    (ArraySized.take Up { atLeast = lowerLimit } lowerLimit)
+                    (exactly lowerLimit repeatedElementMorphRow)
+                |> grab
+                    (\arraySized ->
+                        arraySized
+                            |> ArraySized.dropMin Up lowerLimit
+                            |> ArraySized.maxToInfinity
+                            |> ArraySized.maxToOn
+                    )
+                    (atMost
+                        ((upperLimit |> N.toInt)
+                            - (lowerLimit |> N.toInt)
+                            |> N.intToAtLeast n0
+                            |> N.maxToOn
+                        )
+                        repeatedElementMorphRow
+                    )
+            )
 
 
 {-| morph a given element less or equal to a given number of times
