@@ -461,54 +461,44 @@ isDescriptive =
 
 collapseChainDescription : ChainDescription -> List Description
 collapseChainDescription chainDescription =
-    let
-        tailCollapsed : List Description
-        tailCollapsed =
-            if isDescriptive chainDescription.broad then
-                case chainDescription.broad of
-                    NamedDescription namedDescription ->
-                        [ NamedDescription namedDescription ]
+    [ chainDescription.narrow, chainDescription.broad ]
+        |> List.concatMap
+            (\chainSideDescription ->
+                if isDescriptive chainSideDescription then
+                    case chainSideDescription of
+                        NamedDescription namedDescription ->
+                            [ NamedDescription namedDescription ]
 
-                    ChainDescription lateSequenceDescription ->
-                        collapseChainDescription lateSequenceDescription
+                        ChainDescription lateSequenceDescription ->
+                            collapseChainDescription lateSequenceDescription
 
-                    lastDescription ->
-                        [ lastDescription ]
+                        lastDescription ->
+                            [ lastDescription ]
 
-            else
-                []
-    in
-    if isDescriptive chainDescription.narrow then
-        chainDescription.narrow :: tailCollapsed
-
-    else
-        []
+                else
+                    []
+            )
 
 
 collapseSequenceDescription : SequenceDescription -> List Description
 collapseSequenceDescription sequenceDescription =
-    let
-        tailCollapsed : List Description
-        tailCollapsed =
-            if isDescriptive sequenceDescription.late then
-                case sequenceDescription.late of
-                    NamedDescription namedDescription ->
-                        [ NamedDescription namedDescription ]
+    [ sequenceDescription.early, sequenceDescription.late ]
+        |> List.concatMap
+            (\sequenceSideDescription ->
+                if isDescriptive sequenceSideDescription then
+                    case sequenceSideDescription of
+                        NamedDescription namedDescription ->
+                            [ NamedDescription namedDescription ]
 
-                    SequenceDescription lateSequenceDescription ->
-                        collapseSequenceDescription lateSequenceDescription
+                        SequenceDescription lateSequenceDescription ->
+                            collapseSequenceDescription lateSequenceDescription
 
-                    lastDescription ->
-                        [ lastDescription ]
+                        lastDescription ->
+                            [ lastDescription ]
 
-            else
-                []
-    in
-    if isDescriptive sequenceDescription.early then
-        sequenceDescription.early :: tailCollapsed
-
-    else
-        []
+                else
+                    []
+            )
 
 
 {-| Create a tree from the structured [`Description`](#Description)
@@ -556,18 +546,18 @@ descriptionToTree description_ =
 
         UntilDescription untilDescription ->
             Tree.tree { kind = DescriptionStructureKind, text = "until" }
-                ([ if not (isDescriptive untilDescription.commit) then
-                    Nothing
+                ((if not (isDescriptive untilDescription.commit) then
+                    identity
 
-                   else
-                    Tree.tree { kind = DescriptionStructureKind, text = "end" }
-                        [ descriptionToTree untilDescription.end ]
-                        |> Just
-                 , Tree.tree { kind = DescriptionStructureKind, text = "element" }
-                    [ descriptionToTree untilDescription.element ]
-                    |> Just
-                 ]
-                    |> List.filterMap identity
+                  else
+                    (::)
+                        (Tree.tree { kind = DescriptionStructureKind, text = "end" }
+                            [ descriptionToTree untilDescription.end ]
+                        )
+                 )
+                    [ Tree.tree { kind = DescriptionStructureKind, text = "element" }
+                        [ descriptionToTree untilDescription.element ]
+                    ]
                 )
 
         SequenceDescription elementDescriptions ->
@@ -1073,8 +1063,27 @@ collapseSequenceDescriptionAndError sequenceDescription sequenceError =
     case sequenceError.place of
         SequencePlaceEarly ->
             let
-                laterCollapsed : List (Tree { text : String, kind : DescriptionOrErrorKind })
-                laterCollapsed =
+                earlyCollapsed : List (Tree { text : String, kind : DescriptionOrErrorKind })
+                earlyCollapsed =
+                    case sequenceDescription.early of
+                        NamedDescription namedDescription ->
+                            [ descriptionAndErrorToTree (NamedDescription namedDescription) sequenceError.error ]
+
+                        SequenceDescription lateSequenceDescription ->
+                            case sequenceError.error of
+                                SequenceError lateSequenceError ->
+                                    collapseSequenceDescriptionAndError
+                                        lateSequenceDescription
+                                        lateSequenceError
+
+                                unexpectedError ->
+                                    [ unexpectedError |> unexpectedErrorToTree ]
+
+                        earlyNonSequenceDescription ->
+                            [ descriptionAndErrorToTree earlyNonSequenceDescription sequenceError.error ]
+
+                lateCollapsed : List (Tree { text : String, kind : DescriptionOrErrorKind })
+                lateCollapsed =
                     case sequenceDescription.late of
                         SequenceDescription lateSequenceDescription ->
                             collapseSequenceDescription lateSequenceDescription
@@ -1087,13 +1096,26 @@ collapseSequenceDescriptionAndError sequenceDescription sequenceError =
                             else
                                 []
             in
-            descriptionAndErrorToTree sequenceDescription.early sequenceError.error
-                :: laterCollapsed
+            earlyCollapsed ++ lateCollapsed
 
         SequencePlaceLate ->
             let
-                laterCollapsed : List (Tree { text : String, kind : DescriptionOrErrorKind })
-                laterCollapsed =
+                earlyCollapsed : List (Tree { text : String, kind : DescriptionOrErrorKind })
+                earlyCollapsed =
+                    case sequenceDescription.early of
+                        SequenceDescription earlySequenceDescription ->
+                            collapseSequenceDescription earlySequenceDescription
+                                |> List.map descriptionToLabelTree
+
+                        _ ->
+                            if isDescriptive sequenceDescription.early then
+                                [ descriptionToLabelTree sequenceDescription.early ]
+
+                            else
+                                []
+
+                lateCollapsed : List (Tree { text : String, kind : DescriptionOrErrorKind })
+                lateCollapsed =
                     case sequenceDescription.late of
                         NamedDescription namedDescription ->
                             [ descriptionAndErrorToTree (NamedDescription namedDescription) sequenceError.error ]
@@ -1111,12 +1133,7 @@ collapseSequenceDescriptionAndError sequenceDescription sequenceError =
                         lateNonSequenceDescription ->
                             [ descriptionAndErrorToTree lateNonSequenceDescription sequenceError.error ]
             in
-            if isDescriptive sequenceDescription.early then
-                descriptionToLabelTree sequenceDescription.early
-                    :: laterCollapsed
-
-            else
-                laterCollapsed
+            earlyCollapsed ++ lateCollapsed
 
 
 collapseChainDescriptionAndError :
@@ -1127,9 +1144,28 @@ collapseChainDescriptionAndError sequenceDescription sequenceError =
     case sequenceError.place of
         ChainPlaceNarrow ->
             let
-                broaderCollapsed : List (Tree { text : String, kind : DescriptionOrErrorKind })
-                broaderCollapsed =
+                narrowCollapsed : List (Tree { text : String, kind : DescriptionOrErrorKind })
+                narrowCollapsed =
                     case sequenceDescription.narrow of
+                        NamedDescription namedDescription ->
+                            [ descriptionAndErrorToTree (NamedDescription namedDescription) sequenceError.error ]
+
+                        ChainDescription broadChainDescription ->
+                            case sequenceError.error of
+                                ChainError broadChainError ->
+                                    collapseChainDescriptionAndError
+                                        broadChainDescription
+                                        broadChainError
+
+                                unexpectedError ->
+                                    [ unexpectedError |> unexpectedErrorToTree ]
+
+                        narrowNonChainDescription ->
+                            [ descriptionAndErrorToTree narrowNonChainDescription sequenceError.error ]
+
+                broadCollapsed : List (Tree { text : String, kind : DescriptionOrErrorKind })
+                broadCollapsed =
+                    case sequenceDescription.broad of
                         ChainDescription broadChainDescription ->
                             collapseChainDescription broadChainDescription
                                 |> List.map descriptionToLabelTree
@@ -1141,13 +1177,26 @@ collapseChainDescriptionAndError sequenceDescription sequenceError =
                             else
                                 []
             in
-            descriptionAndErrorToTree sequenceDescription.narrow sequenceError.error
-                :: broaderCollapsed
+            narrowCollapsed ++ broadCollapsed
 
         ChainPlaceBroad ->
             let
-                broaderCollapsed : List (Tree { text : String, kind : DescriptionOrErrorKind })
-                broaderCollapsed =
+                narrowCollapsed : List (Tree { text : String, kind : DescriptionOrErrorKind })
+                narrowCollapsed =
+                    case sequenceDescription.narrow of
+                        ChainDescription narrowChainDescription ->
+                            collapseChainDescription narrowChainDescription
+                                |> List.map descriptionToLabelTree
+
+                        _ ->
+                            if isDescriptive sequenceDescription.narrow then
+                                [ descriptionToLabelTree sequenceDescription.narrow ]
+
+                            else
+                                []
+
+                broadCollapsed : List (Tree { text : String, kind : DescriptionOrErrorKind })
+                broadCollapsed =
                     case sequenceDescription.broad of
                         NamedDescription namedDescription ->
                             [ descriptionAndErrorToTree (NamedDescription namedDescription) sequenceError.error ]
@@ -1165,12 +1214,7 @@ collapseChainDescriptionAndError sequenceDescription sequenceError =
                         broadNonChainDescription ->
                             [ descriptionAndErrorToTree broadNonChainDescription sequenceError.error ]
             in
-            if isDescriptive sequenceDescription.narrow then
-                descriptionToLabelTree sequenceDescription.narrow
-                    :: broaderCollapsed
-
-            else
-                broaderCollapsed
+            narrowCollapsed ++ broadCollapsed
 
 
 startDownLabel : { startDownInBroadList : Int } -> Tree { kind : DescriptionOrErrorKind, text : String }
