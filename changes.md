@@ -1,13 +1,7 @@
 ## TODO
 
-  - add `Value.bits`
+  - add `Value.Morph.bits`
   - add more tests
-
-## to consider
-
-  - split off `Json.Morph`
-      - improve consistency
-      - increase verboseness
 
 # change log
 

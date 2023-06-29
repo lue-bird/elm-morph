@@ -66,19 +66,11 @@ or define new atoms, composed structures, ... (↓ are used by [`Json`](Json) fo
 @docs atom, composed
 
 
-## broad formats
+## supported default broad formats
 
   - [`Json`](Json)
-      - [`jsValueMagic`](Json#jsValueMagic)
-      - [`string`](Json#string)
-
-Motivated? Explore, PR ↓
-
-  - `Url`/`AppUrl`
-  - `Xml`
-  - `Yaml`
-      - following [`MaybeJustJames/yaml`](https://github.com/MaybeJustJames/yaml/blob/2.1.1/src/Yaml/Parser.elm)
-  - ...
+      - [`Json.Morph.jsValueMagic`](Json-Morph#jsValueMagic)
+      - [`Json.Morph.string`](Json-Morph#string)
 
 -}
 
