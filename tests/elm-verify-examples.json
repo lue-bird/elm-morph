@@ -29,6 +29,7 @@
     "Set.Morph",
     "Dict.Morph",
     "Value",
+    "Value.Morph",
     "Json",
     "Util",
     "./README.md"

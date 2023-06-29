@@ -29,7 +29,7 @@ import Char.Morph
 import List.Morph
 import Morph exposing (MorphOrError, MorphRow, OneToOne, oneToOne, oneToOneOn)
 import String.Morph.Internal
-import Value
+import Value.Morph exposing (MorphValue)
 
 
 {-| [`OneToOne`](Morph#OneToOne) from a `String` to a `List Char`.
@@ -144,8 +144,8 @@ for charMorphRow expectedText =
 --
 
 
-{-| `String` [`Value.Morph`](Value#Morph)
+{-| `String` [`MorphValue`](Value-Morph#MorphValue)
 -}
-value : Value.Morph String
+value : MorphValue String
 value =
     String.Morph.Internal.value

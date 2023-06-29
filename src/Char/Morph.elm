@@ -23,7 +23,7 @@ import N exposing (n0, n11, n16, n3, n4, n5, n6, n7)
 import N.Local exposing (n21)
 import String.Morph.Internal
 import Utf8CodePoint exposing (Utf8CodePoint)
-import Value
+import Value.Morph exposing (MorphValue)
 
 
 {-| Character by unicode [code point][https://en.wikipedia.org/wiki/Code_point]
@@ -59,14 +59,14 @@ code =
         }
 
 
-{-| `Char` [`Value.Morph`](Value#Morph)
+{-| `Char` [`MorphValue`](Value-Morph#MorphValue)
 
 Be aware, that [special-cased characters as the result of `Char.toUpper`](https://github.com/elm/core/issues/1001)
 are [encoded](Morph#toBroad) as 2 `Char`s in a `String`
 and therefore can't be [decoded](Morph#toNarrow) again
 
 -}
-value : Value.Morph Char
+value : MorphValue Char
 value =
     string |> Morph.over String.Morph.Internal.value
 

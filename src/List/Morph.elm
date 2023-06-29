@@ -34,6 +34,7 @@ import Possibly exposing (Possibly(..))
 import Rope
 import Stack exposing (Stacked)
 import Value
+import Value.Morph exposing (MorphValue)
 
 
 
@@ -222,9 +223,9 @@ toString =
     Morph.invert string
 
 
-{-| `List` [`Value.Morph`](Value#Morph)
+{-| `List` [`MorphValue`](Value-Morph#MorphValue)
 -}
-value : Value.Morph element -> Value.Morph (List element)
+value : MorphValue element -> MorphValue (List element)
 value elementMorph =
     each elementMorph
         |> Morph.over
@@ -245,7 +246,7 @@ value elementMorph =
                 , toBroad = Value.List
                 }
             )
-        |> Morph.over Value.composed
+        |> Morph.over Value.Morph.composed
 
 
 {-| [`Morph`](Morph#Morph) all elements.

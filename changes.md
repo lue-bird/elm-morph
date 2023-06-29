@@ -5,7 +5,7 @@
 
 ## to consider
 
-  - splitting off `Value.Morph`, `Json-Morph`
+  - split off `Json.Morph`
       - improve consistency
       - increase verboseness
 

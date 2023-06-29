@@ -10,12 +10,12 @@ Below some appetizers
 
 ## [`Value`](Value)
 
-Serialize from and to elm values the easy way.
-Independent of output format
+Easily serialize from and to elm values independent of output format.
 
-Here's an example adapted from [elm guide on custom types](https://guide.elm-lang.org/types/custom_types.html)
+An example adapted from [elm guide on custom types](https://guide.elm-lang.org/types/custom_types.html):
 ```elm
 import Value
+import Value.Morph exposing (MorphValue)
 import Morph
 import String.Morph
 -- from lue-bird/elm-no-record-type-alias-constructor-function
@@ -29,7 +29,7 @@ type alias SignedIn =
     RecordWithoutConstructorFunction
         { name : String, status : String }
 
-value : Value.Morph User
+value : MorphValue User
 value =
     Morph.choice
         (\variantAnonymous variantSignedIn user ->
@@ -40,19 +40,19 @@ value =
                 SignedIn signedIn ->
                     variantSignedIn signedIn
         )
-        |> Value.variant ( \() -> Anonymous, "Anonymous" ) Value.unit
-        |> Value.variant ( SignedIn, "SignedIn" ) signedInValue
-        |> Value.choiceFinish
+        |> Value.Morph.variant ( \() -> Anonymous, "Anonymous" ) Value.Morph.unit
+        |> Value.Morph.variant ( SignedIn, "SignedIn" ) signedInValue
+        |> Value.Morph.choiceFinish
 
-signedInValue : Value.Morph SignedIn
+signedInValue : MorphValue SignedIn
 signedInValue =
-    Value.group
+    Value.Morph.group
         (\name status ->
             { name = name, status = status }
         )
-        |> Value.part ( .name, "name" ) String.Morph.value
-        |> Value.part ( .statue, "status" ) String.Morph.value
-        |> Value.groupFinish
+        |> Value.Morph.part ( .name, "name" ) String.Morph.value
+        |> Value.Morph.part ( .statue, "status" ) String.Morph.value
+        |> Value.Morph.groupFinish
 ```
 surprisingly easy and clean!
 

@@ -22,7 +22,7 @@ module Dict.Morph exposing
 import Dict exposing (Dict)
 import List.Morph
 import Morph exposing (ErrorWithDeadEnd, MorphIndependently, oneToOne, oneToOneOn)
-import Value
+import Value.Morph exposing (MorphValue)
 
 
 {-| [`OneToOne`](Morph#OneToOne) from a `List { key : key, value : value }` to a `Dict key value`.
@@ -118,13 +118,13 @@ eachValueMap valueMap =
 --
 
 
-{-| `Dict` [`Value.Morph`](Value#Morph)
+{-| `Dict` [`MorphValue`](Value-Morph#MorphValue)
 -}
 value :
-    { key : Value.Morph comparableKey
-    , value : Value.Morph value
+    { key : MorphValue comparableKey
+    , value : MorphValue value
     }
-    -> Value.Morph (Dict comparableKey value)
+    -> MorphValue (Dict comparableKey value)
 value entryMorphs =
     list
         |> Morph.over
@@ -132,13 +132,13 @@ value entryMorphs =
 
 
 keyValueValue :
-    { key : Value.Morph key
-    , value : Value.Morph value
+    { key : MorphValue key
+    , value : MorphValue value
     }
-    -> Value.Morph { key : key, value : value }
+    -> MorphValue { key : key, value : value }
 keyValueValue entryMorph =
-    Value.group
+    Value.Morph.group
         (\key value_ -> { key = key, value = value_ })
-        |> Value.part ( .key, "key" ) entryMorph.key
-        |> Value.part ( .value, "value" ) entryMorph.value
-        |> Value.groupFinish
+        |> Value.Morph.part ( .key, "key" ) entryMorph.key
+        |> Value.Morph.part ( .value, "value" ) entryMorph.value
+        |> Value.Morph.groupFinish

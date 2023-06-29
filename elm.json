@@ -28,6 +28,7 @@
         "Set.Morph",
         "Dict.Morph",
         "Value",
+        "Value.Morph",
         "Json"
     ],
     "elm-version": "0.19.1 <= v < 0.20.0",

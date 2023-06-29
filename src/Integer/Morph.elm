@@ -37,7 +37,7 @@ import NaturalAtLeast1.Internal
 import Sign
 import Sign.Morph
 import String.Morph
-import Value
+import Value.Morph exposing (MorphValue)
 
 
 {-| [`Morph`](Morph#Morph) an [`Integer`](Integer#Integer)
@@ -109,9 +109,9 @@ decimalSignedAbsolute =
         }
 
 
-{-| [`Value.Morph`](Value#Morph) from an [`Integer`](Integer#Integer)
+{-| [`MorphValue`](Value-Morph#MorphValue) from an [`Integer`](Integer#Integer)
 -}
-value : Value.Morph Integer
+value : MorphValue Integer
 value =
     decimal |> Morph.over Decimal.Morph.value
 

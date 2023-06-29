@@ -41,6 +41,7 @@ import Sign.Morph
 import Stack exposing (Stacked)
 import String.Morph
 import Value
+import Value.Morph exposing (MorphValue)
 
 
 {-| [`Morph`](Morph#Morph)
@@ -208,14 +209,14 @@ fractionChars =
         )
 
 
-{-| [`Value.Morph`](Value#Morph) from a [`Decimal`](Decimal#Decimal)
+{-| [`MorphValue`](Value-Morph#MorphValue) from a [`Decimal`](Decimal#Decimal)
 
-To get a [`Value.Morph`](Value#Morph) from a `Float`,
+To get a [`MorphValue`](Value-Morph#MorphValue) from a `Float`,
 use [`Decimal.Morph.orExceptionToFloat`](#orExceptionToFloat)
 over [`Decimal.Morph.orExceptionValue`](#orExceptionValue)
 
 -}
-value : Value.Morph Decimal
+value : MorphValue Decimal
 value =
     Morph.custom "Decimal"
         { toNarrow =
@@ -228,16 +229,16 @@ value =
                         atomExceptDecimal |> Value.atomKindToString |> Err
         , toBroad = Value.Number
         }
-        |> Morph.over Value.atom
+        |> Morph.over Value.Morph.atom
 
 
 
 -- OrException Decimal
 
 
-{-| [`Value.Morph`](Value#Morph) from an [`Exception`](Decimal#Exception)
+{-| [`MorphValue`](Value-Morph#MorphValue) from an [`Exception`](Decimal#Exception)
 -}
-exceptionValue : Value.Morph Exception
+exceptionValue : MorphValue Exception
 exceptionValue =
     Morph.choice
         (\variantNaN variantInfinity choiceException ->
@@ -248,12 +249,12 @@ exceptionValue =
                 Infinity sign ->
                     variantInfinity sign
         )
-        |> Value.variant ( \() -> NaN, "NaN" ) Value.unit
-        |> Value.variant ( Infinity, "NaN" ) signValue
-        |> Value.choiceFinish
+        |> Value.Morph.variant ( \() -> NaN, "NaN" ) Value.Morph.unit
+        |> Value.Morph.variant ( Infinity, "NaN" ) signValue
+        |> Value.Morph.choiceFinish
 
 
-signValue : Value.Morph Sign
+signValue : MorphValue Sign
 signValue =
     Morph.choice
         (\negative positive sign ->
@@ -264,9 +265,9 @@ signValue =
                 Positive ->
                     positive ()
         )
-        |> Value.variant ( \() -> Negative, "Negative" ) Value.unit
-        |> Value.variant ( \() -> Positive, "Positive" ) Value.unit
-        |> Value.choiceFinish
+        |> Value.Morph.variant ( \() -> Negative, "Negative" ) Value.Morph.unit
+        |> Value.Morph.variant ( \() -> Positive, "Positive" ) Value.Morph.unit
+        |> Value.Morph.choiceFinish
 
 
 {-| [`Morph`](Morph#Morph)
@@ -525,9 +526,9 @@ orExceptionToFloat =
     Morph.invert orExceptionFloat
 
 
-{-| `Float` [`Value.Morph`](Value#Morph)
+{-| `Float` [`MorphValue`](Value-Morph#MorphValue)
 -}
-orExceptionValue : Value.Morph (OrException Decimal)
+orExceptionValue : MorphValue (OrException Decimal)
 orExceptionValue =
     Morph.choice
         (\variantDecimal variantException choiceExplicit ->
@@ -538,12 +539,12 @@ orExceptionValue =
                 Exception exception ->
                     variantException exception
         )
-        |> Value.variant ( Number, "Decimal" ) decimalInternalValue
-        |> Value.variant ( Exception, "Exception" ) exceptionValue
-        |> Value.choiceFinish
+        |> Value.Morph.variant ( Number, "Decimal" ) decimalInternalValue
+        |> Value.Morph.variant ( Exception, "Exception" ) exceptionValue
+        |> Value.Morph.choiceFinish
 
 
-decimalInternalValue : Value.Morph Decimal
+decimalInternalValue : MorphValue Decimal
 decimalInternalValue =
     Morph.custom "Decimal"
         { toNarrow =
@@ -558,4 +559,4 @@ decimalInternalValue =
                             |> Err
         , toBroad = Value.Number
         }
-        |> Morph.over Value.atom
+        |> Morph.over Value.Morph.atom

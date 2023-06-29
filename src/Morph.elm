@@ -280,10 +280,10 @@ where
 
 For example:
 
-  - [`Value.Morph`](Value#Morph): [`toBroad`](#toBroad) returns a value where we know
+  - [`MorphValue`](Value-Morph#MorphValue): [`toBroad`](#toBroad) returns a value where we know
     **both index and name** for each field/variant,
     whereas [`toNarrow`](#toNarrow) allows **either index or name** for each field/variant.
-    This allows us to choose whether we want a [`descriptive`](Value#descriptive) or [`compact`](Value#compact)
+    This allows us to choose whether we want a [`descriptive`](Value-Morph#descriptive) or [`compact`](Value-Morph#compact)
     view at the end, being able to switch anytime or use both for different situations.
   - [`Stack.Morph.list`](Stack-Morph#list) allows different element types for both directions.
     This is not necessary at all but allows it to be used more generally.

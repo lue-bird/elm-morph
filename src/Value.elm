@@ -1,15 +1,10 @@
 module Value exposing
-    ( Value, Atom(..), Composed(..), Record, Tagged
-    , Morph
-    , unit
-    , GroupMorphEmptiable, PartsError(..)
-    , group, part, groupFinish
-    , variant, choiceFinish
-    , Name, Index, IndexOrName(..), IndexAndName
-    , descriptive, compact, eachTag, tagMap
-    , AtomOrComposed(..)
-    , atom, composed, composedMap
+    ( AtomOrComposed(..)
+    , composedMap
+    , Value, Atom(..), Composed(..), Record, Tagged
     , atomKindToString, composedKindToString
+    , Name, Index, IndexOrName(..), IndexAndName
+    , tagMap
     )
 
 {-| Generic, `case`-able elm value
@@ -22,84 +17,19 @@ so each time you have to spell it out.
 Switching to a different format would also be a lot of work;
 some low-level primitives like bools might not be supported etc.
 
+This module has all the types and operations for these generic [`Value`](#Value)s
+while [`MorphValue`](Value-Morph) is used to convert your types.
+
+@docs AtomOrComposed
+@docs composedMap
 @docs Value, Atom, Composed, Record, Tagged
-
-
-## morph
-
-@docs Morph
-@docs unit
-
-Basically every `module` here has a [`Value.Morph`](#Morph),
-for example
-
-  - [`Integer.Morph`](Integer-Morph)
-  - [`Decimal.Morph`](Decimal-Morph)
-  - [`String.Morph`](String-Morph)
-  - [`Maybe.Morph`](Maybe-Morph)
-  - [`List.Morph`](List-Morph)
-  - [`Dict.Morph`](Dict-Morph)
-  - [`Set.Morph`](Set-Morph)
-  - [`Array.Morph`](Array-Morph)
-
-
-### grouping
-
-@docs GroupMorphEmptiable, PartsError
-@docs group, part, groupFinish
-
-
-### choice
-
-variant union [`Morph`](#Morph)
-
-  - starting from [`Morph.choice`](Morph#choice)
-  - over [`Value.variant`](#variant)
-  - and completed with [`Value.choiceFinish`](#choiceFinish)
-
-@docs variant, choiceFinish
+@docs atomKindToString, composedKindToString
 
 
 ## tag
 
 @docs Name, Index, IndexOrName, IndexAndName
-
-@docs descriptive, compact, eachTag, tagMap
-
-
-## spin your own
-
-build on existing ones
-
-    {-| `Posix` `Value.Morph`
-    -}
-    posixValue : Value.Morph Posix
-    posixValue =
-        Morph.oneToOne
-            Time.posixToMillis
-            Time.millisToPosix
-            |> Morph.over Int.Morph.value
-
-or define new atoms, composed structures, ... (↓ are used by [`Json`](Json) for example)
-
-@docs AtomOrComposed
-@docs atom, composed, composedMap
-@docs atomKindToString, composedKindToString
-
-
-## broad formats
-
-  - [`Json`](Json)
-      - [`jsValueMagic`](Json#jsValueMagic)
-      - [`string`](Json#string)
-
-Motivated? Explore, PR ↓
-
-  - `Url`/`AppUrl`
-  - `Xml`
-  - `Yaml`
-      - following [`MaybeJustJames/yaml`](https://github.com/MaybeJustJames/yaml/blob/2.1.1/src/Yaml/Parser.elm)
-  - ...
+@docs tagMap
 
 
 ## prior art
@@ -130,11 +60,7 @@ Motivated? Explore, PR ↓
 
 import Array exposing (Array)
 import Decimal exposing (Decimal)
-import Emptiable exposing (Emptiable)
-import Morph exposing (ChoiceMorphEmptiable, ErrorWithDeadEnd(..), Morph, MorphIndependently, oneToOne)
-import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
-import Stack exposing (Stacked)
 
 
 {-| An elm literal (that doesn't itself contain other [values](#Value))
@@ -158,7 +84,7 @@ type AtomOrComposed atom composed
 
 {-| Generic representation of any value representable in elm
 
-Use to the [`Morph`](#Morph)s present in most `module`s of this package
+Use the [`MorphValue`](Value-Morph#MorphValue)s present in most `module`s of this package
 to convert a [`Value`](#Value).
 
 -}
@@ -198,9 +124,9 @@ type alias Record tag =
     List (Tagged tag)
 
 
-{-| EIther [`Index`](#Index) or [`Name`](#Name)
+{-| Either [`Index`](#Index) or [`Name`](#Name)
 
-Used as the narrow argument of a [`Morph`](#Morph)
+Used as the narrow argument of a [`MorphValue`](Value-Morph#MorphValue)
 
 -}
 type IndexOrName
@@ -224,7 +150,7 @@ type alias Name =
 
 {-| Both [`Index`](#Index) and [`Name`](#Name)
 
-Used as the broad result of a [`Morph`](#Morph)
+Used as the broad result of a [`MorphValue`](Value-Morph#MorphValue)
 
 -}
 type alias IndexAndName =
@@ -234,76 +160,6 @@ type alias IndexAndName =
 
 
 -- alter
-
-
-{-| with readable names. Use in combination with [`eachTag`](#eachTag)
-
-  - field tag = name given to the [`part` `Morph`](#part)
-  - variant tag = name given to the [`variant` `Morph`](#variant)
-  - →
-      - readable by humans
-      - readable by other tools
-      - debuggable
-      - shuffling fields [`Morph`](#Morph) order → no change
-      - renaming fields → breaking change
-      - not [`compact`](#compact)
-
--}
-descriptive :
-    MorphIndependently
-        (Name -> Result error_ IndexOrName)
-        (IndexAndName -> Name)
-descriptive =
-    oneToOne
-        (\tag -> tag.name |> Name)
-        (\tag -> { name = tag.name })
-
-
-{-| With compact indexes. Use in combination with [`eachTag`](#eachTag)
-
-  - field tag = [`field` `Morph`](#part) index index in the builder
-  - variant tag = [`variant` `Morph`](#variant) index in the builder
-  - →
-      - not [`descriptive`](#descriptive)
-
--}
-compact :
-    MorphIndependently
-        (Index -> Result error_ IndexOrName)
-        (IndexAndName -> Index)
-compact =
-    oneToOne
-        (\tag -> tag.index |> Index)
-        (\tag -> { index = tag.index })
-
-
-{-| [`OneToOne`](Morph#OneToOne) a [`Value`](#Value)
-by reducing the amount of tag information in both directions
-
-For [`Value`](#Value), it's
-
-    ...
-        |> Morph.over (eachTag compact)
-
-    -- or
-    ...
-        |> Morph.over (eachTag descriptive)
-
-but the same thing works for [`Json`](Json), ... as well
-
--}
-eachTag :
-    MorphIndependently
-        (tagBeforeMap -> Result (Morph.ErrorWithDeadEnd Never) tagMapped)
-        (tagBeforeUnmap -> tagUnmapped)
-    ->
-        MorphIndependently
-            (Value tagBeforeMap
-             -> Result (Morph.ErrorWithDeadEnd never_) (Value tagMapped)
-            )
-            (Value tagBeforeUnmap -> Value tagUnmapped)
-eachTag tagTranslate_ =
-    Morph.oneToOneOn ( tagMap, tagMap ) tagTranslate_
 
 
 {-| Reduce the amount of tag information of the [`Value`](#Value)
@@ -377,79 +233,6 @@ composedMap composedChange =
                     |> Composed
 
 
-
--- morph
-
-
-{-| [`Morph`](Morph#Morph) between a given narrow value
-and a [generic value](#Value)
-
-The way it's set up, it allows tags that are either
-
-  - [`descriptive`](#descriptive)
-  - [`compact`](#compact)
-
--}
-type alias Morph narrow =
-    Morph.MorphIndependently
-        (Value IndexOrName
-         -> Result Morph.Error narrow
-        )
-        (narrow -> Value IndexAndName)
-
-
-
--- atom or composed
-
-
-{-| [`Morph`](Morph#Morph) to a [`AtomOrComposed`](#AtomOrComposed)'s atom if possible
--}
-atom :
-    Morph.MorphIndependently
-        (AtomOrComposed narrowAtom narrowComposed_
-         -> Result Morph.Error narrowAtom
-        )
-        (broadAtom
-         -> AtomOrComposed broadAtom broadComposed_
-        )
-atom =
-    Morph.custom "Atom"
-        { toBroad = Atom
-        , toNarrow =
-            \value ->
-                case value of
-                    Atom atomAny ->
-                        atomAny |> Ok
-
-                    Composed _ ->
-                        "Composed" |> Err
-        }
-
-
-{-| [`Morph`](Morph#Morph) to a [`AtomOrComposed`](#AtomOrComposed)'s composed if possible
--}
-composed :
-    MorphIndependently
-        (AtomOrComposed narrowAtom_ narrowComposed
-         -> Result Morph.Error narrowComposed
-        )
-        (broadComposed
-         -> AtomOrComposed broadAtom_ broadComposed
-        )
-composed =
-    Morph.custom "Composed"
-        { toBroad = Composed
-        , toNarrow =
-            \value ->
-                case value of
-                    Composed composed_ ->
-                        composed_ |> Ok
-
-                    Atom _ ->
-                        "Atom" |> Err
-        }
-
-
 {-| Describe the type of [`Atom`](#Atom)
 -}
 atomKindToString : Atom -> String
@@ -483,440 +266,3 @@ composedKindToString =
 
             Variant _ ->
                 "Variant"
-
-
-{-| `()` [`Morph`](#Morph)
-
-Often used in when [morphing](Value#Morph) a [variant](Value#variant)
-with 0 attached values
-
--}
-unit : Morph ()
-unit =
-    Morph.custom "Unit"
-        { toBroad = Unit
-        , toNarrow =
-            \value_ ->
-                case value_ of
-                    Unit unitValue ->
-                        unitValue |> Ok
-
-                    atomExceptUnit ->
-                        atomExceptUnit |> atomKindToString |> Err
-        }
-        |> Morph.over atom
-
-
-{-| Start a record assembly [`Morph`](#Morph)
-
-Continue with [`field`](#part)
-
-An example translated from [`elm/json`](https://dark.elm.dmy.fr/packages/elm/json/latest/)
-
-    import Decimal exposing (Decimal)
-    import Decimal.Morph
-    import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
-    import String.Morph
-    import Value
-
-    type alias Cause =
-        RecordWithoutConstructorFunction
-            { name : String
-            , percent : Decimal
-            , per100k : Decimal
-            }
-
-    value : Value.Morph Cause
-    value =
-        Value.group
-            (\name percent per100k ->
-                { name = name, percent = percent, per100k = per100k }
-            )
-            |> Value.part ( .name, "name" ) String.Morph.value
-            |> Value.part ( .percent, "percent" ) Decimal.Morph.value
-            |> Value.part ( .per100k, "per100k" ) Decimal.Morph.value
-            |> Value.groupFinish
-
-Another example for tuples
-
-    {-| `( ..., ... )` `Morph`
-
-    Just use a record with descriptive names instead!
-
-    -}
-    tuple2 :
-        ( Morph part0
-        , Morph part1
-        )
-        -> Morph ( part0, part1 )
-    tuple2 ( part0Morph, part1Morph ) =
-        Morph.named "Tuple2"
-            (record
-                (\part0 part1 -> ( part0, part1 ))
-                |> field ( Tuple.first, "part0" ) part0Morph
-                |> field ( Tuple.second, "part1" ) part1Morph
-                |> recordFinish
-            )
-
-    {-| `( ..., ..., ... )` `Morph`
-
-    Just use a record with descriptive names instead!
-
-    -}
-    tuple3 :
-        ( Morph part0
-        , Morph part1
-        , Morph part2
-        )
-        -> Morph ( part0, part1, part2 )
-    tuple3 ( part0Morph, part1Morph, part2Morph ) =
-        Morph.named "Tuple3"
-            (record
-                (\part0 part1 part2 -> ( part0, part1, part2 ))
-                |> field ( \( part0, _, _ ) -> part0, "part0" ) part0Morph
-                |> field ( \( _, part1, _ ) -> part1, "part1" ) part1Morph
-                |> field ( \( _, _, part2 ) -> part2, "part2" ) part2Morph
-                |> recordFinish
-            )
-
--}
-group :
-    groupNarrowAssemble
-    -> GroupMorphEmptiable Possibly groupNarrow_ groupNarrowAssemble
-group groupNarrowAssemble =
-    Morph.parts ( groupNarrowAssemble, [] )
-
-
-{-| possibly incomplete step from and to a [`Record`](Value#Record)
-
-building:
-
-  - start with [`group`](#group)
-  - continue with [`field`](#part)
-  - finish with [`groupFinish`](#groupFinish)
-
--}
-type alias GroupMorphEmptiable noPartPossiblyOrNever groupNarrow groupNarrowFurther =
-    Morph.PartsMorphEmptiable
-        noPartPossiblyOrNever
-        (Record IndexOrName
-         -> Result PartsError groupNarrowFurther
-        )
-        (groupNarrow -> Record IndexAndName)
-
-
-{-| What can go wrong narrowing a [`Record`](#Record)
--}
-type PartsError
-    = TagsMissing (Emptiable (Stacked Int) Never)
-    | ValueError { index : Int, error : Morph.Error }
-
-
-{-| Continue a group assembly [`Morph`](#Morph) to [`Value`](#Value).
-
-  - finish with [`groupFinish`](#groupFinish)
-
--}
-part :
-    ( group -> fieldValueNarrow
-    , String
-    )
-    -> Morph fieldValueNarrow
-    ->
-        (GroupMorphEmptiable
-            noPartPossiblyOrNever_
-            group
-            (fieldValueNarrow -> groupNarrowFurther)
-         ->
-            GroupMorphEmptiable
-                noPartNever_
-                group
-                groupNarrowFurther
-        )
-part ( accessFieldValue, fieldName ) fieldValueMorph =
-    \groupMorphSoFar ->
-        let
-            tag : IndexAndName
-            tag =
-                { index = groupMorphSoFar.description |> Stack.length
-                , name = fieldName
-                }
-        in
-        { description =
-            groupMorphSoFar.description
-                |> Stack.onTopLay
-                    { tag = tag.name, value = fieldValueMorph.description }
-        , toNarrow =
-            \groupBroad ->
-                partValueNarrow tag fieldValueMorph groupMorphSoFar.toNarrow groupBroad
-        , toBroad =
-            \wholeNarrow ->
-                let
-                    fieldValueBroad : Value IndexAndName
-                    fieldValueBroad =
-                        wholeNarrow
-                            |> accessFieldValue
-                            |> Morph.toBroad fieldValueMorph
-
-                    fieldBroad : Tagged IndexAndName
-                    fieldBroad =
-                        { tag = tag
-                        , value = fieldValueBroad
-                        }
-                in
-                wholeNarrow
-                    |> groupMorphSoFar.toBroad
-                    |> (::) fieldBroad
-        }
-
-
-partValueNarrow :
-    IndexAndName
-    -> Morph fieldValueNarrow
-    ->
-        (List (Tagged IndexOrName)
-         -> Result PartsError (fieldValueNarrow -> groupNarrowFurther)
-        )
-    ->
-        (List (Tagged IndexOrName)
-         -> Result PartsError groupNarrowFurther
-        )
-partValueNarrow tag fieldValueMorph groupSoFarNarrow =
-    let
-        matches : IndexOrName -> Bool
-        matches =
-            \tagIndexOrName ->
-                case tagIndexOrName of
-                    Index index ->
-                        index == tag.index
-
-                    Name name ->
-                        name == tag.name
-    in
-    \groupBroad ->
-        let
-            wholeAssemblyResult :
-                Result
-                    PartsError
-                    (fieldValueNarrow -> groupNarrowFurther)
-            wholeAssemblyResult =
-                groupBroad |> groupSoFarNarrow
-        in
-        case groupBroad |> List.filter (.tag >> matches) of
-            partBroad :: _ ->
-                case partBroad.value |> Morph.toNarrow fieldValueMorph of
-                    Ok partNarrow ->
-                        wholeAssemblyResult
-                            |> Result.map (\eat -> eat partNarrow)
-
-                    Err innerError ->
-                        ValueError
-                            { index = tag.index
-                            , error = innerError
-                            }
-                            |> Err
-
-            [] ->
-                let
-                    tagsMissingSoFar : Emptiable (Stacked Int) Possibly
-                    tagsMissingSoFar =
-                        case wholeAssemblyResult of
-                            Err (TagsMissing tagsMissing) ->
-                                tagsMissing |> Emptiable.emptyAdapt (\_ -> Possible)
-
-                            Err (ValueError _) ->
-                                Emptiable.empty
-
-                            Ok _ ->
-                                Emptiable.empty
-                in
-                TagsMissing (Stack.onTopLay tag.index tagsMissingSoFar) |> Err
-
-
-{-| Conclude the [`group`](#group) |> [`field`](#part) chain
--}
-groupFinish :
-    GroupMorphEmptiable Never record record
-    -> Morph record
-groupFinish =
-    \groupMorphComplete ->
-        groupMorphComplete
-            |> partsFinish
-            |> Morph.over
-                (Morph.custom "Record"
-                    { toBroad = Record
-                    , toNarrow =
-                        \composedBroad ->
-                            case composedBroad of
-                                Record recordNarrow ->
-                                    recordNarrow |> Ok
-
-                                composedExceptRecord ->
-                                    composedExceptRecord |> composedKindToString |> Err
-                    }
-                )
-            |> Morph.over composed
-
-
-partsFinish :
-    GroupMorphEmptiable
-        Never
-        groupNarrow
-        groupNarrow
-    ->
-        MorphIndependently
-            (Record IndexOrName -> Result Morph.Error groupNarrow)
-            (groupNarrow -> Record IndexAndName)
-partsFinish =
-    \groupMorphInProgress ->
-        { description =
-            groupMorphInProgress.description |> Morph.PartsDescription
-        , toNarrow =
-            \broad_ ->
-                broad_
-                    |> groupMorphInProgress.toNarrow
-                    |> Result.mapError
-                        (\error ->
-                            case error of
-                                TagsMissing missingTags ->
-                                    "missing parts: "
-                                        ++ (missingTags |> Stack.toList |> List.map String.fromInt |> String.join ", ")
-                                        |> DeadEnd
-
-                                ValueError valueError ->
-                                    valueError |> Stack.one |> Morph.PartsError
-                        )
-        , toBroad = groupMorphInProgress.toBroad
-        }
-
-
-{-| Describe another variant [`Morph`](#Morph) to [`Value`](#Value)
-
-Done? → [`Value.choiceFinish`](#choiceFinish)
-
-If a variant doesn't have any value attached, use [`unit`](Value#unit)
-
-    {-| `Bool` `MorphValue`
-    -}
-    boolValue : MorphValue Bool
-    boolValue =
-        Morph.choice
-            (\true false bool ->
-                case bool of
-                    True ->
-                        true ()
-
-                    False ->
-                        false ()
-            )
-            |> Value.variant ( \() -> True, "True" ) unit
-            |> Value.variant ( \() -> False, "False" ) unit
-            |> Value.choiceFinish
-
--}
-variant :
-    ( possibilityNarrow -> choiceNarrow
-    , String
-    )
-    -> Morph possibilityNarrow
-    ->
-        (ChoiceMorphEmptiable
-            noTryPossiblyOrNever_
-            choiceNarrow
-            (Tagged IndexOrName)
-            ((possibilityNarrow
-              -> Tagged IndexAndName
-             )
-             -> choiceBroadenFurther
-            )
-            Morph.Error
-         ->
-            ChoiceMorphEmptiable
-                noTryNever_
-                choiceNarrow
-                (Tagged IndexOrName)
-                choiceBroadenFurther
-                Morph.Error
-        )
-variant ( possibilityToChoice, possibilityTag ) possibilityMorph =
-    \choiceMorphSoFar ->
-        choiceMorphSoFar
-            |> Morph.try possibilityToChoice
-                (Morph.named possibilityTag
-                    { description = possibilityMorph |> Morph.description
-                    , toNarrow =
-                        variantStepNarrow
-                            ( { name = possibilityTag
-                              , index = choiceMorphSoFar.description |> Stack.length
-                              }
-                            , Morph.toNarrow possibilityMorph
-                            )
-                    , toBroad =
-                        \narrowValue ->
-                            { tag =
-                                { name = possibilityTag
-                                , index = choiceMorphSoFar.description |> Stack.length
-                                }
-                            , value = narrowValue |> Morph.toBroad possibilityMorph
-                            }
-                    }
-                )
-
-
-variantStepNarrow :
-    ( IndexAndName
-    , Value IndexOrName
-      -> Result Morph.Error possibilityNarrow
-    )
-    ->
-        (Tagged IndexOrName
-         -> Result Morph.Error possibilityNarrow
-        )
-variantStepNarrow ( variantTag, possibilityNarrow ) =
-    \variantBroad ->
-        case variantBroad.tag of
-            Index index ->
-                if index == variantTag.index then
-                    variantBroad.value |> possibilityNarrow
-
-                else
-                    "tag " ++ (index |> String.fromInt) |> Morph.DeadEnd |> Err
-
-            Name name ->
-                if name == variantTag.name then
-                    variantBroad.value |> possibilityNarrow
-
-                else
-                    "tag " ++ name |> Morph.DeadEnd |> Err
-
-
-{-| Conclude a [`Morph.choice`](Morph#choice) |> [`Value.variant`](#variant) chain
--}
-choiceFinish :
-    ChoiceMorphEmptiable
-        Never
-        choiceNarrow
-        (Tagged IndexOrName)
-        (choiceNarrow -> Tagged IndexAndName)
-        Morph.Error
-    -> Morph choiceNarrow
-choiceFinish =
-    \choiceMorphComplete ->
-        choiceMorphComplete
-            |> Morph.choiceFinish
-            |> Morph.over
-                (Morph.custom "Variant"
-                    { toNarrow =
-                        \value ->
-                            case value of
-                                Variant variant_ ->
-                                    variant_ |> Ok
-
-                                composedExceptVariant ->
-                                    composedExceptVariant
-                                        |> composedKindToString
-                                        |> Err
-                    , toBroad = Variant
-                    }
-                )
-            |> Morph.over composed

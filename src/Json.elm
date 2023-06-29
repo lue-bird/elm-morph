@@ -449,7 +449,7 @@ composedFromValue =
     ...
         |> Morph.over (Json.eachTag Value.descriptive)
 
-Links: [`Value.compact`](Value#compact), [`Value.descriptive`](Value#descriptive)
+Links: [`Value.compact`](Value-Morph#compact), [`Value.descriptive`](Value-Morph#descriptive)
 
 -}
 eachTag :
@@ -467,7 +467,7 @@ eachTag tagTranslate_ =
 
 
 {-| Reduce the amount of tag information.
-Used to make its representation [`compact`](Value#compact) or [`descriptive`](Value#descriptive)
+Used to make its representation [`compact`](Value-Morph#compact) or [`descriptive`](Value-Morph#descriptive)
 -}
 tagMap : (tag -> tagMapped) -> (Json tag -> Json tagMapped)
 tagMap tagChange =

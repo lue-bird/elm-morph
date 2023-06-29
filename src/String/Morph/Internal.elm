@@ -2,9 +2,10 @@ module String.Morph.Internal exposing (value)
 
 import Morph
 import Value
+import Value.Morph exposing (MorphValue)
 
 
-value : Value.Morph String
+value : MorphValue String
 value =
     Morph.custom "String"
         { toBroad = Value.String
@@ -17,4 +18,4 @@ value =
                     atomExceptString ->
                         atomExceptString |> Value.atomKindToString |> Err
         }
-        |> Morph.over Value.atom
+        |> Morph.over Value.Morph.atom

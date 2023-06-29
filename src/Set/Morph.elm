@@ -25,7 +25,7 @@ import Morph exposing (MorphIndependently, oneToOne)
 import Possibly exposing (Possibly(..))
 import Set exposing (Set)
 import Stack
-import Value
+import Value.Morph exposing (MorphValue)
 
 
 {-| [`OneToOne`](Morph#OneToOne) from `List` to `Set`
@@ -144,10 +144,10 @@ each elementMorph =
 --
 
 
-{-| `Set` [`Value.Morph`](Value#Morph)
+{-| `Set` [`MorphValue`](Value-Morph#MorphValue)
 -}
 value :
-    Value.Morph comparableElement
-    -> Value.Morph (Set comparableElement)
+    MorphValue comparableElement
+    -> MorphValue (Set comparableElement)
 value elementMorph =
     list |> Morph.over (List.Morph.value elementMorph)

@@ -25,6 +25,7 @@ import Morph exposing (MorphIndependently, oneToOne)
 import Possibly exposing (Possibly(..))
 import Stack
 import Value
+import Value.Morph exposing (MorphValue)
 
 
 {-| [`OneToOne`](Morph#OneToOne) from `List` to `Array`
@@ -65,9 +66,9 @@ toList =
 --
 
 
-{-| `Array` [`Value.Morph`](Value#Morph)
+{-| `Array` [`MorphValue`](Value-Morph#MorphValue)
 -}
-value : Value.Morph element -> Value.Morph (Array element)
+value : MorphValue element -> MorphValue (Array element)
 value elementMorph =
     each elementMorph
         |> Morph.over
@@ -86,7 +87,7 @@ value elementMorph =
                 , toBroad = Value.Array
                 }
             )
-        |> Morph.over Value.composed
+        |> Morph.over Value.Morph.composed
 
 
 {-| [`Morph`](Morph#Morph) all elements.
