@@ -336,7 +336,6 @@ type
     | InnerRecursiveDescription String (() -> Description)
     | ChainDescription ChainDescription
       -- group morph
-    | GroupDescription (Emptiable (Stacked Description) Never)
     | ElementsDescription Description
     | PartsDescription (Emptiable (Stacked { tag : String, value : Description }) Never)
       -- choice morph
@@ -440,9 +439,6 @@ isDescriptive =
 
             SequenceDescription elements ->
                 [ elements.early, elements.late ] |> List.any isDescriptive
-
-            GroupDescription descriptionParts ->
-                descriptionParts |> Stack.toList |> List.any isDescriptive
 
             ElementsDescription elementDescription ->
                 elementDescription |> isDescriptive
@@ -575,13 +571,6 @@ descriptionToTree description_ =
         ChoiceDescription possibilities ->
             Tree.tree { kind = DescriptionStructureKind, text = "choice between" }
                 (possibilities
-                    |> Stack.toList
-                    |> List.map descriptionToTree
-                )
-
-        GroupDescription elements ->
-            Tree.tree { kind = DescriptionStructureKind, text = "parts" }
-                (elements
                     |> Stack.toList
                     |> List.map descriptionToTree
                 )
@@ -948,34 +937,14 @@ descriptionAndErrorToTree description_ error =
 
         ChoiceDescription possibilities ->
             case error of
-                ChoiceError choiceError ->
+                ChoiceError tryErrors ->
                     Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "choice between" }
                         (List.map2
                             (\elementDescription elementError ->
                                 descriptionAndErrorToTree elementDescription elementError
                             )
                             (possibilities |> Stack.toList)
-                            (choiceError |> Stack.toList)
-                        )
-
-                unexpectedError ->
-                    unexpectedError |> unexpectedErrorToTree
-
-        GroupDescription elements ->
-            case error of
-                PartsError groupError ->
-                    Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "parts" }
-                        (List.map3
-                            (\index elementDescription elementError ->
-                                if elementError.index == index then
-                                    descriptionAndErrorToTree elementDescription elementError.error
-
-                                else
-                                    descriptionToLabelTree elementDescription
-                            )
-                            (List.range 0 ((elements |> Stack.length) - 1))
-                            (elements |> Stack.toList)
-                            (groupError |> Stack.toList)
+                            (tryErrors |> Stack.toList)
                         )
 
                 unexpectedError ->
