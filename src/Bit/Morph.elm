@@ -1,6 +1,6 @@
 module Bit.Morph exposing (char, n, toN, only)
 
-{-| [`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/) [`Morph`](Morph#Morph)s
+{-| [`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bit) [`Morph`](Morph#Morph)s
 
 @docs char, n, toN, only
 

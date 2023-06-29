@@ -2,7 +2,6 @@ module Stack.Morph exposing
     ( each
     , list, toList
     , string, toString
-    , bytes
     )
 
 {-| [`Morph`](Morph#Morph) a [`Stack`](https://dark.elm.dmy.fr/packages/lue-bird/elm-emptiness-typed/latest/Stack)
@@ -17,21 +16,12 @@ module Stack.Morph exposing
 
 @docs list, toList
 @docs string, toString
-@docs bytes
 
 -}
 
-import ArraySized
-import Bit exposing (Bit)
-import BitArray
-import Bytes exposing (Bytes)
-import Bytes.Decode
-import Bytes.Encode
 import Emptiable exposing (Emptiable, filled)
 import Linear exposing (Direction(..))
-import List.Linear
 import Morph exposing (MorphIndependently, MorphOrError, oneToOne)
-import N exposing (n0, n8)
 import Possibly exposing (Possibly(..))
 import Stack exposing (Stacked)
 
@@ -222,66 +212,3 @@ string :
         error_
 string =
     oneToOne Stack.fromString Stack.toString
-
-
-{-| [OneToOne](Morph#OneToOne) [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/)
-to a stack of single bits.
-Now you can [morph them as a row](Morph#MorphRow)!
--}
-bytes : MorphOrError (Emptiable (Stacked Bit) Possibly) Bytes error_
-bytes =
-    Morph.oneToOne
-        (\bytes_ ->
-            bytes_
-                |> Bytes.Decode.decode (byteList (bytes_ |> Bytes.width))
-                |> Maybe.withDefault []
-                |> Stack.fromList
-        )
-        (\bits ->
-            let
-                bytes_ =
-                    bits |> Stack.toList |> List.Linear.toChunksOf Up 8
-            in
-            bytes_.chunks
-                ++ [ bytes_.remainder ]
-                |> List.map
-                    (\unsignedInt8Bits ->
-                        unsignedInt8Bits
-                            |> ArraySized.fromList
-                            |> BitArray.toN
-                            |> N.toInt
-                            |> Bytes.Encode.unsignedInt8
-                    )
-                |> Bytes.Encode.sequence
-                |> Bytes.Encode.encode
-        )
-
-
-byteList : Int -> Bytes.Decode.Decoder (List Bit)
-byteList length =
-    Bytes.Decode.loop ( length, [] ) byteListStep
-
-
-byteListStep :
-    ( Int, List Bit )
-    ->
-        Bytes.Decode.Decoder
-            (Bytes.Decode.Step ( Int, List Bit ) (List Bit))
-byteListStep ( n, elements ) =
-    if n <= 0 then
-        Bytes.Decode.succeed (Bytes.Decode.Done (List.reverse elements))
-
-    else
-        Bytes.Decode.map
-            (\unsignedInt8 ->
-                Bytes.Decode.Loop
-                    ( n - 1
-                    , (unsignedInt8
-                        |> N.intToAtLeast n0
-                        |> BitArray.fromN n8
-                        |> ArraySized.toList
-                      )
-                        ++ elements
-                    )
-            )
-            Bytes.Decode.unsignedInt8

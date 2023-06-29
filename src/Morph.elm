@@ -1382,8 +1382,8 @@ type alias PartsError partError =
 {-| Describe what you want to narrow to.
 This will make errors and descriptions easier to understand.
 
-A good rule of thumb is to add a [`Morph.named`](#named) to every morph _declaration_
-or even more often.
+A good rule of thumb is to at least add a [`Morph.named`](#named) to every morph _declaration_.
+More `named` = •ᴗ•.
 
     import Morph
     import List.Morph

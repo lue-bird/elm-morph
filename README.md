@@ -62,8 +62,7 @@ Know `Parser`s? [`MorphRow`](Morph#MorphRow) simply always creates a builder alo
 
   - `Email/Id/Time/Path/Url.fromString` ⇄ `Email/Id/Time/Path/Url.toString`
   - `Midi.fromBitList` ⇄ `Midi.toBitList`
-  - (concrete syntax tree parser ⇄ syntax token builder) over (tokenization ⇄ pretty formatter) (or without intermediate tokens)
-  - decompiler ⇄ code generation
+  - concrete syntax tree parser ⇄ syntax token builder - over - tokenization ⇄ pretty formatter (or without intermediate tokens)
   - ...
 
 Like [`Morph`](Morph#Morph), [`MorphRow`](Morph#MorphRow) makes the process simpler and more reliable
@@ -132,5 +131,22 @@ What's different from writing a parser?
   - [`Morph.choice (\... -> case ... of ...)`](Morph#choice) exhaustively matches narrow possibilities
   - [`grab ... ...`](Morph#grab) also shows how to access the morphed positional part
   - no `loop`! Instead we have atLeast, between, exactly, optional, while possible, until, ... See [section sequence in the `Morph` module documentation](Morph#sequence)
+
+## [`Morph.OneToOne`](Morph#OneToOne)
+
+The simplest of them all, convert between any two types where nothing can fail. Think
+
+  - [`List Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bit) ⇄ [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/), see [`List.Morph.bytes`](List-Morph#bytes)
+  - case-able [`Value`](Value) ⇄ [`Json`](Json) – both just elm union `type`s
+  - package-facing type ⇄ package-internal type
+  - decompiled AST ⇄ generated code
+
+## [`Morph`](Morph)
+
+The parent of `MorphRow`, `MorphValue`, `Morph.OneToOne` etc. allows converting between any two types. Think
+
+  - accepting numbers only in a specific range
+  - failing for NaN and infinity
+  - allowing only specific printable characters here
 
 Confused? Hyped? Hit @lue up on anything on slack!
