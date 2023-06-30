@@ -146,8 +146,8 @@ The simplest of them all: convert between any two types where nothing can fail. 
 The parent of `MorphRow`, `MorphValue`, `Morph.OneToOne` etc.: convert between any two types. Think
 
   - accepting numbers only in a specific range
-  - failing for NaN and infinity
-  - allowing only specific printable characters here
+  - [`Decimal`](Decimal) (just digits) ⇄ `Float` with NaN and infinity
+  - [`AToZ`](AToZ) ⇄ `Char`, see [`AToZ.Morph.char`](AToZ-Morph#char)
 
 -------
 
