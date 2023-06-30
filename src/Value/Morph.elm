@@ -592,20 +592,26 @@ groupFinish =
     \groupMorphComplete ->
         groupMorphComplete
             |> partsFinish
-            |> Morph.over
-                (Morph.custom "Record"
-                    { toBroad = Record
-                    , toNarrow =
-                        \composedBroad ->
-                            case composedBroad of
-                                Record recordNarrow ->
-                                    recordNarrow |> Ok
-
-                                composedExceptRecord ->
-                                    composedExceptRecord |> composedKindToString |> Err
-                    }
-                )
+            |> Morph.over recordValue
             |> Morph.over composed
+
+
+recordValue :
+    MorphIndependently
+        (Composed IndexOrName -> Result Morph.Error (Record IndexOrName))
+        (Record IndexAndName -> Composed IndexAndName)
+recordValue =
+    Morph.custom "record"
+        { toBroad = Record
+        , toNarrow =
+            \composedBroad ->
+                case composedBroad of
+                    Record recordNarrow ->
+                        recordNarrow |> Ok
+
+                    composedExceptRecord ->
+                        composedExceptRecord |> composedKindToString |> Err
+        }
 
 
 partsFinish :
