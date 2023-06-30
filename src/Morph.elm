@@ -2924,11 +2924,8 @@ overRow morphRowBeforeMorph =
         Text.fromList
             |> Morph.overRow
                 (MorphRow.before
-                    { end =
-                        Morph.succeed ()
-                            |> match (String.Morph.only "Decoder")
-                            |> match Morph.end
-                    , goOn = Morph.keep |> Morph.one
+                    { end = String.Morph.only "Decoder"
+                    , element = Morph.keep |> Morph.one
                     }
                 )
 
@@ -2937,12 +2934,14 @@ You might think: Why not use
     decoderNameSubject : MorphRow String Char expectationCustom
     decoderNameSubject =
         Morph.whilePossible (Morph.keep |> Morph.one)
-            |> match (String.Morph.only "Decoder")
-            |> match Morph.end
+            |> Morph.match (String.Morph.only "Decoder")
 
-Problem is: This will never (Morph.)succeed.
+Problem is: This will never succeed.
 `whilePossible (Morph.keep |> Morph.one)` always goes on.
-We never reach the necessary [`match`](#match)ed sections.
+We never reach the necessary [`match`](#match).
+
+If you want to keep the narrow end
+or even only stop when a certain condition is met → [`until`](#until)
 
 -}
 before :
@@ -3274,7 +3273,7 @@ untilFold config =
 {-| Keep going until an element fails, just like [`atLeast n0`](ArraySized-Morph#atLeast).
 If you want a to morph a `List` instead of an `ArraySized ... (Min (On N0))`, you might as well use [`whilePossible`](#whilePossible)
 
-    ArraySized.toList
+    ArraySized.Morph.toList
         |> Morph.overRow (ArraySized.Morph.atLeast n0)
 
 If you need to carry information to the next element (which is super rare), try [`whilePossibleFold`](#whilePossibleFold)
