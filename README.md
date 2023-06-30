@@ -130,7 +130,7 @@ What's different from writing a parser?
   - [`Morph.choice (\... -> case ... of ...)`](Morph#choice) matches possibilities exhaustively
   - [`grab ... ...`](Morph#grab) also shows how to access the morphed positional part
   - [`broad ...`](Morph#broad) provides a "default value" for the builder
-  - no `loop`! Instead we have atLeast, between, exactly, optional, while possible, until, ... See [section sequence in the `Morph` module documentation](Morph#sequence)
+  - no `loop` and no classic `andThen`! Instead we have atLeast, between, exactly, optional, while possible, until, ... See [section sequence in the `Morph` module documentation](Morph#sequence)
 
 ## [`Morph.OneToOne`](Morph#OneToOne)
 
