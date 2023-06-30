@@ -529,8 +529,8 @@ Here's some ugly consequences if we use `using` instead of a less generic `exact
 -}
 exactlyWith :
     MorphRow (N range) broadElement
-    -> MorphRow element broadElement
-    -> MorphRow (ArraySized element range) broadElement
+    -> MorphRowIndependently elementBeforeToBroad elementNarrow broadElement
+    -> MorphRowIndependently (ArraySized elementBeforeToBroad range) (ArraySized elementNarrow range) broadElement
 exactlyWith lengthMorphRow elementMorphRow =
     { description =
         Morph.SequenceDescription
@@ -558,7 +558,7 @@ exactlyWith lengthMorphRow elementMorphRow =
                 Ok length ->
                     let
                         traversed :
-                            { mapped : ArraySized (Result Morph.Error element) range
+                            { mapped : ArraySized (Result Morph.Error elementNarrow) range
                             , folded : { broad : List broadElement, startsDown : Emptiable (Stacked Int) never_ }
                             }
                         traversed =
