@@ -67,7 +67,7 @@ Know `Parser`s? [`MorphRow`](Morph#MorphRow) simply always creates a builder alo
 
 Like [`Morph`](Morph#Morph), [`MorphRow`](Morph#MorphRow) makes the process simpler and more reliable
 
-Here a 1:1 port of [an example from `elm/parser`](https://dark.elm.dmy.fr/packages/elm/parser/latest/Parser#lazy):
+A 1:1 port of [an example from `elm/parser`](https://dark.elm.dmy.fr/packages/elm/parser/latest/Parser#lazy):
 ```elm
 import Morph exposing (MorphRow, broad, match, grab)
 import List.Morph
