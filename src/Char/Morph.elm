@@ -62,8 +62,8 @@ code =
 {-| `Char` [`MorphValue`](Value-Morph#MorphValue)
 
 Be aware, that [special-cased characters as the result of `Char.toUpper`](https://github.com/elm/core/issues/1001)
-are [encoded](Morph#toBroad) as 2 `Char`s in a `String`
-and therefore can't be [decoded](Morph#toNarrow) again
+are [broadened](Morph#toBroad) as 2 `Char`s in a [`Value.String`](Value#Value)
+and therefore [narrowing](Morph#toNarrow) to a `Char` will fail.
 
 -}
 value : MorphValue Char
@@ -74,8 +74,8 @@ value =
 {-| [`Morph`](Morph#Morph) a `String` of length 1 to a `Char`
 
 Be aware, that [special-cased characters as the result of `Char.toUpper`](https://github.com/elm/core/issues/1001)
-are [encoded](Morph#toBroad) as 2 `Char`s in a `String`
-and therefore can't be [decoded](Morph#toNarrow) again
+are [broadened](Morph#toBroad) as 2 `Char`s in a `String`
+and therefore [narrowing](Morph#toNarrow) to a `Char` will fail.
 
 -}
 string : Morph Char String
