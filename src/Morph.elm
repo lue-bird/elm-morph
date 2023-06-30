@@ -3278,14 +3278,42 @@ If you need to carry information to the next element (which is super rare), try 
 
 -}
 whilePossible :
-    MorphRow element broadElement
-    -> MorphRow (List element) broadElement
+    MorphRowIndependently elementBeforeToBroad elementNarrow broadElement
+    -> MorphRowIndependently (List elementBeforeToBroad) (List elementNarrow) broadElement
 whilePossible element =
-    whilePossibleFold
-        { element = \() -> element
-        , fold = \_ () -> ()
-        , initial = ()
-        }
+    { description = WhilePossibleDescription (element |> description)
+    , toBroad =
+        \beforeToBroad ->
+            beforeToBroad
+                |> List.map (toBroad element)
+                |> Rope.fromList
+                |> Rope.concat
+    , toNarrow =
+        let
+            step :
+                List broadElement
+                ->
+                    { broad : List broadElement
+                    , narrow : List elementNarrow
+                    }
+            step beforeToNarrow =
+                case beforeToNarrow |> toNarrow element of
+                    Err _ ->
+                        { broad = beforeToNarrow, narrow = [] }
+
+                    Ok stepped ->
+                        let
+                            after : { broad : List broadElement, narrow : List elementNarrow }
+                            after =
+                                stepped.broad |> step
+                        in
+                        { narrow = stepped.narrow :: after.narrow
+                        , broad = after.broad
+                        }
+        in
+        \beforeToNarrow ->
+            beforeToNarrow |> step |> Ok
+    }
 
 
 {-| Keep going until an element fails, just like [`whilePossible`](#whilePossible)/[`atLeast n0`](ArraySized-Morph#atLeast).

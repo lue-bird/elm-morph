@@ -329,9 +329,16 @@ forBroad morphRowByElement expectedConstantInputArraySized =
 
 
 sequence :
-    ArraySized (MorphRow elementNarrow broadElement) (In min max)
+    ArraySized
+        (MorphRowIndependently
+            elementBeforeToBroad
+            elementNarrow
+            broadElement
+        )
+        (In min max)
     ->
-        MorphRow
+        MorphRowIndependently
+            (ArraySized elementBeforeToBroad (In min max))
             (ArraySized elementNarrow (In min max))
             broadElement
 sequence toSequence =
@@ -463,10 +470,11 @@ and return them as an [`ArraySized`](https://package.elm-lang.org/packages/lue-b
 -}
 exactly :
     N (In min max)
-    -> MorphRow element broadElement
+    -> MorphRowIndependently elementBeforeToBroad elementNarrow broadElement
     ->
-        MorphRow
-            (ArraySized element (In min max))
+        MorphRowIndependently
+            (ArraySized elementBeforeToBroad (In min max))
+            (ArraySized elementNarrow (In min max))
             broadElement
 exactly repeatCount repeatedMorphRow =
     sequence (ArraySized.repeat repeatedMorphRow repeatCount)
@@ -767,10 +775,10 @@ or equal to the resulting narrow minimum length.
 -}
 atLeast :
     N (In (On lowerLimit) (Up lowerLimitToBroad_ To broadLowerLimit))
-    -> MorphRow narrow broadElement
+    -> MorphRowIndependently beforeToBroad narrow broadElement
     ->
         MorphRowIndependently
-            (ArraySized narrow (In (On broadLowerLimit) max_))
+            (ArraySized beforeToBroad (In (On broadLowerLimit) max_))
             (ArraySized narrow (Min (On lowerLimit)))
             broadElement
 atLeast minimum elementStepMorphRow =
