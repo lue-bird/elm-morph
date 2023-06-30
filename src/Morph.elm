@@ -25,9 +25,8 @@ module Morph exposing
     , ChoiceMorphEmptiable, try, choiceFinish
     , ChoiceMorphRowEmptiable, tryRow
     , MorphRow, MorphRowIndependently, rowFinish
-    , before
     , whilePossible, whilePossibleFold
-    , until, untilFold
+    , before, until, untilFold
     )
 
 {-| Call it Codec, ParserBuilder, TransformReversible, ...
@@ -136,9 +135,8 @@ try [`ArraySized.Morph.exactlyWith`](ArraySized-Morph#exactlyWith).
   - [`exactly`](ArraySized-Morph#exactly)
   - between → [`ArraySized.Morph.in_`](ArraySized-Morph#exactly)
 
-@docs before
 @docs whilePossible, whilePossibleFold
-@docs until, untilFold
+@docs before, until, untilFold
 
 
 ### oh look! other projects do similar things
