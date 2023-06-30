@@ -381,7 +381,7 @@ Another example for tuples
         )
         -> Morph ( part0, part1 )
     tuple2 ( part0Morph, part1Morph ) =
-        Morph.named "Tuple2"
+        Morph.named "2-tuple"
             (record
                 (\part0 part1 -> ( part0, part1 ))
                 |> field ( Tuple.first, "part0" ) part0Morph
@@ -401,7 +401,7 @@ Another example for tuples
         )
         -> Morph ( part0, part1, part2 )
     tuple3 ( part0Morph, part1Morph, part2Morph ) =
-        Morph.named "Tuple3"
+        Morph.named "3-tuple"
             (record
                 (\part0 part1 part2 -> ( part0, part1, part2 ))
                 |> field ( \( part0, _, _ ) -> part0, "part0" ) part0Morph

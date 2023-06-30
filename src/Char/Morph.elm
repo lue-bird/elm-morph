@@ -80,7 +80,7 @@ and therefore [narrowing](Morph#toNarrow) to a `Char` will fail.
 -}
 string : Morph Char String
 string =
-    Morph.custom "Char"
+    Morph.custom "character"
         { toBroad = String.fromChar
         , toNarrow =
             \stringBroad ->
@@ -90,13 +90,13 @@ string =
 
                     Just ( _, stringFrom1 ) ->
                         [ stringFrom1 |> String.length |> String.fromInt
-                        , " too many characters"
+                        , " characters too many"
                         ]
                             |> String.concat
                             |> Err
 
                     Nothing ->
-                        "empty" |> Err
+                        "no characters" |> Err
         }
 
 
