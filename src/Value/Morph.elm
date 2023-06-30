@@ -564,6 +564,19 @@ partValueNarrow tag fieldValueMorph groupSoFarNarrow =
                 TagsMissing (Stack.onTopLay tag.index tagsMissingSoFar) |> Err
 
 
+{-| Conclude the [`group`](#group) |> [`field`](#part) chain
+-}
+groupFinish :
+    MorphValueGroupEmptiable Never record record
+    -> MorphValue record
+groupFinish =
+    \groupMorphComplete ->
+        groupMorphComplete
+            |> partsFinish
+            |> Morph.over recordValue
+            |> Morph.over composed
+
+
 {-| Describe the type of [`Composed`](Value#Composed)
 -}
 composedKindToString : Composed tag_ -> String
@@ -581,19 +594,6 @@ composedKindToString =
 
             Variant _ ->
                 "Variant"
-
-
-{-| Conclude the [`group`](#group) |> [`field`](#part) chain
--}
-groupFinish :
-    MorphValueGroupEmptiable Never record record
-    -> MorphValue record
-groupFinish =
-    \groupMorphComplete ->
-        groupMorphComplete
-            |> partsFinish
-            |> Morph.over recordValue
-            |> Morph.over composed
 
 
 recordValue :
@@ -698,25 +698,35 @@ variant ( possibilityToChoice, possibilityTag ) possibilityMorph =
     \choiceMorphSoFar ->
         choiceMorphSoFar
             |> Morph.try possibilityToChoice
-                (Morph.named possibilityTag
-                    { description = possibilityMorph |> Morph.description
-                    , toNarrow =
-                        variantStepNarrow
-                            ( { name = possibilityTag
-                              , index = choiceMorphSoFar.description |> Stack.length
-                              }
-                            , Morph.toNarrow possibilityMorph
-                            )
-                    , toBroad =
-                        \narrowValue ->
-                            { tag =
-                                { name = possibilityTag
-                                , index = choiceMorphSoFar.description |> Stack.length
-                                }
-                            , value = narrowValue |> Morph.toBroad possibilityMorph
-                            }
+                (variantTry
+                    { name = possibilityTag
+                    , index = choiceMorphSoFar.description |> Stack.length
                     }
+                    possibilityMorph
                 )
+
+
+variantTry :
+    IndexAndName
+    -> MorphValue possibilityNarrow
+    ->
+        MorphIndependently
+            (Tagged IndexOrName -> Result Morph.Error possibilityNarrow)
+            (possibilityNarrow -> Tagged IndexAndName)
+variantTry indexAndName possibilityMorph =
+    Morph.named indexAndName.name
+        { description = possibilityMorph |> Morph.description
+        , toNarrow =
+            variantStepNarrow
+                ( indexAndName
+                , Morph.toNarrow possibilityMorph
+                )
+        , toBroad =
+            \narrowValue ->
+                { tag = indexAndName
+                , value = narrowValue |> Morph.toBroad possibilityMorph
+                }
+        }
 
 
 variantStepNarrow :
