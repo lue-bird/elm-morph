@@ -2714,9 +2714,9 @@ succeed narrowConstant =
 {-| See `match` and `grab` implementation
 -}
 next :
-    (groupNarrow -> partNextNarrow)
+    (groupNarrow -> partNextBeforeToBroad)
     -> (partNextNarrow -> (groupNarrowConstruct -> groupNarrowConstructChanged))
-    -> MorphRow partNextNarrow broadElement
+    -> MorphRowIndependently partNextBeforeToBroad partNextNarrow broadElement
     ->
         (MorphRowIndependently
             groupNarrow
@@ -2777,8 +2777,8 @@ next partAccess partChange nextMorphRow =
 and channel it back up to the [`Morph.succeed`](Morph#succeed) grouping
 -}
 grab :
-    (groupNarrow -> partNextNarrow)
-    -> MorphRow partNextNarrow broadElement
+    (groupNarrow -> partNextBeforeToBroad)
+    -> MorphRowIndependently partNextBeforeToBroad partNextNarrow broadElement
     ->
         (MorphRowIndependently
             groupNarrow
@@ -4193,12 +4193,12 @@ try this [`MorphRow`](#MorphRow).
 -}
 tryRow :
     (possibilityNarrow -> choiceNarrow)
-    -> MorphRow possibilityNarrow broadElement
+    -> MorphRowIndependently possibilityBeforeToBroad possibilityNarrow broadElement
     ->
         (ChoiceMorphRowEmptiable
             noTryPossiblyOrNever_
             choiceNarrow
-            ((possibilityNarrow -> Rope broadElement)
+            ((possibilityBeforeToBroad -> Rope broadElement)
              -> choiceBroadenFurther
             )
             broadElement
