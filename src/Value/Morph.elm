@@ -382,11 +382,11 @@ Another example for tuples
         -> Morph ( part0, part1 )
     tuple2 ( part0Morph, part1Morph ) =
         Morph.named "2-tuple"
-            (record
+            (Value.Morph.group
                 (\part0 part1 -> ( part0, part1 ))
-                |> field ( Tuple.first, "part0" ) part0Morph
-                |> field ( Tuple.second, "part1" ) part1Morph
-                |> recordFinish
+                |> Value.Morph.part ( Tuple.first, "part0" ) part0Morph
+                |> Value.Morph.part ( Tuple.second, "part1" ) part1Morph
+                |> Value.Morph.groupFinish
             )
 
     {-| `( ..., ..., ... )` `Morph`
@@ -402,12 +402,12 @@ Another example for tuples
         -> Morph ( part0, part1, part2 )
     tuple3 ( part0Morph, part1Morph, part2Morph ) =
         Morph.named "3-tuple"
-            (record
+            (Value.Morph.group
                 (\part0 part1 part2 -> ( part0, part1, part2 ))
-                |> field ( \( part0, _, _ ) -> part0, "part0" ) part0Morph
-                |> field ( \( _, part1, _ ) -> part1, "part1" ) part1Morph
-                |> field ( \( _, _, part2 ) -> part2, "part2" ) part2Morph
-                |> recordFinish
+                |> Value.Morph.part ( \( part0, _, _ ) -> part0, "part0" ) part0Morph
+                |> Value.Morph.part ( \( _, part1, _ ) -> part1, "part1" ) part1Morph
+                |> Value.Morph.part ( \( _, _, part2 ) -> part2, "part2" ) part2Morph
+                |> Value.Morph.groupFinish
             )
 
 -}
