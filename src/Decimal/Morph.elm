@@ -740,47 +740,47 @@ fractionLastDigitBits =
                         v9 ()
             )
             |> Morph.tryRow (\() -> n1 |> withDigitRange)
-                (List.Morph.forBroad
+                (List.Morph.broadSequenceMap
                     (Bit.Morph.only >> Morph.one)
                     [ Bit.O, Bit.O, Bit.O, Bit.O ]
                 )
             |> Morph.tryRow (\() -> n2 |> withDigitRange)
-                (List.Morph.forBroad
+                (List.Morph.broadSequenceMap
                     (Bit.Morph.only >> Morph.one)
                     [ Bit.O, Bit.O, Bit.O, Bit.I ]
                 )
             |> Morph.tryRow (\() -> n3 |> withDigitRange)
-                (List.Morph.forBroad
+                (List.Morph.broadSequenceMap
                     (Bit.Morph.only >> Morph.one)
                     [ Bit.O, Bit.O, Bit.I, Bit.O ]
                 )
             |> Morph.tryRow (\() -> n4 |> withDigitRange)
-                (List.Morph.forBroad
+                (List.Morph.broadSequenceMap
                     (Bit.Morph.only >> Morph.one)
                     [ Bit.O, Bit.O, Bit.I, Bit.I ]
                 )
             |> Morph.tryRow (\() -> n5 |> withDigitRange)
-                (List.Morph.forBroad
+                (List.Morph.broadSequenceMap
                     (Bit.Morph.only >> Morph.one)
                     [ Bit.O, Bit.I, Bit.O, Bit.O ]
                 )
             |> Morph.tryRow (\() -> n6 |> withDigitRange)
-                (List.Morph.forBroad
+                (List.Morph.broadSequenceMap
                     (Bit.Morph.only >> Morph.one)
                     [ Bit.O, Bit.I, Bit.O, Bit.I ]
                 )
             |> Morph.tryRow (\() -> n7 |> withDigitRange)
-                (List.Morph.forBroad
+                (List.Morph.broadSequenceMap
                     (Bit.Morph.only >> Morph.one)
                     [ Bit.O, Bit.I, Bit.I, Bit.O ]
                 )
             |> Morph.tryRow (\() -> n8 |> withDigitRange)
-                (List.Morph.forBroad
+                (List.Morph.broadSequenceMap
                     (Bit.Morph.only >> Morph.one)
                     [ Bit.O, Bit.I, Bit.I, Bit.I ]
                 )
             |> Morph.tryRow (\() -> n9 |> withDigitRange)
-                (List.Morph.forBroad
+                (List.Morph.broadSequenceMap
                     (Bit.Morph.only >> Morph.one)
                     [ Bit.I ]
                 )

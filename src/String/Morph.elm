@@ -2,7 +2,7 @@ module String.Morph exposing
     ( each
     , only
     , toList, list, value
-    , for, forBroad
+    , sequenceMap, broadSequenceMap
     )
 
 {-| [`Morph`](Morph#Morph)s from and to a `String`.
@@ -21,7 +21,7 @@ module String.Morph exposing
 
 ## sequence
 
-@docs for, forBroad
+@docs sequenceMap, broadSequenceMap
 
 -}
 
@@ -99,44 +99,49 @@ This is case sensitive.
         |> Result.mapError Morph.Error.textMessage
     --> Err "1:3: I was expecting the text 'abc'. I got stuck when I got the character 'C'."
 
-See [`for`](#for), [`forBroad`](#forBroad) to control what to [morph](Morph#MorphRow) for each `Char`.
+See [`sequenceMap`](#sequenceMap), [`broadSequenceMap`](#broadSequenceMap) to control what to [morph](Morph#MorphRow) for each `Char`.
 
 -}
 only : String -> MorphRow () Char
 only expectedText =
     Morph.named ([ "\"", expectedText, "\"" ] |> String.concat)
-        (forBroad
+        (broadSequenceMap
             (Char.Morph.only >> Morph.one)
             expectedText
         )
 
 
 {-| Match broad [`MorphRow`](Morph#MorphRow)s
-(those that can always [produce its broad value](Morph#toBroad))
-based a given `String`s `Char`s in sequence
+(those that can always produce the same broad value)
+based on given input elements in sequence.
 
-For more details, look at [`ArraySized.Morph.forBroad`](ArraySized-Morph#forBroad)
+More details → [`List.Morph.broadSequenceMap`](List-Morph#broadSequenceMap)
 
 -}
-forBroad :
+broadSequenceMap :
     (Char
      -> MorphRow () broadElement
     )
     -> String
     -> MorphRow () broadElement
-forBroad charMorphRow expectedText =
-    List.Morph.forBroad charMorphRow
+broadSequenceMap charMorphRow expectedText =
+    List.Morph.broadSequenceMap charMorphRow
         (expectedText |> String.toList)
 
 
-{-| Traverse a `String`
+{-| From the chars in a given `String`,
+create [`MorphRow`](Morph#MorphRow)s
+that will be run in the same order, one after the other.
+
+More details → [`List.Morph.sequenceMap`](List-Morph#sequenceMap)
+
 -}
-for :
+sequenceMap :
     (Char -> MorphRow narrowElement broadElement)
     -> String
     -> MorphRow (List narrowElement) broadElement
-for charMorphRow expectedText =
-    List.Morph.for charMorphRow
+sequenceMap charMorphRow expectedText =
+    List.Morph.sequenceMap charMorphRow
         (expectedText |> String.toList)
 
 

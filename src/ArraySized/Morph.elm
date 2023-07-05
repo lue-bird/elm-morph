@@ -4,8 +4,8 @@ module ArraySized.Morph exposing
     , list, toList
     , stack, toStack
     , string, toString
-    , for, forBroad
     , exactly, exactlyWith, atLeast, in_
+    , sequenceMap, broadSequenceMap
     )
 
 {-| [`Morph`](Morph) on an `Array`
@@ -26,8 +26,8 @@ module ArraySized.Morph exposing
 
 ## row
 
-@docs for, forBroad
 @docs exactly, exactlyWith, atLeast, in_
+@docs sequenceMap, broadSequenceMap
 
 -}
 
@@ -289,43 +289,23 @@ each elementMorph =
 
 
 {-| Match broad [`MorphRow`](Morph#MorphRow)s
-(those that can always [produce its broad value](Morph#toBroad))
-based given input elements in sequence
+(those that can always produce the same broad value)
+based on given input elements in sequence.
 
-This can get verbose, so create helpers with it where you see common patterns!
-
-    import Morph
-    import Morph.Error
-
-    textOnly : String -> MorphRow Char ()
-    textOnly stringConstant =
-        Morph.forBroad
-            (Char.Morph.only >> Morph.one)
-            (stringConstant |> String.toList)
-
-    -- Match a specific character, case sensitive
-    "abc"
-        |> Text.toNarrow (textOnly "abc")
-    --> Ok ()
-
-    -- It fails if it's not _exactly_ the same
-    "abC"
-        |> Text.toNarrow (textOnly "abC")
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting the character 'a'. I got stuck when I got the character 'A'."
+More details → [`List.Morph.broadSequenceMap`](List-Morph#broadSequenceMap)
 
 -}
-forBroad :
+broadSequenceMap :
     (element -> MorphRow () broadElement)
     -> ArraySized element (In (On min_) (On max_))
     -> MorphRow () broadElement
-forBroad morphRowByElement expectedConstantInputArraySized =
+broadSequenceMap morphRowByElement expectedConstantInputArraySized =
     broad
         (ArraySized.repeat ()
             (expectedConstantInputArraySized |> ArraySized.length)
         )
         |> Morph.overRow
-            (for morphRowByElement expectedConstantInputArraySized)
+            (sequenceMap morphRowByElement expectedConstantInputArraySized)
 
 
 sequence :
@@ -405,32 +385,14 @@ sequence toSequence =
     }
 
 
-{-| [`grab`](Morph#grab) the elements of a given `List` of [`MorphRow`](Morph#MorphRow)s in order
+{-| From the elements in a given `ArraySized`,
+create [`MorphRow`](Morph#MorphRow)s
+that will be run in the same order, one after the other.
 
-Some also call this "traverse"
-
-Don't try to be clever with this.
-
-    import Morph exposing (one)
-    import Char.Morph as Char
-    import String.Morph as Text
-
-    "AB"
-        |> narrow
-            (Morph.named (Char.Morph.caseNo >> one) [ 'a', 'b' ]
-                |> Morph.rowFinish
-                |> Morph.over Stack.Morph.string
-            )
-    --> Ok [ 'a', 'b' ]
-
-The usual [`Morph.succeed`](Morph#succeed)`(\... -> ...) |>`[`grab`](Morph#grab)-[`match`](Morph#match) chain
-is often more explicit, descriptive and type-safe.
-
-Because of this, `MorphRow` only exposes `for`, not `sequence`,
-making misuse a bit more obvious.
+More details → [`List.Morph.sequenceMap`](List-Morph#sequenceMap)
 
 -}
-for :
+sequenceMap :
     (element
      -> MorphRow elementNarrow broadElement
     )
@@ -439,7 +401,7 @@ for :
         MorphRow
             (ArraySized elementNarrow (In min max))
             broadElement
-for morphRowByElement elementsToTraverseInSequence =
+sequenceMap morphRowByElement elementsToTraverseInSequence =
     elementsToTraverseInSequence |> ArraySized.map morphRowByElement |> sequence
 
 

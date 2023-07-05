@@ -1,6 +1,6 @@
 module List.Morph exposing
     ( each
-    , for, forBroad
+    , sequenceMap, broadSequenceMap
     , string, toString, value, bytes
     )
 
@@ -14,7 +14,7 @@ module List.Morph exposing
 
 ## sequence
 
-@docs for, forBroad
+@docs sequenceMap, broadSequenceMap
 
 
 ## transform
@@ -48,39 +48,45 @@ import Value.Morph.Internal exposing (MorphValue)
 
 
 {-| Match broad [`MorphRow`](Morph#MorphRow)s
-(those that can always [produce its broad value](Morph#toBroad))
-based given input elements in sequence
+(those that can always produce the same broad value)
+based on given input elements in sequence.
 
 This can get verbose, so create helpers with it where you see common patterns!
 
     import Morph
-    import Morph.Error
+    import List.Morph
 
     textOnly : String -> MorphRow Char ()
     textOnly stringConstant =
-        Morph.forBroad
+        List.Morph.broadSequenceMap
             (Char.Morph.only >> Morph.one)
             (stringConstant |> String.toList)
 
     -- Match a specific character, case sensitive
     "abc"
-        |> Text.toNarrow (textOnly "abc")
+        |> Morph.toNarrow
+            (textOnly "abc" |> Morph.rowFinish |> Morph.over List.Morph.string)
     --> Ok ()
 
     -- It fails if it's not _exactly_ the same
     "abC"
-        |> Text.toNarrow (textOnly "abC")
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting the character 'a'. I got stuck when I got the character 'A'."
+        |> Morph.toNarrow
+            (textOnly "abc" |> Morph.rowFinish |> Morph.over List.Morph.string)
+        |> Result.toMaybe
+    --> Nothing
+
+Note that `textOnly` is available as `String.Morph.only`.
+Others aren't, tho, like when matching only a specific
+sequence of [`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/)s
 
 -}
-forBroad :
+broadSequenceMap :
     (element
      -> MorphRow () broadElement
     )
     -> List element
     -> MorphRow () broadElement
-forBroad morphRowByElement expectedConstantInputList =
+broadSequenceMap morphRowByElement expectedConstantInputList =
     broad
         (List.repeat
             (expectedConstantInputList |> List.length)
@@ -88,41 +94,61 @@ forBroad morphRowByElement expectedConstantInputList =
         )
         |> Morph.overRow
             (expectedConstantInputList
-                |> for morphRowByElement
+                |> sequenceMap morphRowByElement
             )
 
 
-{-| [`Morph.grab`](Morph#grab) the elements of a given `List` of [`MorphRow`](Morph#MorphRow)s in order
+{-| From the elements in a given `List`,
+create [`MorphRow`](Morph#MorphRow)s
+that will be run in the same order, one after the other.
 
-Some also call this "traverse"
-
-Don't try to be clever with this.
+Some also call this "traverse" (or "for" when the arguments are flipped)
 
     import Morph
-    import Char.Morph
+    import String.Morph
+    import AToZ exposing (AToZ(..))
 
-    "AB"
+    "helloTherecoo"
         |> Morph.toNarrow
-            (List.Morph.for (Char.Morph.caseNo >> Morph.one) [ 'a', 'b' ]
+            (List.Morph.sequenceMap casedStringOnly [ "hello", "there", "coo" ]
                 |> Morph.rowFinish
-                |> Morph.over Stack.Morph.string
+                |> Morph.over List.Morph.string
             )
-    --> Ok [ 'a', 'b' ]
+    --> Ok [ AToZ.CaseLower, AToZ.CaseUpper, AToZ.CaseLower ]
+
+    casedStringOnly : String -> MorphRow AToZ.Case Char
+    casedStringOnly string =
+        Morph.choice
+            (\lower upper cased ->
+                case cased of
+                    AToZ.CaseLower -> lower ()
+                    AToZ.CaseUpper -> upper ()
+            )
+            |> Morph.tryRow (\() -> AToZ.CharLower)
+                (String.Morph.only (string |> String.toLower))
+            |> Morph.tryRow (\() -> AToZ.CharUpper)
+                (String.Morph.only (string |> String.toUpper))
+            |> Morph.choiceFinish
+
+**Don't try to be clever with this.**
 
 The usual [`Morph.succeed`](Morph#succeed)`(\... -> ...) |>`[`grab`](Morph#grab)-[`match`](Morph#match) chain
 is often more explicit, descriptive and type-safe.
 
-Because of this, `List.Morph` only exposes `for`, not `sequence`,
+Because of this, `List.Morph` only exposes `sequenceMap`, not `sequence`,
 making misuse a bit more obvious.
 
+If each element's [`MorphRow`](Morph#MorphRow)
+will always produce the same broad value like `String.Morph.only`, use [`broadSequenceMap`](#broadSequenceMap)
+
 -}
-for :
+sequenceMap :
     (element
      -> MorphRow narrow broadElement
     )
     -> List element
     -> MorphRow (List narrow) broadElement
-for morphRowByElement elementsToTraverseInSequence =
+sequenceMap morphRowByElement elementsToTraverseInSequence =
     elementsToTraverseInSequence
         |> List.map morphRowByElement
         |> sequence
