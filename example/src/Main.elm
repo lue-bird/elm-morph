@@ -56,16 +56,20 @@ initialStateForInput : String -> State
 initialStateForInput textInput =
     { textInput = textInput
     , descriptionTreeViewModel =
-        Morph.descriptionAndErrorToTree
-            (emailString |> Morph.description)
-            (case textInput |> Morph.toNarrow emailString of
-                Err error ->
+        (case textInput |> Morph.toNarrow emailString of
+            Err error ->
+                Morph.descriptionAndErrorToTree
+                    (emailString |> Morph.description)
                     error
 
-                -- Just (Morph.DeadEnd "email is error")
-                Ok _ ->
-                    Morph.DeadEnd "email is ok"
-            )
+            Ok _ ->
+                Morph.descriptionToTree
+                    (emailString |> Morph.description)
+                    |> Tree.map
+                        (\labelString ->
+                            { kind = labelString.kind |> Morph.DescriptionKind, text = labelString.text }
+                        )
+        )
             |> treeToTreeViewModel
     }
 
@@ -166,28 +170,16 @@ ui =
                         , placeholder = Nothing
                         }
                     ]
+                , [ case state.textInput |> Morph.toNarrow emailString of
+                        Err error ->
+                            Ui.text "failed:"
+
+                        Ok email ->
+                            Ui.text ("succeeded as " ++ (email |> Morph.toBroad emailString))
+                  ]
+                    |> Ui.paragraph [ UiFont.size 20 ]
                 , Ui.map DescriptionTreeViewEvent
                     (TreeUi.ui toStyle state.descriptionTreeViewModel)
-
-                -- , Ui.column []
-                --     (List.map treeLinesUi (state.descriptionTreeViewModel |> Forest.map .text))
-                , case state.textInput |> Morph.toNarrow emailString of
-                    Err error ->
-                        [ Ui.text
-                            (Debug.toString error
-                                |> String.replace "InStructureError" "in"
-                                |> String.replace "DeadEnd " "!"
-                                |> String.replace ", index =" " at"
-                                |> String.replace " error =" ""
-                            )
-                        ]
-                            |> Ui.paragraph
-                                [ HtmlA.style "overflow-wrap" "break-word" |> Ui.htmlAttribute
-                                , UiFont.size 14
-                                ]
-
-                    Ok _ ->
-                        Ui.text "email is ok"
                 ]
                 |> Ui.layout
                     [ UiBackground.color (Ui.rgb 0 0 0)
