@@ -799,13 +799,6 @@ inSequencePlaceToString =
                 "late"
 
 
-unexpectedErrorToTree : Error -> Tree { kind : DescriptionOrErrorKind, text : String }
-unexpectedErrorToTree =
-    \unexpectedError ->
-        Tree.tree { kind = ErrorKind, text = "unexpected error kind" }
-            [ unexpectedError |> errorToLabelTree ]
-
-
 descriptionToLabelTree : Description -> Tree { text : String, kind : DescriptionOrErrorKind }
 descriptionToLabelTree =
     \description_ ->
@@ -817,209 +810,238 @@ descriptionToLabelTree =
                 )
 
 
+unexpectedErrorToTree : Error -> Description -> Tree { kind : DescriptionOrErrorKind, text : String }
+unexpectedErrorToTree unexpectedError description_ =
+    description_
+        |> descriptionToLabelTree
+        |> Tree.prependChild
+            (case unexpectedError of
+                DeadEnd deadEndMessage ->
+                    Tree.singleton { kind = ErrorKind, text = deadEndMessage }
+
+                nonDeadEnd ->
+                    Tree.tree { kind = ErrorKind, text = "unexpected error kind" }
+                        [ nonDeadEnd |> errorToLabelTree ]
+            )
+
+
 {-| Create a tree describing a given [`Error`](#Error) embedded in a given [`Description`](#Description).
 -}
 descriptionAndErrorToTree : Description -> Error -> Tree { text : String, kind : DescriptionOrErrorKind }
-descriptionAndErrorToTree description_ error =
+descriptionAndErrorToTree description_ =
     case description_ of
         CustomDescription ->
-            case error of
-                DeadEnd deadEnd ->
-                    Tree.singleton { kind = ErrorKind, text = deadEnd }
-
-                otherError ->
-                    otherError |> errorToLabelTree
+            \error ->
+                error |> errorToLabelTree
 
         EndDescription ->
-            Tree.singleton { kind = DescriptionStructureKind |> DescriptionKind, text = "end" }
+            \error ->
+                Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "end" }
+                    [ error |> errorToLabelTree ]
 
         InverseDescription inverseDescription ->
-            Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "inverse" }
-                [ descriptionAndErrorToTree inverseDescription error ]
+            \error ->
+                Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "inverse" }
+                    [ descriptionAndErrorToTree inverseDescription error ]
 
         SucceedDescription ->
-            Tree.singleton
-                { kind = DescriptionStructureKind |> DescriptionKind
-                , text = "(always succeeds)"
-                }
+            \_ ->
+                Tree.singleton
+                    { kind = DescriptionStructureKind |> DescriptionKind
+                    , text = "(always succeeds)"
+                    }
 
         OnlyDescription onlyDescription ->
-            Tree.singleton
-                { kind = DescriptionStructureKind |> DescriptionKind
-                , text = "only " ++ onlyDescription
-                }
+            \error ->
+                Tree.tree
+                    { kind = DescriptionStructureKind |> DescriptionKind
+                    , text = "only " ++ onlyDescription
+                    }
+                    [ error |> errorToLabelTree ]
 
         InnerRecursiveDescription _ lazyDescription ->
-            descriptionAndErrorToTree
-                (lazyDescription ()
-                    |> descriptionCustomNameAlter (\s -> "recursive: " ++ s)
-                )
-                error
+            \error ->
+                descriptionAndErrorToTree
+                    (lazyDescription ()
+                        |> descriptionCustomNameAlter (\s -> "recursive: " ++ s)
+                    )
+                    error
 
         WhilePossibleDescription elementDescription ->
-            Tree.tree
-                { kind = DescriptionStructureKind |> DescriptionKind
-                , text = "while possible"
-                }
-                [ descriptionToLabelTree elementDescription ]
+            \_ ->
+                Tree.tree
+                    { kind = DescriptionStructureKind |> DescriptionKind
+                    , text = "while possible"
+                    }
+                    [ descriptionToLabelTree elementDescription ]
 
         UntilDescription untilDescription ->
-            case error of
-                UntilError untilError ->
-                    Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "until" }
-                        (([ if not (isDescriptive untilDescription.commit) then
-                                Nothing
+            \error ->
+                case error of
+                    UntilError untilError ->
+                        Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "until" }
+                            (([ if not (isDescriptive untilDescription.commit) then
+                                    Nothing
 
-                            else
-                                Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "commit" }
+                                else
+                                    Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "commit" }
+                                        [ case untilError.breakError of
+                                            UntilEndError _ ->
+                                                descriptionToLabelTree untilDescription.commit
+
+                                            UntilCommitError commitError ->
+                                                descriptionAndErrorToTree untilDescription.commit commitError
+                                        ]
+                                        |> Just
+                              , Tree.tree
+                                    { kind = DescriptionStructureKind |> DescriptionKind, text = "end" }
                                     [ case untilError.breakError of
-                                        UntilEndError _ ->
-                                            descriptionToLabelTree untilDescription.commit
+                                        UntilCommitError _ ->
+                                            descriptionToLabelTree untilDescription.end
 
-                                        UntilCommitError commitError ->
-                                            descriptionAndErrorToTree untilDescription.commit commitError
+                                        UntilEndError endError ->
+                                            descriptionAndErrorToTree untilDescription.end endError
                                     ]
                                     |> Just
-                          , Tree.tree
-                                { kind = DescriptionStructureKind |> DescriptionKind, text = "end" }
-                                [ case untilError.breakError of
-                                    UntilCommitError _ ->
-                                        descriptionToLabelTree untilDescription.end
+                              ]
+                                |> List.filterMap identity
+                             )
+                                ++ (untilError.startsDownInBroadList
+                                        |> Stack.removeTop
+                                        |> Stack.toList
+                                        |> List.reverse
+                                        |> List.map
+                                            (\startDown ->
+                                                Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "element" }
+                                                    [ startDownLabel { startDownInBroadList = startDown }
+                                                    , untilDescription.element |> descriptionToLabelTree
+                                                    ]
+                                            )
+                                   )
+                                ++ [ Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "element" }
+                                        [ descriptionAndErrorToTree untilDescription.element untilError.elementError
+                                        , startDownLabel { startDownInBroadList = untilError.startsDownInBroadList |> Stack.top }
+                                        ]
+                                   ]
+                            )
 
-                                    UntilEndError endError ->
-                                        descriptionAndErrorToTree untilDescription.end endError
-                                ]
-                                |> Just
-                          ]
-                            |> List.filterMap identity
-                         )
-                            ++ (untilError.startsDownInBroadList
-                                    |> Stack.removeTop
-                                    |> Stack.toList
-                                    |> List.reverse
-                                    |> List.map
-                                        (\startDown ->
-                                            Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "element" }
-                                                [ startDownLabel { startDownInBroadList = startDown }
-                                                , untilDescription.element |> descriptionToLabelTree
-                                                ]
-                                        )
-                               )
-                            ++ [ Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "element" }
-                                    [ descriptionAndErrorToTree untilDescription.element untilError.elementError
-                                    , startDownLabel { startDownInBroadList = untilError.startsDownInBroadList |> Stack.top }
-                                    ]
-                               ]
-                        )
-
-                unexpectedError ->
-                    unexpectedError |> unexpectedErrorToTree
+                    unexpectedError ->
+                        unexpectedErrorToTree unexpectedError description_
 
         SequenceDescription elementDescriptions ->
-            case error of
-                SequenceError inSequenceError ->
-                    collapseSequenceDescriptionAndError elementDescriptions inSequenceError
-                        |> groupTreesAs "sequence"
+            \error ->
+                case error of
+                    SequenceError inSequenceError ->
+                        collapseSequenceDescriptionAndError elementDescriptions inSequenceError
+                            |> groupTreesAs "sequence"
 
-                unexpectedError ->
-                    unexpectedError |> unexpectedErrorToTree
+                    unexpectedError ->
+                        unexpectedErrorToTree unexpectedError description_
 
         ChainDescription elementDescriptions ->
-            case error of
-                ChainError chainError ->
-                    collapseChainDescriptionAndError elementDescriptions chainError
-                        |> groupTreesAs "chained"
+            \error ->
+                case error of
+                    ChainError chainError ->
+                        collapseChainDescriptionAndError elementDescriptions chainError
+                            |> groupTreesAs "chained"
 
-                unexpectedError ->
-                    unexpectedError |> unexpectedErrorToTree
+                    unexpectedError ->
+                        unexpectedErrorToTree unexpectedError description_
 
         ChoiceDescription possibilities ->
-            case error of
-                ChoiceError tryErrors ->
-                    Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "choice between" }
-                        (List.map2
-                            (\elementDescription elementError ->
-                                descriptionAndErrorToTree elementDescription elementError
+            \error ->
+                -- TODO maybe check who got the furthest and display that first?
+                case error of
+                    ChoiceError tryErrors ->
+                        Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "choice between" }
+                            (List.map2
+                                (\elementDescription elementError ->
+                                    descriptionAndErrorToTree elementDescription elementError
+                                )
+                                (possibilities |> Stack.toList)
+                                (tryErrors |> Stack.toList)
+                                |> List.reverse
                             )
-                            (possibilities |> Stack.toList)
-                            (tryErrors |> Stack.toList)
-                        )
 
-                unexpectedError ->
-                    unexpectedError |> unexpectedErrorToTree
+                    unexpectedError ->
+                        unexpectedErrorToTree unexpectedError description_
 
         ElementsDescription elementDescription ->
-            case error of
-                ElementsError inCollectionError ->
-                    Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "elements" }
-                        (inCollectionError
-                            |> Stack.toList
-                            |> List.concatMap
-                                (\elementError ->
-                                    [ descriptionAndErrorToTree elementDescription elementError.error
-                                    , Tree.singleton { kind = ErrorKind, text = "at " ++ elementError.location }
-                                    ]
-                                )
-                        )
+            \error ->
+                case error of
+                    ElementsError inCollectionError ->
+                        Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "elements" }
+                            (inCollectionError
+                                |> Stack.toList
+                                |> List.concatMap
+                                    (\elementError ->
+                                        [ descriptionAndErrorToTree elementDescription elementError.error
+                                        , Tree.singleton { kind = ErrorKind, text = "at " ++ elementError.location }
+                                        ]
+                                    )
+                            )
 
-                unexpectedError ->
-                    unexpectedError |> unexpectedErrorToTree
+                    unexpectedError ->
+                        unexpectedErrorToTree unexpectedError description_
 
         PartsDescription partsDescription ->
-            case error of
-                PartsError partsError ->
-                    Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "parts" }
-                        (partsDescription
-                            |> Stack.toList
-                            |> List.indexedMap
-                                (\index partDescription ->
-                                    Tree.tree
-                                        { kind = DescriptionStructureKind |> DescriptionKind
-                                        , text = partDescription.tag
-                                        }
-                                        [ case partsError |> Stack.toList |> List.filter (\partError -> partError.index == index) of
-                                            [] ->
-                                                descriptionToLabelTree partDescription.value
+            \error ->
+                case error of
+                    PartsError partsError ->
+                        Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "parts" }
+                            (partsDescription
+                                |> Stack.toList
+                                |> List.indexedMap
+                                    (\index partDescription ->
+                                        Tree.tree
+                                            { kind = DescriptionStructureKind |> DescriptionKind
+                                            , text = partDescription.tag
+                                            }
+                                            [ case partsError |> Stack.toList |> List.filter (\partError -> partError.index == index) of
+                                                [] ->
+                                                    descriptionToLabelTree partDescription.value
 
-                                            partError :: _ ->
-                                                descriptionAndErrorToTree partDescription.value partError.error
-                                        ]
-                                )
-                        )
+                                                partError :: _ ->
+                                                    descriptionAndErrorToTree partDescription.value partError.error
+                                            ]
+                                    )
+                            )
 
-                unexpectedError ->
-                    unexpectedError |> unexpectedErrorToTree
+                    unexpectedError ->
+                        unexpectedErrorToTree unexpectedError description_
 
         VariantsDescription variantsDescription ->
-            case error of
-                VariantError variantError ->
-                    Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "variants" }
-                        (variantsDescription
-                            |> Stack.toList
-                            |> List.indexedMap
-                                (\index variantDescription ->
-                                    Tree.tree
-                                        { kind = DescriptionStructureKind |> DescriptionKind
-                                        , text = variantDescription.tag
-                                        }
-                                        [ if variantError.index == index then
-                                            descriptionAndErrorToTree variantDescription.value variantError.error
+            \error ->
+                case error of
+                    VariantError variantError ->
+                        Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "variants" }
+                            (variantsDescription
+                                |> Stack.toList
+                                |> List.indexedMap
+                                    (\index variantDescription ->
+                                        Tree.tree
+                                            { kind = DescriptionStructureKind |> DescriptionKind
+                                            , text = variantDescription.tag
+                                            }
+                                            [ if variantError.index == index then
+                                                descriptionAndErrorToTree variantDescription.value variantError.error
 
-                                          else
-                                            descriptionToLabelTree variantDescription.value
-                                        ]
-                                )
-                        )
+                                              else
+                                                descriptionToLabelTree variantDescription.value
+                                            ]
+                                    )
+                            )
 
-                unexpectedError ->
-                    unexpectedError |> unexpectedErrorToTree
+                    unexpectedError ->
+                        unexpectedErrorToTree unexpectedError description_
 
         NamedDescription namedDescription ->
-            Tree.tree
-                { kind = DescriptionStructureKind |> DescriptionKind
-                , text = namedDescription.name
-                }
-                [ descriptionAndErrorToTree namedDescription.description error ]
+            \error ->
+                Tree.tree
+                    { kind = DescriptionStructureKind |> DescriptionKind
+                    , text = namedDescription.name
+                    }
+                    [ descriptionAndErrorToTree namedDescription.description error ]
 
 
 collapseSequenceDescriptionAndError :
@@ -1044,7 +1066,7 @@ collapseSequenceDescriptionAndError sequenceDescription sequenceError =
                                         lateSequenceError
 
                                 unexpectedError ->
-                                    [ unexpectedError |> unexpectedErrorToTree ]
+                                    [ unexpectedErrorToTree unexpectedError sequenceDescription.early ]
 
                         earlyNonSequenceDescription ->
                             [ descriptionAndErrorToTree earlyNonSequenceDescription sequenceError.error ]
@@ -1095,7 +1117,7 @@ collapseSequenceDescriptionAndError sequenceDescription sequenceError =
                                         lateSequenceError
 
                                 unexpectedError ->
-                                    [ unexpectedError |> unexpectedErrorToTree ]
+                                    [ unexpectedErrorToTree unexpectedError sequenceDescription.late ]
 
                         lateNonSequenceDescription ->
                             [ descriptionAndErrorToTree lateNonSequenceDescription sequenceError.error ]
@@ -1107,39 +1129,39 @@ collapseChainDescriptionAndError :
     ChainDescription
     -> ChainError Error
     -> List (Tree { text : String, kind : DescriptionOrErrorKind })
-collapseChainDescriptionAndError sequenceDescription sequenceError =
-    case sequenceError.place of
+collapseChainDescriptionAndError chainDescription chainError =
+    case chainError.place of
         ChainPlaceNarrow ->
             let
                 narrowCollapsed : List (Tree { text : String, kind : DescriptionOrErrorKind })
                 narrowCollapsed =
-                    case sequenceDescription.narrow of
+                    case chainDescription.narrow of
                         NamedDescription namedDescription ->
-                            [ descriptionAndErrorToTree (NamedDescription namedDescription) sequenceError.error ]
+                            [ descriptionAndErrorToTree (NamedDescription namedDescription) chainError.error ]
 
                         ChainDescription broadChainDescription ->
-                            case sequenceError.error of
+                            case chainError.error of
                                 ChainError broadChainError ->
                                     collapseChainDescriptionAndError
                                         broadChainDescription
                                         broadChainError
 
                                 unexpectedError ->
-                                    [ unexpectedError |> unexpectedErrorToTree ]
+                                    [ unexpectedErrorToTree unexpectedError chainDescription.narrow ]
 
                         narrowNonChainDescription ->
-                            [ descriptionAndErrorToTree narrowNonChainDescription sequenceError.error ]
+                            [ descriptionAndErrorToTree narrowNonChainDescription chainError.error ]
 
                 broadCollapsed : List (Tree { text : String, kind : DescriptionOrErrorKind })
                 broadCollapsed =
-                    case sequenceDescription.broad of
+                    case chainDescription.broad of
                         ChainDescription broadChainDescription ->
                             collapseChainDescription broadChainDescription
                                 |> List.map descriptionToLabelTree
 
                         _ ->
-                            if isDescriptive sequenceDescription.broad then
-                                [ descriptionToLabelTree sequenceDescription.broad ]
+                            if isDescriptive chainDescription.broad then
+                                [ descriptionToLabelTree chainDescription.broad ]
 
                             else
                                 []
@@ -1150,36 +1172,36 @@ collapseChainDescriptionAndError sequenceDescription sequenceError =
             let
                 narrowCollapsed : List (Tree { text : String, kind : DescriptionOrErrorKind })
                 narrowCollapsed =
-                    case sequenceDescription.narrow of
+                    case chainDescription.narrow of
                         ChainDescription narrowChainDescription ->
                             collapseChainDescription narrowChainDescription
                                 |> List.map descriptionToLabelTree
 
                         _ ->
-                            if isDescriptive sequenceDescription.narrow then
-                                [ descriptionToLabelTree sequenceDescription.narrow ]
+                            if isDescriptive chainDescription.narrow then
+                                [ descriptionToLabelTree chainDescription.narrow ]
 
                             else
                                 []
 
                 broadCollapsed : List (Tree { text : String, kind : DescriptionOrErrorKind })
                 broadCollapsed =
-                    case sequenceDescription.broad of
+                    case chainDescription.broad of
                         NamedDescription namedDescription ->
-                            [ descriptionAndErrorToTree (NamedDescription namedDescription) sequenceError.error ]
+                            [ descriptionAndErrorToTree (NamedDescription namedDescription) chainError.error ]
 
                         ChainDescription broadChainDescription ->
-                            case sequenceError.error of
+                            case chainError.error of
                                 ChainError broadChainError ->
                                     collapseChainDescriptionAndError
                                         broadChainDescription
                                         broadChainError
 
                                 unexpectedError ->
-                                    [ unexpectedError |> unexpectedErrorToTree ]
+                                    [ unexpectedErrorToTree unexpectedError chainDescription.broad ]
 
                         broadNonChainDescription ->
-                            [ descriptionAndErrorToTree broadNonChainDescription sequenceError.error ]
+                            [ descriptionAndErrorToTree broadNonChainDescription chainError.error ]
             in
             narrowCollapsed ++ broadCollapsed
 
@@ -3534,19 +3556,19 @@ rowFinish :
     -> Morph narrow (List broadElement)
 rowFinish =
     \morphRow ->
+        let
+            morphRowThenEnd : MorphRow narrow broadElement
+            morphRowThenEnd =
+                succeed (\before_ -> before_) |> grab (\before_ -> before_) morphRow |> match end
+        in
         { description = morphRow.description
         , toNarrow =
             \broadElements ->
                 broadElements
-                    |> toNarrow morphRow
-                    |> Result.andThen
-                        (\result ->
-                            result.broad
-                                |> toNarrow end
-                                |> Result.map (\_ -> result.narrow)
-                        )
+                    |> toNarrow morphRowThenEnd
+                    |> Result.map .narrow
         , toBroad =
-            \narrow -> narrow |> toBroad morphRow |> Rope.toList
+            \narrow -> narrow |> toBroad morphRowThenEnd |> Rope.toList
         }
 
 
