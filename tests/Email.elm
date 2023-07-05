@@ -168,39 +168,20 @@ domain =
                 { first = first, hostLabels = hostLabels, topLevel = topLevel }
             )
             |> Morph.grab .first hostLabel
+            |> Morph.match (String.Morph.only ".")
             |> Morph.grab .hostLabels
                 (whilePossible
                     (Morph.succeed (\label -> label)
-                        |> Morph.match (String.Morph.only ".")
                         |> Morph.grab (\label -> label) hostLabel
+                        |> Morph.match (String.Morph.only ".")
                     )
                 )
-            |> Morph.match (String.Morph.only ".")
             |> Morph.grab .topLevel domainTopLevel
         )
 
 
-hostLabel : MorphRow HostLabel Char
-hostLabel =
-    Morph.named "host label"
-        (Morph.succeed
-            (\firstSymbol betweenFirstAndLastSymbols lastSymbol ->
-                { firstSymbol = firstSymbol
-                , betweenFirstAndLastSymbols = betweenFirstAndLastSymbols
-                , lastSymbol = lastSymbol
-                }
-            )
-            |> grab .firstSymbol
-                (hostLabelSideSymbol |> one)
-            |> grab .betweenFirstAndLastSymbols
-                (whilePossible (hostLabelSymbol |> one))
-            |> grab .lastSymbol
-                (hostLabelSideSymbol |> one)
-        )
-
-
-hostLabelSideSymbol : Morph HostLabelSideSymbol Char
-hostLabelSideSymbol =
+hostLabelSideableSymbol : Morph HostLabelSideableSymbol Char
+hostLabelSideableSymbol =
     Morph.choice
         (\aToZVariant n0To9Variant sideSymbol ->
             case sideSymbol of
@@ -210,31 +191,55 @@ hostLabelSideSymbol =
                 HostLabelSideSymbol0To9 n0To9Value ->
                     n0To9Variant n0To9Value
         )
-        |> Morph.try HostLabelSideSymbolAToZ AToZ.Morph.char
+        |> Morph.try HostLabelSideSymbolAToZ
+            (AToZ.Morph.caseBroad AToZ.CaseLower
+                |> Morph.over AToZ.Morph.char
+            )
         |> Morph.try HostLabelSideSymbol0To9 N.Morph.char
         |> Morph.choiceFinish
 
 
-hostLabelSymbol : Morph HostLabelSymbol Char
-hostLabelSymbol =
-    Morph.choice
-        (\hyphenMinus aToZVariant n0To9Variant symbol ->
-            case symbol of
-                HostLabelHyphenMinus ->
-                    hyphenMinus ()
-
-                HostLabelSymbolAToZ aToZValue ->
-                    aToZVariant aToZValue
-
-                HostLabelSymbol0To9 n0To9Value ->
-                    n0To9Variant n0To9Value
+hostLabel : MorphRow HostLabel Char
+hostLabel =
+    Morph.named "host label"
+        (Morph.succeed
+            (\firstSymbol afterFirstSymbol ->
+                { firstSymbol = firstSymbol
+                , afterFirstSymbol = afterFirstSymbol
+                }
+            )
+            |> grab .firstSymbol
+                (hostLabelSideableSymbol |> one)
+            |> grab .afterFirstSymbol
+                (whilePossible hostLabelSectionAfterFirst)
         )
-        |> Morph.try (\() -> HostLabelHyphenMinus)
-            (Char.Morph.only '-')
-        |> Morph.try HostLabelSymbolAToZ
-            AToZ.Morph.char
-        |> Morph.try HostLabelSymbol0To9
-            N.Morph.char
+
+
+hostLabelSectionAfterFirst : MorphRow HostLabelSection Char
+hostLabelSectionAfterFirst =
+    Morph.choice
+        (\hyphenMinus sideableVariant symbol ->
+            case symbol of
+                HostLabelStartingWithHyphenMinus nextValue ->
+                    hyphenMinus nextValue
+
+                HostLabelSideableSymbol sideableValue ->
+                    sideableVariant sideableValue
+        )
+        |> Morph.tryRow HostLabelStartingWithHyphenMinus
+            (Morph.succeed
+                (\hyphenMinusCount next ->
+                    { hyphenMinusCount = hyphenMinusCount, next = next }
+                )
+                |> Morph.grab .hyphenMinusCount
+                    (Morph.oneToOne List.length (\l -> List.repeat l ())
+                        |> Morph.overRow
+                            (Morph.whilePossible (String.Morph.only "-"))
+                    )
+                |> Morph.grab .next (hostLabelSideableSymbol |> Morph.one)
+            )
+        |> Morph.tryRow HostLabelSideableSymbol
+            (hostLabelSideableSymbol |> Morph.one)
         |> Morph.choiceFinish
 
 
@@ -252,7 +257,10 @@ domainTopLevel =
                 (whilePossible (N.Morph.char |> one))
             |> -- guarantees it can't be numeric only
                grab .firstAToZ
-                (AToZ.Morph.char |> one)
+                (AToZ.Morph.caseBroad AToZ.CaseLower
+                    |> Morph.over AToZ.Morph.char
+                    |> one
+                )
             |> grab .afterFirstAToZ
                 (whilePossible (domainTopLevelAfterFirstAToZSymbol |> one))
         )
@@ -274,7 +282,9 @@ domainTopLevelAfterFirstAToZSymbol =
                     n0To9Variant n0To9Value
         )
         |> Morph.try DomainTopLevelSymbolAToZ
-            AToZ.Morph.char
+            (AToZ.Morph.caseBroad AToZ.CaseLower
+                |> Morph.over AToZ.Morph.char
+            )
         |> Morph.try DomainTopLevelSymbol0To9
             N.Morph.char
         |> Morph.choiceFinish
@@ -329,21 +339,19 @@ type alias Domain =
 
 type alias HostLabel =
     RecordWithoutConstructorFunction
-        { firstSymbol : HostLabelSideSymbol
-        , betweenFirstAndLastSymbols : List HostLabelSymbol
-        , lastSymbol : HostLabelSideSymbol
+        { firstSymbol : HostLabelSideableSymbol
+        , afterFirstSymbol : List HostLabelSection
         }
 
 
-type HostLabelSideSymbol
-    = HostLabelSideSymbolAToZ { case_ : AToZ.Case, letter : AToZ }
+type HostLabelSideableSymbol
+    = HostLabelSideSymbolAToZ AToZ
     | HostLabelSideSymbol0To9 (N (In (On N0) (On N9)))
 
 
-type HostLabelSymbol
-    = HostLabelHyphenMinus
-    | HostLabelSymbolAToZ { case_ : AToZ.Case, letter : AToZ }
-    | HostLabelSymbol0To9 (N (In (On N0) (On N9)))
+type HostLabelSection
+    = HostLabelStartingWithHyphenMinus { hyphenMinusCount : Int, next : HostLabelSideableSymbol }
+    | HostLabelSideableSymbol HostLabelSideableSymbol
 
 
 {-| <https://data.iana.org/TLD/tlds-alpha-by-domain.txt>
@@ -351,11 +359,11 @@ type HostLabelSymbol
 type alias DomainTopLevel =
     RecordWithoutConstructorFunction
         { startDigits : List (N (In (On N0) (On N9)))
-        , firstAToZ : { case_ : AToZ.Case, letter : AToZ }
+        , firstAToZ : AToZ
         , afterFirstAToZ : List DomainTopLevelAfterFirstAToZSymbol
         }
 
 
 type DomainTopLevelAfterFirstAToZSymbol
-    = DomainTopLevelSymbolAToZ { case_ : AToZ.Case, letter : AToZ }
+    = DomainTopLevelSymbolAToZ AToZ
     | DomainTopLevelSymbol0To9 (N (In (On N0) (On N9)))
