@@ -12,18 +12,12 @@ module Char.Morph exposing
 
 -}
 
-import ArraySized
 import Bit exposing (Bit)
-import BitArray
-import Bitwise
 import Char.Morph.Internal
-import Linear exposing (Direction(..))
-import Morph exposing (Morph, MorphOrError, MorphRow)
-import N exposing (n0, n11, n16, n3, n4, n5, n6, n7)
-import N.Local exposing (n21)
+import Morph exposing (Morph, MorphRow)
 import String.Morph.Internal
-import Utf8CodePoint exposing (Utf8CodePoint)
-import Value.Morph exposing (MorphValue)
+import Utf8CodePoint
+import Value.Morph.Internal exposing (MorphValue)
 
 
 {-| Character by unicode [code point][https://en.wikipedia.org/wiki/Code_point]
@@ -116,72 +110,4 @@ Instead, it's just one UTF-8 code point.
 -}
 bits : MorphRow Char Bit
 bits =
-    Morph.named "UTF-8 code point"
-        (code
-            |> Morph.over codeUtf8
-            |> Morph.overRow Utf8CodePoint.bits
-        )
-
-
-codeUtf8 : MorphOrError Int Utf8CodePoint error_
-codeUtf8 =
-    -- Granted this is far from elegant
-    Morph.oneToOne
-        (\utf8CodePointChoice ->
-            case utf8CodePointChoice of
-                Utf8CodePoint.OneByte oneByte ->
-                    oneByte |> BitArray.toN |> N.toInt
-
-                Utf8CodePoint.TwoBytes bytes ->
-                    (bytes.first |> BitArray.toN |> N.toInt |> Bitwise.shiftLeftBy 6)
-                        + (bytes.second |> BitArray.toN |> N.toInt)
-
-                Utf8CodePoint.ThreeBytes bytes ->
-                    (bytes.first |> BitArray.toN |> N.toInt |> Bitwise.shiftLeftBy 12)
-                        + (bytes.second |> BitArray.toN |> N.toInt |> Bitwise.shiftLeftBy 6)
-                        + (bytes.third |> BitArray.toN |> N.toInt)
-
-                Utf8CodePoint.FourBytes bytes ->
-                    (bytes.first |> BitArray.toN |> N.toInt |> Bitwise.shiftLeftBy 18)
-                        + (bytes.second |> BitArray.toN |> N.toInt |> Bitwise.shiftLeftBy 12)
-                        + (bytes.third |> BitArray.toN |> N.toInt |> Bitwise.shiftLeftBy 6)
-                        + (bytes.fourth |> BitArray.toN |> N.toInt)
-        )
-        (\codeChoice ->
-            if codeChoice <= 0x7F then
-                Utf8CodePoint.OneByte (codeChoice |> N.intToAtLeast n0 |> BitArray.fromN n7)
-
-            else if codeChoice <= 0x07FF then
-                let
-                    bytes =
-                        codeChoice - 0x80 |> N.intToAtLeast n0 |> BitArray.fromN n11
-                in
-                Utf8CodePoint.TwoBytes
-                    { first = bytes |> ArraySized.toSize Up n5 (\_ -> Bit.O)
-                    , second = bytes |> ArraySized.toSize Down n6 (\_ -> Bit.O)
-                    }
-
-            else if codeChoice <= 0xFFFF then
-                let
-                    bytes =
-                        codeChoice - 0x0800 |> N.intToAtLeast n0 |> BitArray.fromN n16
-                in
-                Utf8CodePoint.ThreeBytes
-                    { first = bytes |> ArraySized.toSize Up n4 (\_ -> Bit.O)
-                    , second = bytes |> ArraySized.drop Up n4 |> ArraySized.toSize Down n6 (\_ -> Bit.O)
-                    , third = bytes |> ArraySized.toSize Down n6 (\_ -> Bit.O)
-                    }
-
-            else
-                -- codeChoice should be <= 0x10FFFF
-                let
-                    bytes =
-                        codeChoice - 0x00010000 |> N.intToAtLeast n0 |> BitArray.fromN n21
-                in
-                Utf8CodePoint.FourBytes
-                    { first = bytes |> ArraySized.toSize Up n3 (\_ -> Bit.O)
-                    , second = bytes |> ArraySized.drop Up n3 |> ArraySized.toSize Down n6 (\_ -> Bit.O)
-                    , third = bytes |> ArraySized.drop Up (n3 |> N.add n6) |> ArraySized.toSize Down n6 (\_ -> Bit.O)
-                    , fourth = bytes |> ArraySized.toSize Down n6 (\_ -> Bit.O)
-                    }
-        )
+    Utf8CodePoint.charBits

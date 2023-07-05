@@ -1,6 +1,6 @@
 module Natural.Morph exposing
     ( integer
-    , bits, chars
+    , chars, bits, bitsVariableCount
     )
 
 {-| [`Natural`](Natural#Natural) [`Morph`](Morph#Morph)
@@ -10,11 +10,12 @@ module Natural.Morph exposing
 
 ## row
 
-@docs bits, chars
+@docs chars, bits, bitsVariableCount
 
 -}
 
 import Bit exposing (Bit)
+import Bit.Morph
 import Bytes
 import Integer exposing (Integer)
 import Morph exposing (Morph, MorphRow)
@@ -87,8 +88,13 @@ chars =
 
 {-| [`MorphRow`](Morph#MorphRow) for a [`Natural`](Natural#Natural) from a given amount of bits.
 
+Note that the bit count can be any number like `n7` or `n128`. Numbers greater than `n16`
+can quickly be generated locally, see [this section in the `N` module documentation](https://dark.elm.dmy.fr/packages/lue-bird/elm-bounded-nat/latest/N#specific-numbers)
+
 For [`toBroad`](Morph#toBroad): If the number is greater than the capacity possible with the given bit count,
 the greatest possible value will be returned instead.
+
+To keep the whole range → [`bitsVariableCount`](#bitsVariableCount)
 
 -}
 bits :
@@ -97,3 +103,26 @@ bits :
     -> MorphRow Natural Bit
 bits endianness bitCount =
     Natural.Internal.bits endianness bitCount
+
+
+{-| Unlike [`bits`](#bits) which takes a concrete bit count,
+[`bitsVariableCount`](#bitsVariableCount) can preserve any length
+-}
+bitsVariableCount : MorphRow Natural Bit
+bitsVariableCount =
+    Morph.choice
+        (\n0 atLeast1 natural ->
+            case natural of
+                N0 ->
+                    n0 ()
+
+                AtLeast1 atLeast1Value ->
+                    atLeast1 atLeast1Value
+        )
+        |> Morph.tryRow (\() -> N0) (Bit.Morph.only Bit.O |> Morph.one)
+        |> Morph.tryRow AtLeast1
+            (Morph.succeed (\atLeast1 -> atLeast1)
+                |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
+                |> Morph.grab (\atLeast1 -> atLeast1) NaturalAtLeast1.bits
+            )
+        |> Morph.choiceFinish

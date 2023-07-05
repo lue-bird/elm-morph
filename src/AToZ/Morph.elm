@@ -40,7 +40,7 @@ caseBroad caseSeed =
     Morph.oneToOne .letter (\letter -> { letter = letter, case_ = caseSeed })
 
 
-{-| Morph a letter [`AToZ`](AToZ#AToZ) and its [`Case`](AtoZ#Case)
+{-| Morph a letter [`AToZ`](AToZ#AToZ) and its [`Case`](AToZ#Case)
 from a `Char`
 
 > ℹ️ Equivalent regular expression: `[a-zA-Z]`

@@ -10,7 +10,7 @@ import Linear exposing (Direction(..))
 import Morph exposing (Morph, MorphIndependently, MorphRow)
 import N exposing (In, N, To, Up, n1)
 import Natural exposing (Natural)
-import NaturalAtLeast1.Internal
+import NaturalAtLeast1
 import Sign exposing (Sign(..))
 
 
@@ -110,7 +110,7 @@ toBitArrayOfSize bitCount =
                 ArraySized.repeat Bit.O bitCount
 
             Natural.AtLeast1 atLeast1 ->
-                atLeast1 |> NaturalAtLeast1.Internal.toBitArrayOfSize bitCount
+                atLeast1 |> NaturalAtLeast1.toBitArrayOfSize bitCount
 
 
 fromBitArray : ArraySized Bit (In min_ max_) -> Natural
@@ -125,6 +125,5 @@ fromBitArray =
                     { bitsAfterI =
                         unpaddedAtLeast1
                             |> ArraySized.removeMin ( Up, n1 )
-                            |> ArraySized.minToNumber
-                            |> ArraySized.maxToInfinity
+                            |> ArraySized.toList
                     }

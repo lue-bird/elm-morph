@@ -75,10 +75,10 @@ rangeDescription =
             |> String.concat
 
 
-{-| [`Morph`](Morph#Morph) from a [`Natural`](Natural#Natural)
+{-| [`Morph`](Morph#Morph) ta a [`Natural`](Natural#Natural)
 -}
-natural : MorphIndependently (N range_ -> Result error_ Natural) (Natural -> N (Min (Up0 minX_)))
-natural =
+toNatural : MorphIndependently (N range_ -> Result error_ Natural) (Natural -> N (Min (Up0 minX_)))
+toNatural =
     Morph.oneToOne toNaturalImplementation fromNatural
 
 
@@ -96,12 +96,7 @@ toNaturalImplementation =
 
             Ok atLeast1 ->
                 Natural.AtLeast1
-                    { bitsAfterI =
-                        atLeast1
-                            |> ArraySized.removeMin ( Up, n1 )
-                            |> ArraySized.minToNumber
-                            |> ArraySized.maxToInfinity
-                    }
+                    { bitsAfterI = atLeast1 |> ArraySized.toList }
 
 
 fromNatural : Natural -> N (Min (Up0 minX_))
@@ -112,18 +107,17 @@ fromNatural =
                 n0 |> N.maxToInfinity
 
             Natural.AtLeast1 atLeast1 ->
-                atLeast1
-                    |> .bitsAfterI
-                    |> ArraySized.minToOn
-                    |> ArraySized.insertMin ( Up, N.n1 ) Bit.I
+                Bit.I
+                    :: atLeast1.bitsAfterI
+                    |> ArraySized.fromList
                     |> BitArray.toN
 
 
-{-| [`Morph`](Morph#Morph) to a [`Natural`](Natural#Natural)
+{-| [`Morph`](Morph#Morph) from a [`Natural`](Natural#Natural)
 -}
-toNatural : MorphIndependently (Natural -> Result error_ (N (Min (Up0 minX_)))) (N range_ -> Natural)
-toNatural =
-    Morph.invert natural
+natural : MorphIndependently (Natural -> Result error_ (N (Min (Up0 minX_)))) (N range_ -> Natural)
+natural =
+    Morph.invert toNatural
 
 
 {-| [`Morph`](Morph#Morph) a digit in a given range
@@ -143,7 +137,7 @@ char :
         )
         (N (In narrowMin_ (Up narrowMaxTo9_ To N9)) -> Char)
 char =
-    Morph.named "digit"
+    Morph.named "0|..|9"
         (Morph.choice
             (\v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 n ->
                 case n |> N.toInt of

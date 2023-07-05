@@ -355,7 +355,7 @@ composedToValue =
     \composed ->
         case composed of
             Json.Array array ->
-                array |> Array.map toValue |> Value.Array
+                array |> Array.toList |> List.map toValue |> Value.List
 
             Json.Object object ->
                 object
@@ -375,9 +375,6 @@ composedFromValue =
             Value.List list ->
                 list |> List.map fromValueImplementation |> Array.fromList |> Json.Array
 
-            Value.Array array ->
-                array |> Array.map fromValueImplementation |> Json.Array
-
             Value.Record record ->
                 record
                     |> List.map
@@ -392,10 +389,6 @@ composedFromValue =
                 { tag = variant.tag, value = variant.value |> fromValueImplementation }
                     |> List.singleton
                     |> Json.Object
-
-
-
--- Decimal
 
 
 {-| [`Morph.OneToOne`](Morph#OneToOne) for [`Json`](Json#Json)

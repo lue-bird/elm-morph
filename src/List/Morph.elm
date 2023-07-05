@@ -23,7 +23,6 @@ module List.Morph exposing
 
 -}
 
-import Array
 import ArraySized
 import Bit exposing (Bit)
 import BitArray
@@ -41,7 +40,7 @@ import Possibly exposing (Possibly(..))
 import Rope
 import Stack exposing (Stacked)
 import Value
-import Value.Morph exposing (MorphValue)
+import Value.Morph.Internal exposing (MorphValue)
 
 
 
@@ -236,15 +235,12 @@ value : MorphValue element -> MorphValue (List element)
 value elementMorph =
     each elementMorph
         |> Morph.over
-            (Morph.custom "List"
+            (Morph.custom "list"
                 { toNarrow =
                     \broad ->
                         case broad of
                             Value.List listElements ->
                                 listElements |> Ok
-
-                            Value.Array arrayElements ->
-                                arrayElements |> Array.toList |> Ok
 
                             composedExceptList ->
                                 composedExceptList
@@ -253,7 +249,7 @@ value elementMorph =
                 , toBroad = Value.List
                 }
             )
-        |> Morph.over Value.Morph.composed
+        |> Morph.over Value.Morph.Internal.composed
 
 
 {-| [`Morph`](Morph#Morph) all elements.

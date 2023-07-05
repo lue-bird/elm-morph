@@ -21,23 +21,24 @@ module Integer.Morph exposing
 import ArraySized exposing (ArraySized)
 import ArraySized.Morph
 import Bit exposing (Bit)
+import BitArray
 import BitArray.Extra
 import Bytes
 import Decimal exposing (Decimal)
 import Decimal.Morph
 import Integer exposing (Integer)
-import Integer.Internal
 import Linear exposing (Direction(..))
 import Morph exposing (Morph, MorphRow, OneToOne)
-import N exposing (Add1, In, N, On, To, Up, n1)
+import N exposing (Add1, In, N, On, To, Up, n0, n1)
+import N.Local exposing (n32)
+import N.Morph
 import Natural
 import Natural.Internal
 import NaturalAtLeast1
-import NaturalAtLeast1.Internal
-import Sign
+import Sign exposing (Sign)
 import Sign.Morph
 import String.Morph
-import Value.Morph exposing (MorphValue)
+import Value.Morph.Internal exposing (MorphValue)
 
 
 {-| [`Morph`](Morph#Morph) an [`Integer`](Integer#Integer)
@@ -124,7 +125,69 @@ since `Int` is fixed in bit size while [`Integer`](Integer#Integer) is not.
 -}
 int : OneToOne Integer Int
 int =
-    Morph.oneToOne Integer.Internal.fromInt Integer.Internal.toInt
+    Morph.oneToOne fromIntImplementation toIntImplementation
+
+
+fromIntImplementation : Int -> Integer
+fromIntImplementation =
+    \intBroad ->
+        case
+            intBroad
+                |> abs
+                |> N.intToAtLeast n0
+                |> BitArray.fromN n32
+                |> BitArray.Extra.unpad
+                |> ArraySized.hasAtLeast n1
+        of
+            Err _ ->
+                Integer.N0
+
+            Ok absoluteAtLeast1 ->
+                Integer.Signed
+                    { sign =
+                        if intBroad >= 0 then
+                            Sign.Positive
+
+                        else
+                            Sign.Negative
+                    , absolute =
+                        { bitsAfterI =
+                            absoluteAtLeast1
+                                |> ArraySized.removeMin ( Up, n1 )
+                                |> ArraySized.toList
+                        }
+                    }
+
+
+toIntImplementation : Integer -> Int
+toIntImplementation =
+    \integerNarrow ->
+        case integerNarrow of
+            Integer.N0 ->
+                0
+
+            Integer.Signed signedValue ->
+                signedValue.absolute
+                    |> Natural.AtLeast1
+                    |> Morph.mapTo N.Morph.natural
+                    |> N.toInt
+                    |> signPrependToNumber signedValue.sign
+
+
+{-|
+
+  - `Negative` means negate
+  - `Positive` means keep the current sign
+
+-}
+signPrependToNumber : Sign -> (number -> number)
+signPrependToNumber sign =
+    case sign of
+        Sign.Negative ->
+            Basics.negate
+
+        Sign.Positive ->
+            identity
 
 
 {-| [`Morph.OneToOne`](Morph#OneToOne) between an `Int` and a [decimal representation](Integer#Integer).
@@ -262,11 +325,7 @@ fromBitArray =
                 { sign = Sign.Negative
                 , absolute =
                     { bitsAfterI =
-                        negativeAbsolute.inRange
-                            |> ArraySized.insert ( Up, n1 ) negativeAbsolute.overflow
-                            |> ArraySized.minTo0
-                            |> ArraySized.minToNumber
-                            |> ArraySized.maxToInfinity
+                        negativeAbsolute.overflow :: (negativeAbsolute.inRange |> ArraySized.toList)
                     }
                 }
                     |> Integer.Signed
@@ -288,7 +347,7 @@ toBitArrayOfSize bitCount =
                 case signed.sign of
                     Sign.Negative ->
                         signed.absolute
-                            |> NaturalAtLeast1.Internal.toBitArrayOfSize
+                            |> NaturalAtLeast1.toBitArrayOfSize
                                 (bitCount |> N.subtract n1)
                             |> BitArray.Extra.add
                                 (negative1OfSize (bitCount |> N.subtract n1))
@@ -298,6 +357,6 @@ toBitArrayOfSize bitCount =
 
                     Sign.Positive ->
                         signed.absolute
-                            |> NaturalAtLeast1.Internal.toBitArrayOfSize
+                            |> NaturalAtLeast1.toBitArrayOfSize
                                 (bitCount |> N.subtract n1)
                             |> ArraySized.insert ( Linear.Up, n1 ) Bit.O

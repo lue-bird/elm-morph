@@ -1,14 +1,20 @@
-module Sign.Morph exposing (char, maybeMinusChar)
+module Sign.Morph exposing
+    ( char, bit
+    , maybeMinusChar
+    )
 
 {-| [`Sign`](Sign#Sign) [`Morph`](Morph#Morph)
 
-@docs char, maybeMinusChar
+@docs char, bit
+
+@docs maybeMinusChar
 
 -}
 
+import Bit exposing (Bit)
 import Char.Morph
 import Maybe.Morph
-import Morph exposing (Morph, MorphRow, oneToOne)
+import Morph exposing (Morph, MorphOrError, MorphRow, oneToOne)
 import Sign exposing (Sign(..))
 import String.Morph
 
@@ -30,6 +36,31 @@ char =
             |> Morph.try (\() -> Positive) (Char.Morph.only '+')
             |> Morph.try (\() -> Negative) (Char.Morph.only '-')
             |> Morph.choiceFinish
+        )
+
+
+{-| `Bit.O` `Positive`, `Bit.I` ⇄ `Negative`
+-}
+bit : MorphOrError Sign Bit error_
+bit =
+    Morph.named "sign"
+        (Morph.oneToOne
+            (\bit_ ->
+                case bit_ of
+                    Bit.O ->
+                        Positive
+
+                    Bit.I ->
+                        Negative
+            )
+            (\bit_ ->
+                case bit_ of
+                    Positive ->
+                        Bit.O
+
+                    Negative ->
+                        Bit.I
+            )
         )
 
 

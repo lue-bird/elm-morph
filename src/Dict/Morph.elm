@@ -22,7 +22,7 @@ module Dict.Morph exposing
 import Dict exposing (Dict)
 import List.Morph
 import Morph exposing (ErrorWithDeadEnd, MorphIndependently)
-import Value.Morph exposing (MorphValue)
+import Value.Morph.Internal exposing (MorphValue)
 
 
 {-| [`Morph.OneToOne`](Morph#OneToOne) from a `List { key : key, value : value }` to a `Dict key value`.
@@ -137,8 +137,8 @@ keyValueValue :
     }
     -> MorphValue { key : key, value : value }
 keyValueValue entryMorph =
-    Value.Morph.group
+    Value.Morph.Internal.group
         (\key value_ -> { key = key, value = value_ })
-        |> Value.Morph.part ( .key, "key" ) entryMorph.key
-        |> Value.Morph.part ( .value, "value" ) entryMorph.value
-        |> Value.Morph.groupFinish
+        |> Value.Morph.Internal.part ( .key, "key" ) entryMorph.key
+        |> Value.Morph.Internal.part ( .value, "value" ) entryMorph.value
+        |> Value.Morph.Internal.groupFinish

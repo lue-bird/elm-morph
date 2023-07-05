@@ -1,10 +1,12 @@
 module NaturalAtLeast1 exposing
     ( n1
     , add
-    , chars
+    , chars, bits
+    , toBitArrayOfSize
     )
 
-{-| Helpers for [`Natural.AtLeast1`](Natural#AtLeast1)
+{-| Package-internal helpers for [`Natural.AtLeast1`](Natural#AtLeast1).
+**Should not be exposed**
 
 @docs n1
 
@@ -16,25 +18,31 @@ module NaturalAtLeast1 exposing
 
 ## morph
 
-@docs chars
+@docs chars, bits
+
+
+## transform
+
+@docs toBitArrayOfSize
 
 -}
 
 import ArraySized exposing (ArraySized)
 import Bit exposing (Bit)
+import Bit.Morph
 import BitArray.Extra
 import Linear exposing (Direction(..))
-import Morph exposing (MorphRow)
-import N exposing (Min, N0, N1, On, n0)
+import Morph exposing (Morph, MorphRow)
+import N exposing (In, Min, N, N1, On, To, Up)
 import Natural
-import NaturalAtLeast1.Internal
+import NaturalAtLeast1Base10 exposing (NaturalAtLeast1Base10)
 
 
 {-| The [positive natural number](Natural#AtLeast1) 1
 -}
 n1 : Natural.AtLeast1
 n1 =
-    NaturalAtLeast1.Internal.n1
+    { bitsAfterI = [] }
 
 
 add :
@@ -47,20 +55,19 @@ add toAdd =
             bitsSum =
                 naturalPositive |> addBits toAdd
 
-            sumBitsAfterI : ArraySized Bit (Min (On N0))
+            sumBitsAfterI : List Bit
             sumBitsAfterI =
                 case bitsSum.overflow of
                     Bit.I ->
                         bitsSum.inRange
-                            |> ArraySized.minTo n0
+                            |> ArraySized.toList
 
                     Bit.O ->
                         bitsSum.inRange
                             |> ArraySized.removeMin ( Up, N.n1 )
+                            |> ArraySized.toList
         in
-        { bitsAfterI =
-            sumBitsAfterI |> ArraySized.minToNumber
-        }
+        { bitsAfterI = sumBitsAfterI }
 
 
 addBits :
@@ -86,10 +93,57 @@ toBitArray :
 toBitArray =
     \naturalAtLeast1 ->
         naturalAtLeast1.bitsAfterI
-            |> ArraySized.minToOn
+            |> ArraySized.fromList
             |> ArraySized.insertMin ( Up, N.n1 ) Bit.I
 
 
 chars : MorphRow Natural.AtLeast1 Char
 chars =
-    NaturalAtLeast1.Internal.chars
+    base10 |> Morph.overRow NaturalAtLeast1Base10.chars
+
+
+base10 : Morph Natural.AtLeast1 NaturalAtLeast1Base10
+base10 =
+    Morph.oneToOne NaturalAtLeast1Base10.toBase2 NaturalAtLeast1Base10.fromBase2
+
+
+bits : MorphRow Natural.AtLeast1 Bit
+bits =
+    Morph.named "≥ 1"
+        (Morph.succeed (\bitsAfterI -> { bitsAfterI = bitsAfterI })
+            |> Morph.grab .bitsAfterI
+                bitsVariableCount
+        )
+
+
+bitsVariableCount : MorphRow (List Bit) Bit
+bitsVariableCount =
+    Morph.before
+        { end = Bit.Morph.only Bit.O |> Morph.one
+        , element =
+            Morph.succeed (\bit -> bit)
+                |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
+                |> Morph.grab (\bit -> bit)
+                    (Morph.keep |> Morph.one)
+        }
+
+
+toBitArrayOfSize :
+    N (In (Up newMinX To newMinPlusX) newMax)
+    ->
+        (Natural.AtLeast1
+         -> ArraySized Bit (In (Up newMinX To newMinPlusX) newMax)
+        )
+toBitArrayOfSize bitCount =
+    \atLeast1 ->
+        let
+            withI =
+                Bit.I
+                    :: atLeast1.bitsAfterI
+                    |> ArraySized.fromList
+        in
+        if (withI |> ArraySized.length |> N.toInt) <= (bitCount |> N.toInt) then
+            withI |> ArraySized.toSize Down bitCount (\_ -> Bit.O)
+
+        else
+            ArraySized.repeat Bit.I bitCount

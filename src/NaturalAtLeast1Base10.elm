@@ -5,7 +5,9 @@ module NaturalAtLeast1Base10 exposing
     , chars
     )
 
-{-| **Should not be exposed**
+{-| Package-internal helpers for [`Natural.AtLeast1`](Natural#AtLeast1)
+but represented as it's decimal digits.
+**Should not be exposed**
 
 @docs NaturalAtLeast1Base10
 
@@ -26,7 +28,6 @@ module NaturalAtLeast1Base10 exposing
 
 -}
 
-import ArraySized
 import Bit exposing (Bit)
 import Linear exposing (Direction(..))
 import List.Linear
@@ -52,15 +53,14 @@ toBase2 =
                 (naturalAtLeast1Base10.first |> N.minToOn |> N.minTo n0 |> N.minToNumber)
                     :: naturalAtLeast1Base10.afterFirst
                     |> digitsToBase2
+                    |> List.reverse
         in
         base2Digits
             |> base2DigitsUnpad
             -- not possible because the base10 number is >= 1
             |> Maybe.withDefault
                 -- 1
-                { bitsAfterI =
-                    ArraySized.empty |> ArraySized.maxToInfinity |> ArraySized.minToNumber
-                }
+                { bitsAfterI = [] }
 
 
 digitsToBase2 : List (N (In N0 N9)) -> List Bit
@@ -72,7 +72,13 @@ digitsToBase2 =
                 digits |> digitsDivideBy2
         in
         (digitsDivisionBy2.remainder |> Bit.fromN)
-            :: (digitsDivisionBy2.divided |> digitsToBase2)
+            :: (case digitsDivisionBy2.divided |> List.filter (\n -> (n |> N.toInt) /= 0) of
+                    [] ->
+                        []
+
+                    dividedHead :: dividedTail ->
+                        dividedHead :: dividedTail |> digitsToBase2
+               )
 
 
 digitToNumber :
@@ -140,7 +146,7 @@ base2DigitsUnpad =
                         afterFirst |> base2DigitsUnpad
 
                     Bit.I ->
-                        Just { bitsAfterI = afterFirst |> ArraySized.fromList |> ArraySized.minToNumber }
+                        Just { bitsAfterI = afterFirst }
 
 
 add :
@@ -240,9 +246,7 @@ fromBase2 : Natural.AtLeast1 -> NaturalAtLeast1Base10
 fromBase2 =
     \digits ->
         digits.bitsAfterI
-            |> ArraySized.foldFrom
-                (fromDigit n1)
-                Linear.Up
+            |> List.foldl
                 (\bit soFar ->
                     case bit of
                         Bit.O ->
@@ -251,6 +255,7 @@ fromBase2 =
                         Bit.I ->
                             soFar |> multiplyBy2 |> add (fromDigit n1)
                 )
+                (fromDigit n1)
 
 
 fromDigit : N (In (On (Add1 maxX_)) (N.Up maxTo9_ N.To N9)) -> NaturalAtLeast1Base10

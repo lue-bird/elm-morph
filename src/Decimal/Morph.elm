@@ -1,6 +1,6 @@
 module Decimal.Morph exposing
     ( orException, value
-    , chars
+    , chars, bitsVariableCount
     , orExceptionValue, exceptionValue
     , orExceptionFloat, orExceptionToFloat
     )
@@ -12,7 +12,7 @@ module Decimal.Morph exposing
 
 ## row
 
-@docs chars
+@docs chars, bitsVariableCount
 
 
 ## [`Decimal`](Decimal#Decimal) [`OrException`](Decimal#OrException)
@@ -28,20 +28,25 @@ module Decimal.Morph exposing
 
 -}
 
+import Bit exposing (Bit)
+import Bit.Morph
 import Decimal exposing (Decimal(..), Exception(..), Fraction, OrException(..), SignedAbsolute(..))
 import Emptiable exposing (Emptiable)
+import List.Morph
 import Maybe.Morph
 import Morph exposing (Morph, MorphOrError, MorphRow, grab, match, one, oneToOne)
-import N exposing (In, N, N0, N9, n0, n1, n9)
+import N exposing (Add1, In, N, N0, N1, N9, To, Up, n0, n1, n2, n3, n4, n5, n6, n7, n8, n9)
 import N.Morph
-import NaturalAtLeast1.Internal
+import Natural
+import Natural.Morph
+import NaturalAtLeast1
 import NaturalAtLeast1Base10
 import Sign exposing (Sign(..))
 import Sign.Morph
 import Stack exposing (Stacked)
 import String.Morph
 import Value
-import Value.Morph exposing (MorphValue)
+import Value.Morph.Internal exposing (MorphValue)
 
 
 {-| [`Morph`](Morph#Morph)
@@ -50,7 +55,7 @@ to an [`OrException Decimal`](Decimal#OrException)
 -}
 orException : Morph Decimal (OrException Decimal)
 orException =
-    Morph.custom "Decimal"
+    Morph.custom "decimal"
         { toNarrow =
             \floatExplicit_ ->
                 case floatExplicit_ of
@@ -63,7 +68,7 @@ orException =
         }
 
 
-{-| Match a decimal number
+{-| [`MorphRow`](Morph#MorphRow) from chars to a [`Decimal`](Decimal#Decimal) number.
 
     import Morph.Error
 
@@ -125,7 +130,7 @@ chars =
             |> Morph.tryRow Signed signedChars
             |> Morph.tryRow (\() -> N0) (String.Morph.only "0.")
             |> Morph.choiceFinish
-            |> match
+            |> Morph.match
                 (Morph.broad []
                     |> Morph.overRow
                         (Morph.whilePossible
@@ -135,6 +140,8 @@ chars =
         )
 
 
+{-| [`MorphRow`](Morph#MorphRow) from chars to a [`Decimal.Signed`](Decimal#Signed) number.
+-}
 signedChars : MorphRow Decimal.Signed Char
 signedChars =
     Morph.named "signed"
@@ -178,7 +185,7 @@ signedAbsoluteChars =
                         , fraction = fractionPart
                         }
                     )
-                    |> grab .whole NaturalAtLeast1.Internal.chars
+                    |> grab .whole NaturalAtLeast1.chars
                     |> match (String.Morph.only ".")
                     |> grab .fraction (Maybe.Morph.row fractionChars)
                 )
@@ -186,6 +193,8 @@ signedAbsoluteChars =
         )
 
 
+{-| [`MorphRow`](Morph#MorphRow) from chars to a [`Decimal.Fraction`](Decimal#Fraction).
+-}
 fractionChars : MorphRow Fraction Char
 fractionChars =
     Morph.named "fraction"
@@ -218,7 +227,7 @@ over [`Decimal.Morph.orExceptionValue`](#orExceptionValue)
 -}
 value : MorphValue Decimal
 value =
-    Morph.custom "Decimal"
+    Morph.custom "decimal"
         { toNarrow =
             \atom ->
                 case atom of
@@ -229,7 +238,7 @@ value =
                         atomExceptDecimal |> Value.atomKindToString |> Err
         , toBroad = Value.Number
         }
-        |> Morph.over Value.Morph.atom
+        |> Morph.over Value.Morph.Internal.atom
 
 
 
@@ -249,9 +258,9 @@ exceptionValue =
                 Infinity sign ->
                     variantInfinity sign
         )
-        |> Value.Morph.variant ( \() -> NaN, "NaN" ) Value.Morph.unit
-        |> Value.Morph.variant ( Infinity, "NaN" ) signValue
-        |> Value.Morph.choiceFinish
+        |> Value.Morph.Internal.variant ( \() -> NaN, "NaN" ) Value.Morph.Internal.unit
+        |> Value.Morph.Internal.variant ( Infinity, "Infinity" ) signValue
+        |> Value.Morph.Internal.choiceFinish
 
 
 signValue : MorphValue Sign
@@ -265,9 +274,9 @@ signValue =
                 Positive ->
                     positive ()
         )
-        |> Value.Morph.variant ( \() -> Negative, "Negative" ) Value.Morph.unit
-        |> Value.Morph.variant ( \() -> Positive, "Positive" ) Value.Morph.unit
-        |> Value.Morph.choiceFinish
+        |> Value.Morph.Internal.variant ( \() -> Negative, "Negative" ) Value.Morph.Internal.unit
+        |> Value.Morph.Internal.variant ( \() -> Positive, "Positive" ) Value.Morph.Internal.unit
+        |> Value.Morph.Internal.choiceFinish
 
 
 {-| [`Morph`](Morph#Morph)
@@ -425,7 +434,7 @@ signedAbsoluteToFloat =
                 let
                     wholeFloat : Float
                     wholeFloat =
-                        atLeast1.whole |> NaturalAtLeast1.Internal.toN |> N.toFloat
+                        atLeast1.whole |> Natural.AtLeast1 |> Morph.mapTo N.Morph.natural |> N.toFloat
                 in
                 case atLeast1.fraction of
                     Nothing ->
@@ -539,14 +548,14 @@ orExceptionValue =
                 Exception exception ->
                     variantException exception
         )
-        |> Value.Morph.variant ( Number, "Decimal" ) decimalInternalValue
-        |> Value.Morph.variant ( Exception, "Exception" ) exceptionValue
-        |> Value.Morph.choiceFinish
+        |> Value.Morph.Internal.variant ( Number, "Decimal" ) decimalInternalValue
+        |> Value.Morph.Internal.variant ( Exception, "Exception" ) exceptionValue
+        |> Value.Morph.Internal.choiceFinish
 
 
 decimalInternalValue : MorphValue Decimal
 decimalInternalValue =
-    Morph.custom "Decimal"
+    Morph.custom "decimal"
         { toNarrow =
             \atom ->
                 case atom of
@@ -559,4 +568,277 @@ decimalInternalValue =
                             |> Err
         , toBroad = Value.Number
         }
-        |> Morph.over Value.Morph.atom
+        |> Morph.over Value.Morph.Internal.atom
+
+
+{-| `MorphRow` from from `Bit`s to a [`Decimal`](Decimal#Decimal)
+-}
+bitsVariableCount : MorphRow Decimal Bit
+bitsVariableCount =
+    Morph.named "decimal"
+        (Morph.choice
+            (\n0 signed decimal ->
+                case decimal of
+                    Decimal.N0 ->
+                        n0 ()
+
+                    Decimal.Signed signedValue ->
+                        signed signedValue
+            )
+            |> Morph.tryRow (\() -> Decimal.N0)
+                (Morph.named "0" (Bit.Morph.only Bit.O |> Morph.one))
+            |> Morph.tryRow Decimal.Signed
+                (Morph.succeed (\signed -> signed)
+                    |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
+                    |> Morph.grab (\signed -> signed) signedBits
+                )
+            |> Morph.choiceFinish
+        )
+
+
+{-| [`MorphRow`](Morph#MorphRow) from `Bit`s to a [`Decimal.Signed`](Decimal#Signed)
+-}
+signedBits : MorphRow Decimal.Signed Bit
+signedBits =
+    Morph.named "signed"
+        (Morph.succeed (\sign absolute -> { sign = sign, absolute = absolute })
+            |> Morph.grab .sign (Sign.Morph.bit |> Morph.one)
+            |> Morph.grab .absolute signedAbsoluteBits
+        )
+
+
+{-| [`MorphRow`](Morph#MorphRow) from `Bit`s to a [`Decimal.Fraction`](Decimal#Fraction)
+-}
+fractionBits : MorphRow Decimal.Fraction Bit
+fractionBits =
+    Morph.named "fraction"
+        (Morph.oneToOne
+            (\initial0CountAndAfter ->
+                { beforeLast =
+                    List.repeat
+                        (initial0CountAndAfter.initial0Count |> N.toInt)
+                        (n0 |> N.maxTo n9 |> N.inToNumber)
+                        ++ (case initial0CountAndAfter.after0s of
+                                Natural.N0 ->
+                                    []
+
+                                Natural.AtLeast1 after0sAtLeast1 ->
+                                    let
+                                        after0sAtLeast1Base2 =
+                                            after0sAtLeast1 |> NaturalAtLeast1Base10.fromBase2
+                                    in
+                                    (after0sAtLeast1Base2.first |> N.minTo0 |> N.minToNumber)
+                                        :: after0sAtLeast1Base2.afterFirst
+                           )
+                , last = initial0CountAndAfter.last
+                }
+            )
+            (\fraction ->
+                let
+                    beforeLast =
+                        fraction.beforeLast
+                            |> List.foldl
+                                (\el soFar ->
+                                    case soFar.after0sBase10 of
+                                        Just after0sBase10AtLeast1 ->
+                                            { soFar
+                                                | after0sBase10 =
+                                                    { after0sBase10AtLeast1
+                                                        | afterFirstReverse =
+                                                            after0sBase10AtLeast1.afterFirstReverse |> (::) el
+                                                    }
+                                                        |> Just
+                                            }
+
+                                        Nothing ->
+                                            case el |> N.inToOn |> N.isAtLeast n1 of
+                                                Err _ ->
+                                                    { soFar | initial0Count = soFar.initial0Count + 1 }
+
+                                                Ok elAtLeast1 ->
+                                                    { soFar
+                                                        | after0sBase10 =
+                                                            { first = elAtLeast1 |> N.inToNumber
+                                                            , afterFirstReverse = []
+                                                            }
+                                                                |> Just
+                                                    }
+                                )
+                                { initial0Count = 0, after0sBase10 = Nothing }
+                in
+                { initial0Count = beforeLast.initial0Count |> N.intToAtLeast n0
+                , last = fraction.last
+                , after0s =
+                    case beforeLast.after0sBase10 of
+                        Nothing ->
+                            Natural.N0
+
+                        Just after0sBase10AtLeast1 ->
+                            { first = after0sBase10AtLeast1.first
+                            , afterFirst =
+                                after0sBase10AtLeast1.afterFirstReverse
+                                    |> List.reverse
+                            }
+                                |> NaturalAtLeast1Base10.toBase2
+                                |> Natural.AtLeast1
+                }
+            )
+            |> Morph.overRow
+                (Morph.succeed
+                    (\initial0Count after0s last ->
+                        { initial0Count = initial0Count, after0s = after0s, last = last }
+                    )
+                    |> Morph.grab .initial0Count
+                        (N.Morph.natural
+                            |> Morph.overRow Natural.Morph.bitsVariableCount
+                        )
+                    |> Morph.grab .after0s Natural.Morph.bitsVariableCount
+                    |> Morph.grab .last fractionLastDigitBits
+                )
+        )
+
+
+fractionLastDigitBits : MorphRow (N (In N1 N9)) Bit
+fractionLastDigitBits =
+    let
+        withDigitRange :
+            N (In (N.On (Add1 minX_)) (Up max_ To N9))
+            -> N (In N1 N9)
+        withDigitRange digit =
+            digit |> N.minTo n1 |> N.maxTo n9 |> N.inToNumber
+    in
+    Morph.named "1|..|9"
+        (Morph.choice
+            (\v1 v2 v3 v4 v5 v6 v7 v8 v9 n ->
+                case n |> N.toInt of
+                    1 ->
+                        v1 ()
+
+                    2 ->
+                        v2 ()
+
+                    3 ->
+                        v3 ()
+
+                    4 ->
+                        v4 ()
+
+                    5 ->
+                        v5 ()
+
+                    6 ->
+                        v6 ()
+
+                    7 ->
+                        v7 ()
+
+                    8 ->
+                        v8 ()
+
+                    -- 9
+                    _ ->
+                        v9 ()
+            )
+            |> Morph.tryRow (\() -> n1 |> withDigitRange)
+                (List.Morph.forBroad
+                    (Bit.Morph.only >> Morph.one)
+                    [ Bit.O, Bit.O, Bit.O, Bit.O ]
+                )
+            |> Morph.tryRow (\() -> n2 |> withDigitRange)
+                (List.Morph.forBroad
+                    (Bit.Morph.only >> Morph.one)
+                    [ Bit.O, Bit.O, Bit.O, Bit.I ]
+                )
+            |> Morph.tryRow (\() -> n3 |> withDigitRange)
+                (List.Morph.forBroad
+                    (Bit.Morph.only >> Morph.one)
+                    [ Bit.O, Bit.O, Bit.I, Bit.O ]
+                )
+            |> Morph.tryRow (\() -> n4 |> withDigitRange)
+                (List.Morph.forBroad
+                    (Bit.Morph.only >> Morph.one)
+                    [ Bit.O, Bit.O, Bit.I, Bit.I ]
+                )
+            |> Morph.tryRow (\() -> n5 |> withDigitRange)
+                (List.Morph.forBroad
+                    (Bit.Morph.only >> Morph.one)
+                    [ Bit.O, Bit.I, Bit.O, Bit.O ]
+                )
+            |> Morph.tryRow (\() -> n6 |> withDigitRange)
+                (List.Morph.forBroad
+                    (Bit.Morph.only >> Morph.one)
+                    [ Bit.O, Bit.I, Bit.O, Bit.I ]
+                )
+            |> Morph.tryRow (\() -> n7 |> withDigitRange)
+                (List.Morph.forBroad
+                    (Bit.Morph.only >> Morph.one)
+                    [ Bit.O, Bit.I, Bit.I, Bit.O ]
+                )
+            |> Morph.tryRow (\() -> n8 |> withDigitRange)
+                (List.Morph.forBroad
+                    (Bit.Morph.only >> Morph.one)
+                    [ Bit.O, Bit.I, Bit.I, Bit.I ]
+                )
+            |> Morph.tryRow (\() -> n9 |> withDigitRange)
+                (List.Morph.forBroad
+                    (Bit.Morph.only >> Morph.one)
+                    [ Bit.I ]
+                )
+            |> Morph.choiceFinish
+        )
+
+
+signedAbsoluteBits : MorphRow Decimal.SignedAbsolute Bit
+signedAbsoluteBits =
+    Morph.named "absolute"
+        (Morph.choice
+            (\fraction atLeast1 absolute ->
+                case absolute of
+                    Decimal.Fraction fractionValue ->
+                        fraction fractionValue
+
+                    Decimal.AtLeast1 atLeast1Value ->
+                        atLeast1 atLeast1Value
+            )
+            |> Morph.tryRow Decimal.Fraction
+                (Morph.succeed (\fraction -> fraction)
+                    |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
+                    |> Morph.grab (\fraction -> fraction) fractionBits
+                )
+            |> Morph.tryRow Decimal.AtLeast1
+                (Morph.succeed (\atLeast1 -> atLeast1)
+                    |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
+                    |> Morph.grab (\atLeast1 -> atLeast1) atLeast1Bits
+                )
+            |> Morph.choiceFinish
+        )
+
+
+atLeast1Bits : MorphRow Decimal.AtLeast1 Bit
+atLeast1Bits =
+    Morph.named "≥ 1"
+        (Morph.succeed (\whole fraction -> { whole = whole, fraction = fraction })
+            |> Morph.grab .whole NaturalAtLeast1.bits
+            |> Morph.grab .fraction (maybeBits fractionBits)
+        )
+
+
+maybeBits : MorphRow content Bit -> MorphRow (Maybe content) Bit
+maybeBits contentMorphRow =
+    Morph.choice
+        (\nothing just maybe ->
+            case maybe of
+                Nothing ->
+                    nothing ()
+
+                Just content ->
+                    just content
+        )
+        |> Morph.tryRow (\() -> Nothing)
+            (Bit.Morph.only Bit.O |> Morph.one)
+        |> Morph.tryRow Just
+            (Morph.succeed (\content -> content)
+                |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
+                |> Morph.grab (\content -> content) contentMorphRow
+            )
+        |> Morph.choiceFinish

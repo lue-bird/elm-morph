@@ -1,5 +1,5 @@
 module Decimal exposing
-    ( Decimal(..), Signed, SignedAbsolute(..), Fraction
+    ( Decimal(..), Signed, SignedAbsolute(..), Fraction, AtLeast1
     , OrException(..), Exception(..)
     , ceiling, floor, truncate
     )
@@ -7,13 +7,15 @@ module Decimal exposing
 {-| safe and explicit floating point number
 without the possibility of [exceptions](Decimal#Exception)
 
-@docs Decimal, Signed, SignedAbsolute, Fraction
+@docs Decimal, Signed, SignedAbsolute, Fraction, AtLeast1
 @docs OrException, Exception
 
 
 ## alter
 
 @docs ceiling, floor, truncate
+
+More in [`Decimal.Morph`](Decimal-Morph)
 
 -}
 
@@ -42,7 +44,14 @@ type Decimal
     | Signed Signed
 
 
-{-| _Some_ digits after the decimal point. Can't be none
+{-| _Some_ digits after the decimal point. Can't be none.
+
+Note that "fraction" here doesn't mean "rational number with a numerator and denominator"
+or "number in range [0;1]"
+It means: the absolute value of a written decimal number without a period, like 0.345 or 0.001
+
+You think this name can be improved? → issue
+
 -}
 type alias Fraction =
     RecordWithoutConstructorFunction
@@ -64,7 +73,13 @@ type alias Signed =
 -}
 type SignedAbsolute
     = Fraction Fraction
-    | AtLeast1
+    | AtLeast1 AtLeast1
+
+
+{-| Absolute value of a signed [`Decimal`](#Decimal) ≥ 1
+-}
+type alias AtLeast1 =
+    RecordWithoutConstructorFunction
         { whole : Natural.AtLeast1
         , fraction : Maybe Fraction
         }

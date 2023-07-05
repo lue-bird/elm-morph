@@ -25,7 +25,7 @@ import Morph exposing (MorphIndependently, oneToOne)
 import Possibly exposing (Possibly(..))
 import Set exposing (Set)
 import Stack
-import Value.Morph exposing (MorphValue)
+import Value.Morph.Internal exposing (MorphValue)
 
 
 {-| [`Morph.OneToOne`](Morph#OneToOne) from `List` to `Set`

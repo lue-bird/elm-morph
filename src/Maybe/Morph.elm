@@ -10,7 +10,7 @@ module Maybe.Morph exposing (value, row)
 -}
 
 import Morph exposing (MorphRow)
-import Value.Morph exposing (MorphValue)
+import Value.Morph.Internal exposing (MorphValue)
 
 
 {-| `Maybe` [`MorphValue`](Value-Morph#MorphValue)
@@ -26,9 +26,9 @@ value contentMorph =
                 Just content ->
                     content |> just
         )
-        |> Value.Morph.variant ( Just, "Just" ) contentMorph
-        |> Value.Morph.variant ( \() -> Nothing, "Nothing" ) Value.Morph.unit
-        |> Value.Morph.choiceFinish
+        |> Value.Morph.Internal.variant ( Just, "Just" ) contentMorph
+        |> Value.Morph.Internal.variant ( \() -> Nothing, "Nothing" ) Value.Morph.Internal.unit
+        |> Value.Morph.Internal.choiceFinish
 
 
 {-| [`Morph`](Morph#Morph) an optional value and return it as a `Maybe`

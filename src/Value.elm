@@ -58,7 +58,6 @@ while [`MorphValue`](Value-Morph) is used to convert your types.
 
 -}
 
-import Array exposing (Array)
 import Decimal exposing (Decimal)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 
@@ -106,7 +105,6 @@ for example
 -}
 type Composed tag
     = List (List (Value tag))
-    | Array (Array (Value tag))
     | Record (Record tag)
     | Variant (Tagged tag)
 
@@ -186,11 +184,6 @@ composedTagMap tagChange =
                     |> List.map (tagMap tagChange)
                     |> List
 
-            Array array_ ->
-                array_
-                    |> Array.map (tagMap tagChange)
-                    |> Array
-
             Record fields ->
                 fields
                     |> List.map (taggedAnyTagMap tagChange)
@@ -257,9 +250,6 @@ composedKindToString =
         case composed_ of
             List _ ->
                 "List"
-
-            Array _ ->
-                "Array"
 
             Record _ ->
                 "Record"

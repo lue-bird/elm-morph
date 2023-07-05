@@ -1,8 +1,9 @@
 ## TODO
 
-  - `forBroad`??
-  - add `Value.Morph.bits`
+  - `for`, `forBroad` rename (to `sequenceMap(Broad)`)
+  - swap `MorphRowIndependently beforeToBroad narrow broadElement` to `MorphRowIndependently narrow beforeToBroad broadElement`
   - add more tests
+  - update examples
 
 # change log
 

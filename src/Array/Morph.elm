@@ -25,7 +25,7 @@ import Morph exposing (MorphIndependently, oneToOne)
 import Possibly exposing (Possibly(..))
 import Stack
 import Value
-import Value.Morph exposing (MorphValue)
+import Value.Morph.Internal exposing (MorphValue)
 
 
 {-| [`Morph.OneToOne`](Morph#OneToOne) from `List` to `Array`
@@ -72,22 +72,19 @@ value : MorphValue element -> MorphValue (Array element)
 value elementMorph =
     each elementMorph
         |> Morph.over
-            (Morph.custom "Array"
+            (Morph.custom "array"
                 { toNarrow =
                     \broad ->
                         case broad of
-                            Value.Array arrayElements ->
-                                arrayElements |> Ok
-
                             Value.List listElements ->
                                 listElements |> Array.fromList |> Ok
 
                             composedOther ->
                                 composedOther |> Value.composedKindToString |> Err
-                , toBroad = Value.Array
+                , toBroad = \array -> array |> Array.toList |> Value.List
                 }
             )
-        |> Morph.over Value.Morph.composed
+        |> Morph.over Value.Morph.Internal.composed
 
 
 {-| [`Morph`](Morph#Morph) all elements.

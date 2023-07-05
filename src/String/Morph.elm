@@ -29,7 +29,7 @@ import Char.Morph
 import List.Morph
 import Morph exposing (MorphOrError, MorphRow, OneToOne, oneToOne, oneToOneOn)
 import String.Morph.Internal
-import Value.Morph exposing (MorphValue)
+import Value.Morph.Internal exposing (MorphValue)
 
 
 {-| [`Morph.OneToOne`](Morph#OneToOne) from a `String` to a `List Char`.

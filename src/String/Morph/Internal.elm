@@ -2,12 +2,12 @@ module String.Morph.Internal exposing (value)
 
 import Morph
 import Value
-import Value.Morph exposing (MorphValue)
+import Value.Morph.Internal exposing (MorphValue)
 
 
 value : MorphValue String
 value =
-    Morph.custom "String"
+    Morph.custom "string"
         { toBroad = Value.String
         , toNarrow =
             \valueBroad ->
@@ -18,4 +18,4 @@ value =
                     atomExceptString ->
                         atomExceptString |> Value.atomKindToString |> Err
         }
-        |> Morph.over Value.Morph.atom
+        |> Morph.over Value.Morph.Internal.atom
