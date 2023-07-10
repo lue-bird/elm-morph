@@ -1,9 +1,6 @@
 module ArraySized.Morph exposing
     ( each
-    , array, toArray
-    , list, toList
-    , stack, toStack
-    , string, toString
+    , array, list, stack, string
     , exactly, exactlyWith, atLeast, in_
     , sequenceMap, broadSequenceMap
     )
@@ -18,10 +15,7 @@ module ArraySized.Morph exposing
 
 ## structure
 
-@docs array, toArray
-@docs list, toList
-@docs stack, toStack
-@docs string, toString
+@docs array, list, stack, string
 
 
 ## row
@@ -35,7 +29,7 @@ import Array exposing (Array)
 import ArraySized exposing (ArraySized)
 import Emptiable exposing (Emptiable)
 import Linear exposing (Direction(..))
-import Morph exposing (ErrorWithDeadEnd, MorphIndependently, MorphRow, MorphRowIndependently, broad, grab, oneToOne, toBroad, toNarrow)
+import Morph exposing (ErrorWithDeadEnd, MorphIndependently, MorphRow, MorphRowIndependently, broad, grab)
 import Morph.Internal
 import N exposing (Exactly, In, Min, N, N0, N0OrAdd1, On, To, Up, Up0, n0)
 import Rope
@@ -51,6 +45,8 @@ import Stack exposing (Stacked)
         |> Morph.mapTo ArraySized.Morph.fromArray
     --: ArraySized (Min (Up0 x_)) number_
 
+[Inverse](Morph#invert) of [`Array.Morph.arraySized`](Array-Morph#arraySized)
+
 -}
 array :
     MorphIndependently
@@ -64,38 +60,19 @@ array :
          -> Array broadElement
         )
 array =
-    oneToOne ArraySized.fromArray ArraySized.toArray
-
-
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `ArraySized` to `Array`
-
-    import ArraySized
-    import Array
-
-    ArraySized.l4 0 1 2 3
-        |> Morph.mapTo ArraySized.Morph.toArray
-    --> Array.fromList [ 0, 1, 2, 3 ]
-
--}
-toArray :
-    MorphIndependently
-        (ArraySized narrowElement narrowRange_
-         -> Result error_ (Array narrowElement)
-        )
-        (Array broadElement
-         -> ArraySized broadElement (Min (Up0 broadX_))
-        )
-toArray =
-    Morph.invert array
+    Morph.oneToOne ArraySized.fromArray ArraySized.toArray
 
 
 {-| [`Morph.OneToOne`](Morph#OneToOne) from `List` to `ArraySized`
 
     import ArraySized
+    import Morph
 
     [ 0, 1, 2, 3 ]
         |> Morph.mapTo ArraySized.Morph.list
     --: ArraySized (Min (Up0 x_)) number_
+
+[Inverse](Morph#invert) of [`List.Morph.arraySized`](List-Morph#arraySized)
 
 -}
 list :
@@ -110,37 +87,19 @@ list :
          -> List broadElement
         )
 list =
-    oneToOne ArraySized.fromList ArraySized.toList
-
-
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `ArraySized` to `List`
-
-    import ArraySized
-
-    ArraySized.l4 0 1 2 3
-        |> Morph.mapTo ArraySized.Morph.toList
-    --> [ 0, 1, 2, 3 ]
-
--}
-toList :
-    MorphIndependently
-        (ArraySized narrowElement narrowRange_
-         -> Result error_ (List narrowElement)
-        )
-        (List broadElement
-         -> ArraySized broadElement (Min (Up0 broadX_))
-        )
-toList =
-    Morph.invert list
+    Morph.oneToOne ArraySized.fromList ArraySized.toList
 
 
 {-| [`Morph.OneToOne`](Morph#OneToOne) from `String` to `ArraySized`
 
     import ArraySized
+    import Morph
 
     "0123"
         |> Morph.mapTo ArraySized.Morph.string
     --: ArraySized (Min (Up0 x_)) number_
+
+[Inverse](Morph#invert) of [`String.Morph.arraySized`](String-Morph#arraySized)
 
 -}
 string :
@@ -155,37 +114,19 @@ string :
          -> String
         )
 string =
-    oneToOne ArraySized.fromString ArraySized.toString
-
-
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `ArraySized` to `String`
-
-    import ArraySized
-
-    ArraySized.l4 0 1 2 3
-        |> Morph.mapTo ArraySized.Morph.toString
-    --> "0123"
-
--}
-toString :
-    MorphIndependently
-        (ArraySized Char narrowRange_
-         -> Result error_ String
-        )
-        (String
-         -> ArraySized Char (Min (Up0 broadX_))
-        )
-toString =
-    Morph.invert string
+    Morph.oneToOne ArraySized.fromString ArraySized.toString
 
 
 {-| [`Morph.OneToOne`](Morph#OneToOne) from `Emptiable (Stacked ...) ...` to `ArraySized`
 
     import ArraySized
+    import Morph
 
     Stack.topBelow 0 [ 1, 2, 3, 4 ]
         |> Morph.mapTo ArraySized.Morph.stack
     --: ArraySized (Min (Up1 x_)) number_
+
+[Inverse](Morph#invert) of [`Stack.Morph.arraySized`](Stack-Morph#arraySized)
 
 -}
 stack :
@@ -200,31 +141,7 @@ stack :
          -> Emptiable (Stacked broadElement) broadPossiblyOrNever
         )
 stack =
-    oneToOne ArraySized.fromStack ArraySized.toStack
-
-
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `ArraySized` to `Emptiable (Stacked ...) ...`
-
-    import ArraySized
-
-    ArraySized.l4 0 1 2 3
-        |> Morph.mapTo ArraySized.Morph.toStack
-    --> Stack.topBelow 0 [ 1, 2, 3 ]
-
--}
-toStack :
-    MorphIndependently
-        (ArraySized narrowElement (In (On (N0OrAdd1 narrowPossiblyOrNever minFrom1_)) max_)
-         ->
-            Result
-                error_
-                (Emptiable (Stacked narrowElement) narrowPossiblyOrNever)
-        )
-        (Emptiable (Stacked broadElement) broadPossiblyOrNever
-         -> ArraySized broadElement (Min (On (N0OrAdd1 broadPossiblyOrNever N0)))
-        )
-toStack =
-    Morph.invert stack
+    Morph.oneToOne ArraySized.fromStack ArraySized.toStack
 
 
 
@@ -339,7 +256,7 @@ sequence toSequence =
                             { broad = initialInput, startsDown = initialInput |> List.length |> Stack.one }
                             Up
                             (\state ->
-                                case state.folded.broad |> toNarrow state.element of
+                                case state.folded.broad |> Morph.toNarrow state.element of
                                     Ok parsed ->
                                         { element = parsed.narrow |> Ok
                                         , folded =
@@ -377,7 +294,7 @@ sequence toSequence =
     , toBroad =
         \narrowSequence ->
             List.map2
-                (\morphRowSequence -> toBroad morphRowSequence)
+                (\morphRowSequence narrow -> narrow |> Morph.toBroad morphRowSequence)
                 (toSequence |> ArraySized.toList)
                 (narrowSequence |> ArraySized.toList)
                 |> Rope.fromList
@@ -539,7 +456,7 @@ exactlyWith lengthMorphRow elementMorphRow =
                                     }
                                     Up
                                     (\state ->
-                                        case state.folded.broad |> toNarrow state.element of
+                                        case state.folded.broad |> Morph.toNarrow state.element of
                                             Ok parsed ->
                                                 { element = parsed.narrow |> Ok
                                                 , folded =
@@ -845,7 +762,7 @@ in_ :
             (ArraySized element (In (On min) (On max)))
             broadElement
 in_ ( lowerLimit, upperLimit ) repeatedElementMorphRow =
-    oneToOne identity (ArraySized.minTo lowerLimit)
+    Morph.toBroadOnly (ArraySized.minTo lowerLimit)
         |> Morph.overRow
             (Morph.succeed
                 (\minimumList overMinimum ->

@@ -1,7 +1,6 @@
 module Set.Morph exposing
     ( each
-    , list, toList
-    , value
+    , list, value
     )
 
 {-| [`Morph`](Morph) a `Set`
@@ -14,14 +13,13 @@ module Set.Morph exposing
 
 ## transform
 
-@docs list, toList
-@docs value
+@docs list, value
 
 -}
 
 import Emptiable
 import List.Morph
-import Morph exposing (MorphIndependently, oneToOne)
+import Morph exposing (MorphIndependently)
 import Possibly exposing (Possibly(..))
 import Set exposing (Set)
 import Stack
@@ -36,6 +34,8 @@ import Value.Morph.Internal exposing (MorphValue)
         |> Morph.mapTo Set.Morph.list
     --> Set.fromList [ 0, 1, 2, 3 ]
 
+[Inverse](Morph#invert) of [`List.Morph.set`](List-Morph#set)
+
 -}
 list :
     MorphIndependently
@@ -44,28 +44,7 @@ list :
         )
         (Set broadElement -> List broadElement)
 list =
-    oneToOne Set.fromList Set.toList
-
-
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `Set` to `List`
-
-    import Set
-
-    Set.fromList [ 0, 1, 2, 3 ]
-        |> Morph.mapTo Set.Morph.toList
-    --> [ 0, 1, 2, 3 ]
-
--}
-toList :
-    MorphIndependently
-        (Set narrowElement
-         -> Result error_ (List narrowElement)
-        )
-        (List comparableBroadElement
-         -> Set comparableBroadElement
-        )
-toList =
-    oneToOne Set.toList Set.fromList
+    Morph.oneToOne Set.fromList Set.toList
 
 
 

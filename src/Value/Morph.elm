@@ -94,12 +94,13 @@ import Decimal exposing (Decimal)
 import Decimal.Morph
 import Emptiable exposing (Emptiable)
 import List.Morph
-import Morph exposing (ChoiceMorphEmptiable, ErrorWithDeadEnd(..), MorphIndependently, MorphRow, MorphRowIndependently, oneToOne)
+import Morph exposing (ChoiceMorphEmptiable, ErrorWithDeadEnd(..), MorphIndependently, MorphRow, MorphRowIndependently)
 import N.Local exposing (n32)
 import N.Morph
 import Natural.Morph
 import Possibly exposing (Possibly(..))
 import Stack exposing (Stacked)
+import String.Morph
 import Utf8CodePoint
 import Value exposing (Index, IndexAndName, IndexOrName(..), Name, Record, Tagged, Value)
 import Value.Morph.Internal
@@ -127,7 +128,7 @@ descriptive :
         (Name -> Result error_ IndexOrName)
         (IndexAndName -> Name)
 descriptive =
-    oneToOne
+    Morph.oneToOne
         (\tag -> tag.name |> Name)
         (\tag -> { name = tag.name })
 
@@ -145,7 +146,7 @@ compact :
         (Index -> Result error_ IndexOrName)
         (IndexAndName -> Index)
 compact =
-    oneToOne
+    Morph.oneToOne
         (\tag -> tag.index |> Index)
         (\tag -> { index = tag.index })
 
@@ -625,7 +626,7 @@ listUnnamedBits :
     MorphRowIndependently beforeToBroad narrow Bit
     -> MorphRowIndependently (List beforeToBroad) (List narrow) Bit
 listUnnamedBits step =
-    ArraySized.Morph.toList
+    List.Morph.arraySized
         |> Morph.overRow
             (ArraySized.Morph.exactlyWith
                 (N.Morph.natural
@@ -638,7 +639,7 @@ listUnnamedBits step =
 stringBits : MorphRow String Bit
 stringBits =
     Morph.named "string"
-        (List.Morph.toString
+        (String.Morph.list
             |> Morph.overRow (listUnnamedBits Utf8CodePoint.charBits)
         )
 

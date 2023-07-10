@@ -28,7 +28,7 @@ import Decimal exposing (Decimal)
 import Decimal.Morph
 import Integer exposing (Integer)
 import Linear exposing (Direction(..))
-import Morph exposing (Morph, MorphRow, OneToOne)
+import Morph exposing (Morph, MorphOrError, MorphRow)
 import N exposing (Add1, In, N, On, To, Up, n0, n1)
 import N.Local exposing (n32)
 import N.Morph
@@ -123,7 +123,7 @@ Keep in mind that `Integer -> Int` can overflow
 since `Int` is fixed in bit size while [`Integer`](Integer#Integer) is not.
 
 -}
-int : OneToOne Integer Int
+int : MorphOrError Integer Int error_
 int =
     Morph.oneToOne fromIntImplementation toIntImplementation
 
@@ -195,8 +195,10 @@ signPrependToNumber sign =
 Keep in mind that `Integer -> Int` can overflow
 since `Int` is fixed in bit size while [`Integer`](Integer#Integer) is not.
 
+TODO separate as `Int.Morph.integer`
+
 -}
-toInt : OneToOne Int Integer
+toInt : MorphOrError Int Integer error_
 toInt =
     Morph.invert int
 

@@ -1427,7 +1427,7 @@ More `named` = •ᴗ•.
 
 Especially for [`oneToOne`](#oneToOne) etc,
 adding a description doesn't really add value
-as users often don't need to know that you for example converted a [stack to a list](Stack-Morph#toList)
+as users often don't need to know that you for example converted a [stack to a list](List-Morph#stack)
 
 -}
 named :
@@ -1582,8 +1582,9 @@ Examples:
             |> Morph.over
                 (Value.list elementMorph)
 
-      - [`Array.Morph.toList`](Array-Morph#toList), [`Array.Morph.list`](Array-Morph#list)
-      - [`Stack.Morph.toString`](Stack-Morph#toString), [`Stack.Morph.string`](Stack-Morph#string)
+      - [`List.Morph.array`](List-Morph#array), [`Array.Morph.list`](Array-Morph#list)
+      - [`String.Morph.stack`](String-Morph#stack), [`Stack.Morph.string`](Stack-Morph#string)
+      - ...
 
   - strip unnecessary information
     ~`{ end : (), before :`~`List element`~`}`~
@@ -1798,7 +1799,7 @@ custom descriptionCustom morphTransformations =
 
 {-| Define a [`Morph`](#Morph) recursively
 
-    import Morph exposing (grab, match, one)
+    import Morph exposing (grab, match)
     import Integer exposing (Integer)
     import Integer.Morph
     import String.Morph
@@ -2396,6 +2397,10 @@ deadEndNever =
 {-| Change the potential [`Error`](#Error). This is usually used with either
 
   - [`deadEndNever : ErrorWithDeadEnd Never -> any_`](#deadEndNever)
+      - allows you to for example annotate a
+        [`MorphOrError narrow broad (ErrorWithDeadEnd never_)`](#MorphOrError)
+        as
+        `MorphOrError narrow broad never_`
   - [`deadEndMap`](#deadEndMap)
 
 -}
@@ -2481,7 +2486,7 @@ type alias MorphText narrow =
 
 ## example: 2D point
 
-    import Morph exposing (MorphRow, atLeast, match, into, Morph.succeed, grab, one)
+    import Morph exposing (MorphRow, atLeast, match, Morph.succeed, grab)
     import Char.Morph as Char
     import String.Morph as Text exposing (number)
     import Morph.Error
@@ -2528,17 +2533,10 @@ type alias MorphText narrow =
                 )
             |> match (String.Morph.only ")")
 
-    -- we can get a nice error message if it fails
     "(2.71, x)"
         |> Text.toNarrow point
-        |> Result.mapError (Morph.Error.dump "filename.txt")
-    --> Err
-    -->     [ "[ERROR] filename.txt: line 1:8: I was expecting a digit [0-9]. I got stuck when I got 'x'."
-    -->     , "  in Point at line 1:1"
-    -->     , ""
-    -->     , "1|(2.71, x)"
-    -->     , "  ~~~~~~~^"
-    -->     ]
+        |> Result.toMaybe
+    --> Nothing
 
 Note before we start:
 `MorphRow` _always backtracks_ and never commits to a specific path!
@@ -2665,23 +2663,25 @@ For anything composed of multiple parts,
 first declaratively describes what you expect to get in the end,
 then [grabbing (taking)](#grab) and [matching (dropping/skipping)](#match) what you need
 
-    import Morph exposing (Morph.succeed, one)
-    import String.Morph exposing (integer)
+    import Morph
+    import String.Morph
+    import Integer.Morph
+    import Integer exposing (Integer)
 
     type alias Point =
         -- makes `Point` function unavailable:
         -- https://dark.elm.dmy.fr/packages/lue-bird/elm-no-record-type-alias-constructor-function/latest/
         RecordWithoutConstructorFunction
-            { x : Int
-            , y : Int
+            { x : Integer
+            , y : Integer
             }
 
     point : MorphRow Point Char
     point =
         Morph.succeed (\x y -> { x = x, y = y })
-            |> grab .x integer
+            |> grab .x Integer.Morph.chars
             |> match (String.Morph.only ",")
-            |> grab .y integer
+            |> grab .y Integer.Morph.chars
 
     "12,34" |> Text.toNarrow point
     --> Ok { x = 12, y = 34 }
@@ -2689,10 +2689,10 @@ then [grabbing (taking)](#grab) and [matching (dropping/skipping)](#match) what 
 
 ### example: infix-separated elements
 
-    Morph.succeed Stack.onTopLay
+    Morph.succeed Stack.topBelow
         |> grab Stack.top element
         |> grab (Stack.removeTop >> Stack.toList)
-            (ArraySized.Morph.whilePossible
+            (Morph.whilePossible
                 (Morph.succeed (\separator element -> { element = element, separator = separator })
                     |> grab .separator separator
                     |> grab .element element

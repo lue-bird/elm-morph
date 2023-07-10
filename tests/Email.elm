@@ -6,7 +6,7 @@ import ArraySized exposing (ArraySized)
 import ArraySized.Morph exposing (atLeast)
 import Char.Morph
 import Linear exposing (Direction(..))
-import Morph exposing (Morph, MorphRow, MorphRowIndependently, grab, match, one, whilePossible)
+import Morph exposing (Morph, MorphRow, MorphRowIndependently, grab, match, whilePossible)
 import N exposing (In, Min, N, N0, N1, N2, N9, On, n1)
 import N.Morph
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
@@ -58,7 +58,7 @@ localPart :
         LocalPart
         Char
 localPart =
-    atLeast n1 (localSymbol |> one)
+    atLeast n1 (localSymbol |> Morph.one)
 
 
 localSymbol : Morph LocalSymbol Char
@@ -209,7 +209,7 @@ hostLabel =
                 }
             )
             |> grab .firstSymbol
-                (hostLabelSideableSymbol |> one)
+                (hostLabelSideableSymbol |> Morph.one)
             |> grab .afterFirstSymbol
                 (whilePossible hostLabelSectionAfterFirst)
         )
@@ -254,15 +254,15 @@ domainTopLevel =
                 }
             )
             |> grab .startDigits
-                (whilePossible (N.Morph.char |> one))
+                (whilePossible (N.Morph.char |> Morph.one))
             |> -- guarantees it can't be numeric only
                grab .firstAToZ
                 (AToZ.Morph.caseBroad AToZ.CaseLower
                     |> Morph.over AToZ.Morph.char
-                    |> one
+                    |> Morph.one
                 )
             |> grab .afterFirstAToZ
-                (whilePossible (domainTopLevelAfterFirstAToZSymbol |> one))
+                (whilePossible (domainTopLevelAfterFirstAToZSymbol |> Morph.one))
         )
 
 

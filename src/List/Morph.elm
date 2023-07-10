@@ -1,7 +1,8 @@
 module List.Morph exposing
     ( each
     , sequenceMap, broadSequenceMap
-    , string, toString, value, bytes
+    , stack, array, arraySized, string, set, dict
+    , bytes, value
     )
 
 {-| [`Morph`](Morph#Morph) to and from a `List`
@@ -19,25 +20,29 @@ module List.Morph exposing
 
 ## transform
 
-@docs string, toString, value, bytes
+@docs stack, array, arraySized, string, set, dict
+@docs bytes, value
 
 -}
 
-import ArraySized
+import Array exposing (Array)
+import ArraySized exposing (ArraySized)
 import Bit exposing (Bit)
 import BitArray
 import Bytes exposing (Bytes)
 import Bytes.Decode
 import Bytes.Encode
+import Dict exposing (Dict)
 import Emptiable exposing (Emptiable)
 import Linear exposing (Direction(..))
 import List.Linear
 import Morph exposing (MorphIndependently, MorphOrError, MorphRow, broad, toBroad, toNarrow)
 import Morph.Internal
-import N exposing (n0, n8)
+import N exposing (Min, Up0, n0, n8)
 import PartialOrComplete exposing (PartialOrComplete(..))
 import Possibly exposing (Possibly(..))
 import Rope
+import Set exposing (Set)
 import Stack exposing (Stacked)
 import Value
 import Value.Morph.Internal exposing (MorphValue)
@@ -241,18 +246,146 @@ sequence toSequence =
 --
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from a `String` to a `List` of `Char`s
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a stack to a `List`
+
+    import Stack
+    import Stack.Morph
+    import Morph
+
+    Stack.topBelow 0 [ 12, 3 ]
+        |> Morph.mapTo List.Morph.stack
+    --> [ 0, 12, 3 ]
+
+[Inverse](Morph#invert) of [`Stack.Morph.list`](Stack-Morph#list)
+
+-}
+stack :
+    MorphIndependently
+        (Emptiable (Stacked broadElement) Possibly
+         -> Result error_ (List broadElement)
+        )
+        (List narrowElement
+         -> Emptiable (Stacked narrowElement) Possibly
+        )
+stack =
+    Morph.oneToOne Stack.toList Stack.fromList
+
+
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `Array` to `List`
+
+    import Array
+    import Morph
+
+    Array.fromList [ 0, 1, 2, 3 ]
+        |> Morph.mapTo List.Morph.array
+    --> [ 0, 1, 2, 3 ]
+
+[Inverse](Morph#invert) of [`Array.Morph.list`](Array-Morph#list)
+
+-}
+array :
+    MorphIndependently
+        (Array narrowElement -> Result error_ (List narrowElement))
+        (List element -> Array element)
+array =
+    Morph.oneToOne Array.toList Array.fromList
+
+
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `ArraySized` to `List`
+
+    import ArraySized
+    import Morph
+
+    ArraySized.l4 0 1 2 3
+        |> Morph.mapTo List.Morph.arraySized
+    --> [ 0, 1, 2, 3 ]
+
+[Inverse](Morph#invert) of [`ArraySized.Morph.list`](ArraySized-Morph#list)
+
+-}
+arraySized :
+    MorphIndependently
+        (ArraySized narrowElement narrowRange_
+         -> Result error_ (List narrowElement)
+        )
+        (List broadElement
+         -> ArraySized broadElement (Min (Up0 broadX_))
+        )
+arraySized =
+    Morph.oneToOne ArraySized.toList ArraySized.fromList
+
+
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a `String` to a `List` of `Char`s.
+
+[Inverse](Morph#invert) of [`String.Morph.list`](String-Morph#list)
+
 -}
 string : MorphOrError (List Char) String error_
 string =
     Morph.oneToOne String.toList String.fromList
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from a `List` of `Char`s to a `String`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `Set` to `List`
+
+    import Set
+    import Morph
+
+    Set.fromList [ 0, 1, 2, 3 ]
+        |> Morph.mapTo List.Morph.set
+    --> [ 0, 1, 2, 3 ]
+
+[Inverse](Morph#invert) of [`Set.Morph.list`](Set-Morph#list)
+
 -}
-toString : MorphOrError String (List Char) error_
-toString =
-    Morph.invert string
+set :
+    MorphIndependently
+        (Set narrowElement
+         -> Result error_ (List narrowElement)
+        )
+        (List comparableBroadElement
+         -> Set comparableBroadElement
+        )
+set =
+    Morph.oneToOne Set.toList Set.fromList
+
+
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a `Dict key value` to a `List { key : key, value : value }`.
+
+    import Dict
+    import List.Morph
+    import Morph
+
+    Dict.empty
+        |> Dict.insert 0 'a'
+        |> Dict.insert 1 'b'
+        |> Morph.mapTo List.Morph.dict
+    --> [ { key = 0, value = 'a' }, { key = 1, value = 'b' } ]
+
+[Inverse](Morph#invert) of [`Dict.Morph.list`](Dict-Morph#list)
+
+-}
+dict :
+    MorphIndependently
+        (Dict broadKey broadValue
+         -> Result error_ (List { key : broadKey, value : broadValue })
+        )
+        (List { key : comparableNarrowKey, value : narrowValue }
+         -> Dict comparableNarrowKey narrowValue
+        )
+dict =
+    Morph.oneToOne
+        (\dict_ ->
+            dict_
+                |> Dict.foldr
+                    (\key value_ -> (::) { key = key, value = value_ })
+                    []
+        )
+        (\dict_ ->
+            dict_
+                |> List.foldl
+                    (\entry -> Dict.insert entry.key entry.value)
+                    Dict.empty
+        )
 
 
 {-| `List` [`MorphValue`](Value-Morph#MorphValue)

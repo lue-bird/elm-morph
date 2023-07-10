@@ -1,6 +1,6 @@
 ## TODO
 
-  - replace all `A.Morph.toB` with `B.Morph.a`, whenever OneToOne
+  - replace all `A.Morph.toB` with `B.Morph.a`, whenever OneToOne (int and float left)
   - swap `MorphRowIndependently beforeToBroad narrow broadElement` to `MorphRowIndependently narrow beforeToBroad broadElement`
   - add more tests
   - update examples

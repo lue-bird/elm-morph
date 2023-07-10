@@ -1,7 +1,7 @@
 module String.Morph exposing
     ( each
     , only
-    , toList, list, value
+    , list, stack, array, arraySized, value
     , sequenceMap, broadSequenceMap
     )
 
@@ -16,7 +16,7 @@ module String.Morph exposing
 
 ### transform
 
-@docs toList, list, value
+@docs list, stack, array, arraySized, value
 
 
 ## sequence
@@ -25,41 +25,110 @@ module String.Morph exposing
 
 -}
 
+import Array exposing (Array)
+import ArraySized exposing (ArraySized)
 import Char.Morph
+import Emptiable exposing (Emptiable)
 import List.Morph
-import Morph exposing (MorphOrError, MorphRow, OneToOne, oneToOne, oneToOneOn)
+import Morph exposing (MorphIndependently, MorphOrError, MorphRow)
+import N exposing (Min, Up0)
+import Possibly exposing (Possibly)
+import Stack exposing (Stacked)
 import String.Morph.Internal
 import Value.Morph.Internal exposing (MorphValue)
-
-
-{-| [`Morph.OneToOne`](Morph#OneToOne) from a `String` to a `List Char`.
-
-    import Morph
-    
-    "0123" |> Morph.mapTo String.Morph.toList
-    --> [ '0', '1', '2', '3' ]
-
--}
-toList : MorphOrError (List Char) String error_
-toList =
-    oneToOne String.toList String.fromList
 
 
 {-| [`Morph.OneToOne`](Morph#OneToOne) from `List Char` to a `String`.
 
     import Morph
-    
+
     [ '0', '1', '2', '3' ] |> Morph.mapTo String.Morph.list
     --> "0123"
 
-Parse-build a `String` →
-Use [`toNarrow`](Morph#toNarrow), [`toBroad`](Morph#toBroad)
-with [`Morph.rowFinish`](Morph#rowFinish) `|> over` [`String.Morph.List`](#list)
+    "0123" |> Morph.toBroad String.Morph.list
+    --> [ '0', '1', '2', '3' ]
+
+[Inverse](Morph#invert) of [`String.Morph.list`](String-Morph#list)
+
+To use a [`MorphRow ... Char`](Morph#MorphRow) with a `String`,
+use [`Morph.toNarrow`](Morph#toNarrow)/[`toBroad`](Morph#toBroad)
+with
+
+    yourData
+        |> Morph.toNarrowOrBroad
+            (yourMorphRow
+                |> Morph.rowFinish
+                |> Morph.over String.Morph.List
+            )
 
 -}
 list : MorphOrError String (List Char) error_
 list =
-    oneToOne String.fromList String.toList
+    Morph.oneToOne String.fromList String.toList
+
+
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a stack of `Char`s to a `String`.
+
+    import Stack
+    import Morph
+
+    Stack.topBelow '0' [ '1', '2' ]
+        |> Morph.mapTo String.Morph.stack
+    --> "012"
+
+[Inverse](Morph#invert) of [`Stack.Morph.string`](Stack-Morph#string)
+
+-}
+stack :
+    MorphOrError
+        String
+        (Emptiable (Stacked Char) Possibly)
+        error_
+stack =
+    Morph.oneToOne Stack.toString Stack.fromString
+
+
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `ArraySized` to `String`
+
+    import ArraySized
+    import Morph
+
+    ArraySized.l4 0 1 2 3
+        |> Morph.mapTo String.Morph.arraySized
+    --> "0123"
+
+[Inverse](Morph#invert) of [`ArraySized.Morph.string`](ArraySized-Morph#string)
+
+-}
+arraySized :
+    MorphIndependently
+        (ArraySized Char narrowRange_
+         -> Result error_ String
+        )
+        (String
+         -> ArraySized Char (Min (Up0 broadX_))
+        )
+arraySized =
+    Morph.oneToOne ArraySized.toString ArraySized.fromString
+
+
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `ArraySized` to `String`
+
+    import Array
+    import Morph
+
+    Array.fromList [ 0, 1, 2, 3 ]
+        |> Morph.mapTo String.Morph.array
+    --> "0123"
+
+[Inverse](Morph#invert) of [`Array.Morph.string`](Array-Morph#string)
+
+-}
+array : MorphOrError String (Array Char) error_
+array =
+    list
+        |> Morph.over (Morph.oneToOne Array.toList Array.fromList)
+        |> Morph.narrowErrorMap Morph.deadEndNever
 
 
 
@@ -74,10 +143,10 @@ and use its `each` morph.
 
 -}
 each :
-    OneToOne Char Char
+    Morph.OneToOne Char Char
     -> MorphOrError String String error_
 each elementCharTranslate =
-    oneToOneOn ( String.map, String.map ) elementCharTranslate
+    Morph.oneToOneOn ( String.map, String.map ) elementCharTranslate
 
 
 
@@ -89,7 +158,7 @@ This is case sensitive.
 
     import Morph
     import List.Morph
-    
+
     -- match an exact text, case sensitive
     "abc" |> Morph.toNarrow (String.Morph.only "abc" |> Morph.rowFinish |> Morph.over List.Morph.string)
     --> Ok ()

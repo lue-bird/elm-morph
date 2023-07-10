@@ -34,7 +34,7 @@ import Decimal exposing (Decimal(..), Exception(..), Fraction, OrException(..), 
 import Emptiable exposing (Emptiable)
 import List.Morph
 import Maybe.Morph
-import Morph exposing (Morph, MorphOrError, MorphRow, grab, match, one, oneToOne)
+import Morph exposing (Morph, MorphOrError, MorphRow, grab, match)
 import N exposing (Add1, In, N, N0, N1, N9, To, Up, n0, n1, n2, n3, n4, n5, n6, n7, n8, n9)
 import N.Morph
 import Natural
@@ -204,16 +204,16 @@ fractionChars =
             )
             |> Morph.grab .beforeLast
                 (Morph.whilePossible
-                    (oneToOne N.inToNumber N.inToOn
+                    (Morph.oneToOne N.inToNumber N.inToOn
                         |> Morph.over N.Morph.char
-                        |> one
+                        |> Morph.one
                     )
                 )
             |> Morph.grab .last
-                (oneToOne N.inToNumber N.inToOn
+                (Morph.oneToOne N.inToNumber N.inToOn
                     |> Morph.over (N.Morph.in_ ( n1, n9 ))
                     |> Morph.over N.Morph.char
-                    |> one
+                    |> Morph.one
                 )
         )
 

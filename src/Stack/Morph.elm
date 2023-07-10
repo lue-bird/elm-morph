@@ -1,7 +1,6 @@
 module Stack.Morph exposing
     ( each
-    , list, toList
-    , string, toString
+    , list, array, arraySized, string
     )
 
 {-| [`Morph`](Morph#Morph) a [`Stack`](https://dark.elm.dmy.fr/packages/lue-bird/elm-emptiness-typed/latest/Stack)
@@ -14,14 +13,16 @@ module Stack.Morph exposing
 
 ## transform
 
-@docs list, toList
-@docs string, toString
+@docs list, array, arraySized, string
 
 -}
 
+import Array exposing (Array)
+import ArraySized exposing (ArraySized)
 import Emptiable exposing (Emptiable, filled)
 import Linear exposing (Direction(..))
-import Morph exposing (MorphIndependently, MorphOrError, oneToOne)
+import Morph exposing (MorphIndependently, MorphOrError)
+import N exposing (In, Min, N0, N0OrAdd1, On)
 import Possibly exposing (Possibly(..))
 import Stack exposing (Stacked)
 
@@ -127,39 +128,17 @@ each elementMorph =
 -- transform
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from a stack to a `List`
-
-    import Stack
-    import Stack.Morph
-    import Morph
-
-    Stack.topBelow 0 [ 12, 3 ]
-        |> Morph.mapTo Stack.Morph.toList
-    --> [ 0, 12, 3 ]
-
--}
-toList :
-    MorphIndependently
-        (Emptiable (Stacked broadElement) Possibly
-         -> Result error_ (List broadElement)
-        )
-        (List narrowElement
-         -> Emptiable (Stacked narrowElement) Possibly
-        )
-toList =
-    Morph.invert list
-
-
 {-| [`Morph.OneToOne`](Morph#OneToOne) from `List` to a stack.
 
     import Stack
-    import Stack.Morph
     import Morph
 
     [ 0, 12, 3 ]
         |> Morph.mapTo Stack.Morph.list
     --> Stack.topBelow 0 [ 12, 3 ]
     --: Emptiable (Stacked Int) Possibly
+
+[Inverse](Morph#invert) of [`List.Morph.stack`](List-Morph#stack)
 
 -}
 list :
@@ -174,26 +153,66 @@ list :
          -> List narrowElement
         )
 list =
-    oneToOne Stack.fromList Stack.toList
+    Morph.oneToOne Stack.fromList Stack.toList
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from a stack of `Char`s to a `String`.
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `List` to a stack.
 
     import Stack
+    import Array
     import Morph
 
-    Stack.topBelow '0' [ '1', '2' ]
-        |> Morph.mapTo Stack.Morph.toString
-    --> "012"
+    Array.fromList [ 0, 12, 3 ]
+        |> Morph.mapTo Stack.Morph.array
+    --> Stack.topBelow 0 [ 12, 3 ]
+    --: Emptiable (Stacked Int) Possibly
+
+[Inverse](Morph#invert) of [`Array.Morph.stack`](Array-Morph#stack)
 
 -}
-toString :
-    MorphOrError
-        String
-        (Emptiable (Stacked Char) Possibly)
-        error_
-toString =
-    Morph.invert string
+array :
+    MorphIndependently
+        (Array broadElement
+         ->
+            Result
+                error_
+                (Emptiable (Stacked broadElement) Possibly)
+        )
+        (Emptiable (Stacked narrowElement) Possibly
+         -> Array narrowElement
+        )
+array =
+    list
+        |> Morph.over (Morph.oneToOne Array.toList Array.fromList)
+        |> Morph.narrowErrorMap Morph.deadEndNever
+
+
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `ArraySized` to `Emptiable (Stacked ...) ...`
+
+    import ArraySized
+    import Morph
+    import Stack
+
+    ArraySized.l4 0 1 2 3
+        |> Morph.mapTo Stack.Morph.arraySized
+    --> Stack.topBelow 0 [ 1, 2, 3 ]
+
+[Inverse](Morph#invert) of [`ArraySized.Morph.stack`](ArraySized-Morph#stack)
+
+-}
+arraySized :
+    MorphIndependently
+        (ArraySized narrowElement (In (On (N0OrAdd1 narrowPossiblyOrNever minFrom1_)) max_)
+         ->
+            Result
+                error_
+                (Emptiable (Stacked narrowElement) narrowPossiblyOrNever)
+        )
+        (Emptiable (Stacked broadElement) broadPossiblyOrNever
+         -> ArraySized broadElement (Min (On (N0OrAdd1 broadPossiblyOrNever N0)))
+        )
+arraySized =
+    Morph.oneToOne ArraySized.toStack ArraySized.fromStack
 
 
 {-| [`Morph.OneToOne`](Morph#OneToOne) from `String` to a stack of `Char`s.
@@ -204,6 +223,8 @@ toString =
     "012" |> Morph.mapTo Stack.Morph.string
     --> Stack.fromList [ '0', '1', '2' ]
 
+[Inverse](Morph#invert) of [`String.Morph.stack`](String-Morph#stack)
+
 -}
 string :
     MorphOrError
@@ -211,4 +232,4 @@ string :
         String
         error_
 string =
-    oneToOne Stack.fromString Stack.toString
+    Morph.oneToOne Stack.fromString Stack.toString

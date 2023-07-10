@@ -1,6 +1,6 @@
 module Array.Morph exposing
     ( each
-    , list, toList
+    , list, stack, arraySized, string
     , value
     )
 
@@ -14,16 +14,18 @@ module Array.Morph exposing
 
 ## transform
 
-@docs list, toList
+@docs list, stack, arraySized, string
 @docs value
 
 -}
 
 import Array exposing (Array)
-import Emptiable
-import Morph exposing (MorphIndependently, oneToOne)
+import ArraySized exposing (ArraySized)
+import Emptiable exposing (Emptiable)
+import Morph exposing (MorphIndependently, MorphOrError)
+import N exposing (Min, Up0)
 import Possibly exposing (Possibly(..))
-import Stack
+import Stack exposing (Stacked)
 import Value
 import Value.Morph.Internal exposing (MorphValue)
 
@@ -31,10 +33,13 @@ import Value.Morph.Internal exposing (MorphValue)
 {-| [`Morph.OneToOne`](Morph#OneToOne) from `List` to `Array`
 
     import Array
+    import Morph
 
     [ 0, 1, 2, 3 ]
         |> Morph.mapTo Array.Morph.list
     --> Array.fromList [ 0, 1, 2, 3 ]
+
+[Inverse](Morph#invert) of [`List.Morph.array`](List-Morph#array)
 
 -}
 list :
@@ -42,24 +47,74 @@ list :
         (List narrowElement -> Result error_ (Array narrowElement))
         (Array broadElement -> List broadElement)
 list =
-    oneToOne Array.fromList Array.toList
+    Morph.oneToOne Array.fromList Array.toList
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `Array` to `List`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `List` to `Array`
+
+    import Morph
+    import Array
+    import Stack
+
+    [ 0, 1, 2, 3 ]
+        |> Morph.mapTo Array.Morph.stack
+    --> Array.fromList [ 0, 1, 2, 3 ]
+
+[Inverse](Morph#invert) of [`Stack.Morph.array`](Stack-Morph#array)
+
+-}
+stack :
+    MorphIndependently
+        (Emptiable (Stacked narrowElement) possiblyOrNever_
+         -> Result error_ (Array narrowElement)
+        )
+        (Array broadElement -> Emptiable (Stacked broadElement) Possibly)
+stack =
+    list
+        |> Morph.over (Morph.oneToOne Stack.toList Stack.fromList)
+        |> Morph.narrowErrorMap Morph.deadEndNever
+
+
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `String` to `Array Char`
 
     import Array
 
-    Array.fromList [ 0, 1, 2, 3 ]
-        |> Morph.mapTo Array.Morph.toList
-    --> [ 0, 1, 2, 3 ]
+    "0123"
+        |> Morph.mapTo Array.Morph.string
+    --> Array.fromList [ 0, 1, 2, 3 ]
+
+[Inverse](Morph#invert) of [`String.Morph.array`](String-Morph#array)
 
 -}
-toList :
+string : MorphOrError (Array Char) String error_
+string =
+    list
+        |> Morph.over (Morph.oneToOne String.toList String.fromList)
+        |> Morph.narrowErrorMap Morph.deadEndNever
+
+
+{-| [`Morph.OneToOne`](Morph#OneToOne) from `ArraySized` to `Array`
+
+    import ArraySized
+    import Array
+
+    ArraySized.l4 0 1 2 3
+        |> Morph.mapTo Array.Morph.arraySized
+    --> Array.fromList [ 0, 1, 2, 3 ]
+
+[Inverse](Morph#invert) of [`ArraySized.Morph.array`](ArraySized-Morph#array)
+
+-}
+arraySized :
     MorphIndependently
-        (Array narrowElement -> Result error_ (List narrowElement))
-        (List element -> Array element)
-toList =
-    oneToOne Array.toList Array.fromList
+        (ArraySized narrowElement narrowRange_
+         -> Result error_ (Array narrowElement)
+        )
+        (Array broadElement
+         -> ArraySized broadElement (Min (Up0 broadX_))
+        )
+arraySized =
+    Morph.oneToOne ArraySized.toArray ArraySized.fromArray
 
 
 

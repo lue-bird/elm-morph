@@ -24,7 +24,7 @@ import Emptiable
 import Json exposing (Json)
 import Json.Decode
 import Json.Encode
-import Morph exposing (Morph, MorphIndependently, oneToOne)
+import Morph exposing (Morph, MorphIndependently)
 import Possibly exposing (Possibly(..))
 import Stack
 import Tree
@@ -345,7 +345,7 @@ value :
          -> Value.Value Value.IndexAndName
         )
 value =
-    oneToOne fromValueImplementation toValue
+    Morph.oneToOne fromValueImplementation toValue
 
 
 composedToValue :

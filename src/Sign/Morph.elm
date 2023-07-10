@@ -14,7 +14,7 @@ module Sign.Morph exposing
 import Bit exposing (Bit)
 import Char.Morph
 import Maybe.Morph
-import Morph exposing (Morph, MorphOrError, MorphRow, oneToOne)
+import Morph exposing (Morph, MorphOrError, MorphRow)
 import Sign exposing (Sign(..))
 import String.Morph
 
@@ -70,7 +70,7 @@ else [narrows to](Morph#toNarrow) [`Positive`](Sign#Sign)
 maybeMinusChar : MorphRow Sign Char
 maybeMinusChar =
     Morph.named "negation"
-        (oneToOne
+        (Morph.oneToOne
             (\minusSymbol ->
                 case minusSymbol of
                     Nothing ->

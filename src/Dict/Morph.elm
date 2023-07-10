@@ -1,6 +1,6 @@
 module Dict.Morph exposing
     ( eachValue
-    , list, toList
+    , list
     , value
     )
 
@@ -14,7 +14,7 @@ module Dict.Morph exposing
 
 ## transform
 
-@docs list, toList
+@docs list
 @docs value
 
 -}
@@ -28,7 +28,6 @@ import Value.Morph.Internal exposing (MorphValue)
 {-| [`Morph.OneToOne`](Morph#OneToOne) from a `List { key : key, value : value }` to a `Dict key value`.
 
     import Dict
-    import Dict.Morph
     import Morph
 
     [ { key = "hi", value = "there" }
@@ -36,6 +35,8 @@ import Value.Morph.Internal exposing (MorphValue)
     ]
         |> Morph.mapTo Dict.Morph.list
     --> Dict.empty |> Dict.insert "Hi" "there" |> Dict.insert "git" "gud"
+
+[Inverse](Morph#invert) of [`List.Morph.dict`](List-Morph#dict)
 
 -}
 list :
@@ -60,31 +61,6 @@ list =
                     (\key value_ -> (::) { key = key, value = value_ })
                     []
         )
-
-
-{-| [`Morph.OneToOne`](Morph#OneToOne) from a `Dict key value` to a `List { key : key, value : value }`.
-
-    import Dict
-    import Dict.Morph
-    import Morph
-
-    Dict.empty
-    	|> Dict.insert 0 'a'
-    	|> Dict.insert 1 'b'
-        |> Morph.mapTo Dict.Morph.toList
-    --> [ { key = 0, value = 'a' }, { key = 1, value = 'b' } ]
-
--}
-toList :
-    MorphIndependently
-        (Dict broadKey broadValue
-         -> Result error_ (List { key : broadKey, value : broadValue })
-        )
-        (List { key : comparableNarrowKey, value : narrowValue }
-         -> Dict comparableNarrowKey narrowValue
-        )
-toList =
-    Morph.invert list
 
 
 
