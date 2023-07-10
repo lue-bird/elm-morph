@@ -35,7 +35,7 @@ import Value.Morph.Internal exposing (MorphValue)
     , { key = "git", value = "gud" }
     ]
         |> Morph.mapTo Dict.Morph.list
-    --> Dict.fromList [ ( "Hi", "there" ), ( "git", "gud" ) ]
+    --> Dict.empty |> Dict.insert "Hi" "there" |> Dict.insert "git" "gud"
 
 -}
 list :
@@ -68,7 +68,9 @@ list =
     import Dict.Morph
     import Morph
 
-    Dict.fromList [ ( 0, 'a' ), ( 1, 'b' ) ]
+    Dict.empty
+    	|> Dict.insert 0 'a'
+    	|> Dict.insert 1 'b'
         |> Morph.mapTo Dict.Morph.toList
     --> [ { key = 0, value = 'a' }, { key = 1, value = 'b' } ]
 

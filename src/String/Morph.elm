@@ -34,7 +34,9 @@ import Value.Morph.Internal exposing (MorphValue)
 
 {-| [`Morph.OneToOne`](Morph#OneToOne) from a `String` to a `List Char`.
 
-    "0123" |> (String.Morph.toList |> Morph.map)
+    import Morph
+    
+    "0123" |> Morph.mapTo String.Morph.toList
     --> [ '0', '1', '2', '3' ]
 
 -}
@@ -45,8 +47,10 @@ toList =
 
 {-| [`Morph.OneToOne`](Morph#OneToOne) from `List Char` to a `String`.
 
-    "0123" |> Morph.mapTo String.Morph.list
-    --> [ '0', '1', '2', '3' ]
+    import Morph
+    
+    [ '0', '1', '2', '3' ] |> Morph.mapTo String.Morph.list
+    --> "0123"
 
 Parse-build a `String` →
 Use [`toNarrow`](Morph#toNarrow), [`toBroad`](Morph#toBroad)
@@ -84,9 +88,10 @@ each elementCharTranslate =
 This is case sensitive.
 
     import Morph
-
+    import List.Morph
+    
     -- match an exact text, case sensitive
-    "abc" |> Morph.toNarrow (String.Morph.only "abc")
+    "abc" |> Morph.toNarrow (String.Morph.only "abc" |> Morph.rowFinish |> Morph.over List.Morph.string)
     --> Ok ()
 
     -- match an exact text, case sensitive
