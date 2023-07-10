@@ -926,7 +926,7 @@ descriptionAndErrorToTree description_ =
                             )
 
                     unexpectedError ->
-                        unexpectedErrorToTree unexpectedError description_
+                        unexpectedErrorToTree unexpectedError (UntilDescription untilDescription)
 
         SequenceDescription elementDescriptions ->
             \error ->
@@ -936,7 +936,7 @@ descriptionAndErrorToTree description_ =
                             |> groupTreesAs "sequence"
 
                     unexpectedError ->
-                        unexpectedErrorToTree unexpectedError description_
+                        unexpectedErrorToTree unexpectedError (SequenceDescription elementDescriptions)
 
         ChainDescription elementDescriptions ->
             \error ->
@@ -946,7 +946,7 @@ descriptionAndErrorToTree description_ =
                             |> groupTreesAs "chained"
 
                     unexpectedError ->
-                        unexpectedErrorToTree unexpectedError description_
+                        unexpectedErrorToTree unexpectedError (ChainDescription elementDescriptions)
 
         ChoiceDescription possibilities ->
             \error ->
@@ -964,7 +964,7 @@ descriptionAndErrorToTree description_ =
                             )
 
                     unexpectedError ->
-                        unexpectedErrorToTree unexpectedError description_
+                        unexpectedErrorToTree unexpectedError (ChoiceDescription possibilities)
 
         ElementsDescription elementDescription ->
             \error ->
@@ -982,7 +982,7 @@ descriptionAndErrorToTree description_ =
                             )
 
                     unexpectedError ->
-                        unexpectedErrorToTree unexpectedError description_
+                        unexpectedErrorToTree unexpectedError (ElementsDescription elementDescription)
 
         PartsDescription partsDescription ->
             \error ->
@@ -1008,7 +1008,7 @@ descriptionAndErrorToTree description_ =
                             )
 
                     unexpectedError ->
-                        unexpectedErrorToTree unexpectedError description_
+                        unexpectedErrorToTree unexpectedError (PartsDescription partsDescription)
 
         VariantsDescription variantsDescription ->
             \error ->
@@ -1033,7 +1033,7 @@ descriptionAndErrorToTree description_ =
                             )
 
                     unexpectedError ->
-                        unexpectedErrorToTree unexpectedError description_
+                        unexpectedErrorToTree unexpectedError (VariantsDescription variantsDescription)
 
         NamedDescription namedDescription ->
             \error ->
@@ -1066,7 +1066,7 @@ collapseSequenceDescriptionAndError sequenceDescription sequenceError =
                                         lateSequenceError
 
                                 unexpectedError ->
-                                    [ unexpectedErrorToTree unexpectedError sequenceDescription.early ]
+                                    [ unexpectedErrorToTree unexpectedError (SequenceDescription lateSequenceDescription) ]
 
                         earlyNonSequenceDescription ->
                             [ descriptionAndErrorToTree earlyNonSequenceDescription sequenceError.error ]
@@ -1078,9 +1078,9 @@ collapseSequenceDescriptionAndError sequenceDescription sequenceError =
                             collapseSequenceDescription lateSequenceDescription
                                 |> List.map descriptionToLabelTree
 
-                        _ ->
-                            if isDescriptive sequenceDescription.late then
-                                [ descriptionToLabelTree sequenceDescription.late ]
+                        sequenceLateNonSequence ->
+                            if isDescriptive sequenceLateNonSequence then
+                                [ descriptionToLabelTree sequenceLateNonSequence ]
 
                             else
                                 []
@@ -1096,9 +1096,9 @@ collapseSequenceDescriptionAndError sequenceDescription sequenceError =
                             collapseSequenceDescription earlySequenceDescription
                                 |> List.map descriptionToLabelTree
 
-                        _ ->
-                            if isDescriptive sequenceDescription.early then
-                                [ descriptionToLabelTree sequenceDescription.early ]
+                        sequenceEarlyNonSequence ->
+                            if isDescriptive sequenceEarlyNonSequence then
+                                [ descriptionToLabelTree sequenceEarlyNonSequence ]
 
                             else
                                 []
@@ -1117,7 +1117,7 @@ collapseSequenceDescriptionAndError sequenceDescription sequenceError =
                                         lateSequenceError
 
                                 unexpectedError ->
-                                    [ unexpectedErrorToTree unexpectedError sequenceDescription.late ]
+                                    [ unexpectedErrorToTree unexpectedError (SequenceDescription lateSequenceDescription) ]
 
                         lateNonSequenceDescription ->
                             [ descriptionAndErrorToTree lateNonSequenceDescription sequenceError.error ]
@@ -1147,7 +1147,7 @@ collapseChainDescriptionAndError chainDescription chainError =
                                         broadChainError
 
                                 unexpectedError ->
-                                    [ unexpectedErrorToTree unexpectedError chainDescription.narrow ]
+                                    [ unexpectedErrorToTree unexpectedError (ChainDescription broadChainDescription) ]
 
                         narrowNonChainDescription ->
                             [ descriptionAndErrorToTree narrowNonChainDescription chainError.error ]
@@ -1159,9 +1159,9 @@ collapseChainDescriptionAndError chainDescription chainError =
                             collapseChainDescription broadChainDescription
                                 |> List.map descriptionToLabelTree
 
-                        _ ->
-                            if isDescriptive chainDescription.broad then
-                                [ descriptionToLabelTree chainDescription.broad ]
+                        chainDescriptionBroadNonChain ->
+                            if isDescriptive chainDescriptionBroadNonChain then
+                                [ descriptionToLabelTree chainDescriptionBroadNonChain ]
 
                             else
                                 []
@@ -1177,9 +1177,9 @@ collapseChainDescriptionAndError chainDescription chainError =
                             collapseChainDescription narrowChainDescription
                                 |> List.map descriptionToLabelTree
 
-                        _ ->
-                            if isDescriptive chainDescription.narrow then
-                                [ descriptionToLabelTree chainDescription.narrow ]
+                        chainDescriptionNarrowNonChain ->
+                            if isDescriptive chainDescriptionNarrowNonChain then
+                                [ descriptionToLabelTree chainDescriptionNarrowNonChain ]
 
                             else
                                 []
@@ -1198,7 +1198,7 @@ collapseChainDescriptionAndError chainDescription chainError =
                                         broadChainError
 
                                 unexpectedError ->
-                                    [ unexpectedErrorToTree unexpectedError chainDescription.broad ]
+                                    [ unexpectedErrorToTree unexpectedError (ChainDescription broadChainDescription) ]
 
                         broadNonChainDescription ->
                             [ descriptionAndErrorToTree broadNonChainDescription chainError.error ]
