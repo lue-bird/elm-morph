@@ -16,9 +16,8 @@ Rules on radar
         exceptions where we can't
         abstract/simplify functions further
 
+
 ## split on
-
-
 
 
 ## rejected
@@ -40,9 +39,9 @@ because `aSemanticallyInfixFunction` covers `atLeast`/`atMost`/... which can be 
             ">> pipeline"
             [ "Forbidding `g >> f` for reasons of simplicity, consistency:"
             , [ "Establish a subject: `List.map (\\user -> user |> User.badgeAdd ... |> User.levelIncrease)`"
-                , " for easier readability and scalability (maybe even creating a separate function)"
-                , " when chaining multiple operations"
-                ]
+              , " for easier readability and scalability (maybe even creating a separate function)"
+              , " when chaining multiple operations"
+              ]
                 |> String.concat
             ]
 
@@ -57,6 +56,7 @@ because they can improve food scoping
 import Docs.NoMissing
 import Docs.ReviewAtDocs
 import Docs.ReviewLinksAndSections
+import NoAlways
 import NoDebug.Log
 import NoDebug.TodoOrToString
 import NoExposingEverything
@@ -85,7 +85,7 @@ import ReviewPipelineStyles.Fixes as PipelineFix
 import ReviewPipelineStyles.Predicates as PipelinePredicate
 import ReviewPipelineStyles.Premade as Pipeline
 import Simplify
-import NoAlways
+import VariablesBetweenCaseOf.AccessInCases
 
 
 config : List Rule
@@ -189,6 +189,7 @@ config =
     , NoAlways.rule
     , -- could be included in the above
       NoDebug.Log.rule
+    , VariablesBetweenCaseOf.AccessInCases.forbid
     ]
 
 

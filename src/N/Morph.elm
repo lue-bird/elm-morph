@@ -22,7 +22,6 @@ import Bit
 import BitArray
 import BitArray.Extra
 import Char.Morph.Internal
-import Linear exposing (Direction(..))
 import Morph exposing (MorphIndependently)
 import N exposing (Add1, In, Min, N, N9, To, Up, Up0, Up9, n0, n1, n2, n3, n4, n5, n6, n7, n8, n9)
 import N.Local exposing (n32)
