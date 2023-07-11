@@ -14,7 +14,6 @@ Easily serialize from and to elm values independent of output format.
 
 An example adapted from [elm guide on custom types](https://guide.elm-lang.org/types/custom_types.html):
 ```elm
-import Value
 import Value.Morph exposing (MorphValue)
 import Morph
 import String.Morph
