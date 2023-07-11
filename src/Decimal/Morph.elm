@@ -2,7 +2,7 @@ module Decimal.Morph exposing
     ( orException, value
     , chars, bitsVariableCount
     , orExceptionValue, exceptionValue
-    , orExceptionFloat, orExceptionToFloat
+    , orExceptionFloat
     )
 
 {-| [`Decimal`](Decimal#Decimal) [`Morph`](Morph#Morph)
@@ -15,7 +15,7 @@ module Decimal.Morph exposing
 @docs chars, bitsVariableCount
 
 
-## [`Decimal`](Decimal#Decimal) [`OrException`](Decimal#OrException)
+## [`Decimal`](Decimal#Decimal) or [`Exception`](Decimal#Exception)
 
 [`Morph`](Morph#Morph) a [`Decimal`](Decimal#Decimal) where infinities and NaN are possible states
 
@@ -24,18 +24,17 @@ module Decimal.Morph exposing
 
 ## `Float`
 
-@docs orExceptionFloat, orExceptionToFloat
+@docs orExceptionFloat
 
 -}
 
 import Bit exposing (Bit)
 import Bit.Morph
-import Decimal exposing (Decimal(..), Exception(..), Fraction, OrException(..), SignedAbsolute(..))
-import Emptiable exposing (Emptiable)
+import Decimal exposing (Decimal(..), Exception(..), Fraction, SignedAbsolute(..))
 import List.Morph
 import Maybe.Morph
 import Morph exposing (Morph, MorphOrError, MorphRow, grab, match)
-import N exposing (Add1, In, N, N0, N1, N9, To, Up, n0, n1, n2, n3, n4, n5, n6, n7, n8, n9)
+import N exposing (Add1, In, N, N1, N9, To, Up, n0, n1, n2, n3, n4, n5, n6, n7, n8, n9)
 import N.Morph
 import Natural
 import Natural.Morph
@@ -43,28 +42,27 @@ import NaturalAtLeast1
 import NaturalAtLeast1Base10
 import Sign exposing (Sign(..))
 import Sign.Morph
-import Stack exposing (Stacked)
 import String.Morph
 import Value
 import Value.Morph.Internal exposing (MorphValue)
 
 
 {-| [`Morph`](Morph#Morph)
-a [`Decimal`](Decimal#Decimal)
-to an [`OrException Decimal`](Decimal#OrException)
+a value
+to a [`Result Exception value`](Decimal#Exception)
 -}
-orException : Morph Decimal (OrException Decimal)
+orException : Morph aValue (Result Exception aValue)
 orException =
-    Morph.custom "decimal"
+    Morph.custom "without exception"
         { toNarrow =
             \floatExplicit_ ->
                 case floatExplicit_ of
-                    Number number ->
+                    Ok number ->
                         number |> Ok
 
-                    Exception _ ->
-                        "Exception" |> Err
-        , toBroad = Number
+                    Err exception ->
+                        ("exception: " ++ (exception |> Decimal.exceptionToString)) |> Err
+        , toBroad = Ok
         }
 
 
@@ -221,7 +219,7 @@ fractionChars =
 {-| [`MorphValue`](Value-Morph#MorphValue) from a [`Decimal`](Decimal#Decimal)
 
 To get a [`MorphValue`](Value-Morph#MorphValue) from a `Float`,
-use [`Decimal.Morph.orExceptionToFloat`](#orExceptionToFloat)
+use [`Float.Morph.decimalOrException`](Float-Morph#decimalOrException)
 over [`Decimal.Morph.orExceptionValue`](#orExceptionValue)
 
 -}
@@ -281,275 +279,34 @@ signValue =
 
 {-| [`Morph`](Morph#Morph)
 an [`elm/core` `Float`](https://dark.elm.dmy.fr/packages/elm/core/latest/Basics#Float)
-to a [`OrException Decimal`](Decimal#OrException)
+to a [`Result Exception Decimal`](Decimal#Exception)
 
 Keep in mind that `DecimalOrException -> Float` can be lossy
-since `Float` is fixed in bit size while [`OrException Decimal`](Decimal#OrException) is not
+since `Float` is fixed in bit size while [`Decimal`](Decimal#Decimal) is not
 
-    -9999.124
-        |> broaden
-            (Decimal.Morph.chars
-                |> Morph.overRow Decimal.orException
-                |> Morph.overRow DecimalOrException.toFloat
-                |> Morph.rowFinish
-            )
-    --> "-999.1239999999997962731868028640747070312"
+[Inverse] of [`Float.Morph.decimalOrException`](Float-Morph#decimalOrException)
 
 -}
-orExceptionFloat : MorphOrError (OrException Decimal) Float error_
+orExceptionFloat : MorphOrError (Result Exception Decimal) Float error_
 orExceptionFloat =
-    Morph.variants
-        ( \variantDecimal variantNaN variantInfinity choiceFloat ->
-            if choiceFloat |> Basics.isNaN then
-                variantNaN ()
-
-            else if choiceFloat |> Basics.isInfinite then
-                variantInfinity
-                    (if choiceFloat < 0 then
-                        Negative
-
-                     else
-                        Positive
-                    )
-
-            else
-                variantDecimal choiceFloat
-        , \variantDecimal variantNaN variantInfinity choiceExplicit ->
-            case choiceExplicit of
-                Number decimal ->
-                    variantDecimal decimal
-
-                Exception NaN ->
-                    variantNaN ()
-
-                Exception (Infinity sign) ->
-                    variantInfinity sign
-        )
-        |> Morph.variant "Number"
-            ( Number, identity )
-            (Morph.oneToOne
-                (\float_ ->
-                    if float_ == 0 then
-                        Decimal.N0
-
-                    else
-                        -- /= 0
-                        let
-                            floatAbsolute =
-                                float_ |> Basics.abs
-
-                            wholeAbsolute =
-                                floatAbsolute |> Basics.truncate
-                        in
-                        { sign =
-                            if float_ < 0 then
-                                Negative
-
-                            else
-                                Positive
-                        , absolute =
-                            case wholeAbsolute of
-                                0 ->
-                                    floatAbsolute |> floatToFraction |> Decimal.Fraction
-
-                                wholeAbsoluteExcept0 ->
-                                    { whole =
-                                        wholeAbsoluteExcept0 |> NaturalAtLeast1Base10.fromIntPositive |> NaturalAtLeast1Base10.toBase2
-                                    , fraction =
-                                        let
-                                            floatFraction =
-                                                floatAbsolute - (wholeAbsoluteExcept0 |> Basics.toFloat)
-                                        in
-                                        if floatFraction == 0 then
-                                            Nothing
-
-                                        else
-                                            -- floatFraction /= 0
-                                            floatFraction
-                                                |> Basics.abs
-                                                |> floatToFraction
-                                                |> Just
-                                    }
-                                        |> Decimal.AtLeast1
-                        }
-                            |> Decimal.Signed
-                )
-                (\floatNarrow ->
-                    case floatNarrow of
-                        Decimal.N0 ->
-                            0
-
-                        Decimal.Signed numberSigned ->
-                            let
-                                toSigned =
-                                    case numberSigned.sign of
-                                        Negative ->
-                                            Basics.negate
-
-                                        Positive ->
-                                            Basics.abs
-                            in
-                            numberSigned.absolute |> signedAbsoluteToFloat |> toSigned
-                )
-            )
-        |> Morph.variant "NaN" ( \() -> Exception NaN, identity ) (Morph.oneToOne identity (\() -> floatNaN))
-        |> Morph.variant "Infinity"
-            ( \sign -> Exception (Infinity sign), identity )
-            (Morph.oneToOne identity
-                (\sign ->
-                    let
-                        toSigned =
-                            case sign of
-                                Negative ->
-                                    Basics.negate
-
-                                Positive ->
-                                    Basics.abs
-                    in
-                    floatInfinity |> toSigned
-                )
-            )
-        |> Morph.variantsFinish
-        |> Morph.narrowErrorMap Morph.deadEndNever
-
-
-floatNaN : Float
-floatNaN =
-    0.0 / 0.0
-
-
-floatInfinity : Float
-floatInfinity =
-    1.0 / 0.0
-
-
-signedAbsoluteToFloat : Decimal.SignedAbsolute -> Float
-signedAbsoluteToFloat =
-    \absolute ->
-        case absolute of
-            Decimal.Fraction fraction ->
-                fraction |> fractionToFloat
-
-            Decimal.AtLeast1 atLeast1 ->
-                let
-                    wholeFloat : Float
-                    wholeFloat =
-                        atLeast1.whole |> Natural.AtLeast1 |> Morph.mapTo N.Morph.natural |> N.toFloat
-                in
-                case atLeast1.fraction of
-                    Nothing ->
-                        wholeFloat
-
-                    Just fraction_ ->
-                        wholeFloat + (fraction_ |> fractionToFloat)
-
-
-fractionToFloat : Fraction -> Float
-fractionToFloat =
-    \fraction_ ->
-        fraction_.beforeLast
-            ++ [ fraction_.last |> N.inToOn |> N.minTo n0 |> N.inToNumber ]
-            |> List.indexedMap
-                (\decimal digit ->
-                    (digit |> N.toFloat)
-                        * (10 ^ -(1 + (decimal |> Basics.toFloat)))
-                )
-            |> List.sum
-
-
-floatToFraction : Float -> Fraction
-floatToFraction =
-    \float_ ->
-        case float_ |> floatFractionToBase10 |> unpadLeading0Digits of
-            [] ->
-                { beforeLast = [], last = n1 |> N.maxTo n9 |> N.inToNumber }
-
-            first :: afterFirst ->
-                let
-                    digitsReverse : Emptiable (Stacked (N (In N0 N9))) never_
-                    digitsReverse =
-                        Stack.topBelow first afterFirst |> Stack.reverse
-                in
-                { beforeLast = digitsReverse |> Stack.removeTop |> Stack.toList |> List.reverse
-                , last = digitsReverse |> Stack.top |> N.inToOn |> N.toIn ( n1, n9 ) |> N.inToNumber
-                }
-
-
-unpadLeading0Digits : List (N (In N0 N9)) -> List (N (In N0 N9))
-unpadLeading0Digits =
-    \digits ->
-        case digits of
-            [] ->
-                []
-
-            digit0 :: digits1Up ->
-                case N.toInt digit0 of
-                    0 ->
-                        unpadLeading0Digits digits1Up
-
-                    _ ->
-                        digit0 :: digits1Up
-
-
-floatFractionToBase10 : Float -> List (N (In N0 N9))
-floatFractionToBase10 =
-    \float_ ->
-        if float_ == 0 then
-            []
-
-        else
-            let
-                floatShifted1Digit : Float
-                floatShifted1Digit =
-                    float_ * 10
-
-                digit : Int
-                digit =
-                    floatShifted1Digit |> floor
-            in
-            (digit |> N.intToIn ( n0, n9 ) |> N.inToNumber)
-                :: ((floatShifted1Digit - (digit |> Basics.toFloat))
-                        |> floatFractionToBase10
-                   )
-
-
-{-| [`Morph`](Morph#Morph)
-a [`OrException Decimal`](Decimal#OrException)
-to an [`elm/core` `Float`](https://dark.elm.dmy.fr/packages/elm/core/latest/Basics#Float)
-
-Keep in mind that `DecimalOrException -> Float` can be lossy
-since `Float` is fixed in bit size while [`OrException Decimal`](Decimal#OrException) is not
-
-    -9999.124
-        |> broaden
-            (Decimal.Morph.chars
-                |> Morph.overRow Decimal.orException
-                |> Morph.overRow DecimalOrException.toFloat
-                |> Morph.rowFinish
-            )
-    --> "-999.1239999999997962731868028640747070312"
-
--}
-orExceptionToFloat : MorphOrError Float (OrException Decimal) error_
-orExceptionToFloat =
-    Morph.invert orExceptionFloat
+    Morph.oneToOne Decimal.fromFloat Decimal.orExceptionToFloat
 
 
 {-| `Float` [`MorphValue`](Value-Morph#MorphValue)
 -}
-orExceptionValue : MorphValue (OrException Decimal)
+orExceptionValue : MorphValue (Result Exception Decimal)
 orExceptionValue =
     Morph.choice
         (\variantDecimal variantException choiceExplicit ->
             case choiceExplicit of
-                Number decimal ->
+                Ok decimal ->
                     variantDecimal decimal
 
-                Exception exception ->
+                Err exception ->
                     variantException exception
         )
-        |> Value.Morph.Internal.variant ( Number, "Decimal" ) decimalInternalValue
-        |> Value.Morph.Internal.variant ( Exception, "Exception" ) exceptionValue
+        |> Value.Morph.Internal.variant ( Ok, "decimal" ) decimalInternalValue
+        |> Value.Morph.Internal.variant ( Err, "exception" ) exceptionValue
         |> Value.Morph.Internal.choiceFinish
 
 

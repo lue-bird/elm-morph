@@ -1,14 +1,12 @@
 module Integer.Morph exposing
-    ( int, toInt
-    , decimal
+    ( int, decimal
     , value
     , chars, bits
     )
 
 {-| [`Integer`](Integer#Integer) [`Morph`](Morph#Morph)
 
-@docs int, toInt
-@docs decimal
+@docs int, decimal
 @docs value
 
 
@@ -122,85 +120,12 @@ value =
 Keep in mind that `Integer -> Int` can overflow
 since `Int` is fixed in bit size while [`Integer`](Integer#Integer) is not.
 
+[Inverse] of [`Int.Morph.integer`](Int-Morph#integer)
+
 -}
 int : MorphOrError Integer Int error_
 int =
-    Morph.oneToOne fromIntImplementation toIntImplementation
-
-
-fromIntImplementation : Int -> Integer
-fromIntImplementation =
-    \intBroad ->
-        case
-            intBroad
-                |> abs
-                |> N.intToAtLeast n0
-                |> BitArray.fromN n32
-                |> BitArray.Extra.unpad
-                |> ArraySized.hasAtLeast n1
-        of
-            Err _ ->
-                Integer.N0
-
-            Ok absoluteAtLeast1 ->
-                Integer.Signed
-                    { sign =
-                        if intBroad >= 0 then
-                            Sign.Positive
-
-                        else
-                            Sign.Negative
-                    , absolute =
-                        { bitsAfterI =
-                            absoluteAtLeast1
-                                |> ArraySized.removeMin ( Up, n1 )
-                                |> ArraySized.toList
-                        }
-                    }
-
-
-toIntImplementation : Integer -> Int
-toIntImplementation =
-    \integerNarrow ->
-        case integerNarrow of
-            Integer.N0 ->
-                0
-
-            Integer.Signed signedValue ->
-                signedValue.absolute
-                    |> Natural.AtLeast1
-                    |> Morph.mapTo N.Morph.natural
-                    |> N.toInt
-                    |> signPrependToNumber signedValue.sign
-
-
-{-|
-
-  - `Negative` means negate
-  - `Positive` means keep the current sign
-
--}
-signPrependToNumber : Sign -> (number -> number)
-signPrependToNumber sign =
-    case sign of
-        Sign.Negative ->
-            Basics.negate
-
-        Sign.Positive ->
-            identity
-
-
-{-| [`Morph.OneToOne`](Morph#OneToOne) between an `Int` and a [decimal representation](Integer#Integer).
-
-Keep in mind that `Integer -> Int` can overflow
-since `Int` is fixed in bit size while [`Integer`](Integer#Integer) is not.
-
-TODO separate as `Int.Morph.integer`
-
--}
-toInt : MorphOrError Int Integer error_
-toInt =
-    Morph.invert int
+    Morph.oneToOne Integer.fromInt Integer.toInt
 
 
 {-| [`Integer`](Integer#Integer) [`MorphRow`](Morph#MorphRow)

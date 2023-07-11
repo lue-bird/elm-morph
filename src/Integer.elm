@@ -1,6 +1,8 @@
 module Integer exposing
     ( Integer(..), Signed
+    , fromInt
     , absolute, negate
+    , toInt
     )
 
 {-| Arbitrary-precision whole number
@@ -8,12 +10,28 @@ module Integer exposing
 @docs Integer, Signed
 
 
+## create
+
+@docs fromInt
+
+
 ## alter
 
 @docs absolute, negate
 
+
+## transform
+
+@docs toInt
+
 -}
 
+import ArraySized
+import BitArray
+import BitArray.Extra
+import Linear exposing (Direction(..))
+import N exposing (n0, n1)
+import N.Local exposing (n32)
 import Natural exposing (Natural)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Sign exposing (Sign)
@@ -94,3 +112,73 @@ absolute =
                ( Positive, Negative ) ->
                    signed.absolute |> Natural.AtLeast1.subtract toAdd.absolute
 -}
+
+
+{-| Convert from an `Int`
+-}
+fromInt : Int -> Integer
+fromInt =
+    \intBroad ->
+        case
+            intBroad
+                |> abs
+                |> N.intToAtLeast n0
+                |> BitArray.fromN n32
+                |> BitArray.Extra.unpad
+                |> ArraySized.hasAtLeast n1
+        of
+            Err _ ->
+                N0
+
+            Ok absoluteAtLeast1 ->
+                Signed
+                    { sign =
+                        if intBroad >= 0 then
+                            Sign.Positive
+
+                        else
+                            Sign.Negative
+                    , absolute =
+                        { bitsAfterI =
+                            absoluteAtLeast1
+                                |> ArraySized.removeMin ( Up, n1 )
+                                |> ArraySized.toList
+                        }
+                    }
+
+
+{-| Convert to an `Int`
+
+Keep in mind that this can overflow
+since `Int` is fixed in bit size while [`Integer`](Integer#Integer) is not.
+
+-}
+toInt : Integer -> Int
+toInt =
+    \integerNarrow ->
+        case integerNarrow of
+            N0 ->
+                0
+
+            Signed signedValue ->
+                signedValue.absolute
+                    |> Natural.AtLeast1
+                    |> Natural.toN
+                    |> N.toInt
+                    |> signPrependToNumber signedValue.sign
+
+
+{-|
+
+  - `Negative` means negate
+  - `Positive` means keep the current sign
+
+-}
+signPrependToNumber : Sign -> (number -> number)
+signPrependToNumber sign =
+    case sign of
+        Sign.Negative ->
+            Basics.negate
+
+        Sign.Positive ->
+            identity

@@ -3550,6 +3550,9 @@ transforming it into a [`Morph`](#Morph) on the full stack of input elements.
                 |> Morph.over List.Morph.string
             )
 
+Once you've called `|> rowFinish` there is no (performant) way to convert it back to a [`MorphRow`](#MorphRow),
+so delay it for as long as you can.
+
 -}
 rowFinish :
     MorphRow narrow broadElement

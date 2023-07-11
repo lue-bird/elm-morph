@@ -78,38 +78,7 @@ rangeDescription =
 -}
 toNatural : MorphIndependently (N range_ -> Result error_ Natural) (Natural -> N (Min (Up0 minX_)))
 toNatural =
-    Morph.oneToOne toNaturalImplementation fromNatural
-
-
-toNaturalImplementation : N range_ -> Natural
-toNaturalImplementation =
-    \n_ ->
-        case
-            n_
-                |> BitArray.fromN n32
-                |> BitArray.Extra.unpad
-                |> ArraySized.hasAtLeast n1
-        of
-            Err _ ->
-                Natural.N0
-
-            Ok atLeast1 ->
-                Natural.AtLeast1
-                    { bitsAfterI = atLeast1 |> ArraySized.toList }
-
-
-fromNatural : Natural -> N (Min (Up0 minX_))
-fromNatural =
-    \naturalNarrow ->
-        case naturalNarrow of
-            Natural.N0 ->
-                n0 |> N.maxToInfinity
-
-            Natural.AtLeast1 atLeast1 ->
-                Bit.I
-                    :: atLeast1.bitsAfterI
-                    |> ArraySized.fromList
-                    |> BitArray.toN
+    Morph.oneToOne Natural.fromN Natural.toN
 
 
 {-| [`Morph`](Morph#Morph) from a [`Natural`](Natural#Natural)
