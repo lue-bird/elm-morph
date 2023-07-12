@@ -18,7 +18,6 @@
     "Natural",
     "Natural.Morph",
     "Integer",
-    "Integer.Internal",
     "Integer.Morph",
     "Int.Morph",
     "Decimal",

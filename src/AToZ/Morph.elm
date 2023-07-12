@@ -1,5 +1,5 @@
 module AToZ.Morph exposing
-    ( only, caseBroad
+    ( only, broadCase
     , lowerChar, upperChar, char
     )
 
@@ -8,7 +8,7 @@ module AToZ.Morph exposing
 
 ## [`Morph`](Morph#Morph)
 
-@docs only, caseBroad
+@docs only, broadCase
 @docs lowerChar, upperChar, char
 
 -}
@@ -26,7 +26,7 @@ For the general idea, check out [`Morph.broad`](Morph#broad)
 
 Example: We want to format it as lowercase but also accept uppercase:
 
-    AToZ.caseBroad AToZ.CaseLower
+    AToZ.broadCase AToZ.CaseLower
         |> Morph.over AToZ.Morph.char
 
 which would be equivalent to
@@ -35,8 +35,8 @@ which would be equivalent to
         |> Morph.over AToZ.Morph.char
 
 -}
-caseBroad : Case -> Morph AToZ { case_ : Case, letter : AToZ }
-caseBroad caseSeed =
+broadCase : Case -> Morph AToZ { case_ : Case, letter : AToZ }
+broadCase caseSeed =
     Morph.oneToOne .letter (\letter -> { letter = letter, case_ = caseSeed })
 
 
@@ -46,55 +46,56 @@ from a `Char`
 > ℹ️ Equivalent regular expression: `[a-zA-Z]`
 
     import AToZ
-    import String.Morph
 
-    -- match any letter, case insensitive
-    "abc" |> Text.toNarrow letter --> Ok 'a'
-    "ABC" |> Text.toNarrow letter --> Ok 'A'
+    -- match any letter, remembering the case
+    'a' |> Morph.toNarrow AToZ.Morph.char
+    --> Ok { case_ = AToZ.CaseLower, letter = AToZ.A }
 
-    -- But anything else makes it fail.
-    import Morph.Error
+    'A' |> Morph.toNarrow AToZ.Morph.char
+    --> Ok { case_ = AToZ.CaseUpper, letter = AToZ.A }
 
-    "123"
-        |> Text.toNarrow letter
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '1'."
+    -- digits, symbols etc makes it fail
+    '1'
+        |> Morph.toNarrow AToZ.Morph.char
+        |> Result.toMaybe
+    --> Nothing
+
+Combine with [`broadCase`](#broadCase) to provide a default casing on [`toBroad`](Morph#toBroad)
+
+Combine with [`Morph.one`](Morph#one) to use it in a [`MorphRow`](Morph#MorphRow)
 
 
-### example `ArraySized.Morph.atLeast n1 (AToZ.Morph.char |> Morph.one)`
+### example `Morph.whilePossible (AToZ.Morph.char |> Morph.one)`
 
-> ℹ️ Equivalent regular expression: `[a-zA-Z]+`
+> ℹ️ Equivalent regular expression: `[a-zA-Z]*`
 
     import Morph
-    import Morph.Error
     import List.Morph
 
-    -- match many letters, case insensitive
-    "aBcEY"
+    -- multiple letters, remembering their cases
+    "aBc"
         |> Morph.toNarrow
             (Morph.whilePossible (AToZ.Morph.char |> Morph.one)
                 |> Morph.rowFinish
                 |> Morph.over List.Morph.string
             )
-    --> Ok "aBcEY"
+    --> Ok
+    -->     [ { case_ = AToZ.CaseLower, letter = AToZ.A }
+    -->     , { case_ = AToZ.CaseUpper, letter = AToZ.B }
+    -->     , { case_ = AToZ.CaseLower, letter = AToZ.C }
+    -->     ]
 
-    "π123abc"
+    -- greek letters, space, -, ', . etc are not [a-Z]
+    "abπc"
         |> Morph.toNarrow
-            (Morph.whilePossible (AToZ.Morph.char |> Morph.one)
+            (Morph.broad []
+                |> Morph.overRow
+                    (Morph.whilePossible (AToZ.Morph.char |> Morph.one))
                 |> Morph.rowFinish
                 |> Morph.over List.Morph.string
             )
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting at least 1 letters [a-zA-Z]+. I got stuck when I got 'π'."
-
-    "abc-efg"
-        |> Morph.toNarrow
-            (Morph.whilePossible (AToZ.Morph.char |> Morph.one)
-                |> Morph.rowFinish
-                |> Morph.over List.Morph.string
-            )
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting at least 1 letters [a-zA-Z]+. I got stuck when I got '-'."
+        |> Result.toMaybe
+    --> Nothing
 
 -}
 char : Morph { case_ : Case, letter : AToZ } Char
@@ -201,22 +202,32 @@ choiceAToZ =
                 z ()
 
 
-{-| Match exactly one lowercase letter character.
-This is case sensitive.
+{-| Match a lowercase letter `Char`.
 
 > ℹ️ Equivalent regular expression: `[a-z]`
 
-    import Morph.Error
-    import String.Morph as Text
+    import Morph
+    import List.Morph
+    import AToZ exposing (AToZ(..))
 
     -- match a lowercase letter
-    "abc" |> Text.toNarrow aToZLower --> Ok 'a'
+    'a' |> Morph.toNarrow AToZ.Morph.lowerChar
+    --> Ok A
 
     -- but anything else makes it fail
-    "ABC"
-        |> Text.toNarrow aToZLower
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting a lowercase letter [a-z]. I got stuck when I got the character 'A'."
+    'A'
+        |> Morph.toNarrow AToZ.Morph.lowerChar
+        |> Result.toMaybe
+    --> Nothing
+
+Combine with [`Morph.one`](Morph#one) to use it in a [`MorphRow`](Morph#MorphRow)
+
+This is different from
+
+    AToZ.Morph.broadCase AToZ.CaseLower
+        |> Morph.over AToZ.Morph.char
+
+which parses any case but only prints lowercase
 
 -}
 lowerChar : Morph AToZ Char
@@ -252,23 +263,32 @@ lowerChar =
         |> Morph.named "a|..|z"
 
 
-{-| Match exactly one uppercase letter character.
-This is case sensitive.
+{-| Match an uppercase letter `Char`.
 
 > ℹ️ Equivalent regular expression: `[A-Z]`
 
     import Morph
-    import Morph.Error
-    import String.Morph as Text
+    import List.Morph
+    import AToZ exposing (AToZ(..))
 
-    -- match an uppercase letter
-    aToZUpper |> Text.toNarrow "ABC" --> Ok 'A'
+    -- match an uppercase a-z letter
+    'A' |> Morph.toNarrow AToZ.Morph.upperChar
+    --> Ok A
 
     -- but anything else makes it fail
-    "abc"
-        |> Text.toNarrow aToZUpper
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting a letter uppercase [A-Z]. I got stuck when I got the character 'a'."
+    'a'
+        |> Morph.toNarrow AToZ.Morph.upperChar
+        |> Result.toMaybe
+    --> Nothing
+
+Combine with [`Morph.one`](Morph#one) to use it in a [`MorphRow`](Morph#MorphRow)
+
+This is different from
+
+    AToZ.Morph.broadCase AToZ.CaseUpper
+        |> Morph.over AToZ.Morph.char
+
+which parses any case but only prints uppercase
 
 -}
 upperChar : Morph AToZ Char

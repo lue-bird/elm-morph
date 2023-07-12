@@ -331,20 +331,34 @@ and return them as an [`ArraySized`](https://package.elm-lang.org/packages/lue-b
 
 > ℹ️ Equivalent regular expression: `{n}`
 
-    import Morph.Error
-    import Char.Morph as Char
-    import String.Morph as Text
+    import Morph
+    import Char.Morph
+    import String.Morph
+    import AToZ exposing (AToZ(..))
+    import AToZ.Morph
     import N exposing (n3)
+    import ArraySized
+    import List.Morph
 
     -- we want `exactly 3` letters
-    "abcdef" |> narrow (map Text.fromList (exactly n3 AToZ.Morph.char))
-    --> Ok [ 'a', 'b', 'c' ]
+    "abc"
+        |> Morph.toNarrow
+            (exactly n3 (AToZ.Morph.lowerChar |> Morph.one)
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+        |> Result.map ArraySized.toList
+    --> Ok [ A, B, C ]
 
     -- not 2 or 4, we want 3
-    "ab_def"
-        |> narrow (map Text.fromList (exactly n3 AToZ.Morph.char))
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:3: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '_'."
+    "ab"
+        |> Morph.toNarrow
+            (exactly n3 (AToZ.Morph.lowerChar |> Morph.one)
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+        |> Result.toMaybe
+    --> Nothing
 
 -}
 exactly :
@@ -496,39 +510,66 @@ and return them as an [`ArraySized`](https://package.elm-lang.org/packages/lue-b
 
 > ℹ️ Equivalent regular expression: `{min,}`
 
-    import Morph.Error
-    import Char.Morph as Char
-    import String.Morph as Text
+    import Morph
+    import List.Morph
+    import AToZ.Morph
+    import AToZ
+    import ArraySized
+    import N exposing (n3)
 
     -- we want at least three letters, we are okay with more than three
     "abcdef"
-        |> Text.toNarrow (atLeast n3 AToZ.Morph.char)
-    --> Ok [ 'a', 'b', 'c', 'd', 'e', 'f' ]
+        |> Morph.toNarrow
+            (ArraySized.Morph.atLeast n3 (AToZ.Morph.lowerChar |> Morph.one)
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+        |> Result.map ArraySized.toList
+    --> Ok [ A, B, C, D, E, F ]
 
     -- but not two, that's sacrilegious
-    "ab_def"
-        |> Text.toNarrow (atLeast n3 AToZ.Morph.char)
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:3: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '_'."
+    "ab"
+        |> Morph.toNarrow
+            (ArraySized.Morph.atLeast n3 (AToZ.Morph.lowerChar |> Morph.one)
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+        |> Result.toMaybe
+    --> Nothing
 
 
 ### `atLeast n0`
 
 > ℹ️ Equivalent regular expression: `*`
 
-    import Char.Morph as Char
-    import String.Morph as Text
+    import Morph
+    import List.Morph
+    import AToZ.Morph
+    import AToZ exposing (AToZ(..))
+    import ArraySized
+    import N exposing (n0)
 
     -- We want as many letters as there are.
-    "abc" |> Text.toNarrow (atLeast n0 AToZ.Morph.char)
-    --> Ok [ 'a', 'b', 'c' ]
-
-    "abc123" |> Text.toNarrow (atLeast n0 AToZ.Morph.char)
-    --> Ok [ 'a', 'b', 'c' ]
+    "abc"
+        |> Morph.toNarrow
+            (ArraySized.Morph.atLeast n0 (AToZ.Morph.lowerChar |> Morph.one)
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+        |> Result.map ArraySized.toList
+    --> Ok [ A, B, C ]
 
     -- even zero letters is okay
-    "123abc" |> Text.toNarrow (atLeast n0 AToZ.Morph.char)
+    ""
+        |> Morph.toNarrow
+            (ArraySized.Morph.atLeast n0 (AToZ.Morph.lowerChar |> Morph.one)
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+        |> Result.map ArraySized.toList
     --> Ok []
+
+As you can see, `atLeast n0` will never fail.
 
 If you want a to morph a `List` instead of an `ArraySized ... (Min (On N0))`,
 you might as well use [`Morph.whilePossible`](Morph#whilePossible) instead of
@@ -541,23 +582,32 @@ you might as well use [`Morph.whilePossible`](Morph#whilePossible) instead of
 
 > ℹ️ Equivalent regular expression: `+`
 
+    import Morph
+    import List.Morph
+    import AToZ.Morph
+    import AToZ exposing (AToZ(..))
+    import ArraySized
     import N exposing (n1)
-    import Morph.Error
-    import Char.Morph as Char
-    import String.Morph as Text
 
     -- we want as many letters as there are
-    "abc" |> Text.toNarrow (atLeast n1 AToZ.Morph.char)
-    --> Ok [ 'a', 'b', 'c' ]
-
-    "abc123" |> Text.toNarrow (atLeast n1 AToZ.Morph.char)
-    --> Ok [ 'a', 'b', 'c' ]
+    "abc"
+        |> Morph.toNarrow
+            (ArraySized.Morph.atLeast n1 (AToZ.Morph.lowerChar |> Morph.one)
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+        |> Result.map ArraySized.toList
+    --> Ok [ A, B, C ]
 
     -- but we want at least one
-    "123abc"
-        |> Text.toNarrow (atLeast n1 AToZ.Morph.char)
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting a letter a|..|z or A|...|Z. I got stuck when I got the character '1'."
+    ""
+        |> Morph.toNarrow
+            (ArraySized.Morph.atLeast n1 (AToZ.Morph.lowerChar |> Morph.one)
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+        |> Result.toMaybe
+    --> Nothing
 
 
 ### example: interspersed separators
@@ -565,18 +615,20 @@ you might as well use [`Morph.whilePossible`](Morph#whilePossible) instead of
     import Stack
     import Morph
     import ArraySized.Morph exposing (atLeast)
-    import String.Morph as Text exposing (text)
-    import Char.Morph as Char
+    import List.Morph
+    import AToZ.Morph
+    import AToZ exposing (AToZ(..))
+    import N exposing (n0)
 
 
     tag =
-        atLeast n0 (Morph.AToZ.caseAnyLower |> Morph.one)
+        atLeast n1 (AToZ.Morph.lowerChar |> Morph.one)
 
     tags =
         Morph.succeed Stack.onTopLay
             |> grab Stack.top tag
             |> grab Stack.removeTop
-                (ArraySized.Morph.toStack
+                (List.Morph.arraySized
                     |> Morph.overRow
                         (atLeast n0
                             (Morph.succeed (\tag -> tag)
@@ -586,31 +638,15 @@ you might as well use [`Morph.whilePossible`](Morph#whilePossible) instead of
                         )
                 )
 
-    -- note that both values and separators must be of the same type
     "a,bc,def"
-        |> Text.toNarrow tags
-    --> Ok
-    -->     (Stack.topBelow [ 'a' ]
-    -->         [ [ 'b', 'c' ]
-    -->         , [ 'd', 'e', 'f' ]
-    -->         ]
-    -->     )
-
-    ",a,,"
-        |> Text.toNarrow tags
-    --> Ok
-    -->     (Stack.topBelow
-    -->         []
-    -->         [ { separator = (), part = [ 'a' ] }
-    -->         , { separator = (), part = [] }
-    -->         , { separator = (), part = [] }
-    -->         ]
-    -->     )
-
-    -- an empty input text gives a single element from an empty string
-    ""
-        |> Text.toNarrow tags
-    --> Ok (Stack.topBelow [] [])
+        |> Morph.toNarrow (tags |> Morph.rowFinish |> Morph.over List.Morph.string)
+        |> Result.map (Stack.map (\_ -> ArraySized.toList))
+    --→ Ok
+    --→     (Stack.topBelow [ A ]
+    --→         [ [ B, C ]
+    --→         , [ D, E, F ]
+    --→         ]
+    --→     )
 
 
 ### anti-example: parsing infinitely
@@ -682,44 +718,39 @@ and return them as an [`ArraySized`](https://package.elm-lang.org/packages/lue-b
 
 > ℹ️ Equivalent regular expression: `{min,max}`
 
-    import Morph.Error
-    import Char.Morph as Char
-    import String.Morph as Text
+    import Morph
+    import AToZ.Morph
+    import AToZ exposing (AToZ(..))
+    import List.Morph
+    import ArraySized
+    import N exposing (n2, n4)
 
     -- we want between two and four letters
-    "abcdef" |> Text.toNarrow (in_ ( n2, n4 ) AToZ.Morph.char)
-    --> Ok [ 'a', 'b', 'c', 'd' ]
-
-    "abc_ef" |> Text.toNarrow (in_ ( n2, n4 ) AToZ.Morph.char)
-    --> Ok [ 'a', 'b', 'c' ]
-
-    "ab_def" |> Text.toNarrow (in_ ( n2, n4 ) AToZ.Morph.char)
-    --> Ok [ 'a', 'b' ]
-
-
-    -- but less than that is not cool
-    "i_am_here"
-        |> Text.toNarrow (in_ ( n2, n3 ) letter)
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:2: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '_'."
+    "abc"
+        |> Morph.toNarrow
+            (in_ ( n2, n4 ) (AToZ.Morph.lowerChar |> Morph.one)
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+        |> Result.map ArraySized.toList
+    --> Ok [ A, B, C ]
 
 
-### example: `in_ ( n0, n1 )`
+    "a"
+        |> Morph.toNarrow
+            (in_ ( n2, n4 ) (AToZ.Morph.lowerChar |> Morph.one)
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+        |> Result.toMaybe
+    --> Nothing
 
-Alternative to [`Maybe.Morph.row`](Maybe-Morph#row) which instead returns a `List`.
+
+### `in_ ( n0, n1 )`
+
+Alternative to [`Maybe.Morph.row`](Maybe-Morph#row) which instead returns an `ArraySized`.
 
 > ℹ️ Equivalent regular expression: `?`
-
-    import Char.Morph as Char
-    import String.Morph as Text
-
-    -- we want one letter, optionally
-    "abc" |> Text.toNarrow (in_ ( n0, n1 ) AToZ.Morph.char)
-    --> Ok [ 'a' ]
-
-    -- if we don't get any, that's still okay
-    "123abc" |> Text.toNarrow (in_ ( n0, n1 ) AToZ.Morph.char)
-    --> Ok []
 
 
 ### example: at most
@@ -727,29 +758,31 @@ Alternative to [`Maybe.Morph.row`](Maybe-Morph#row) which instead returns a `Lis
 > ℹ️ Equivalent regular expression: `{0,max}`
 
     import Morph
-    import Char.Morph as Char
-    import String.Morph as Text
+    import AToZ exposing (AToZ(..))
+    import AToZ.Morph
+    import List.Morph
+    import ArraySized
+    import N exposing (n0, n3)
 
     -- we want a maximum of three letters
-    "abcdef" |> Text.toNarrow (in_ ( n0, n3 ) AToZ.Morph.char)
-    --> Ok [ 'a', 'b', 'c' ]
-
-    -- less than that is also okay
-    "ab_def" |> Text.toNarrow (in_ ( n0, n3 ) AToZ.Morph.char)
-    --> Ok [ 'a', 'b' ]
+    "ab"
+        |> Morph.toNarrow
+            (in_ ( n0, n3 ) (AToZ.Morph.lowerChar |> Morph.one)
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+        |> Result.map ArraySized.toList
+    --> Ok [ A, B ]
 
     -- even zero letters are fine
-    "_underscore" |> Text.toNarrow (in_ ( n0, n3 ) AToZ.Morph.char)
-    --> Ok []
-
-    -- make sure we don't consume more than three letters
-    "abcdef"
-        |> Text.toNarrow
-            (Morph.succeed (\letters -> letters)
-                |> grab (in_ ( n0, n3 ) AToZ.Morph.char)
-                |> match (one 'd')
+    ""
+        |> Morph.toNarrow
+            (in_ ( n0, n3 ) (AToZ.Morph.lowerChar |> Morph.one)
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
             )
-    --> Ok [ 'a', 'b', 'c' ]
+        |> Result.map ArraySized.toList
+    --> Ok []
 
 -}
 in_ :

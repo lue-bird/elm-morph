@@ -2,9 +2,6 @@ module Maybe.Morph exposing (value, row)
 
 {-| [`Morph`](Morph#Morph) a `Maybe`
 
-
-## transform
-
 @docs value, row
 
 -}
@@ -31,23 +28,32 @@ value contentMorph =
         |> Value.Morph.Internal.choiceFinish
 
 
-{-| [`Morph`](Morph#Morph) an optional value and return it as a `Maybe`
+{-| Try to [`Morph`](Morph#Morph) a value and return it as a `Just`.
+If something fails, go back to where you started and return `Nothing`
 
 > ℹ️ Equivalent regular expression: `?`
 
-    import Char.Morph exposing (letter)
-    import String.Morph as Text
+    import AToZ
+    import AToZ.Morph
+    import List.Morph
+    import Morph
 
     -- maybe we get `Just` a letter
     "a"
-        |> Text.toNarrow
-            (Maybe.Morph.row (AToZ.Morph.char |> Morph.one))
-    --> Ok (Just 'a')
+        |> Morph.toNarrow
+            (Maybe.Morph.row (AToZ.Morph.lowerChar |> Morph.one)
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+    --> Ok (Just AToZ.A)
 
     -- maybe we get `Nothing`
-    "123abc"
-        |> Text.toNarrow
-            (Maybe.Morph.row (AToZ.Morph.char |> Morph.one))
+    ""
+        |> Morph.toNarrow
+            (Maybe.Morph.row (AToZ.Morph.char |> Morph.one)
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
     --> Ok Nothing
 
 -}

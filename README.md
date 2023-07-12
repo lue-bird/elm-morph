@@ -35,7 +35,6 @@ value =
             case user of
                 Anonymous ->
                     variantAnonymous ()
-                
                 SignedIn signedIn ->
                     variantSignedIn signedIn
         )
@@ -79,25 +78,26 @@ type Boolean
 
 boolean : MorphRow Boolean Char
 boolean =
-    Morph.choice
-        (\variantTrue variantFalse variantOr booleanChoice ->
-            case booleanChoice of
-                BooleanTrue ->
-                    variantTrue ()
-
-                BooleanFalse ->
-                    variantFalse ()
-
-                BooleanOr arguments ->
-                    variantOr arguments
+    Morph.recursive "boolean"
+        (\step ->
+            Morph.choice
+                (\variantTrue variantFalse variantOr booleanChoice ->
+                    case booleanChoice of
+                        BooleanTrue ->
+                            variantTrue ()
+                        BooleanFalse ->
+                            variantFalse ()
+                        BooleanOr arguments ->
+                            variantOr arguments
+                )
+                |> Morph.tryRow (\() -> BooleanTrue) (String.Morph.only "true")
+                |> Morph.tryRow (\() -> BooleanFalse) (String.Morph.only "false")
+                |> Morph.tryRow BooleanOr (or step)
+                |> Morph.choiceFinish
         )
-        |> Morph.tryRow (\() -> BooleanTrue) (String.Morph.only "true")
-        |> Morph.tryRow (\() -> BooleanFalse) (String.Morph.only "false")
-        |> Morph.tryRow BooleanOr or
-        |> Morph.choiceFinish
 
-or : MorphRow { left : Boolean, right : Boolean } Char
-or =
+or : MorphRow Boolean Char -> MorphRow { left : Boolean, right : Boolean } Char
+or step =
     let
         spaces : MorphRow (List ()) Char
         spaces =
@@ -107,11 +107,11 @@ or =
         (\left right -> { left = left, right = right })
         |> match (String.Morph.only "(")
         |> match (broad [] |> Morph.overRow spaces)
-        |> grab .left boolean
+        |> grab .left step
         |> match (broad [ () ] |> Morph.overRow spaces)
         |> match (String.Morph.only "||")
         |> match (broad [ () ] |> Morph.overRow spaces)
-        |> grab .right boolean
+        |> grab .right step
         |> match (broad [] |> Morph.overRow spaces)
         |> match (String.Morph.only ")")
 

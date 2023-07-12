@@ -408,7 +408,7 @@ floatInfinity =
     1.0 / 0.0
 
 
-{-| TODO
+{-| Convert to a `Float`
 
 Keep in mind that `DecimalOrException -> Float` can be lossy
 since `Float` is fixed in bit size while [`Decimal`](Decimal#Decimal) is not

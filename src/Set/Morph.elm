@@ -29,6 +29,8 @@ import Value.Morph.Internal exposing (MorphValue)
 {-| [`Morph.OneToOne`](Morph#OneToOne) from `List` to `Set`
 
     import Set
+    import Set.Morph
+    import Morph
 
     [ 0, 1, 2, 3 ]
         |> Morph.mapTo Set.Morph.list

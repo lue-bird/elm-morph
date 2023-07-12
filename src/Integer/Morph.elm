@@ -125,26 +125,56 @@ int =
     Morph.oneToOne Integer.fromInt Integer.toInt
 
 
-{-| [`Integer`](Integer#Integer) [`MorphRow`](Morph#MorphRow)
+{-| [`Integer`](Integer#Integer) [`MorphRow`](Morph#MorphRow).
 
-    import Morph.Error
+You can of course work with the [`Integer`](Decimal#Decimal) type directly,
+or convert it to for example an `Int`
 
-    "123" |> Text.toNarrow integer --> Ok 123
+    import Morph
+    import List.Morph
+    import Int.Morph
 
-    -- It also works with negative numbers
-    "-123" |> Text.toNarrow integer --> Ok -123
+    -- works with natural numbers
+    "123"
+        |> Morph.toNarrow
+            (Int.Morph.integer
+                |> Morph.overRow Integer.Morph.chars
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+    --> Ok 123
+
+    -- works with negative numbers
+    "-123"
+        |> Morph.toNarrow
+            (Int.Morph.integer
+                |> Morph.overRow Integer.Morph.chars
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+    --> Ok -123
 
     -- a decimal number is _not_ an integer
     "3.14"
-        |> Text.toNarrow integer
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:2: I was expecting an integer value. I got stuck when I got the character '.'."
+        |> Morph.toNarrow
+            (Int.Morph.integer
+                |> Morph.overRow Integer.Morph.chars
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+        |> Result.toMaybe
+    --> Nothing
 
-    -- but not with invalid numbers
-    "abc"
-        |> Text.toNarrow integer
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting an integer value. I got stuck when I got the character 'a'."
+    -- exponential notation, other letters, symbols etc make it fail
+    "3e10"
+        |> Morph.toNarrow
+            (Int.Morph.integer
+                |> Morph.overRow Integer.Morph.chars
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+        |> Result.toMaybe
+    --> Nothing
 
 -}
 chars : MorphRow Integer Char

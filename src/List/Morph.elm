@@ -58,10 +58,11 @@ based on given input elements in sequence.
 
 This can get verbose, so create helpers with it where you see common patterns!
 
-    import Morph
+    import Morph exposing (MorphRow)
+    import Char.Morph
     import List.Morph
 
-    textOnly : String -> MorphRow Char ()
+    textOnly : String -> MorphRow () Char
     textOnly stringConstant =
         List.Morph.broadSequenceMap
             (Char.Morph.only >> Morph.one)
@@ -86,9 +87,7 @@ sequence of [`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/)s
 
 -}
 broadSequenceMap :
-    (element
-     -> MorphRow () broadElement
-    )
+    (element -> MorphRow () broadElement)
     -> List element
     -> MorphRow () broadElement
 broadSequenceMap morphRowByElement expectedConstantInputList =
@@ -109,7 +108,7 @@ that will be run in the same order, one after the other.
 
 Some also call this "traverse" (or "for" when the arguments are flipped)
 
-    import Morph
+    import Morph exposing (MorphRow)
     import String.Morph
     import AToZ exposing (AToZ(..))
 
@@ -129,9 +128,9 @@ Some also call this "traverse" (or "for" when the arguments are flipped)
                     AToZ.CaseLower -> lower ()
                     AToZ.CaseUpper -> upper ()
             )
-            |> Morph.tryRow (\() -> AToZ.CharLower)
+            |> Morph.tryRow (\() -> AToZ.CaseLower)
                 (String.Morph.only (string |> String.toLower))
-            |> Morph.tryRow (\() -> AToZ.CharUpper)
+            |> Morph.tryRow (\() -> AToZ.CaseUpper)
                 (String.Morph.only (string |> String.toUpper))
             |> Morph.choiceFinish
 

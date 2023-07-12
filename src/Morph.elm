@@ -1374,56 +1374,50 @@ This will make errors and descriptions easier to understand.
 A good rule of thumb is to at least add a [`Morph.named`](#named) to every morph _declaration_.
 More `named` = •ᴗ•.
 
-    import Morph
+    import Morph exposing (MorphRow, match, grab)
     import List.Morph
     import String.Morph
-    import Decimal.Morph
-    import Decimal exposing (Decimal)
-    import AToZ.Morph
-    import ArraySized.Morph exposing (atLeast)
-    import N exposing (n1)
+    import Int.Morph
+    import Integer.Morph
+    -- from lue-bird/elm-no-record-type-alias-constructor-function
+    import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 
-    "123"
-        |> Text.toNarrow
-            (Morph.named "variable name"
-                (atLeast n1 AToZ.Morph.char)
+    type alias Point =
+        -- makes `Point` function unavailable:
+        RecordWithoutConstructorFunction
+            { x : Int
+            , y : Int
+            }
+
+    -- we can use `expect` to have more context when an error happens
+    point : MorphRow Point Char
+    point =
+        Morph.named "point"
+            (Morph.succeed (\x y -> { x = x, y = y })
+                |> match (String.Morph.only "(")
+                |> grab .x (Int.Morph.integer |> Morph.overRow Integer.Morph.chars)
+                |> match (String.Morph.only ",")
+                |> grab .y (Int.Morph.integer |> Morph.overRow Integer.Morph.chars)
+                |> match (String.Morph.only ")")
+            )
+
+    "(12,34)"
+        |> Morph.toNarrow
+            (point
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+    --> Ok { x = 12, y = 34 }
+
+    -- we can get the error context stack as well as where they started matching
+    "(a,b)"
+        |> Morph.toNarrow
+            (point
                 |> Morph.rowFinish
                 |> Morph.over List.Morph.string
             )
         |> Result.toMaybe
     --> Nothing
-
-
-    import Morph exposing (match, grab)
-    import String.Morph as Text
-
-    type alias Point =
-        -- makes `Point` function unavailable:
-        -- https://dark.elm.dmy.fr/packages/lue-bird/elm-no-record-type-alias-constructor-function/latest/
-        RecordWithoutConstructorFunction
-            { x : Decimal
-            , y : Decimal
-            }
-
-    -- we can use `expect` to have more context when an error happens
-    point : MorphRow Point
-    point =
-        Morph.named "point"
-            (Morph.succeed (\x y -> { x = x, y = y })
-                |> match (String.Morph.only "(")
-                |> grab .x Decimal.Morph.chars
-                |> match (Char.Morph.only ",")
-                |> grab .y Decimal.Morph.chars
-                |> match (String.Morph.only ")")
-            )
-
-    "(12,34)" |> narrow (map Text.fromList point)
-    --> Ok { x = 12, y = 34 }
-
-    -- we can get the error context stack as well as where they started matching
-    "(a,b)" |> narrow (map Text.fromList point)
-        |> Result.mapError .expected
-    --> Err [ ExpectedCustom "point" ]
 
 Especially for [`oneToOne`](#oneToOne) etc,
 adding a description doesn't really add value
@@ -1478,7 +1472,9 @@ toNarrow =
 
 {-| Convert values of the arbitrarily chosen types `unmapped -> mapped`.
 
-    "3456" |> |> Morph.mapTo String.Morph.toList
+    import List.Morph
+
+    "3456" |> Morph.mapTo List.Morph.string
     --> [ '3', '4', '5', '6' ]
 
 -}
@@ -1800,15 +1796,19 @@ custom descriptionCustom morphTransformations =
 {-| Define a [`Morph`](#Morph) recursively
 
     import Morph exposing (grab, match)
-    import Integer exposing (Integer)
+    import Int.Morph
     import Integer.Morph
     import String.Morph
+    import ArraySized.Morph exposing (atLeast)
+    import ArraySized
+    import List.Morph
+    import N exposing (n1)
 
     type IntList
         = End
-        | Next { head : Integer, tail : IntList }
+        | Next { head : Int, tail : IntList }
 
-    intList : MorphRow IntList
+    intList : MorphRow IntList Char
     intList =
         Morph.recursive "int list"
             (\innerIntList ->
@@ -1823,7 +1823,7 @@ custom descriptionCustom morphTransformations =
                     |> Morph.tryRow (\() -> End) (String.Morph.only "[]")
                     |> Morph.tryRow Next
                         (Morph.succeed (\h t -> { head = h, tail = t })
-                            |> grab .head Integer.Morph.rowChar
+                            |> grab .head (Int.Morph.integer |> Morph.overRow Integer.Morph.chars)
                             |> match
                                 (broad (ArraySized.one ())
                                     |> Morph.overRow
@@ -1837,16 +1837,23 @@ custom descriptionCustom morphTransformations =
                                 )
                             |> grab .tail innerIntList
                         )
+                    |> Morph.choiceFinish
             )
 
-    "[]" |> Text.toNarrow intList
+    "[]"
+        |> Morph.toNarrow
+            (intList |> Morph.rowFinish |> Morph.over List.Morph.string)
     --> Ok End
 
-    "a :: []" |> Text.toNarrow intList
-    --> Ok (Next { head = 'a', tail = End })
+    "1 :: []"
+        |> Morph.toNarrow
+            (intList |> Morph.rowFinish |> Morph.over List.Morph.string)
+    --> Ok (Next { head = 1, tail = End })
 
-    "a :: b :: []" |> Text.toNarrow intList
-    --> Ok (Next { head = 'a', tail = Next { head = 'b', tail = End })
+    "1 :: 2 :: []"
+        |> Morph.toNarrow
+            (intList |> Morph.rowFinish |> Morph.over List.Morph.string)
+    --> Ok (Next { head = 1, tail = Next { head = 2, tail = End } })
 
 Without `recursive`, you would get an error like:
 
@@ -1949,24 +1956,32 @@ type alias PartsMorphEmptiable noPartPossiblyOrNever narrow broaden =
 Use [`group`](#group)
 when each broad, toNarrow [`part`](#part) always has their respective counterpart
 
+    import Int.Morph
+    import Integer.Morph
+    import List.Morph
+    import Morph
+
     ( "4", "5" )
         |> Morph.toNarrow
             (Morph.parts
                 ( \x y -> { x = x, y = y }
                 , \x y -> ( x, y )
                 )
-                |> Group.part ( .x, Tuple.first )
-                    (Integer.Morph.toInt
+                |> Morph.part "x"
+                    ( .x, Tuple.first )
+                    (Int.Morph.integer
                         |> Morph.overRow Integer.Morph.chars
                         |> Morph.rowFinish
+                        |> Morph.over List.Morph.string
                     )
-                |> Group.part ( .y, Tuple.second )
-                    (Integer.Morph.toInt
-                        |> Morph.over (Integer.Morph.bitSizeAtMost n32)
+                |> Morph.part "y"
+                    ( .y, Tuple.second )
+                    (Int.Morph.integer
                         |> Morph.overRow Integer.Morph.chars
                         |> Morph.rowFinish
+                        |> Morph.over List.Morph.string
                     )
-                |> Group.finish
+                |> Morph.partsFinish
             )
     --> Ok { x = 4, y = 5 }
 
@@ -2192,6 +2207,9 @@ over morphBroad =
 {-| `OneToOne a <-> b`
 by swapping the functions [`map`](#mapTo) <-> [`unmap`](#toBroad).
 
+    import Morph
+    import String.Morph
+
     [ 'O', 'h', 'a', 'y', 'o' ]
         |> Morph.mapTo String.Morph.list
     --> "Ohayo"
@@ -2224,9 +2242,9 @@ This can be used to easily create a `fromX`/`toX` pair
              -> Emptiable (Stacked element) never_
             )
     toListNonEmpty =
-        oneToOne Stack.toListNonEmpty Stack.fromListNonEmpty
+        Morph.oneToOne Stack.toTopBelow Stack.fromTopBelow
 
-[`unmap`](#toBroad) `...` is equivalent to `map (... |> reverse)`.
+[`toBroad`](#toBroad) `...` is equivalent to `mapTo (... |> invert)`.
 
 -}
 invert :
@@ -2489,7 +2507,6 @@ type alias MorphText narrow =
     import Morph exposing (MorphRow, atLeast, match, Morph.succeed, grab)
     import Char.Morph as Char
     import String.Morph as Text exposing (number)
-    import Morph.Error
     -- from lue-bird/elm-no-record-type-alias-constructor-function
     import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 
@@ -2501,11 +2518,21 @@ type alias MorphText narrow =
             }
 
     -- successful parsing looks like
-    "(2.71, 3.14)" |> narrow (listToString |> over point)
+    "(2.71, 3.14)"
+        |> Morph.toNarrow
+            (point
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.sting
+            )
     --> Ok { x = 2.71, y = 3.14 }
 
     -- building always works
-    { x = 2.71, y = 3.14 } |> broad (listToString |> over point)
+    { x = 2.71, y = 3.14 }
+        |> Morph.toBroad
+            (point
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.sting
+            )
     --> "( 2.71, 3.14 )"
 
     point : MorphRow Point Char
@@ -2534,7 +2561,11 @@ type alias MorphText narrow =
             |> match (String.Morph.only ")")
 
     "(2.71, x)"
-        |> Text.toNarrow point
+        |> Morph.toNarrow
+            (point
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.sting
+            )
         |> Result.toMaybe
     --> Nothing
 
@@ -2608,21 +2639,26 @@ type alias MorphRowIndependently beforeToBroad narrow broadElement =
 > ℹ️ Equivalent regular expression: `.`
 
     import Morph
-    import Morph.Error
-    import String.Morph as Text
+    import List.Morph
+    import String.Morph
 
     -- can match any character
-    "a" |> Text.toNarrow (Morph.keep |> one)
+    "a"
+        |> Morph.toNarrow
+            (Morph.keep |> Morph.one |> Morph.rowFinish |> Morph.over List.Morph.string)
     --> Ok 'a'
 
-    "#" |> Text.toNarrow (Morph.keep |> one)
+    "#"
+        |> Morph.toNarrow
+            (Morph.keep |> Morph.one |> Morph.rowFinish |> Morph.over List.Morph.string)
     --> Ok '#'
 
     -- only fails if we run out of inputs
     ""
-        |> Text.toNarrow (Morph.keep |> one)
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:0: I was expecting a character. I reached the end of the input."
+        |> Morph.toNarrow
+            (Morph.keep |> Morph.one |> Morph.rowFinish |> Morph.over List.Morph.string)
+        |> Result.toMaybe
+    --> Nothing
 
 -}
 one :
@@ -2666,24 +2702,28 @@ then [grabbing (taking)](#grab) and [matching (dropping/skipping)](#match) what 
     import Morph
     import String.Morph
     import Integer.Morph
-    import Integer exposing (Integer)
+    import Int.Morph
+    import List.Morph
+    -- from lue-bird/elm-no-record-type-alias-constructor-function
+    import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 
     type alias Point =
         -- makes `Point` function unavailable:
-        -- https://dark.elm.dmy.fr/packages/lue-bird/elm-no-record-type-alias-constructor-function/latest/
         RecordWithoutConstructorFunction
-            { x : Integer
-            , y : Integer
+            { x : Int
+            , y : Int
             }
 
     point : MorphRow Point Char
     point =
         Morph.succeed (\x y -> { x = x, y = y })
-            |> grab .x Integer.Morph.chars
+            |> grab .x (Int.Morph.integer |> Morph.overRow Integer.Morph.chars)
             |> match (String.Morph.only ",")
-            |> grab .y Integer.Morph.chars
+            |> grab .y (Int.Morph.integer |> Morph.overRow Integer.Morph.chars)
 
-    "12,34" |> Text.toNarrow point
+    "12,34"
+        |> Morph.toNarrow
+            (point |> Morph.rowFinish |> Morph.over List.Morph.string)
     --> Ok { x = 12, y = 34 }
 
 
@@ -2820,23 +2860,29 @@ grab partAccess grabbedNextMorphRow =
 {-| Require values to be present next to continue but ignore the result.
 On the parsing side, this is often called "skip" or "drop", `elm/parser` uses `|.`
 
-    import String.Morph exposing (text)
+    import String.Morph
+    import List.Morph
     import Morph exposing (match, grab)
+    import AToZ.Morph
+    import AToZ exposing (AToZ(..))
 
     -- parse a simple email, but we're only interested in the username
     "user@example.com"
-        |> Text.toNarrow
+        |> Morph.toNarrow
             (Morph.succeed (\userName -> { username = userName })
-                |> grab .username (ArraySized.Morph.atLeast n1 aToZ)
+                |> grab .username
+                    (Morph.whilePossible (AToZ.Morph.lowerChar |> Morph.one))
                 |> match (String.Morph.only "@")
                 |> match
-                    (Text.fromList
-                        |> Morph.overRow (atLeast n1 aToZ)
-                        |> broad "example"
+                    (broad [ E, X, A, M, P, L, E ]
+                        |> Morph.overRow
+                            (Morph.whilePossible (AToZ.Morph.lowerChar |> Morph.one))
                     )
-                |> match (text ".com")
+                |> match (String.Morph.only ".com")
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
             )
-    --> Ok { username = "user" }
+    --> Ok { username = [ U, S, E, R ] }
 
 [`broad`](#broad) `... |>` [`Morph.overRow`](Morph#overRow) is cool:
 when multiple kinds of input can be dropped,
@@ -3648,18 +3694,6 @@ type alias ChoiceMorphEmptiable noTryPossiblyOrNever choiceNarrow choiceBeforeNa
 
     > ℹ️ Equivalent regular expression: `[\n\r]`
 
-        import Morph.Error
-        import String.Morph as Text
-
-        -- match a blank
-        "\n\t abc" |> Text.toNarrow blank --> Ok '\n'
-
-        -- anything else makes it fail
-        "abc"
-            |> Text.toNarrow blank
-            |> Result.mapError Morph.Error.textMessage
-        --> Err "1:1: I was expecting a blank space or new line. I got stuck when I got 'a'."
-
     -}
     returnChar : Morph Return Char (Morph.Error Char)
     returnChar =
@@ -3708,6 +3742,19 @@ type alias ChoiceMorphEmptiable noTryPossiblyOrNever choiceNarrow choiceBeforeNa
             |> Morph.tryRow (\() -> InputEnd)
                 Morph.end
             |> Morph.choiceFinish
+
+    -- match a blank
+    "\n\t "
+        |> Morph.toNarrow
+            (Morph.whilePossible blank
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+    --> Ok [ Return NewLine, Tab, Space ]
+
+    -- anything else makes it fail
+    'a' |> Morph.toNarrow blank |> Result.toMaybe
+    --> Nothing
 
 -}
 choice :
@@ -3876,41 +3923,42 @@ try this [`Morph`](#Morph).
 
 > ℹ️ Equivalent regular expression: `|`
 
-    import Char.Morph as Char
-    import Morph.Error
+    import Char.Morph
+    import AToZ.Morph
+    import Morph
     import AToZ exposing (AToZ)
 
     type UnderscoreOrLetter
         = Underscore
-        | Letter Char
+        | Letter AToZ
 
     underscoreOrLetter : Morph UnderscoreOrLetter Char
     underscoreOrLetter =
         Morph.choice
-            (\underscore letter underscoreOrLetter ->
-                case underscoreOrLetter of
+            (\underscore letter underscoreOrLetterChoice ->
+                case underscoreOrLetterChoice of
                     Underscore ->
                         underscore ()
-
                     Letter aToZ ->
                         letter aToZ
             )
-            |> try Underscore (Char.Morph.only '_')
-            |> try Letter AToZ.Morph.char
+            |> Morph.try (\() -> Underscore) (Char.Morph.only '_')
+            |> Morph.try Letter AToZ.Morph.lowerChar
+            |> Morph.choiceFinish
 
     -- try the first possibility
-    "_" |> Text.toNarrow (underscoreOrLetter |> one)
+    '_' |> Morph.toNarrow underscoreOrLetter
     --> Ok Underscore
 
     -- if it fails, try the next
-    "a" |> Text.toNarrow (underscoreOrLetter |> one)
-    --> Ok 'a'
+    'a' |> Morph.toNarrow underscoreOrLetter
+    --> Ok (Letter AToZ.A)
 
     -- if none work, we get the error from all possible steps
-    "1"
-        |> Text.toNarrow (underscoreOrLetter |> one)
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting a letter [a-zA-Z]. I got stuck when I got the character '1'."
+    '1'
+        |> Morph.toNarrow underscoreOrLetter
+        |> Result.toMaybe
+    --> Nothing
 
 -}
 try :
@@ -4156,9 +4204,64 @@ try this [`MorphRow`](#MorphRow).
 
 > ℹ️ Equivalent regular expression: `|`
 
+
+### example: fallback step if the previous step fails
+
+    import Morph
+    import N.Morph
+    import ArraySized.Morph exposing (atLeast)
+    import ArraySized exposing (ArraySized)
+    import N exposing (n0, n1, n2, n3, n9, N, Min, In, On, N1, N0, N9)
+    import AToZ exposing (AToZ(..))
+    import AToZ.Morph
+    import List.Morph
+
+    type AlphaNum
+        = Digits (ArraySized (N (In (On N0) (On N9))) (Min (On N1)))
+        | Letters (ArraySized AToZ (Min (On N1)))
+
+    alphaNum : MorphRow AlphaNum Char
+    alphaNum =
+        Morph.choice
+            (\letter digit alphaNumChoice ->
+                case alphaNumChoice of
+                    Digits int ->
+                        digit int
+                    Letters char ->
+                        letter char
+            )
+            |> Morph.tryRow Letters
+                (atLeast n1 (AToZ.Morph.lowerChar |> Morph.one))
+            |> Morph.tryRow Digits
+                (atLeast n1 (N.Morph.char |> Morph.one))
+            |> Morph.choiceFinish
+
+    -- try letters, or else give me some digits
+    "abc"
+        |> Morph.toNarrow
+            (alphaNum |> Morph.rowFinish |> Morph.over List.Morph.string)
+    --→ Ok (Letters (ArraySized.l3 A B C |> ArraySized.minTo n1))
+
+    -- we didn't get letters, but we still got digits
+    "123" |> Morph.toNarrow (alphaNum |> Morph.rowFinish |> Morph.over List.Morph.string)
+    --→ Ok
+    --→     (Digits
+    --→         (ArraySized.l3 (n1 |> N.minTo n0 |> N.maxTo n9) (n2 |> N.minTo n0 |> N.maxTo n9) (n3 |> N.minTo n0 |> N.maxTo n9) |> ArraySized.minTo n1)
+    --→     )
+
+    -- but if we still fail, records what failed for each possibility in the error
+    "_"
+        |> Morph.toNarrow (alphaNum |> Morph.rowFinish |> Morph.over List.Morph.string)
+        |> Result.toMaybe
+    --> Nothing
+
+
+## anti-example: using `MorphRow` for what could be a `Morph` of a single element
+
     import Morph
     import AToZ exposing (AToZ(..))
     import Char.Morph
+    import String.Morph
 
     type UnderscoreOrLetter
         = Underscore
@@ -4171,13 +4274,12 @@ try this [`MorphRow`](#MorphRow).
                 case underscoreOrLetterNarrow of
                     Underscore ->
                         underscoreVariant ()
-
                     Letter letter ->
                         letterVariant letter
             )
-            |> Morph.tryRow (\() -> Underscore) (Char.Morph.only '_')
+            |> Morph.tryRow (\() -> Underscore) (String.Morph.only "_")
             |> Morph.tryRow Letter
-                (Morph.oneToOne .letter (\l -> { letter = l, case_ = AToZ.CaseLower })
+                (AToZ.Morph.broadCase AToZ.CaseLower
                     |> Morph.over AToZ.Morph.char
                     |> Morph.one
                 )
@@ -4189,7 +4291,7 @@ try this [`MorphRow`](#MorphRow).
 
     -- if it fails, try the next
     "a" |> Morph.toNarrow (underscoreOrLetter |> Morph.rowFinish |> Morph.over List.Morph.string)
-    --> Ok A
+    --> Ok (Letter A)
 
     -- if none work, records what failed for each possibility in the error
     "1"
@@ -4197,51 +4299,26 @@ try this [`MorphRow`](#MorphRow).
         |> Result.toMaybe
     --> Nothing
 
+better would be
 
-### example: fallback step if the previous step fails
-
-    import Morph
-    import N.Morph
-    import ArraySized.Morph exposing (atLeast)
-    import ArraySized exposing (ArraySized)
-    import N exposing (n0, n1, n2, n3, n9, N, Min, On)
-    import AToZ exposing (AtoZ(..))
-    import List.Morph
-
-    type AlphaNum
-        = Digits (ArraySized (N (In N0 N9)) (Min (On N1)))
-        | Letters (ArraySized AtoZ (Min (On N1)))
-
-    alphaNum : MorphRow Char AlphaNum
-    alphaNum =
+    underscoreOrLetterBetter : Morph UnderscoreOrLetter Char
+    underscoreOrLetterBetter =
         Morph.choice
-            (\digit letter alphaNum ->
-                case alphaNum of
-                    Digits int ->
-                        digit int
-
-                    Letters char ->
-                        letter char
+            (\underscoreVariant letterVariant underscoreOrLetterNarrow ->
+                case underscoreOrLetterNarrow of
+                    Underscore ->
+                        underscoreVariant ()
+                    Letter letter ->
+                        letterVariant letter
             )
-            |> Morph.tryRow Letter
-                (atLeast n1 AToZ.Morph.lowerChar)
-            |> Morph.tryRow Digit
-                (atLeast n1 N.Morph.char)
+            |> Morph.try (\() -> Underscore) (Char.Morph.only '_')
+            |> Morph.try Letter
+                (AToZ.Morph.broadCase AToZ.CaseLower
+                    |> Morph.over AToZ.Morph.char
+                )
             |> Morph.choiceFinish
 
-    -- try letters, or else give me some digits
-    "abc" |> Morph.toNarrow (alphaNum |> Morph.rowFinish |> Morph.over List.Morph.string)
-    --> Ok (ArraySized.l3 A B C |> ArraySized.minTo n1)
-
-    -- we didn't get letters, but we still got digits
-    "123" |> Morph.toNarrow (alphaNum |> Morph.rowFinish |> Morph.over List.Morph.string)
-    --> Ok (ArraySized.l3 (n1 |> N.minTo n0 |> N.maxTo n9) (n2 |> N.minTo n0 |> N.maxTo n9) (n3 |> N.minTo n0 |> N.maxTo n9) |> ArraySized.minTo n1)
-
-    -- but if we still fail, records what failed for each possibility in the error
-    "_"
-        |> Morph.toNarrow (alphaNum |> Morph.rowFinish |> Morph.over List.Morph.string)
-        |> Result.toMaybe
-    --> Nothing
+    underscoreOrLetter |> Morph.one
 
 -}
 tryRow :

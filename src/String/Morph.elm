@@ -93,7 +93,7 @@ stack =
     import ArraySized
     import Morph
 
-    ArraySized.l4 0 1 2 3
+    ArraySized.l4 '0' '1' '2' '3'
         |> Morph.mapTo String.Morph.arraySized
     --> "0123"
 
@@ -117,7 +117,7 @@ arraySized =
     import Array
     import Morph
 
-    Array.fromList [ 0, 1, 2, 3 ]
+    Array.fromList [ '0', '1', '2', '3' ]
         |> Morph.mapTo String.Morph.array
     --> "0123"
 
@@ -159,19 +159,25 @@ This is case sensitive.
     import Morph
     import List.Morph
 
-    -- match an exact text, case sensitive
-    "abc" |> Morph.toNarrow (String.Morph.only "abc" |> Morph.rowFinish |> Morph.over List.Morph.string)
+    -- match an exact text
+    "abc"
+        |> Morph.toNarrow
+            (String.Morph.only "abc" |> Morph.rowFinish |> Morph.over List.Morph.string)
     --> Ok ()
 
-    -- match an exact text, case sensitive
-    "abcdef" |> Morph.toNarrow (String.Morph.only "abc")
-    --> Err (Morph.DeadEnd "TODO")
+    -- case sensitive
+    "abC"
+        |> Morph.toNarrow
+            (String.Morph.only "abc" |> Morph.rowFinish |> Morph.over List.Morph.string)
+        |> Result.toMaybe
+    --> Nothing
 
-    -- but anything else makes it fail
-    "abCDEF"
-        |> Text.toNarrow (text "abc")
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:3: I was expecting the text 'abc'. I got stuck when I got the character 'C'."
+    -- if there is still input remaining, fail
+    "abcdef"
+        |> Morph.toNarrow
+            (String.Morph.only "abc" |> Morph.rowFinish |> Morph.over List.Morph.string)
+        |> Result.toMaybe
+    --> Nothing
 
 See [`sequenceMap`](#sequenceMap), [`broadSequenceMap`](#broadSequenceMap) to control what to [morph](Morph#MorphRow) for each `Char`.
 

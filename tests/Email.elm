@@ -78,7 +78,7 @@ localSymbol =
             )
             |> Morph.try LocalSymbolPrintable localSymbolPrintable
             |> Morph.try LocalSymbolAToZ
-                (AToZ.Morph.caseBroad AToZ.CaseLower
+                (AToZ.Morph.broadCase AToZ.CaseLower
                     |> Morph.over AToZ.Morph.char
                 )
             |> Morph.try LocalSymbol0To9 N.Morph.char
@@ -192,7 +192,7 @@ hostLabelSideableSymbol =
                     n0To9Variant n0To9Value
         )
         |> Morph.try HostLabelSideSymbolAToZ
-            (AToZ.Morph.caseBroad AToZ.CaseLower
+            (AToZ.Morph.broadCase AToZ.CaseLower
                 |> Morph.over AToZ.Morph.char
             )
         |> Morph.try HostLabelSideSymbol0To9 N.Morph.char
@@ -257,7 +257,7 @@ domainTopLevel =
                 (whilePossible (N.Morph.char |> Morph.one))
             |> -- guarantees it can't be numeric only
                grab .firstAToZ
-                (AToZ.Morph.caseBroad AToZ.CaseLower
+                (AToZ.Morph.broadCase AToZ.CaseLower
                     |> Morph.over AToZ.Morph.char
                     |> Morph.one
                 )
@@ -282,7 +282,7 @@ domainTopLevelAfterFirstAToZSymbol =
                     n0To9Variant n0To9Value
         )
         |> Morph.try DomainTopLevelSymbolAToZ
-            (AToZ.Morph.caseBroad AToZ.CaseLower
+            (AToZ.Morph.broadCase AToZ.CaseLower
                 |> Morph.over AToZ.Morph.char
             )
         |> Morph.try DomainTopLevelSymbol0To9

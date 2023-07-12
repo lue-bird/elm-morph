@@ -20,19 +20,21 @@ import Utf8CodePoint
 import Value.Morph.Internal exposing (MorphValue)
 
 
-{-| Character by unicode [code point][https://en.wikipedia.org/wiki/Code_point]
+{-| Character by unicode [code point](https://en.wikipedia.org/wiki/Code_point)
 
-    Morph.toNarrow Char.code 65 --> Ok 'A'
+    import Morph
 
-    Morph.toNarrow Char.code 66 --> Ok 'B'
+    Morph.toNarrow Char.Morph.code 65 --> Ok 'A'
 
-    Morph.toNarrow Char.code 0x6728 --> Ok '木'
+    Morph.toNarrow Char.Morph.code 66 --> Ok 'B'
 
-    Morph.toNarrow Char.code 0x0001D306 --> Ok '𝌆'
+    Morph.toNarrow Char.Morph.code 0x6728 --> Ok '木'
 
-    Morph.toNarrow Char.code 0x0001F603 --> Ok '😃'
+    Morph.toNarrow Char.Morph.code 0x0001D306 --> Ok '𝌆'
 
-    Morph.toNarrow Char.code -1
+    Morph.toNarrow Char.Morph.code 0x0001F603 --> Ok '😃'
+
+    Morph.toNarrow Char.Morph.code -1
     --> Err (Morph.DeadEnd "unicode code point outside of range 0 to 0x10FFFF")
 
 The full range of unicode is from `0` to `0x10FFFF`. With numbers outside that

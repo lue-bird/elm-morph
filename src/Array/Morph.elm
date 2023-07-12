@@ -56,7 +56,7 @@ list =
     import Array
     import Stack
 
-    [ 0, 1, 2, 3 ]
+    Stack.topBelow 0 [ 1, 2, 3 ]
         |> Morph.mapTo Array.Morph.stack
     --> Array.fromList [ 0, 1, 2, 3 ]
 
@@ -78,10 +78,11 @@ stack =
 {-| [`Morph.OneToOne`](Morph#OneToOne) from `String` to `Array Char`
 
     import Array
+    import Morph
 
     "0123"
         |> Morph.mapTo Array.Morph.string
-    --> Array.fromList [ 0, 1, 2, 3 ]
+    --> Array.fromList [ '0', '1', '2', '3' ]
 
 [Inverse](Morph#invert) of [`String.Morph.array`](String-Morph#array)
 
@@ -97,6 +98,7 @@ string =
 
     import ArraySized
     import Array
+    import Morph
 
     ArraySized.l4 0 1 2 3
         |> Morph.mapTo Array.Morph.arraySized

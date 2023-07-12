@@ -8,7 +8,7 @@ module Natural.Morph exposing
 @docs integer
 
 
-## row
+## [row](Morph#MorphRow)
 
 @docs chars, bits, bitsVariableCount
 
@@ -44,24 +44,35 @@ integer =
 
 {-| [`Natural`](Natural#Natural) [`MorphRow`](Morph#MorphRow)
 
-    import Morph.Error
+    import Morph
+    import List.Morph
+    import N
+    import Natural
 
-    "123" |> Text.toNarrow integer --> Ok 123
+    "123"
+        |> Morph.toNarrow
+            (Natural.Morph.chars |> Morph.rowFinish |> Morph.over List.Morph.string)
+        |> Result.map (Natural.toN >> N.toInt)
+    --> Ok 123
 
-    -- It doesn't work with negative numbers.
-    "-123" |> Text.toNarrow integer --> Ok -123
+    -- a negative integer is not a natural
+    "-123"
+        |> Morph.toNarrow
+            (Natural.Morph.chars |> Morph.rowFinish |> Morph.over List.Morph.string)
+        |> Result.toMaybe
+    --> Nothing
 
-    -- a decimal number is _not_ a natural
+    -- a decimal number is not a natural
     "3.14"
-        |> Text.toNarrow integer
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:2: I was expecting an integer value. I got stuck when I got the character '.'."
+        |> Morph.toNarrow (Natural.Morph.chars |> Morph.rowFinish |> Morph.over List.Morph.string)
+        |> Result.toMaybe
+    --> Nothing
 
-    -- but not with invalid numbers
-    "abc"
-        |> Text.toNarrow integer
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting an integer value. I got stuck when I got the character 'a'."
+    -- letters etc are not accepted
+    "3e10"
+        |> Morph.toNarrow (Natural.Morph.chars |> Morph.rowFinish |> Morph.over List.Morph.string)
+        |> Result.toMaybe
+    --> Nothing
 
 -}
 chars : MorphRow Natural Char

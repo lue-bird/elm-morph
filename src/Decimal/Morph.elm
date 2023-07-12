@@ -68,49 +68,98 @@ orException =
 
 {-| [`MorphRow`](Morph#MorphRow) from chars to a [`Decimal`](Decimal#Decimal) number.
 
-    import Morph.Error
+    import Morph
+    import List.Morph
 
+    -- trailing 0s are matched but have no effect
+    "12.0340000"
+        |> Morph.toNarrow
+            (Decimal.Morph.chars
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+    --→ Ok with a Decimal representing
+    --→ 12.034
 
-    -- trailing 0s aren't represented in the final type
+    "-12.000"
+        |> Morph.toNarrow
+            (Decimal.Morph.chars
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+    --→ Ok with a Decimal representing
+    --→ -12.0
 
-    "12.0340000" |> Text.toNarrow number  --> Ok 12.034
-    "-12.000" |> Text.toNarrow number --> Ok -12.0
 
     -- leading floating point is allowed
 
-    ".012" |> Text.toNarrow number    --> Ok 0.012
-    "-.12" |> Text.toNarrow number   --> Ok -0.12
+    ".012"
+        |> Morph.toNarrow
+            (Decimal.Morph.chars
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+    --→ Ok with a Decimal representing
+    --→ 0.012
 
-    -- fails for integers without a floating point
+    "-.12"
+        |> Morph.toNarrow
+            (Decimal.Morph.chars
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+    --→ Ok with a Decimal representing
+    --→ -0.12
 
+    -- fails for integers without a floating point, see the not below
     "12"
-        |> Text.toNarrow number
-        |> Result.mapError Morph.Error.textMessage
-    --> Err ...
+        |> Morph.toNarrow
+            (Decimal.Morph.chars
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+        |> Result.toMaybe
+    --> Nothing
 
     -- but succeeds for integers with a trailing floating point
+    "12."
+        |> Morph.toNarrow
+            (Decimal.Morph.chars
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+    --→ Ok with a Decimal representing
+    --→ 12.0
 
-    "12." |> Text.toNarrow number    --> Ok 12.0
-
-    -- fails for everything else
+    -- exponential notation, other letters, symbols etc make it fail
 
     "."
-        |> Text.toNarrow number
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting a digit [0-9]. I got stuck when I got the character '.'."
+        |> Morph.toNarrow
+            (Decimal.Morph.chars
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+        |> Result.toMaybe
+    --> Nothing
 
-    "abc"
-        |> Text.toNarrow number
-        |> Result.mapError Morph.Error.textMessage
-    --> Err "1:1: I was expecting a digit [0-9]. I got stuck when I got the character 'a'."
+    "3e10"
+        |> Morph.toNarrow
+            (Decimal.Morph.chars
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+        |> Result.toMaybe
+    --> Nothing
 
 To allow integers to parse as decimals as well,
-build a [`Morph.choice`](Morph#choice)
+build a [`Morph.choice`](Morph#choice) between
 [`Decimal.Morph.chars`](#chars)
 and [`Integer.Morph.chars`](Integer-Morph#chars)
 
-For different parsing behavior, spin your own
-using [`Decimal.Morph.chars`](#chars) implementation as a reference
+The fact that `"12."` parses as 12 might also seem weird to you.
+If you don't want to allow that,
+you'll need to spin your own version, taking this implementation as a reference.
+It's not that scary I swear!
 
 -}
 chars : MorphRow Decimal Char
@@ -263,18 +312,20 @@ exceptionValue =
 
 signValue : MorphValue Sign
 signValue =
-    Morph.choice
-        (\negative positive sign ->
-            case sign of
-                Negative ->
-                    negative ()
+    Morph.named "sign"
+        (Morph.choice
+            (\negative positive sign ->
+                case sign of
+                    Negative ->
+                        negative ()
 
-                Positive ->
-                    positive ()
+                    Positive ->
+                        positive ()
+            )
+            |> Value.Morph.Internal.variant ( \() -> Negative, "negative" ) Value.Morph.Internal.unit
+            |> Value.Morph.Internal.variant ( \() -> Positive, "positive" ) Value.Morph.Internal.unit
+            |> Value.Morph.Internal.choiceFinish
         )
-        |> Value.Morph.Internal.variant ( \() -> Negative, "Negative" ) Value.Morph.Internal.unit
-        |> Value.Morph.Internal.variant ( \() -> Positive, "Positive" ) Value.Morph.Internal.unit
-        |> Value.Morph.Internal.choiceFinish
 
 
 {-| [`Morph`](Morph#Morph)

@@ -53,6 +53,7 @@ char =
 {-| Match a specific given `Bit` and not the other one.
 
     import Morph
+    import Bit
 
     Bit.O |> Morph.toNarrow (Bit.Morph.only Bit.I)
     --> Err (Morph.DeadEnd "0")
