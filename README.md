@@ -15,7 +15,7 @@ Know `Parser`s? [`MorphRow`](Morph#MorphRow) simply always creates a builder alo
 
   - `Email/Id/Time/Path/Url.fromString` ⇄ `Email/Id/Time/Path/Url.toString`
   - `Midi.fromBitList` ⇄ `Midi.toBitList`
-  - concrete syntax tree parser ⇄ syntax token builder - over - tokenization ⇄ pretty formatter (or without intermediate tokens)
+  - concrete syntax tree parser ⇄ syntax token builder
   - ...
 
 Like [`Morph`](Morph#Morph), [`MorphRow`](Morph#MorphRow) makes the process simpler and more reliable
