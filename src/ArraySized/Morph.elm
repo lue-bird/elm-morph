@@ -31,7 +31,7 @@ import Emptiable exposing (Emptiable)
 import Linear exposing (Direction(..))
 import Morph exposing (ErrorWithDeadEnd, MorphIndependently, MorphRow, MorphRowIndependently, broad, grab)
 import Morph.Internal
-import N exposing (Exactly, In, Min, N, N0, N0OrAdd1, On, To, Up, Up0, n0)
+import N exposing (Exactly, In, Infinity(..), Min, N, N0, N0OrAdd1, On, To, Up, Up0, n0)
 import Rope
 import Stack exposing (Stacked)
 
@@ -786,40 +786,36 @@ Alternative to [`Maybe.Morph.row`](Maybe-Morph#row) which instead returns an `Ar
 
 -}
 in_ :
-    ( N (Exactly (On min))
-    , N (In (On min) (On max))
+    ( N (In min (Up minToMaxMin_ To maxMin))
+    , N (In (On maxMin) max)
     )
     -> MorphRow element broadElement
     ->
         MorphRow
-            (ArraySized element (In (On min) (On max)))
+            (ArraySized element (In min max))
             broadElement
 in_ ( lowerLimit, upperLimit ) repeatedElementMorphRow =
-    Morph.toBroadOnly (ArraySized.minTo lowerLimit)
+    Morph.toBroadOnly ArraySized.maxToOn
         |> Morph.overRow
             (Morph.succeed
                 (\minimumList overMinimum ->
                     minimumList
-                        |> ArraySized.attachMin Up
-                            (overMinimum |> ArraySized.minTo n0)
-                        |> ArraySized.minTo lowerLimit
-                        |> ArraySized.take Up { atLeast = lowerLimit } upperLimit
+                        |> ArraySized.minToOn
+                        |> ArraySized.attachMin Up overMinimum
+                        |> ArraySized.minToNumber
+                        |> ArraySized.takeCurrentMin Up (upperLimit |> N.minTo lowerLimit)
                 )
                 |> grab
-                    (ArraySized.take Up { atLeast = lowerLimit } lowerLimit)
+                    (ArraySized.takeCurrentMin Up lowerLimit)
                     (exactly lowerLimit repeatedElementMorphRow)
                 |> grab
                     (\arraySized ->
-                        arraySized
-                            |> ArraySized.dropMin Up lowerLimit
-                            |> ArraySized.maxToInfinity
-                            |> ArraySized.maxToOn
+                        arraySized |> ArraySized.dropMax Up (lowerLimit |> N.minTo0)
                     )
                     (atMost
-                        ((upperLimit |> N.toInt)
-                            - (lowerLimit |> N.toInt)
-                            |> N.intToAtLeast n0
+                        (upperLimit
                             |> N.maxToOn
+                            |> N.subtractMax (lowerLimit |> N.minTo0)
                         )
                         repeatedElementMorphRow
                     )
