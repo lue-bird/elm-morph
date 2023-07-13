@@ -141,9 +141,15 @@ try [`ArraySized.Morph.exactlyWith`](ArraySized-Morph#exactlyWith).
 
 ### oh look! other projects do similar things
 
-  - [`invertible-syntax`](https://hackage.haskell.org/package/invertible-syntax) same idea in the haskell world
+  - haskell: [`invertible-syntax`](https://hackage.haskell.org/package/invertible-syntax),
+    [`partial-isomorphisms`](https://hackage.haskell.org/package/partial-isomorphisms) same idea
+  - python: [`construct`](https://construct.readthedocs.io/en/latest/intro.html) from and to broad bits
+  - kotlin: [`searles/parsing`](https://github.com/searles/parsing)
+  - js: [`nearley.js`](https://nearley.js.org/)
+  - prolog: [`phrase/2`](https://www.swi-prolog.org/pldoc/doc_for?object=phrase/2) is somewhat similar for text
   - parse-build an enum over a String: [`jmpavlick/bimap`](https://dark.elm.dmy.fr/packages/jmpavlick/bimap/latest/), [`toastal/select-prism`](https://package.elm-lang.org/packages/toastal/select-prism/latest/), [`Herteby/enum`](https://package.elm-lang.org/packages/Herteby/enum/latest), [`genthaler/elm-enum`](https://package.elm-lang.org/packages/genthaler/elm-enum/latest/), [`the-sett/elm-refine` `Enum`](https://package.elm-lang.org/packages/the-sett/elm-refine/latest/Enum)
   - equivalent to [`Morph.OneToOne`](#OneToOne): [`arturopala/elm-monocle` `Monocle.Iso`](https://package.elm-lang.org/packages/arturopala/elm-monocle/latest/Monocle-Iso), [`Heimdell/elm-optics` `Optics.Core.Iso`](https://package.elm-lang.org/packages/Heimdell/elm-optics/latest/Optics-Core#Iso), [`erlandsona/elm-accessors` `Accessors.Iso`](https://dark.elm.dmy.fr/packages/erlandsona/elm-accessors/latest/Accessors#Iso), [`fujiy/elm-json-convert` `Json.Convert.Iso`](https://package.elm-lang.org/packages/fujiy/elm-json-convert/latest/Json-Convert#Iso)
+  - I expect there to be lots more, please send some (PR, issue etc)!
 
 ---
 
