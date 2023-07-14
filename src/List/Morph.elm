@@ -110,9 +110,9 @@ Some also call this "traverse" (or "for" when the arguments are flipped)
 
     import Morph exposing (MorphRow)
     import String.Morph
-    import AToZ exposing (AToZ(..))
+    import AToZ
 
-    "helloTherecoo"
+    "helloTHEREcoo"
         |> Morph.toNarrow
             (List.Morph.sequenceMap casedStringOnly [ "hello", "there", "coo" ]
                 |> Morph.rowFinish
@@ -224,8 +224,8 @@ sequence toSequence =
                             { narrow = ok.narrow, broad = ok.broad } |> Ok
 
                         Complete error ->
-                            case toSequence0 :: toSequence1Up |> List.length of
-                                1 ->
+                            case toSequence1Up of
+                                [] ->
                                     error.error |> Err
 
                                 _ ->
