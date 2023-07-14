@@ -56,7 +56,7 @@ toBase2 =
                     |> List.reverse
         in
         base2Digits
-            |> base2DigitsUnpad
+            |> bitsUnpad
             -- not possible because the base10 number is >= 1
             |> Maybe.withDefault
                 -- 1
@@ -72,12 +72,12 @@ digitsToBase2 =
                 digits |> digitsDivideBy2
         in
         (digitsDivisionBy2.remainder |> Bit.fromN)
-            :: (case digitsDivisionBy2.divided |> List.filter (\n -> (n |> N.toInt) /= 0) of
+            :: (case digitsDivisionBy2.divided |> digitsUnpad of
                     [] ->
                         []
 
                     dividedHead :: dividedTail ->
-                        dividedHead :: dividedTail |> digitsToBase2
+                        (dividedHead :: dividedTail) |> digitsToBase2
                )
 
 
@@ -133,17 +133,33 @@ digitsDivideBy2 =
         }
 
 
-base2DigitsUnpad : List Bit -> Maybe Natural.AtLeast1
-base2DigitsUnpad =
-    \base2Digits ->
-        case base2Digits of
+digitsUnpad : List (N range) -> List (N range)
+digitsUnpad =
+    \digits ->
+        case digits of
+            [] ->
+                []
+
+            first :: afterFirst ->
+                case first |> N.toInt of
+                    0 ->
+                        afterFirst |> digitsUnpad
+
+                    _ ->
+                        first :: afterFirst
+
+
+bitsUnpad : List Bit -> Maybe Natural.AtLeast1
+bitsUnpad =
+    \bits ->
+        case bits of
             [] ->
                 Nothing
 
             first :: afterFirst ->
                 case first of
                     Bit.O ->
-                        afterFirst |> base2DigitsUnpad
+                        afterFirst |> bitsUnpad
 
                     Bit.I ->
                         Just { bitsAfterI = afterFirst }
