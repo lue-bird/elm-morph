@@ -14,28 +14,33 @@ import Html.Attributes as HtmlA
 import Html.Events as Html
 import List.Morph
 import Morph exposing (Morph)
+import Point exposing (Point)
 import Stack exposing (Stacked)
 import Stack.Morph
 import Tree exposing (Tree)
 import TreeUi
 
 
-type alias InitialJsInfo =
+type alias InitialJsData =
     ()
 
 
 type alias State =
-    { textInput : String
-    , descriptionTreeViewModel : TreeUi.State Morph.DescriptionOrErrorKind
+    { emailInput : String
+    , emailDescriptionTreeState : TreeUi.State Morph.DescriptionOrErrorKind
+    , pointInput : String
+    , pointDescriptionTreeState : TreeUi.State Morph.DescriptionOrErrorKind
     }
 
 
 type Event
-    = TextInputChangedTo String
-    | DescriptionTreeViewEvent TreeUi.Event
+    = EmailInputChangedTo String
+    | EmailDescriptionTreeEvent TreeUi.Event
+    | PointInputChangedTo String
+    | PointDescriptionTreeEvent TreeUi.Event
 
 
-main : Program InitialJsInfo State Event
+main : Program InitialJsData State Event
 main =
     Browser.document
         { init = init
@@ -45,33 +50,35 @@ main =
         }
 
 
-init : InitialJsInfo -> ( State, Cmd Event )
+init : InitialJsData -> ( State, Cmd Event )
 init initialJsData =
-    ( initialStateForInput "jOn.dOe@example.com"
+    ( { emailInput = "jOn.dOe@example.com"
+      , emailDescriptionTreeState = "jOn.dOe@example.com" |> toDescriptionState emailString
+      , pointInput = "(3.000,  -.)"
+      , pointDescriptionTreeState = "(3.000,  -.)" |> toDescriptionState pointString
+      }
     , Cmd.none
     )
 
 
-initialStateForInput : String -> State
-initialStateForInput textInput =
-    { textInput = textInput
-    , descriptionTreeViewModel =
-        (case textInput |> Morph.toNarrow emailString of
+toDescriptionState : Morph narrow_ String -> String -> TreeUi.State Morph.DescriptionOrErrorKind
+toDescriptionState stringMorph =
+    \stringInput ->
+        case stringInput |> Morph.toNarrow stringMorph of
             Err error ->
                 Morph.descriptionAndErrorToTree
-                    (emailString |> Morph.description)
+                    (stringMorph |> Morph.description)
                     error
+                    |> treeToState
 
             Ok _ ->
                 Morph.descriptionToTree
-                    (emailString |> Morph.description)
+                    (stringMorph |> Morph.description)
                     |> Tree.map
                         (\labelString ->
                             { kind = labelString.kind |> Morph.DescriptionKind, text = labelString.text }
                         )
-        )
-            |> treeToTreeViewModel
-    }
+                    |> treeToState
 
 
 emailString : Morph Email String
@@ -79,10 +86,15 @@ emailString =
     Email.chars |> Morph.rowFinish |> Morph.over List.Morph.string
 
 
-treeToTreeViewModel :
+pointString : Morph Point String
+pointString =
+    Point.chars |> Morph.rowFinish |> Morph.over List.Morph.string
+
+
+treeToState :
     Tree { text : String, kind : Morph.DescriptionOrErrorKind }
     -> TreeUi.State Morph.DescriptionOrErrorKind
-treeToTreeViewModel =
+treeToState =
     \tree ->
         tree |> treeToTreeViewNode |> List.singleton
 
@@ -117,16 +129,42 @@ treeToTreeViewNode tree =
 reactTo : Event -> (State -> ( State, Cmd Event ))
 reactTo event =
     case event of
-        TextInputChangedTo newTextInput ->
-            \state -> ( initialStateForInput newTextInput, Cmd.none )
-
-        DescriptionTreeViewEvent (TreeUi.Toggled path) ->
+        EmailInputChangedTo newEmailInput ->
             \state ->
                 ( { state
-                    | descriptionTreeViewModel =
+                    | emailInput = newEmailInput
+                    , emailDescriptionTreeState = newEmailInput |> toDescriptionState emailString
+                  }
+                , Cmd.none
+                )
+
+        EmailDescriptionTreeEvent (TreeUi.Toggled path) ->
+            \state ->
+                ( { state
+                    | emailDescriptionTreeState =
                         Forest.Navigate.alter path
                             (Tree.mapLabel TreeUi.labelOpenClosedToggle)
-                            state.descriptionTreeViewModel
+                            state.emailDescriptionTreeState
+                  }
+                , Cmd.none
+                )
+
+        PointInputChangedTo newPointInput ->
+            \state ->
+                ( { state
+                    | pointInput = newPointInput
+                    , pointDescriptionTreeState = newPointInput |> toDescriptionState pointString
+                  }
+                , Cmd.none
+                )
+
+        PointDescriptionTreeEvent (TreeUi.Toggled path) ->
+            \state ->
+                ( { state
+                    | pointDescriptionTreeState =
+                        Forest.Navigate.alter path
+                            (Tree.mapLabel TreeUi.labelOpenClosedToggle)
+                            state.pointDescriptionTreeState
                   }
                 , Cmd.none
                 )
@@ -135,51 +173,25 @@ reactTo event =
 ui : State -> Browser.Document Event
 ui =
     \state ->
-        { title = "morph debug"
+        { title = "morph example"
         , body =
-            Ui.column
-                [ Ui.paddingXY 80 50
-                , Ui.spacing 14
-                ]
-                [ Ui.el
-                    [ UiFont.size 30
-                    , Ui.paddingXY 0 20
-                    ]
-                    (Ui.text "morph an email")
-                , Ui.row []
-                    [ Ui.el
-                        [ Ui.paddingEach { eachSide0 | right = 5 }
-                        ]
-                        (Html.i
-                            [ HtmlA.class "fa fa-pencil"
-                            , HtmlA.attribute "aria-hidden" "true"
-                            , HtmlA.attribute "color" "rgb(255, 255, 0)"
-                            ]
-                            []
-                            |> Ui.html
-                        )
-                    , UiInput.text
-                        [ UiBackground.color (Ui.rgba 0 0 0 0)
-                        , UiBorder.width 0
-                        , HtmlA.style "color" "inherit" |> Ui.htmlAttribute
-                        , UiFont.size 17
-                        ]
-                        { onChange = TextInputChangedTo
-                        , text = state.textInput
-                        , label = UiInput.labelHidden "sample email string"
-                        , placeholder = Nothing
-                        }
-                    ]
-                , [ case state.textInput |> Morph.toNarrow emailString of
-                        Err error ->
-                            Ui.text "failed:"
-
-                        Ok email ->
-                            Ui.text ("succeeded as " ++ (email |> Morph.toBroad emailString))
-                  ]
-                    |> Ui.paragraph [ UiFont.size 20 ]
-                , Ui.map DescriptionTreeViewEvent
-                    (TreeUi.ui toStyle state.descriptionTreeViewModel)
+            Ui.column [ Ui.spacing 0 ]
+                [ inputAndDescriptionUi
+                    { title = "email"
+                    , input = state.emailInput
+                    , descriptionTreeState = state.emailDescriptionTreeState
+                    , onInputChange = EmailInputChangedTo
+                    , onDescriptionTreeEvent = EmailDescriptionTreeEvent
+                    , morph = emailString
+                    }
+                , inputAndDescriptionUi
+                    { title = "point"
+                    , input = state.pointInput
+                    , descriptionTreeState = state.pointDescriptionTreeState
+                    , onInputChange = PointInputChangedTo
+                    , onDescriptionTreeEvent = PointDescriptionTreeEvent
+                    , morph = pointString
+                    }
                 ]
                 |> Ui.layout
                     [ UiBackground.color (Ui.rgb 0 0 0)
@@ -188,6 +200,62 @@ ui =
                     ]
                 |> List.singleton
         }
+
+
+inputAndDescriptionUi :
+    { title : String
+    , onInputChange : String -> event
+    , input : String
+    , morph : Morph narrow_ String
+    , onDescriptionTreeEvent : TreeUi.Event -> event
+    , descriptionTreeState : TreeUi.State Morph.DescriptionOrErrorKind
+    }
+    -> Ui.Element event
+inputAndDescriptionUi config =
+    Ui.column
+        [ Ui.paddingXY 80 50
+        , Ui.spacing 14
+        ]
+        [ Ui.el
+            [ UiFont.size 30
+            , Ui.paddingXY 0 20
+            ]
+            (Ui.text config.title)
+        , Ui.row []
+            [ Ui.el
+                [ Ui.paddingEach { eachSide0 | right = 5 }
+                ]
+                (Html.i
+                    [ HtmlA.class "fa fa-pencil"
+                    , HtmlA.attribute "aria-hidden" "true"
+                    , HtmlA.attribute "color" "rgb(255, 255, 0)"
+                    ]
+                    []
+                    |> Ui.html
+                )
+            , UiInput.text
+                [ UiBackground.color (Ui.rgba 0 0 0 0)
+                , UiBorder.width 0
+                , HtmlA.style "color" "inherit" |> Ui.htmlAttribute
+                , UiFont.size 17
+                ]
+                { onChange = config.onInputChange
+                , text = config.input
+                , label = UiInput.labelHidden "sample email string"
+                , placeholder = Nothing
+                }
+            ]
+        , [ case config.input |> Morph.toNarrow config.morph of
+                Err error ->
+                    Ui.text "failed:"
+
+                Ok email ->
+                    Ui.text ("succeeded as " ++ (email |> Morph.toBroad config.morph))
+          ]
+            |> Ui.paragraph [ UiFont.size 20 ]
+        , Ui.map config.onDescriptionTreeEvent
+            (TreeUi.ui toStyle config.descriptionTreeState)
+        ]
 
 
 eachSide0 : { left : Int, right : Int, top : Int, bottom : Int }
