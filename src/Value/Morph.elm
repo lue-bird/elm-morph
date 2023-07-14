@@ -683,7 +683,7 @@ numberBits =
 
 
 composedBits :
-    MorphRow (Value String) Bit
+    (() -> MorphRow (Value String) Bit)
     -> MorphRow (Value.Composed String) Bit
 composedBits step =
     Morph.choice
@@ -698,9 +698,9 @@ composedBits step =
                 Value.Variant taggedValue ->
                     taggedVariant taggedValue
         )
-        |> Morph.tryRow Value.List (listBits step)
-        |> Morph.tryRow Value.Record (recordBits step)
-        |> Morph.tryRow Value.Variant (variantBits step)
+        |> Morph.tryRow Value.List (listBits (step ()))
+        |> Morph.tryRow Value.Record (recordBits (step ()))
+        |> Morph.tryRow Value.Variant (variantBits (step ()))
         |> Morph.choiceFinish
 
 

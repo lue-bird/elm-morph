@@ -337,7 +337,7 @@ type
       -- others
     | NamedDescription { name : String, description : Description }
     | OnlyDescription String
-    | InnerRecursiveDescription String (() -> Description)
+    | RecursiveDescription String (() -> Description)
     | ChainDescription ChainDescription
       -- group morph
     | ElementsDescription Description
@@ -426,7 +426,7 @@ isDescriptive =
             OnlyDescription _ ->
                 True
 
-            InnerRecursiveDescription _ _ ->
+            RecursiveDescription _ _ ->
                 True
 
             InverseDescription inverseDescription ->
@@ -531,7 +531,7 @@ descriptionToTree description_ =
                 , text = "only " ++ onlyDescription
                 }
 
-        InnerRecursiveDescription recursiveStructureName _ ->
+        RecursiveDescription recursiveStructureName _ ->
             Tree.singleton
                 { kind = DescriptionStructureKind
                 , text = "recursive: " ++ recursiveStructureName
@@ -865,7 +865,7 @@ descriptionAndErrorToTree description_ =
                     }
                     [ error |> errorToLabelTree ]
 
-        InnerRecursiveDescription _ lazyDescription ->
+        RecursiveDescription _ lazyDescription ->
             \error ->
                 descriptionAndErrorToTree
                     (lazyDescription ()
@@ -1841,7 +1841,7 @@ custom descriptionCustom morphTransformations =
                                     |> Morph.overRow
                                         (atLeast n1 (String.Morph.only " "))
                                 )
-                            |> grab .tail innerIntList
+                            |> grab .tail (innerIntList ())
                         )
                     |> Morph.choiceFinish
             )
@@ -1908,39 +1908,34 @@ More notes:
     [`description`](#description). Using [`Morph.recursive`](#recursive),
     each inner recursion step just refers back to the outer one.
 
+    (In principle, this would be possible btw by introducing `LazyDescription (() -> Description)`
+    but it's ugly when displaying because we don't have a structure name for the recursion)
+
 -}
 recursive :
     String
     ->
-        (MorphIndependently toNarrow toBroad
-         -> MorphIndependently toNarrow toBroad
+        ((() -> MorphIndependently (beforeToNarrow -> narrow) (beforeToBroad -> broad))
+         -> MorphIndependently (beforeToNarrow -> narrow) (beforeToBroad -> broad)
         )
-    -> MorphIndependently toNarrow toBroad
+    -> MorphIndependently (beforeToNarrow -> narrow) (beforeToBroad -> broad)
 recursive structureName morphLazy =
     let
-        innerRecursive : () -> MorphIndependently toNarrow toBroad
-        innerRecursive () =
-            recursive structureName
-                (\step ->
-                    { description =
-                        InnerRecursiveDescription structureName
-                            (\() -> morphLazy (innerRecursive ()) |> description)
-                    , toNarrow = toNarrow step
-                    , toBroad = toBroad step
-                    }
-                )
-
-        recursiveMorph : MorphIndependently toNarrow toBroad
-        recursiveMorph =
-            morphLazy (innerRecursive ())
+        morphRecursive : () -> MorphIndependently (beforeToNarrow -> narrow) (beforeToBroad -> broad)
+        morphRecursive () =
+            morphLazy (\() -> lazy structureName morphRecursive)
     in
-    { description =
-        NamedDescription
-            { description = recursiveMorph |> description
-            , name = structureName
-            }
-    , toNarrow = toNarrow recursiveMorph
-    , toBroad = toBroad recursiveMorph
+    named structureName (morphRecursive ())
+
+
+lazy :
+    String
+    -> (() -> MorphIndependently (beforeToNarrow -> narrow) (beforeToBroad -> broad))
+    -> MorphIndependently (beforeToNarrow -> narrow) (beforeToBroad -> broad)
+lazy structureName morphLazy =
+    { description = RecursiveDescription structureName (\unit -> morphLazy unit |> description)
+    , toNarrow = \beforeToNarrow -> beforeToNarrow |> toNarrow (morphLazy ())
+    , toBroad = \beforeToBroad -> beforeToBroad |> toBroad (morphLazy ())
     }
 
 
