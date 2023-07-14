@@ -62,7 +62,7 @@ row :
     -> MorphRow (Maybe contentNarrow) broadElement
 row contentMorphRow =
     Morph.choice
-        (\nothingVariant justVariant maybeNarrow ->
+        (\justVariant nothingVariant maybeNarrow ->
             case maybeNarrow of
                 Nothing ->
                     nothingVariant ()
@@ -70,6 +70,6 @@ row contentMorphRow =
                 Just justValue ->
                     justVariant justValue
         )
-        |> Morph.tryRow (\() -> Nothing) (Morph.succeed ())
         |> Morph.tryRow Just contentMorphRow
+        |> Morph.tryRow (\() -> Nothing) (Morph.succeed ())
         |> Morph.choiceFinish
