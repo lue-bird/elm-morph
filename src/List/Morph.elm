@@ -112,13 +112,13 @@ Some also call this "traverse" (or "for" when the arguments are flipped)
     import String.Morph
     import AToZ
 
-    "helloTHEREcoo"
+    "helloTHEREcooorwhat"
         |> Morph.toNarrow
-            (List.Morph.sequenceMap casedStringOnly [ "hello", "there", "coo" ]
+            (List.Morph.sequenceMap casedStringOnly [ "hello", "there", "coo", "or", "what" ]
                 |> Morph.rowFinish
                 |> Morph.over List.Morph.string
             )
-    --> Ok [ AToZ.CaseLower, AToZ.CaseUpper, AToZ.CaseLower ]
+    --> Ok [ AToZ.CaseLower, AToZ.CaseUpper, AToZ.CaseLower, AToZ.CaseLower, AToZ.CaseLower ]
 
     casedStringOnly : String -> MorphRow AToZ.Case Char
     casedStringOnly string =
@@ -221,7 +221,7 @@ sequence toSequence =
                     in
                     case traversed of
                         Partial ok ->
-                            { narrow = ok.narrow, broad = ok.broad } |> Ok
+                            { narrow = ok.narrow |> List.reverse, broad = ok.broad } |> Ok
 
                         Complete error ->
                             case toSequence1Up of
