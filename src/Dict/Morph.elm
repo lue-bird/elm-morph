@@ -30,11 +30,11 @@ import Value.Morph.Internal exposing (MorphValue)
     import Dict
     import Morph
 
-    [ { key = "hi", value = "there" }
-    , { key = "git", value = "gud" }
+    [ { key = "git", value = "gud" }
+    , { key = "Hi", value = "there" }
     ]
         |> Morph.mapTo Dict.Morph.list
-    --> Dict.empty |> Dict.insert "Hi" "there" |> Dict.insert "git" "gud"
+    --> Dict.fromList [ ( "Hi", "there" ), ( "git", "gud" ) ]
 
 [Inverse](Morph#invert) of [`List.Morph.dict`](List-Morph#dict)
 
