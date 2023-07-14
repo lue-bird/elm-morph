@@ -165,24 +165,25 @@ It's not that scary I swear!
 chars : MorphRow Decimal Char
 chars =
     Morph.named "decimal"
-        (Morph.choice
-            (\signedVariant n0Variant numberNarrow ->
-                case numberNarrow of
-                    N0 ->
-                        n0Variant ()
+        (Morph.succeed (\decimal -> decimal)
+            |> Morph.grab (\decimal -> decimal)
+                (Morph.choice
+                    (\signedVariant n0Variant numberNarrow ->
+                        case numberNarrow of
+                            N0 ->
+                                n0Variant ()
 
-                    Signed signedValue ->
-                        signedVariant signedValue
-            )
-            |> Morph.tryRow Signed signedChars
-            |> Morph.tryRow (\() -> N0) (String.Morph.only "0.")
-            |> Morph.choiceFinish
+                            Signed signedValue ->
+                                signedVariant signedValue
+                    )
+                    |> Morph.tryRow Signed signedChars
+                    |> Morph.tryRow (\() -> N0) (String.Morph.only "0.")
+                    |> Morph.choiceFinish
+                )
             |> Morph.match
                 (Morph.broad []
                     |> Morph.overRow
-                        (Morph.whilePossible
-                            (String.Morph.only "0")
-                        )
+                        (Morph.whilePossible (String.Morph.only "0"))
                 )
         )
 
@@ -215,54 +216,62 @@ signedAbsoluteChars =
                     AtLeast1 atLeast1Value ->
                         atLeast1Variant atLeast1Value
             )
-            |> Morph.tryRow Fraction
-                (Morph.succeed (\fraction_ -> fraction_)
-                    |> match
-                        (Morph.broad (Just ())
-                            |> Morph.overRow
-                                (Maybe.Morph.row (String.Morph.only "0"))
-                        )
-                    |> match (String.Morph.only ".")
-                    |> grab (\fraction_ -> fraction_) fractionChars
-                )
-            |> Morph.tryRow AtLeast1
-                (Morph.succeed
-                    (\wholePart fractionPart ->
-                        { whole = wholePart
-                        , fraction = fractionPart
-                        }
-                    )
-                    |> grab .whole NaturalAtLeast1.chars
-                    |> match (String.Morph.only ".")
-                    |> grab .fraction (Maybe.Morph.row fractionChars)
-                )
+            |> Morph.tryRow Fraction fractionChars
+            |> Morph.tryRow AtLeast1 atLeast1Chars
             |> Morph.choiceFinish
+        )
+
+
+atLeast1Chars : MorphRow Decimal.AtLeast1 Char
+atLeast1Chars =
+    Morph.named "≥ 1"
+        (Morph.succeed
+            (\wholePart fractionPart ->
+                { whole = wholePart
+                , fraction = fractionPart
+                }
+            )
+            |> grab .whole NaturalAtLeast1.chars
+            |> match (String.Morph.only ".")
+            |> grab .fraction (Maybe.Morph.row fractionAfterPointChars)
+        )
+
+
+fractionChars : MorphRow Fraction Char
+fractionChars =
+    Morph.named "fraction"
+        (Morph.succeed (\fraction_ -> fraction_)
+            |> match
+                (Morph.broad (Just ())
+                    |> Morph.overRow
+                        (Maybe.Morph.row (String.Morph.only "0"))
+                )
+            |> match (String.Morph.only ".")
+            |> grab (\fraction_ -> fraction_) fractionAfterPointChars
         )
 
 
 {-| [`MorphRow`](Morph#MorphRow) from chars to a [`Decimal.Fraction`](Decimal#Fraction).
 -}
-fractionChars : MorphRow Fraction Char
-fractionChars =
-    Morph.named "fraction"
-        (Morph.succeed
-            (\beforeLast last ->
-                { beforeLast = beforeLast, last = last }
-            )
-            |> Morph.grab .beforeLast
-                (Morph.whilePossible
-                    (Morph.oneToOne N.inToNumber N.inToOn
-                        |> Morph.over N.Morph.char
-                        |> Morph.one
-                    )
-                )
-            |> Morph.grab .last
+fractionAfterPointChars : MorphRow Fraction Char
+fractionAfterPointChars =
+    Morph.succeed
+        (\beforeLast last ->
+            { beforeLast = beforeLast, last = last }
+        )
+        |> Morph.grab .beforeLast
+            (Morph.whilePossible
                 (Morph.oneToOne N.inToNumber N.inToOn
-                    |> Morph.over (N.Morph.in_ ( n1, n9 ))
                     |> Morph.over N.Morph.char
                     |> Morph.one
                 )
-        )
+            )
+        |> Morph.grab .last
+            (Morph.oneToOne N.inToNumber N.inToOn
+                |> Morph.over (N.Morph.in_ ( n1, n9 ))
+                |> Morph.over N.Morph.char
+                |> Morph.one
+            )
 
 
 {-| [`MorphValue`](Value-Morph#MorphValue) from a [`Decimal`](Decimal#Decimal)

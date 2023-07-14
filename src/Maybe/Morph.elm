@@ -71,5 +71,6 @@ row contentMorphRow =
                     justVariant justValue
         )
         |> Morph.tryRow Just contentMorphRow
-        |> Morph.tryRow (\() -> Nothing) (Morph.succeed ())
+        |> Morph.tryRow (\() -> Nothing)
+            (Morph.named "nothing" (Morph.succeed ()))
         |> Morph.choiceFinish

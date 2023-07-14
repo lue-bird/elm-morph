@@ -57,7 +57,7 @@ toBase2 =
         in
         base2Digits
             |> bitsUnpad
-            -- not possible because the base10 number is >= 1
+            -- not possible because the base10 number is ≥ 1
             |> Maybe.withDefault
                 -- 1
                 { bitsAfterI = [] }
@@ -314,7 +314,7 @@ digitFor10Exponent n10Exponent =
 
 chars : MorphRow NaturalAtLeast1Base10 Char
 chars =
-    Morph.named "natural >= 1"
+    Morph.named "natural ≥ 1"
         (Morph.succeed (\first afterFirst -> { first = first, afterFirst = afterFirst })
             |> grab .first
                 (Morph.oneToOne N.inToNumber N.inToOn

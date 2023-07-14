@@ -36,7 +36,7 @@ import N.Local exposing (n32)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 
 
-{-| Whole number (integer) >= 0 of arbitrary precision.
+{-| Whole number (integer) ≥ 0 of arbitrary precision.
 Either 0 directly or a positive number represented by the bit `I` followed by at most a given count of
 [`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bit)s
 

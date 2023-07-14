@@ -48,11 +48,11 @@ in_ ( lowerLimit, upperLimit ) =
                         (\notInRange ->
                             case notInRange of
                                 N.Below below ->
-                                    [ "<= ", (below |> N.toInt) - 1 |> String.fromInt ]
+                                    [ "≤ ", (below |> N.toInt) - 1 |> String.fromInt ]
                                         |> String.concat
 
                                 N.Above above ->
-                                    [ ">= ", (above |> N.toInt) + 1 |> String.fromInt ]
+                                    [ "≥ ", (above |> N.toInt) + 1 |> String.fromInt ]
                                         |> String.concat
                         )
         , toBroad = identity
@@ -85,9 +85,9 @@ natural =
 
 {-| [`Morph`](Morph#Morph) a digit in a given range
 
-You can require a maximum >= 10.
-In that case, the [narrowed](Morph#toNarrow) `N` will also have a maximum >= 10
-even though every possible `Char` can only show a digit <= 9
+You can require a maximum ≥ 10.
+In that case, the [narrowed](Morph#toNarrow) `N` will also have a maximum ≥ 10
+even though every possible `Char` can only show a digit ≤ 9
 
 -}
 char :
