@@ -191,6 +191,7 @@ config =
       NoDebug.Log.rule
     , VariablesBetweenCaseOf.AccessInCases.forbid
     ]
+        |> List.map (Rule.ignoreErrorsForDirectories [ "VerifyExamples/" ])
 
 
 forbiddenFunctionOrValues : List String
