@@ -111,8 +111,7 @@ bits : MorphRow Natural.AtLeast1 Bit
 bits =
     Morph.named "≥ 1"
         (Morph.succeed (\bitsAfterI -> { bitsAfterI = bitsAfterI })
-            |> Morph.grab .bitsAfterI
-                bitsVariableCount
+            |> Morph.grab .bitsAfterI bitsVariableCount
         )
 
 
