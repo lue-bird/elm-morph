@@ -3,7 +3,7 @@
 a parser-builder: developer-friendly, general-purpose, great errors
 
   - 📻 related: ["codecs" elm-radio episode](https://elm-radio.com/episode/codecs/)
-  - 🎧 while reading: ["Morphable", microtonal electronic music by Sevish](https://www.youtube.com/watch?v=J-JZhCWsk3M&t=330s)
+  - 🎧 while reading: ["Morphable", microtonal electronic music by Sevish](https://youtu.be/J-JZhCWsk3M?t=733)
 
 One ["morph"](Morph) can convert between narrow ⇄ broad types which is surprisingly useful!
 Below some appetizers
