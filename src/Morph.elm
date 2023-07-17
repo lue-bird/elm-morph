@@ -2978,7 +2978,7 @@ overRow morphRowBeforeMorph =
     decoderNameSubject : MorphRow String Char
     decoderNameSubject =
         String.Morph.list
-            |> Morph.over MorphRow.broadEnd
+            |> Morph.over Morph.broadEnd
             |> Morph.overRow
                 (Morph.until
                     { end = String.Morph.only "Decoder"
@@ -3008,15 +3008,23 @@ broadEnd =
 
 An example: going through all declarations, which one is a decoder and for what?
 
-    "userDecoder" |> Morph.toNarrow decoderNameSubject
+    import String.Morph
+    import List.Morph
+
+    "userDecoder"
+        |> Morph.toNarrow
+            (decoderNameSubject
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
     --> Ok "user"
 
     decoderNameSubject : MorphRow String Char
     decoderNameSubject =
-        List.Morph.string
+        String.Morph.list
             |> Morph.over Morph.broadEnd
             |> Morph.overRow
-                (MorphRow.untilNext
+                (Morph.untilNext
                     { end =
                         Morph.succeed ()
                             |> match (String.Morph.only "Decoder")
@@ -3027,12 +3035,9 @@ An example: going through all declarations, which one is a decoder and for what?
 
 See [`broadEnd`](#broadEnd).
 
-Fun fact: This exact use-case was the original motivation for creating `elm-morph`.
+Notice the [`Morph.end`](#end) which makes "userDecoders" fail.
 
-Notice the [`Morph.end`](#end) which makes "userDecoder123" fail for example.type alias Forest a =
-List (Tree a) -- Tree with each branch a label
-
-If you still have input after the end element in `untilNext`, use [`untilLast`](#untilLast)
+**If you still have input after the end element in `untilNext`, use [`untilLast`](#untilLast)**
 
 If you need to carry information to the next element (which is super rare), try [`untilNextFold`](#untilNextFold)
 
@@ -3279,6 +3284,8 @@ untilNextFold config =
 
     import String.Morph
     import List.Morph
+    import AToZ.Morph
+    import AToZ exposing (..)
 
     "listDecoder userDecoder"
         |> Morph.toNarrow
@@ -3289,20 +3296,24 @@ untilNextFold config =
                 |> Morph.rowFinish
                 |> Morph.over List.Morph.string
             )
-    --> Ok { called = "list", arg = "user" }
+    --> Ok
+    -->     { called = [ L, I, S, T ] |> List.map (\l -> { case_ = AToZ.CaseLower, letter = l })
+    -->     , arg = [ U, S, E, R ] |> List.map (\l -> { case_ = AToZ.CaseLower, letter = l })
+    -->     }
 
-    decoderNameSubject : MorphRow String Char
+    decoderNameSubject : MorphRow (List { case_ : AToZ.Case, letter : AToZ }) Char
     decoderNameSubject =
-        List.Morph.string
-            |> Morph.over Morph.broadEnd
+        Morph.broadEnd
             |> Morph.overRow
-                (MorphRow.untilLast
+                (Morph.untilLast
                     { end = String.Morph.only "Decoder"
-                    , element = Morph.keep |> Morph.one
+                    , element = AToZ.Morph.char |> Morph.one
                     }
                 )
 
 See [`broadEnd`](#broadEnd).
+
+Fun fact: This exact use-case was the original motivation for creating `elm-morph`.
 
 If you just want to repeat elements until the next `end` element regardless of whether there are
 more elements after it, use [`untilNext`](#untilNext).

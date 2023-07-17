@@ -2,7 +2,6 @@
 
   - swap `MorphRowIndependently beforeToBroad narrow broadElement` to `MorphRowIndependently narrow beforeToBroad broadElement`
   - add more tests
-  - update examples
 
 # change log
 
@@ -82,11 +81,11 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
       - `lowercase` name → `caseLower`
       - `uppercase` name → `caseUpper`
       - `alphaNum` remove
-          - in favor of `Choice.between ... |> Choice.tryRow |> Morph.choiceFinish`
+          - in favor of `Choice.between ... |> Choice.rowTry |> Morph.choiceFinish`
       - `space` name → `blank`
           - to emphasize it can be any whitespace
       - `except` remove
-          - in favor of `Choice.between ... |> Choice.tryRow |> Morph.choiceFinish`
+          - in favor of `Choice.between ... |> Choice.rowTry |> Morph.choiceFinish`
   - `MorphRow`
       - `parse : String -> MorphRow narrow -> Result Error narrow` remove
           - in favor of
@@ -107,6 +106,6 @@ changes from [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/p
       - `until` add
       - `while` add
       - `oneOf` remove
-          - in favor of `Choice.between ... |> Choice.tryRow |> Morph.choiceFinish`
+          - in favor of `Choice.between ... |> Choice.rowTry |> Morph.choiceFinish`
       - `possibility` add
       - `choiceFinish` add
