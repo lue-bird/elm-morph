@@ -71,8 +71,8 @@ You think this name can be improved? → issue
 -}
 type alias Fraction =
     RecordWithoutConstructorFunction
-        { beforeLast : List (N (In N0 N9))
-        , last : N (In N1 N9)
+        { beforeEnd : List (N (In N0 N9))
+        , end : N (In N1 N9)
         }
 
 
@@ -314,7 +314,7 @@ floatToFraction =
     \float_ ->
         case float_ |> floatFractionToBase10 |> unpadLeading0Digits of
             [] ->
-                { beforeLast = [], last = n1 |> N.maxTo n9 |> N.inToNumber }
+                { beforeEnd = [], end = n1 |> N.maxTo n9 |> N.inToNumber }
 
             first :: afterFirst ->
                 let
@@ -322,8 +322,8 @@ floatToFraction =
                     digitsReverse =
                         Stack.topBelow first afterFirst |> Stack.reverse
                 in
-                { beforeLast = digitsReverse |> Stack.removeTop |> Stack.toList |> List.reverse
-                , last = digitsReverse |> Stack.top |> N.inToOn |> N.toIn ( n1, n9 ) |> N.inToNumber
+                { beforeEnd = digitsReverse |> Stack.removeTop |> Stack.toList |> List.reverse
+                , end = digitsReverse |> Stack.top |> N.inToOn |> N.toIn ( n1, n9 ) |> N.inToNumber
                 }
 
 
@@ -458,8 +458,8 @@ signedAbsoluteToFloat =
 fractionToFloat : Fraction -> Float
 fractionToFloat =
     \fraction_ ->
-        fraction_.beforeLast
-            ++ [ fraction_.last |> N.inToOn |> N.minTo n0 |> N.inToNumber ]
+        fraction_.beforeEnd
+            ++ [ fraction_.end |> N.inToOn |> N.minTo n0 |> N.inToNumber ]
             |> List.indexedMap
                 (\decimal digit ->
                     (digit |> N.toFloat)

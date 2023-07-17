@@ -117,14 +117,17 @@ bits =
 
 bitsVariableCount : MorphRow (List Bit) Bit
 bitsVariableCount =
-    Morph.before
-        { end = Bit.Morph.only Bit.O |> Morph.one
-        , element =
-            Morph.succeed (\bit -> bit)
-                |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
-                |> Morph.grab (\bit -> bit)
-                    (Morph.keep |> Morph.one)
-        }
+    Morph.broadEnd
+        |> Morph.overRow
+            (Morph.untilNext
+                { end = Bit.Morph.only Bit.O |> Morph.one
+                , element =
+                    Morph.succeed (\bit -> bit)
+                        |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
+                        |> Morph.grab (\bit -> bit)
+                            (Morph.keep |> Morph.one)
+                }
+            )
 
 
 toBitArrayOfSize :

@@ -9,7 +9,7 @@ module Morph exposing
     , invert
     , deadEndMap
     , deadEndNever, narrowErrorMap
-    , Error, ErrorWithDeadEnd(..), PartsError, SequenceError, SequencePlace(..), ChainError, ChainPlace(..), UntilBreakError(..), UntilError, CountAndExactlyElementSequenceError(..)
+    , Error, ErrorWithDeadEnd(..), PartsError, SequenceError, SequencePlace(..), ChainError, ChainPlace(..), UntilError, CountAndExactlyElementSequenceError(..)
     , description
     , Description(..), ChainDescription, SequenceDescription, UntilDescription
     , descriptionToTree, DescriptionKind(..)
@@ -25,11 +25,12 @@ module Morph exposing
     , ChoiceMorphEmptiable, try, choiceFinish
     , ChoiceMorphRowEmptiable, tryRow
     , MorphRow, MorphRowIndependently, rowFinish
-    , whilePossible, whilePossibleFold
-    , before, until, untilFold
+    , whilePossible
+    , untilNext, broadEnd, untilLast
+    , whilePossibleFold, untilNextFold, untilLastFold
     )
 
-{-| Call it Codec, ParserBuilder, TransformReversible, ...
+{-| Call it Codec, ParserPrinter, TransformReversible, ...
 We call it
 
 @docs Morph, OneToOne, MorphOrError, MorphIndependently
@@ -59,7 +60,7 @@ We call it
 
 ## error
 
-@docs Error, ErrorWithDeadEnd, PartsError, SequenceError, SequencePlace, ChainError, ChainPlace, UntilBreakError, UntilError, CountAndExactlyElementSequenceError
+@docs Error, ErrorWithDeadEnd, PartsError, SequenceError, SequencePlace, ChainError, ChainPlace, UntilError, CountAndExactlyElementSequenceError
 
 
 ## describe
@@ -135,18 +136,20 @@ try [`ArraySized.Morph.exactlyWith`](ArraySized-Morph#exactlyWith).
   - [`exactly`](ArraySized-Morph#exactly)
   - between → [`ArraySized.Morph.in_`](ArraySized-Morph#exactly)
 
-@docs whilePossible, whilePossibleFold
-@docs before, until, untilFold
+@docs whilePossible
+@docs untilNext, broadEnd, untilLast
+@docs whilePossibleFold, untilNextFold, untilLastFold
 
 
 ### oh look! other projects do similar things
 
   - haskell: [`invertible-syntax`](https://hackage.haskell.org/package/invertible-syntax),
-    [`partial-isomorphisms`](https://hackage.haskell.org/package/partial-isomorphisms) same idea
+    [`partial-isomorphisms`](https://hackage.haskell.org/package/partial-isomorphisms)
   - python: [`construct`](https://construct.readthedocs.io/en/latest/intro.html) from and to broad bits
   - kotlin: [`searles/parsing`](https://github.com/searles/parsing)
   - js: [`nearley.js`](https://nearley.js.org/)
   - prolog: [`phrase/2`](https://www.swi-prolog.org/pldoc/doc_for?object=phrase/2) is somewhat similar for text
+  - custom: [FliPpr](https://link.springer.com/article/10.1007/s00354-018-0033-7)
   - parse-build an enum over a String: [`jmpavlick/bimap`](https://dark.elm.dmy.fr/packages/jmpavlick/bimap/latest/), [`toastal/select-prism`](https://package.elm-lang.org/packages/toastal/select-prism/latest/), [`Herteby/enum`](https://package.elm-lang.org/packages/Herteby/enum/latest), [`genthaler/elm-enum`](https://package.elm-lang.org/packages/genthaler/elm-enum/latest/), [`the-sett/elm-refine` `Enum`](https://package.elm-lang.org/packages/the-sett/elm-refine/latest/Enum)
   - equivalent to [`Morph.OneToOne`](#OneToOne): [`arturopala/elm-monocle` `Monocle.Iso`](https://package.elm-lang.org/packages/arturopala/elm-monocle/latest/Monocle-Iso), [`Heimdell/elm-optics` `Optics.Core.Iso`](https://package.elm-lang.org/packages/Heimdell/elm-optics/latest/Optics-Core#Iso), [`erlandsona/elm-accessors` `Accessors.Iso`](https://dark.elm.dmy.fr/packages/erlandsona/elm-accessors/latest/Accessors#Iso), [`fujiy/elm-json-convert` `Json.Convert.Iso`](https://package.elm-lang.org/packages/fujiy/elm-json-convert/latest/Json-Convert#Iso)
   - I expect there to be lots more, please send some (PR, issue etc)!
@@ -170,7 +173,7 @@ import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFuncti
 import Rope exposing (Rope)
 import Stack exposing (Stacked)
 import Tree exposing (Tree)
-import Util exposing (recoverTry)
+import Util exposing (recoverTry, stackInit, stackLast)
 
 
 
@@ -332,7 +335,8 @@ type
     | SucceedDescription
     | EndDescription
     | WhilePossibleDescription Description
-    | UntilDescription UntilDescription
+    | UntilNextDescription UntilDescription
+    | UntilLastDescription UntilDescription
     | SequenceDescription SequenceDescription
       -- others
     | NamedDescription { name : String, description : Description }
@@ -347,12 +351,11 @@ type
     | VariantsDescription (Emptiable (Stacked { tag : String, value : Description }) Never)
 
 
-{-| [`until`](#until) and [`untilFold`](#untilFold)-specific [`Description`](#Description)
+{-| [`untilNext`](#untilNext) and [`untilNextFold`](#untilNextFold)-specific [`Description`](#Description)
 -}
 type alias UntilDescription =
     RecordWithoutConstructorFunction
-        { commit : Description
-        , end : Description
+        { end : Description
         , element : Description
         }
 
@@ -435,7 +438,10 @@ isDescriptive =
             WhilePossibleDescription _ ->
                 True
 
-            UntilDescription _ ->
+            UntilNextDescription _ ->
+                True
+
+            UntilLastDescription _ ->
                 True
 
             ChainDescription elements ->
@@ -544,21 +550,21 @@ descriptionToTree description_ =
                 }
                 [ descriptionToTree elementDescription ]
 
-        UntilDescription untilDescription ->
-            Tree.tree { kind = DescriptionStructureKind, text = "until" }
-                ((if not (isDescriptive untilDescription.commit) then
-                    identity
+        UntilNextDescription untilDescription ->
+            Tree.tree { kind = DescriptionStructureKind, text = "until next" }
+                [ Tree.tree { kind = DescriptionStructureKind, text = "element" }
+                    [ descriptionToTree untilDescription.element ]
+                , Tree.tree { kind = DescriptionStructureKind, text = "end" }
+                    [ descriptionToTree untilDescription.end ]
+                ]
 
-                  else
-                    (::)
-                        (Tree.tree { kind = DescriptionStructureKind, text = "end" }
-                            [ descriptionToTree untilDescription.end ]
-                        )
-                 )
-                    [ Tree.tree { kind = DescriptionStructureKind, text = "element" }
-                        [ descriptionToTree untilDescription.element ]
-                    ]
-                )
+        UntilLastDescription untilDescription ->
+            Tree.tree { kind = DescriptionStructureKind, text = "until last" }
+                [ Tree.tree { kind = DescriptionStructureKind, text = "element" }
+                    [ descriptionToTree untilDescription.element ]
+                , Tree.tree { kind = DescriptionStructureKind, text = "end" }
+                    [ descriptionToTree untilDescription.end ]
+                ]
 
         SequenceDescription elementDescriptions ->
             elementDescriptions
@@ -689,26 +695,14 @@ errorToTree =
                                     [ { startDownInBroadList = startDown } |> startDownMessage |> Tree.singleton ]
                             )
                      )
-                        ++ [ case untilError.breakError of
-                                UntilCommitError commitError ->
-                                    Tree.tree "commit"
-                                        [ { startDownInBroadList =
-                                                untilError.startsDownInBroadList |> Stack.top
-                                          }
-                                            |> startDownMessage
-                                            |> Tree.singleton
-                                        , commitError |> errorToTree
-                                        ]
-
-                                UntilEndError endError ->
-                                    Tree.tree "end"
-                                        [ endError |> errorToTree
-                                        , { startDownInBroadList =
-                                                untilError.startsDownInBroadList |> Stack.top
-                                          }
-                                            |> startDownMessage
-                                            |> Tree.singleton
-                                        ]
+                        ++ [ Tree.tree "end"
+                                [ untilError.endError |> errorToTree
+                                , { startDownInBroadList =
+                                        untilError.startsDownInBroadList |> Stack.top
+                                  }
+                                    |> startDownMessage
+                                    |> Tree.singleton
+                                ]
                            ]
                     )
 
@@ -881,38 +875,16 @@ descriptionAndErrorToTree description_ =
                     }
                     [ descriptionToLabelTree elementDescription ]
 
-        UntilDescription untilDescription ->
+        UntilNextDescription untilDescription ->
             \error ->
                 case error of
                     UntilError untilError ->
-                        Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "until" }
-                            (([ if not (isDescriptive untilDescription.commit) then
-                                    Nothing
-
-                                else
-                                    Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "commit" }
-                                        [ case untilError.breakError of
-                                            UntilEndError _ ->
-                                                descriptionToLabelTree untilDescription.commit
-
-                                            UntilCommitError commitError ->
-                                                descriptionAndErrorToTree untilDescription.commit commitError
-                                        ]
-                                        |> Just
-                              , Tree.tree
-                                    { kind = DescriptionStructureKind |> DescriptionKind, text = "end" }
-                                    [ case untilError.breakError of
-                                        UntilCommitError _ ->
-                                            descriptionToLabelTree untilDescription.end
-
-                                        UntilEndError endError ->
-                                            descriptionAndErrorToTree untilDescription.end endError
-                                    ]
-                                    |> Just
-                              ]
-                                |> List.filterMap identity
-                             )
-                                ++ (untilError.startsDownInBroadList
+                        Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "until next" }
+                            (Tree.tree
+                                { kind = DescriptionStructureKind |> DescriptionKind, text = "end" }
+                                [ descriptionAndErrorToTree untilDescription.end untilError.endError
+                                ]
+                                :: (untilError.startsDownInBroadList
                                         |> Stack.removeTop
                                         |> Stack.toList
                                         |> List.reverse
@@ -932,7 +904,37 @@ descriptionAndErrorToTree description_ =
                             )
 
                     unexpectedError ->
-                        unexpectedErrorToTree unexpectedError (UntilDescription untilDescription)
+                        unexpectedErrorToTree unexpectedError (UntilNextDescription untilDescription)
+
+        UntilLastDescription untilDescription ->
+            \error ->
+                case error of
+                    UntilError untilError ->
+                        Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "until last" }
+                            (Tree.tree
+                                { kind = DescriptionStructureKind |> DescriptionKind, text = "end" }
+                                [ descriptionAndErrorToTree untilDescription.end untilError.endError
+                                ]
+                                :: (untilError.startsDownInBroadList
+                                        |> stackInit
+                                        |> Stack.toList
+                                        |> List.map
+                                            (\startDown ->
+                                                Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "element" }
+                                                    [ startDownLabel { startDownInBroadList = startDown }
+                                                    , untilDescription.element |> descriptionToLabelTree
+                                                    ]
+                                            )
+                                   )
+                                ++ [ Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "element" }
+                                        [ descriptionAndErrorToTree untilDescription.element untilError.elementError
+                                        , startDownLabel { startDownInBroadList = untilError.startsDownInBroadList |> stackLast }
+                                        ]
+                                   ]
+                            )
+
+                    unexpectedError ->
+                        unexpectedErrorToTree unexpectedError (UntilNextDescription untilDescription)
 
         SequenceDescription elementDescriptions ->
             \error ->
@@ -956,7 +958,7 @@ descriptionAndErrorToTree description_ =
 
         ChoiceDescription possibilities ->
             \error ->
-                -- TODO maybe check who got the furthest and display that first?
+                -- TODO check who got the furthest and show that first
                 case error of
                     ChoiceError tryErrors ->
                         Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "choice between" }
@@ -1347,23 +1349,15 @@ type ChainPlace
     | ChainPlaceNarrow
 
 
-{-| [`until`](#until) and [`untilFold`](#untilFold) specific [`Error`])#Error
+{-| [`Error`](#Error) specific to
+[`untilNext`](#untilNext), [`untilLast`](#untilLast), [`untilNextFold`](#untilNextFold), [`untilLastFold`](#untilLastFold)
 -}
 type alias UntilError partError =
     RecordWithoutConstructorFunction
-        { breakError : UntilBreakError partError
+        { endError : partError
         , elementError : partError
         , startsDownInBroadList : Emptiable (Stacked Int) Never
         }
-
-
-{-| With the element morph failing, what made the until unsuccessful
--}
-type UntilBreakError error
-    = -- end parsed successfully but commit failed
-      UntilCommitError error
-    | -- end element failed to parse
-      UntilEndError error
 
 
 {-| A group's part [`Error`](#Error)s, each with their part index
@@ -1871,7 +1865,7 @@ Read more about why this limitation exists
 in [compiler hint "bad recursion"](https://github.com/elm/compiler/blob/master/hints/bad-recursion.md#tricky-recursion)
 up until the end
 
-Note: in this example you can also simply use [`Morph.before`](#before)
+Note: in this example you can also simply use [`Morph.broadEnd`](#broadEnd) `|> over` [`Morph.untilNext`](#untilNext)
 
 More notes:
 
@@ -2292,13 +2286,8 @@ deadEndMap deadEndChange =
 
             UntilError untilError ->
                 { startsDownInBroadList = untilError.startsDownInBroadList
-                , breakError =
-                    case untilError.breakError of
-                        UntilEndError untilEndError ->
-                            untilEndError |> deadEndMap deadEndChange |> UntilEndError
-
-                        UntilCommitError untilCommitError ->
-                            untilCommitError |> deadEndMap deadEndChange |> UntilCommitError
+                , endError =
+                    untilError.endError |> deadEndMap deadEndChange
                 , elementError = untilError.elementError |> deadEndMap deadEndChange
                 }
                     |> UntilError
@@ -2486,7 +2475,7 @@ oneToOneOn ( structureMap, structureUnmap ) elementTranslate =
 -- row
 
 
-{-| Parser-builder:
+{-| Parser-printer:
 
   - grab some elements from an input stack,
     and return either a value or else an [`Error`](#Error)
@@ -2986,11 +2975,12 @@ overRow morphRowBeforeMorph =
 
 {-| [Morph](#MorphRow) multiple elements from now to when `end` matches.
 
-    decoderNameSubject : MorphRow String Char expectationCustom
+    decoderNameSubject : MorphRow String Char
     decoderNameSubject =
-        Text.fromList
+        String.Morph.list
+            |> Morph.over MorphRow.broadEnd
             |> Morph.overRow
-                (MorphRow.before
+                (Morph.until
                     { end = String.Morph.only "Decoder"
                     , element = Morph.keep |> Morph.one
                     }
@@ -2998,7 +2988,7 @@ overRow morphRowBeforeMorph =
 
 You might think: Why not use
 
-    decoderNameSubject : MorphRow String Char expectationCustom
+    decoderNameSubject : MorphRow (List Char) Char
     decoderNameSubject =
         Morph.whilePossible (Morph.keep |> Morph.one)
             |> Morph.match (String.Morph.only "Decoder")
@@ -3007,242 +2997,69 @@ Problem is: This will never succeed.
 `whilePossible (Morph.keep |> Morph.one)` always goes on.
 We never reach the necessary [`match`](#match).
 
-If you want to keep the narrow end
-or even only stop when a certain condition is met → [`until`](#until)
-
 -}
-before :
-    { end : MorphRow () broadElement
-    , element : MorphRow goOnElement broadElement
-    }
-    -> MorphRow (List goOnElement) broadElement
-before untilStep =
-    until
-        { commit =
-            oneToOne .before
-                (\before_ -> { before = before_, end = () })
-        , end = untilStep.end
-        , element = untilStep.element
-        }
+broadEnd : Morph (List beforeEndElement) { end : (), beforeEnd : List beforeEndElement }
+broadEnd =
+    oneToOne .beforeEnd
+        (\before_ -> { beforeEnd = before_, end = () })
 
 
-untilAsFold :
-    { commit :
-        Morph
-            commitResult
-            { end : endElement
-            , before : Emptiable folded Possibly
-            }
-    , element :
-        Emptiable folded Possibly -> MorphRow element broadElement
-    , end : MorphRow endElement broadElement
-    , fold : OneToOne folded ( element, Emptiable folded Possibly )
-    }
-    -> MorphRow commitResult broadElement
-untilAsFold config =
-    { description =
-        UntilDescription
-            { commit = config.commit |> description
-            , element = config.element Emptiable.empty |> description
-            , end = config.commit |> description
-            }
-    , toBroad =
-        let
-            step :
-                { previous : Emptiable folded Possibly
-                , rest : Emptiable folded Possibly
-                }
-                -> Rope broadElement
-            step state =
-                case state.rest of
-                    Emptiable.Empty _ ->
-                        Rope.empty
+{-| See if we have an `end`, if not, morph an `element`. Repeat.
 
-                    Emptiable.Filled folded ->
-                        let
-                            ( element, rest ) =
-                                folded |> toBroad config.fold
+An example: going through all declarations, which one is a decoder and for what?
 
-                            previousWithElement =
-                                ( element, state.previous ) |> mapTo config.fold
-                        in
-                        step { previous = previousWithElement |> Emptiable.filled, rest = rest }
-                            |> Rope.prependTo
-                                (element
-                                    |> toBroad
-                                        (config.element
-                                            (previousWithElement |> Emptiable.filled)
-                                        )
-                                )
-        in
-        \beforeToBroad ->
-            let
-                uncommitted =
-                    beforeToBroad |> toBroad config.commit
-            in
-            step { previous = Emptiable.empty, rest = uncommitted.before }
-                |> Rope.prependTo
-                    (uncommitted.end
-                        |> toBroad config.end
-                    )
-    , toNarrow =
-        let
-            stepFrom :
-                Emptiable folded Possibly
-                ->
-                    (List broadElement
-                     ->
-                        Result
-                            (UntilError Error)
-                            { broad : List broadElement
-                            , narrow : commitResult
-                            }
-                    )
-            stepFrom state =
-                \beforeToNarrow ->
-                    let
-                        continue element =
-                            let
-                                foldedWithStepped =
-                                    case state of
-                                        Emptiable.Empty _ ->
-                                            ( element.narrow, Emptiable.empty ) |> mapTo config.fold
-
-                                        Emptiable.Filled folded ->
-                                            ( element.narrow, folded |> Emptiable.filled ) |> mapTo config.fold
-                            in
-                            case element.broad |> stepFrom (foldedWithStepped |> Emptiable.filled) of
-                                Err error ->
-                                    { error
-                                        | startsDownInBroadList =
-                                            error.startsDownInBroadList
-                                                |> Stack.onTopLay (element.broad |> List.length)
-                                    }
-                                        |> Err
-
-                                Ok result ->
-                                    result |> Ok
-                    in
-                    case beforeToNarrow |> toNarrow config.end of
-                        Err endError ->
-                            case beforeToNarrow |> toNarrow (config.element state) of
-                                Err elementError ->
-                                    { elementError = elementError
-                                    , breakError = UntilEndError endError
-                                    , startsDownInBroadList = beforeToNarrow |> List.length |> Stack.one
-                                    }
-                                        |> Err
-
-                                Ok element ->
-                                    continue element
-
-                        Ok endElement ->
-                            case
-                                { end = endElement.narrow, before = state }
-                                    |> toNarrow config.commit
-                            of
-                                Ok committed ->
-                                    { narrow = committed, broad = endElement.broad } |> Ok
-
-                                Err commitError ->
-                                    case beforeToNarrow |> toNarrow (config.element state) of
-                                        Err elementError ->
-                                            { elementError = elementError
-                                            , breakError = UntilCommitError commitError
-                                            , startsDownInBroadList = beforeToNarrow |> List.length |> Stack.one
-                                            }
-                                                |> Err
-
-                                        Ok element ->
-                                            continue element
-        in
-        \beforeToNarrow ->
-            beforeToNarrow
-                |> stepFrom Emptiable.empty
-                |> Result.mapError
-                    (\error ->
-                        UntilError
-                            { error
-                                | startsDownInBroadList =
-                                    error.startsDownInBroadList
-                                        |> Stack.reverse
-                            }
-                    )
-    }
-
-
-{-| How could one define `atMost 3 elements`, `until "Decoder" ...`, ...?
+    "userDecoder" |> Morph.toNarrow decoderNameSubject
+    --> Ok "user"
 
     decoderNameSubject : MorphRow String Char
     decoderNameSubject =
-        Stack.string
-            |> Morph.over
-                (MorphRow.until
+        List.Morph.string
+            |> Morph.over Morph.broadEnd
+            |> Morph.overRow
+                (MorphRow.untilNext
                     { end =
                         Morph.succeed ()
                             |> match (String.Morph.only "Decoder")
                             |> match Morph.end
                     , element = Morph.keep |> Morph.one
-                    , commit =
-                        oneToOne .before
-                            (\before -> { before = before, end = () })
                     }
                 )
 
-↑ can be simplified with [`before`](#before)
+See [`broadEnd`](#broadEnd).
 
-_Any kind of structure check that if it fails should proceed to go on parsing `element`s
-must be in `commit`_
+Fun fact: This exact use-case was the original motivation for creating `elm-morph`.
 
-If you need to carry information to the next element (which is super rare), try [`untilFold`](#untilFold)
+Notice the [`Morph.end`](#end) which makes "userDecoder123" fail for example.type alias Forest a =
+List (Tree a) -- Tree with each branch a label
+
+If you still have input after the end element in `untilNext`, use [`untilLast`](#untilLast)
+
+If you need to carry information to the next element (which is super rare), try [`untilNextFold`](#untilNextFold)
 
 -}
-until :
-    { commit :
-        Morph
-            commitResult
-            { end : endElement
-            , before : List element
-            }
-    , end : MorphRow endElement broadElement
+untilNext :
+    { end : MorphRow endElement broadElement
     , element : MorphRow element broadElement
     }
-    -> MorphRow commitResult broadElement
-until config =
-    untilAsFold
-        { commit =
-            config.commit
-                |> over
-                    (oneToOne
-                        (\beforeAndEnd ->
-                            { end = beforeAndEnd.end
-                            , before = beforeAndEnd.before |> Stack.toList |> List.reverse
-                            }
-                        )
-                        (\beforeAndEnd ->
-                            { end = beforeAndEnd.end
-                            , before = beforeAndEnd.before |> Stack.fromList
-                            }
-                        )
-                    )
-        , element = \_ -> config.element
+    ->
+        MorphRow
+            { end : endElement
+            , beforeEnd : List element
+            }
+            broadElement
+untilNext config =
+    untilNextFold
+        { element = \() -> config.element
         , end = config.end
-        , fold =
-            oneToOne (\( top, below ) -> below |> Stack.onTopLay top |> Emptiable.fill)
-                (\stacked ->
-                    let
-                        stackFilled =
-                            stacked |> Emptiable.filled
-                    in
-                    ( stackFilled |> Stack.top, stackFilled |> Stack.removeTop )
-                )
+        , initial = ()
+        , fold = \_ () -> ()
         }
 
 
-{-| Keep on parsing `element`s until you encounter an `end` element that doesn't fail `commit`ting.
-This behavior is just like [`until`](#until).
+{-| Keep on parsing `element`s until you encounter an `end` element.
+This behavior is just like [`untilNext`](#untilNext).
 
-In addition, [`untilFold`](#untilFold) carries accumulated "status" information
+In addition, [`untilNextFold`](#untilNextFold) carries accumulated "status" information
 to the next element morph where you can decide how to proceed.
 
 If that sounds complicated, then you don't need it.
@@ -3251,51 +3068,53 @@ Sadly some formats like midi want to save space by making you remember stuff abo
 The fact that a morph for this case exist is pretty neat.
 But because a few functions are involved,
 its [description](#description) can be less nice than you're used to from other structures.
-Maybe add some more context via [`Morph.named`](#named) to the whole thing and or the `commit` morph :)
-
-If you want to use this but feel like you need
-the accumulated state in `commit` and or `end`, please open an issue :).
-Implementing it is straightforward but it would clutter the API a bit.
+Maybe add some more context via [`Morph.named`](#named)
 
 -}
-untilFold :
-    { commit :
-        Morph
-            commitResult
-            { end : endElement
-            , before : List element
-            }
-    , end : MorphRow endElement broadElement
+untilNextFold :
+    { end : MorphRow endElement broadElement
     , element : folded -> MorphRow element broadElement
     , initial : folded
     , fold : element -> (folded -> folded)
     }
-    -> MorphRow commitResult broadElement
-untilFold config =
-    untilAsFold
-        { commit =
-            config.commit
+    ->
+        MorphRow
+            { end : endElement
+            , beforeEnd : List element
+            }
+            broadElement
+untilNextFold config =
+    let
+        commit =
+            oneToOne
+                (\beforeAndEnd ->
+                    { end = beforeAndEnd.end
+                    , beforeEnd = beforeAndEnd.beforeEnd |> Stack.toList |> List.reverse
+                    }
+                )
+                (\beforeAndEnd ->
+                    { end = beforeAndEnd.end
+                    , beforeEnd = beforeAndEnd.beforeEnd |> Stack.fromList
+                    }
+                )
                 |> over
                     (oneToOne
                         (\beforeAndEnd ->
                             { end = beforeAndEnd.end
-                            , before =
-                                beforeAndEnd.before
-                                    |> Emptiable.map .stack
-                                    |> Stack.toList
-                                    |> List.reverse
+                            , beforeEnd =
+                                beforeAndEnd.beforeEnd |> Emptiable.map .stack
                             }
                         )
                         (\beforeAndEnd ->
-                            { before =
-                                beforeAndEnd.before
-                                    |> Stack.fromList
+                            { beforeEnd =
+                                beforeAndEnd.beforeEnd
                                     |> Emptiable.map (\before_ -> { stack = before_, folded = config.initial })
                             , end = beforeAndEnd.end
                             }
                         )
                     )
-        , element =
+
+        element =
             \state ->
                 case state of
                     Emptiable.Empty _ ->
@@ -3303,8 +3122,8 @@ untilFold config =
 
                     Emptiable.Filled folded ->
                         folded.folded |> config.element
-        , end = config.end
-        , fold =
+
+        fold =
             oneToOne
                 (\( top, state ) ->
                     case state of
@@ -3334,7 +3153,277 @@ untilFold config =
                             )
                     )
                 )
+    in
+    { description =
+        UntilNextDescription
+            { element = config.element config.initial |> description
+            , end = config.end |> description
+            }
+    , toBroad =
+        let
+            step :
+                { previous : Emptiable { folded : folded, stack : Stacked element } Possibly
+                , rest : Emptiable { folded : folded, stack : Stacked element } Possibly
+                }
+                -> Rope broadElement
+            step state =
+                case state.rest of
+                    Emptiable.Empty _ ->
+                        Rope.empty
+
+                    Emptiable.Filled folded ->
+                        let
+                            ( elementBroad, rest ) =
+                                folded |> toBroad fold
+
+                            previousWithElement =
+                                ( elementBroad, state.previous ) |> mapTo fold
+                        in
+                        step { previous = previousWithElement |> Emptiable.filled, rest = rest }
+                            |> Rope.prependTo
+                                (elementBroad
+                                    |> toBroad
+                                        (element
+                                            (previousWithElement |> Emptiable.filled)
+                                        )
+                                )
+        in
+        \beforeToBroad ->
+            let
+                uncommitted =
+                    beforeToBroad |> toBroad commit
+            in
+            step { previous = Emptiable.empty, rest = uncommitted.beforeEnd }
+                |> Rope.prependTo
+                    (uncommitted.end
+                        |> toBroad config.end
+                    )
+    , toNarrow =
+        let
+            stepFrom :
+                Emptiable { folded : folded, stack : Stacked element } Possibly
+                ->
+                    (List broadElement
+                     ->
+                        Result
+                            (UntilError Error)
+                            { broad : List broadElement
+                            , narrow : { beforeEnd : List element, end : endElement }
+                            }
+                    )
+            stepFrom state =
+                \beforeToNarrow ->
+                    let
+                        continue :
+                            { narrow : element, broad : List broadElement }
+                            -> Result (UntilError Error) { broad : List broadElement, narrow : { beforeEnd : List element, end : endElement } }
+                        continue elementParsed =
+                            let
+                                foldedWithStepped =
+                                    case state of
+                                        Emptiable.Empty _ ->
+                                            ( elementParsed.narrow, Emptiable.empty ) |> mapTo fold
+
+                                        Emptiable.Filled folded ->
+                                            ( elementParsed.narrow, folded |> Emptiable.filled ) |> mapTo fold
+                            in
+                            case elementParsed.broad |> stepFrom (foldedWithStepped |> Emptiable.filled) of
+                                Err error ->
+                                    { error
+                                        | startsDownInBroadList =
+                                            error.startsDownInBroadList
+                                                |> Stack.onTopLay (elementParsed.broad |> List.length)
+                                    }
+                                        |> Err
+
+                                Ok result ->
+                                    result |> Ok
+                    in
+                    case beforeToNarrow |> toNarrow config.end of
+                        Err endError ->
+                            case beforeToNarrow |> toNarrow (element state) of
+                                Err elementError ->
+                                    { elementError = elementError
+                                    , endError = endError
+                                    , startsDownInBroadList = beforeToNarrow |> List.length |> Stack.one
+                                    }
+                                        |> Err
+
+                                Ok elementParsed ->
+                                    continue elementParsed
+
+                        Ok endElement ->
+                            { narrow =
+                                { end = endElement.narrow, beforeEnd = state }
+                                    |> mapTo commit
+                            , broad = endElement.broad
+                            }
+                                |> Ok
+        in
+        \beforeToNarrow ->
+            beforeToNarrow
+                |> stepFrom Emptiable.empty
+                |> Result.mapError
+                    (\error ->
+                        UntilError
+                            { error
+                                | startsDownInBroadList =
+                                    error.startsDownInBroadList
+                                        |> Stack.reverse
+                            }
+                    )
+    }
+
+
+{-| Keep on parsing `element`s until you encounter an `end` with no `element`s after it.
+
+    import String.Morph
+    import List.Morph
+
+    "listDecoder userDecoder"
+        |> Morph.toNarrow
+            (Morph.succeed (\called arg -> { called = called, arg = arg })
+                |> Morph.grab .called decoderNameSubject
+                |> Morph.match (String.Morph.only " ")
+                |> Morph.grab .arg decoderNameSubject
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+    --> Ok { called = "list", arg = "user" }
+
+    decoderNameSubject : MorphRow String Char
+    decoderNameSubject =
+        List.Morph.string
+            |> Morph.over Morph.broadEnd
+            |> Morph.overRow
+                (MorphRow.untilLast
+                    { end = String.Morph.only "Decoder"
+                    , element = Morph.keep |> Morph.one
+                    }
+                )
+
+See [`broadEnd`](#broadEnd).
+
+If you just want to repeat elements until the next `end` element regardless of whether there are
+more elements after it, use [`untilNext`](#untilNext).
+
+If you need to carry information to the next element (which is super rare), try [`untilLastFold`](#untilLastFold)
+
+-}
+untilLast :
+    { element : MorphRow element broadElement
+    , end : MorphRow end broadElement
+    }
+    -> MorphRow { end : end, beforeEnd : List element } broadElement
+untilLast config =
+    untilLastFold
+        { element = \() -> config.element
+        , end = config.end
+        , initial = ()
+        , fold = \_ () -> ()
         }
+
+
+{-| Just like [`untilLast`](#untilLast):
+Keep on parsing `element`s until you encounter an `end` with no `element`s after it.
+
+In addition, [`untilLastFold`](#untilLastFold) carries accumulated "status" information
+to the next element morph where you can decide how to proceed.
+
+If that sounds complicated, then you don't need it.
+Sadly some formats like midi want to save space by making you remember stuff about past events.
+
+The fact that a morph for this case exist is pretty neat.
+But because a few functions are involved,
+its [description](#description) can be less nice than you're used to from other structures.
+Maybe add some more context via [`Morph.named`](#named)
+
+-}
+untilLastFold :
+    { element : folded -> MorphRow element broadElement
+    , end : MorphRow end broadElement
+    , initial : folded
+    , fold : element -> (folded -> folded)
+    }
+    -> MorphRow { end : end, beforeEnd : List element } broadElement
+untilLastFold config =
+    { description =
+        UntilLastDescription
+            { end = config.end |> description
+            , element = config.element config.initial |> description
+            }
+    , toNarrow =
+        let
+            step foldedSoFar beforeToNarrow =
+                case beforeToNarrow |> toNarrow (config.element foldedSoFar) of
+                    Ok element ->
+                        case element.broad |> step (foldedSoFar |> config.fold element.narrow) of
+                            Ok tail ->
+                                Ok
+                                    { narrow =
+                                        { end = tail.narrow.end
+                                        , beforeEnd = element.narrow :: tail.narrow.beforeEnd
+                                        }
+                                    , broad = tail.broad
+                                    }
+
+                            Err tailError ->
+                                case beforeToNarrow |> toNarrow config.end of
+                                    Ok endParsed ->
+                                        Ok
+                                            { broad = endParsed.broad
+                                            , narrow =
+                                                { end = endParsed.narrow, beforeEnd = [] }
+                                            }
+
+                                    Err endError ->
+                                        Err
+                                            { elementError = tailError.elementError
+                                            , endError = endError
+                                            , startsDownInBroadList =
+                                                tailError.startsDownInBroadList
+                                                    |> Stack.onTopLay (beforeToNarrow |> List.length)
+                                            }
+
+                    Err elementError ->
+                        case beforeToNarrow |> toNarrow config.end of
+                            Ok endParsed ->
+                                Ok
+                                    { broad = endParsed.broad
+                                    , narrow =
+                                        { end = endParsed.narrow, beforeEnd = [] }
+                                    }
+
+                            Err endError ->
+                                Err
+                                    { elementError = elementError
+                                    , endError = endError
+                                    , startsDownInBroadList =
+                                        beforeToNarrow
+                                            |> List.length
+                                            |> Stack.one
+                                    }
+        in
+        \initialBeforeToBroad ->
+            initialBeforeToBroad
+                |> step config.initial
+                |> Result.mapError UntilError
+    , toBroad =
+        \beforeAndEnd ->
+            beforeAndEnd.beforeEnd
+                |> List.foldl
+                    (\element soFar ->
+                        { folded = soFar.folded |> config.fold element
+                        , rope =
+                            soFar.rope
+                                |> Rope.prependTo
+                                    (element |> toBroad (config.element soFar.folded))
+                        }
+                    )
+                    { folded = config.initial, rope = Rope.empty }
+                |> .rope
+                |> Rope.prependTo (beforeAndEnd.end |> toBroad config.end)
+    }
 
 
 {-| Keep going until an element fails, just like [`atLeast n0`](ArraySized-Morph#atLeast).
@@ -3546,25 +3635,32 @@ whilePossibleAsFold config =
 --
 
 
-{-| Only matches when there's no further broad input afterwards.
+{-| Only succeeds when there are no remaining broad input elements afterwards.
 
-This is not required for [`narrow`](#toNarrow)ing to Morph.succeed.
+This is not required for [`Morph.toNarrow`](#toNarrow) to succeed.
 
-It can, however simplify checking for specific endings:
+The only use I can think of is when checking for a line ending:
 
-    decoderNameSubject : MorphRow String Char expectationCustom
-    decoderNameSubject =
-        String.list
+    type LineEnding
+        = LineBreak
+        | EndOfFile
+
+    lineEnding : MorphRow () Char
+    lineEnding =
+        -- always prefer a line-break before the end of the file
+        Morph.broad LineBreak
             |> Morph.overRow
-                (MorphRow.until
-                    { commit =
-                        oneToOne .before (\before -> { before = before, end = () })
-                    , end =
-                        Morph.succeed ()
-                            |> match (String.Morph.only "Decoder")
-                            |> match Morph.end
-                    , element = Morph.keep |> Morph.one
-                    }
+                (Morph.choice
+                    (\lineBreak endOfFile lineEndingChoice ->
+                        case lineEndingChoice of
+                            LineBreak ->
+                                lineBreak ()
+
+                            EndOfFile ->
+                                endOfFile ()
+                    )
+                    |> Morph.tryRow (\() -> LineBreak) (String.Morph.only "\n")
+                    |> Morph.tryRow (\() -> EndOfFile) Morph.end
                 )
 
 -}
@@ -4022,7 +4118,7 @@ try possibilityToChoice possibilityMorph =
 {-| Initialize a [variants morph](#VariantsMorphEmptiable)
 by discriminating `(` the broad`,` the narrow `)` choices,
 then `|>` [`Morph.try`](Morph#try)ing each possibility,
-concluding the builder with [`Morph.choiceFinish`](#choiceFinish)
+concluding the printer with [`Morph.choiceFinish`](#choiceFinish)
 
 A use case is [morphing](Morph#Morph) from and to an internal type
 

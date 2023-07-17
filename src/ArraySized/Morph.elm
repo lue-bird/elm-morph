@@ -31,7 +31,7 @@ import Emptiable exposing (Emptiable)
 import Linear exposing (Direction(..))
 import Morph exposing (ErrorWithDeadEnd, MorphIndependently, MorphRow, MorphRowIndependently, broad, grab)
 import Morph.Internal
-import N exposing (Exactly, In, Infinity(..), Min, N, N0, N0OrAdd1, On, To, Up, Up0, n0)
+import N exposing (In, Min, N, N0, N0OrAdd1, On, To, Up, Up0, n0)
 import Rope
 import Stack exposing (Stacked)
 
@@ -417,7 +417,8 @@ Here's some ugly consequences if we use `using` instead of a less generic `exact
 
     Adding [`Morph.named`](Morph#named) to the whole `using` morph helps but the quality is still notably lower.
 
-  - Instead of recursively using `using`, you should use [`until`](Morph#until), [`untilFold`](Morph#untilFold)
+  - Instead of recursively using `using`, you should use
+    [`untilNext`](Morph#untilNext), [`untilLast`](Morph#untilNext), [`untilNextFold`](Morph#untilNextFold), [`untilLastFold`](Morph#untilLastFold)
     to not blow the stack and get a nicer [`description`](Morph#description)
 
   - Its harder to reason about

@@ -222,6 +222,23 @@ signedAbsoluteChars =
         )
 
 
+{-| [`MorphRow`](Morph#MorphRow) from chars to a [`Decimal.Fraction`](Decimal#Fraction).
+-}
+fractionAfterPointChars : MorphRow Fraction Char
+fractionAfterPointChars =
+    Morph.untilLast
+        { end =
+            Morph.oneToOne N.inToNumber N.inToOn
+                |> Morph.over (N.Morph.in_ ( n1, n9 ))
+                |> Morph.over N.Morph.char
+                |> Morph.one
+        , element =
+            Morph.oneToOne N.inToNumber N.inToOn
+                |> Morph.over N.Morph.char
+                |> Morph.one
+        }
+
+
 atLeast1Chars : MorphRow Decimal.AtLeast1 Char
 atLeast1Chars =
     Morph.named "≥ 1"
@@ -249,29 +266,6 @@ fractionChars =
             |> match (String.Morph.only ".")
             |> grab (\fraction_ -> fraction_) fractionAfterPointChars
         )
-
-
-{-| [`MorphRow`](Morph#MorphRow) from chars to a [`Decimal.Fraction`](Decimal#Fraction).
--}
-fractionAfterPointChars : MorphRow Fraction Char
-fractionAfterPointChars =
-    Morph.succeed
-        (\beforeLast last ->
-            { beforeLast = beforeLast, last = last }
-        )
-        |> Morph.grab .beforeLast
-            (Morph.whilePossible
-                (Morph.oneToOne N.inToNumber N.inToOn
-                    |> Morph.over N.Morph.char
-                    |> Morph.one
-                )
-            )
-        |> Morph.grab .last
-            (Morph.oneToOne N.inToNumber N.inToOn
-                |> Morph.over (N.Morph.in_ ( n1, n9 ))
-                |> Morph.over N.Morph.char
-                |> Morph.one
-            )
 
 
 {-| [`MorphValue`](Value-Morph#MorphValue) from a [`Decimal`](Decimal#Decimal)
@@ -431,7 +425,7 @@ fractionBits =
     Morph.named "fraction"
         (Morph.oneToOne
             (\initial0CountAndAfter ->
-                { beforeLast =
+                { beforeEnd =
                     List.repeat
                         (initial0CountAndAfter.initial0Count |> N.toInt)
                         (n0 |> N.maxTo n9 |> N.inToNumber)
@@ -447,13 +441,13 @@ fractionBits =
                                     (after0sAtLeast1Base2.first |> N.minTo0 |> N.minToNumber)
                                         :: after0sAtLeast1Base2.afterFirst
                            )
-                , last = initial0CountAndAfter.last
+                , end = initial0CountAndAfter.end
                 }
             )
             (\fraction ->
                 let
                     beforeLast =
-                        fraction.beforeLast
+                        fraction.beforeEnd
                             |> List.foldl
                                 (\el soFar ->
                                     case soFar.after0sBase10 of
@@ -484,7 +478,7 @@ fractionBits =
                                 { initial0Count = 0, after0sBase10 = Nothing }
                 in
                 { initial0Count = beforeLast.initial0Count |> N.intToAtLeast n0
-                , last = fraction.last
+                , end = fraction.end
                 , after0s =
                     case beforeLast.after0sBase10 of
                         Nothing ->
@@ -502,15 +496,15 @@ fractionBits =
             )
             |> Morph.overRow
                 (Morph.succeed
-                    (\initial0Count after0s last ->
-                        { initial0Count = initial0Count, after0s = after0s, last = last }
+                    (\initial0Count after0s end ->
+                        { initial0Count = initial0Count, after0s = after0s, end = end }
                     )
                     |> Morph.grab .initial0Count
                         (N.Morph.natural
                             |> Morph.overRow Natural.Morph.bitsVariableCount
                         )
                     |> Morph.grab .after0s Natural.Morph.bitsVariableCount
-                    |> Morph.grab .last fractionLastDigitBits
+                    |> Morph.grab .end fractionLastDigitBits
                 )
         )
 
