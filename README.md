@@ -1,6 +1,6 @@
 ## [elm morph](https://dark.elm.dmy.fr/packages/lue-bird/elm-morph/latest/)
 
-a parser-builder: developer-friendly, general-purpose, great errors
+a parser-printer: developer-friendly, general-purpose, great errors
 
   - 📻 related: ["codecs" elm-radio episode](https://elm-radio.com/episode/codecs/)
   - 🎧 while reading: ["Morphable", microtonal electronic music by Sevish](https://youtu.be/J-JZhCWsk3M?t=733)
@@ -11,7 +11,7 @@ Below some appetizers
 
 ## [`MorphRow`](Morph#MorphRow)
 
-Know `Parser`s? [`MorphRow`](Morph#MorphRow) simply always creates a builder alongside. Think
+Know `Parser`s? [`MorphRow`](Morph#MorphRow) simply always creates a printer alongside. Think
 
   - `Email/Id/Time/Path/Url.fromString` ⇄ `Email/Id/Time/Path/Url.toString`
   - `Midi.fromBitList` ⇄ `Midi.toBitList`
@@ -83,7 +83,7 @@ What's different from writing a parser?
 
   - [`Morph.choice (\... -> case ... of ...)`](Morph#choice) matches possibilities exhaustively
   - [`grab ... ...`](Morph#grab) also shows how to access the morphed positional part
-  - [`broad ...`](Morph#broad) provides a "default value" for the builder
+  - [`broad ...`](Morph#broad) provides a "default value" for the printer
   - no `loop` and no classic `andThen`! Instead we have atLeast, between, exactly, optional, while possible, until, ... See [section sequence in the `Morph` module documentation](Morph#sequence)
 
 ## [`MorphValue`](Value-Morph)
