@@ -176,8 +176,8 @@ chars =
                             Signed signedValue ->
                                 signedVariant signedValue
                     )
-                    |> Morph.tryRow Signed signedChars
-                    |> Morph.tryRow (\() -> N0) (String.Morph.only "0.")
+                    |> Morph.rowTry Signed signedChars
+                    |> Morph.rowTry (\() -> N0) (String.Morph.only "0.")
                     |> Morph.choiceFinish
                 )
             |> Morph.match
@@ -216,8 +216,8 @@ signedAbsoluteChars =
                     AtLeast1 atLeast1Value ->
                         atLeast1Variant atLeast1Value
             )
-            |> Morph.tryRow Fraction fractionChars
-            |> Morph.tryRow AtLeast1 atLeast1Chars
+            |> Morph.rowTry Fraction fractionChars
+            |> Morph.rowTry AtLeast1 atLeast1Chars
             |> Morph.choiceFinish
         )
 
@@ -396,9 +396,9 @@ bitsVariableCount =
                     Decimal.Signed signedValue ->
                         signed signedValue
             )
-            |> Morph.tryRow (\() -> Decimal.N0)
+            |> Morph.rowTry (\() -> Decimal.N0)
                 (Morph.named "0" (Bit.Morph.only Bit.O |> Morph.one))
-            |> Morph.tryRow Decimal.Signed
+            |> Morph.rowTry Decimal.Signed
                 (Morph.succeed (\signed -> signed)
                     |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                     |> Morph.grab (\signed -> signed) signedBits
@@ -550,47 +550,47 @@ fractionLastDigitBits =
                     _ ->
                         v9 ()
             )
-            |> Morph.tryRow (\() -> n1 |> withDigitRange)
+            |> Morph.rowTry (\() -> n1 |> withDigitRange)
                 (List.Morph.broadSequenceMap
                     (Bit.Morph.only >> Morph.one)
                     [ Bit.O, Bit.O, Bit.O, Bit.O ]
                 )
-            |> Morph.tryRow (\() -> n2 |> withDigitRange)
+            |> Morph.rowTry (\() -> n2 |> withDigitRange)
                 (List.Morph.broadSequenceMap
                     (Bit.Morph.only >> Morph.one)
                     [ Bit.O, Bit.O, Bit.O, Bit.I ]
                 )
-            |> Morph.tryRow (\() -> n3 |> withDigitRange)
+            |> Morph.rowTry (\() -> n3 |> withDigitRange)
                 (List.Morph.broadSequenceMap
                     (Bit.Morph.only >> Morph.one)
                     [ Bit.O, Bit.O, Bit.I, Bit.O ]
                 )
-            |> Morph.tryRow (\() -> n4 |> withDigitRange)
+            |> Morph.rowTry (\() -> n4 |> withDigitRange)
                 (List.Morph.broadSequenceMap
                     (Bit.Morph.only >> Morph.one)
                     [ Bit.O, Bit.O, Bit.I, Bit.I ]
                 )
-            |> Morph.tryRow (\() -> n5 |> withDigitRange)
+            |> Morph.rowTry (\() -> n5 |> withDigitRange)
                 (List.Morph.broadSequenceMap
                     (Bit.Morph.only >> Morph.one)
                     [ Bit.O, Bit.I, Bit.O, Bit.O ]
                 )
-            |> Morph.tryRow (\() -> n6 |> withDigitRange)
+            |> Morph.rowTry (\() -> n6 |> withDigitRange)
                 (List.Morph.broadSequenceMap
                     (Bit.Morph.only >> Morph.one)
                     [ Bit.O, Bit.I, Bit.O, Bit.I ]
                 )
-            |> Morph.tryRow (\() -> n7 |> withDigitRange)
+            |> Morph.rowTry (\() -> n7 |> withDigitRange)
                 (List.Morph.broadSequenceMap
                     (Bit.Morph.only >> Morph.one)
                     [ Bit.O, Bit.I, Bit.I, Bit.O ]
                 )
-            |> Morph.tryRow (\() -> n8 |> withDigitRange)
+            |> Morph.rowTry (\() -> n8 |> withDigitRange)
                 (List.Morph.broadSequenceMap
                     (Bit.Morph.only >> Morph.one)
                     [ Bit.O, Bit.I, Bit.I, Bit.I ]
                 )
-            |> Morph.tryRow (\() -> n9 |> withDigitRange)
+            |> Morph.rowTry (\() -> n9 |> withDigitRange)
                 (List.Morph.broadSequenceMap
                     (Bit.Morph.only >> Morph.one)
                     [ Bit.I ]
@@ -611,12 +611,12 @@ signedAbsoluteBits =
                     Decimal.AtLeast1 atLeast1Value ->
                         atLeast1 atLeast1Value
             )
-            |> Morph.tryRow Decimal.Fraction
+            |> Morph.rowTry Decimal.Fraction
                 (Morph.succeed (\fraction -> fraction)
                     |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
                     |> Morph.grab (\fraction -> fraction) fractionBits
                 )
-            |> Morph.tryRow Decimal.AtLeast1
+            |> Morph.rowTry Decimal.AtLeast1
                 (Morph.succeed (\atLeast1 -> atLeast1)
                     |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                     |> Morph.grab (\atLeast1 -> atLeast1) atLeast1Bits
@@ -645,9 +645,9 @@ maybeBits contentMorphRow =
                 Just content ->
                     just content
         )
-        |> Morph.tryRow (\() -> Nothing)
+        |> Morph.rowTry (\() -> Nothing)
             (Bit.Morph.only Bit.O |> Morph.one)
-        |> Morph.tryRow Just
+        |> Morph.rowTry Just
             (Morph.succeed (\content -> content)
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                 |> Morph.grab (\content -> content) contentMorphRow

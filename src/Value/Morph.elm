@@ -608,12 +608,12 @@ bits =
                         Value.Composed composedValue ->
                             composedVariant composedValue
                 )
-                |> Morph.tryRow Value.Atom
+                |> Morph.rowTry Value.Atom
                     (Morph.succeed (\atom_ -> atom_)
                         |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
                         |> Morph.grab (\atom_ -> atom_) atomBits
                     )
-                |> Morph.tryRow Value.Composed
+                |> Morph.rowTry Value.Composed
                     (Morph.succeed (\composed_ -> composed_)
                         |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                         |> Morph.grab (\composed_ -> composed_) (composedBits step)
@@ -658,18 +658,18 @@ atomBits =
                 Value.String stringValue ->
                     stringVariant stringValue
         )
-        |> Morph.tryRow Value.Unit
+        |> Morph.rowTry Value.Unit
             (Morph.succeed ()
                 |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
                 |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
             )
-        |> Morph.tryRow Value.Number
+        |> Morph.rowTry Value.Number
             (Morph.succeed (\number_ -> number_)
                 |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                 |> Morph.grab (\number_ -> number_) numberBits
             )
-        |> Morph.tryRow Value.String
+        |> Morph.rowTry Value.String
             (Morph.succeed (\string_ -> string_)
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                 |> Morph.grab (\string_ -> string_) stringBits
@@ -698,9 +698,9 @@ composedBits step =
                 Value.Variant taggedValue ->
                     taggedVariant taggedValue
         )
-        |> Morph.tryRow Value.List (listBits (step ()))
-        |> Morph.tryRow Value.Record (recordBits (step ()))
-        |> Morph.tryRow Value.Variant (variantBits (step ()))
+        |> Morph.rowTry Value.List (listBits (step ()))
+        |> Morph.rowTry Value.Record (recordBits (step ()))
+        |> Morph.rowTry Value.Variant (variantBits (step ()))
         |> Morph.choiceFinish
 
 

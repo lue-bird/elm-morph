@@ -23,7 +23,7 @@ module Morph exposing
     , VariantsMorphEmptiable, variants, variant, variantsFinish
     , choice
     , ChoiceMorphEmptiable, try, choiceFinish
-    , ChoiceMorphRowEmptiable, tryRow
+    , ChoiceMorphRowEmptiable, rowTry
     , MorphRow, MorphRowIndependently, rowFinish
     , whilePossible
     , untilNext, broadEnd, untilLast
@@ -121,7 +121,7 @@ try [`ArraySized.Morph.exactlyWith`](ArraySized-Morph#exactlyWith).
 
 ## choice [`MorphRow`](#MorphRow)
 
-@docs ChoiceMorphRowEmptiable, tryRow
+@docs ChoiceMorphRowEmptiable, rowTry
 
 
 ## row
@@ -1820,8 +1820,8 @@ custom descriptionCustom morphTransformations =
                             Next next ->
                                 nextVariant next
                     )
-                    |> Morph.tryRow (\() -> End) (String.Morph.only "[]")
-                    |> Morph.tryRow Next
+                    |> Morph.rowTry (\() -> End) (String.Morph.only "[]")
+                    |> Morph.rowTry Next
                         (Morph.succeed (\h t -> { head = h, tail = t })
                             |> grab .head (Int.Morph.integer |> Morph.overRow Integer.Morph.chars)
                             |> match
@@ -1874,8 +1874,8 @@ More notes:
         intList : () -> MorphRow IntList
         intList =
             Morph.choice ...
-                |> Morph.tryRow (\() -> End) ...
-                |> Morph.tryRow Next
+                |> Morph.rowTry (\() -> End) ...
+                |> Morph.rowTry Next
                     (...
                         |> grab .tail (intList ())
                     )
@@ -3659,8 +3659,8 @@ The only use I can think of is when checking for a line ending:
                             EndOfFile ->
                                 endOfFile ()
                     )
-                    |> Morph.tryRow (\() -> LineBreak) (String.Morph.only "\n")
-                    |> Morph.tryRow (\() -> EndOfFile) Morph.end
+                    |> Morph.rowTry (\() -> LineBreak) (String.Morph.only "\n")
+                    |> Morph.rowTry (\() -> EndOfFile) Morph.end
                 )
 
 -}
@@ -3834,9 +3834,9 @@ type alias ChoiceMorphEmptiable noTryPossiblyOrNever choiceNarrow choiceBeforeNa
                     InputEnd ->
                         inputEndVariant ()
             )
-            |> Morph.tryRow Return
+            |> Morph.rowTry Return
                 (returnChar |> Morph.one)
-            |> Morph.tryRow (\() -> InputEnd)
+            |> Morph.rowTry (\() -> InputEnd)
                 Morph.end
             |> Morph.choiceFinish
 
@@ -4276,7 +4276,7 @@ variantsFinish =
 
 
 {-| Possibly incomplete [`MorphRow`](#MorphRow) to and from a Morph.choice.
-See [`Morph.choice`](Morph#choice), [`Morph.tryRow`](#try), [`Morph.choiceFinish`](#choiceFinish)
+See [`Morph.choice`](Morph#choice), [`Morph.rowTry`](#try), [`Morph.choiceFinish`](#choiceFinish)
 -}
 type alias ChoiceMorphRowEmptiable noTryPossiblyOrNever choiceNarrow choiceBroaden broadElement =
     RecordWithoutConstructorFunction
@@ -4296,7 +4296,7 @@ type alias ChoiceMorphRowEmptiable noTryPossiblyOrNever choiceNarrow choiceBroad
         }
 
 
-{-| If the previous [`possibility`](#tryRow) fails
+{-| If the previous [`possibility`](#rowTry) fails
 try this [`MorphRow`](#MorphRow).
 
 > ℹ️ Equivalent regular expression: `|`
@@ -4327,9 +4327,9 @@ try this [`MorphRow`](#MorphRow).
                     Letters char ->
                         letter char
             )
-            |> Morph.tryRow Letters
+            |> Morph.rowTry Letters
                 (atLeast n1 (AToZ.Morph.lowerChar |> Morph.one))
-            |> Morph.tryRow Digits
+            |> Morph.rowTry Digits
                 (atLeast n1 (N.Morph.char |> Morph.one))
             |> Morph.choiceFinish
 
@@ -4374,8 +4374,8 @@ try this [`MorphRow`](#MorphRow).
                     Letter letter ->
                         letterVariant letter
             )
-            |> Morph.tryRow (\() -> Underscore) (String.Morph.only "_")
-            |> Morph.tryRow Letter
+            |> Morph.rowTry (\() -> Underscore) (String.Morph.only "_")
+            |> Morph.rowTry Letter
                 (AToZ.Morph.broadCase AToZ.CaseLower
                     |> Morph.over AToZ.Morph.char
                     |> Morph.one
@@ -4418,7 +4418,7 @@ better would be
     underscoreOrLetter |> Morph.one
 
 -}
-tryRow :
+rowTry :
     (possibilityNarrow -> choiceNarrow)
     -> MorphRowIndependently possibilityBeforeToBroad possibilityNarrow broadElement
     ->
@@ -4436,7 +4436,7 @@ tryRow :
                 choiceBroadenFurther
                 broadElement
         )
-tryRow possibilityToChoice possibilityMorph =
+rowTry possibilityToChoice possibilityMorph =
     \choiceMorphSoFar ->
         { description =
             choiceMorphSoFar.description
@@ -4466,7 +4466,7 @@ tryRow possibilityToChoice possibilityMorph =
         }
 
 
-{-| Always the last step of a [`Morph.choice`](Morph#choice) `|>` [`Morph.try`](Morph#try) or `|>` [`Morph.tryRow`](#tryRow) builder.
+{-| Always the last step of a [`Morph.choice`](Morph#choice) `|>` [`Morph.try`](Morph#try) or `|>` [`Morph.rowTry`](#rowTry) builder.
 -}
 choiceFinish :
     ChoiceMorphEmptiable

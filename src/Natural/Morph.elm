@@ -87,8 +87,8 @@ chars =
                     AtLeast1 atLeast1Value ->
                         atLeast1Variant atLeast1Value
             )
-            |> Morph.tryRow (\() -> N0) (String.Morph.only "0")
-            |> Morph.tryRow AtLeast1 NaturalAtLeast1.chars
+            |> Morph.rowTry (\() -> N0) (String.Morph.only "0")
+            |> Morph.rowTry AtLeast1 NaturalAtLeast1.chars
             |> Morph.choiceFinish
         )
 
@@ -130,8 +130,8 @@ bitsVariableCount =
                 AtLeast1 atLeast1Value ->
                     atLeast1 atLeast1Value
         )
-        |> Morph.tryRow (\() -> N0) (Bit.Morph.only Bit.O |> Morph.one)
-        |> Morph.tryRow AtLeast1
+        |> Morph.rowTry (\() -> N0) (Bit.Morph.only Bit.O |> Morph.one)
+        |> Morph.rowTry AtLeast1
             (Morph.succeed (\atLeast1 -> atLeast1)
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                 |> Morph.grab (\atLeast1 -> atLeast1) NaturalAtLeast1.bits

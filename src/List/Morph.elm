@@ -128,9 +128,9 @@ Some also call this "traverse" (or "for" when the arguments are flipped)
                     AToZ.CaseLower -> lower ()
                     AToZ.CaseUpper -> upper ()
             )
-            |> Morph.tryRow (\() -> AToZ.CaseLower)
+            |> Morph.rowTry (\() -> AToZ.CaseLower)
                 (String.Morph.only (string |> String.toLower))
-            |> Morph.tryRow (\() -> AToZ.CaseUpper)
+            |> Morph.rowTry (\() -> AToZ.CaseUpper)
                 (String.Morph.only (string |> String.toUpper))
             |> Morph.choiceFinish
 

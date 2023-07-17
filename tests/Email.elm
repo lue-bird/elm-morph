@@ -226,7 +226,7 @@ hostLabelSectionAfterFirst =
                 HostLabelSideableSymbol sideableValue ->
                     sideableVariant sideableValue
         )
-        |> Morph.tryRow HostLabelStartingWithHyphenMinus
+        |> Morph.rowTry HostLabelStartingWithHyphenMinus
             (Morph.succeed
                 (\hyphenMinusCount next ->
                     { hyphenMinusCount = hyphenMinusCount, next = next }
@@ -238,7 +238,7 @@ hostLabelSectionAfterFirst =
                     )
                 |> Morph.grab .next (hostLabelSideableSymbol |> Morph.one)
             )
-        |> Morph.tryRow HostLabelSideableSymbol
+        |> Morph.rowTry HostLabelSideableSymbol
             (hostLabelSideableSymbol |> Morph.one)
         |> Morph.choiceFinish
 

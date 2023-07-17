@@ -189,8 +189,8 @@ chars =
                     Integer.Signed signedValue ->
                         signedVariant signedValue
             )
-            |> Morph.tryRow (\() -> Integer.N0) (String.Morph.only "0")
-            |> Morph.tryRow Integer.Signed signedChars
+            |> Morph.rowTry (\() -> Integer.N0) (String.Morph.only "0")
+            |> Morph.rowTry Integer.Signed signedChars
             |> Morph.choiceFinish
         )
 

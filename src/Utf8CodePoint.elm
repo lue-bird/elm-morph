@@ -59,12 +59,12 @@ bits =
                 FourBytes fourBytesValue ->
                     fourBytes fourBytesValue
         )
-        |> Morph.tryRow OneByte
+        |> Morph.rowTry OneByte
             (Morph.succeed identity
                 |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
                 |> Morph.grab identity (ArraySized.Morph.exactly n7 (Morph.keep |> Morph.one))
             )
-        |> Morph.tryRow TwoBytes
+        |> Morph.rowTry TwoBytes
             (Morph.succeed (\f s -> { first = f, second = s })
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
@@ -72,7 +72,7 @@ bits =
                 |> Morph.grab .first (ArraySized.Morph.exactly n5 (Morph.keep |> Morph.one))
                 |> Morph.grab .second followingByte
             )
-        |> Morph.tryRow ThreeBytes
+        |> Morph.rowTry ThreeBytes
             (Morph.succeed (\f s t -> { first = f, second = s, third = t })
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
@@ -82,7 +82,7 @@ bits =
                 |> Morph.grab .second followingByte
                 |> Morph.grab .third followingByte
             )
-        |> Morph.tryRow FourBytes
+        |> Morph.rowTry FourBytes
             (Morph.succeed (\fi s t fo -> { first = fi, second = s, third = t, fourth = fo })
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
