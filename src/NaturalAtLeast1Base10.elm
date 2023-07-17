@@ -174,30 +174,41 @@ add :
 add toAdd =
     \naturalAtLeast1Base10 ->
         let
-            firstDigitSum =
-                digitsAfterFirstSum.overflow
-                    |> N.add (naturalAtLeast1Base10.first |> digitToUp ( n1, n9 ))
-                    |> N.add (toAdd.first |> digitToUp ( n1, n9 ))
-
-            digitsAfterFirstSum :
+            digitsSum :
                 { inRange : List (N (In N0 N9))
                 , overflow : N (In (On N0) (On N1))
                 }
-            digitsAfterFirstSum =
-                naturalAtLeast1Base10.afterFirst |> addDigits toAdd.afterFirst
+            digitsSum =
+                (naturalAtLeast1Base10 |> toDigits)
+                    |> addDigits (toAdd |> toDigits)
         in
-        case firstDigitSum |> N.isAtLeast n10 of
-            Ok firstDigitSumAtLeast10 ->
-                { first = n1 |> N.minTo n1 |> N.maxTo n9 |> N.inToNumber
-                , afterFirst =
-                    (firstDigitSumAtLeast10 |> N.remainderBy n10 |> N.inToNumber)
-                        :: digitsAfterFirstSum.inRange
+        case digitsSum.overflow |> N.toInt of
+            0 ->
+                case digitsSum.inRange of
+                    -- can't happen
+                    [] ->
+                        naturalAtLeast1Base10
+
+                    first :: afterFirst ->
+                        { first =
+                            -- we can do that because both numbers start with a positive digit
+                            -- and the overflow is 0
+                            first |> N.toIn ( n1, n9 ) |> N.inToNumber
+                        , afterFirst = afterFirst
+                        }
+
+            -- 1
+            _ ->
+                { first = n1 |> N.maxTo n9 |> N.inToNumber
+                , afterFirst = digitsSum.inRange
                 }
 
-            Err firstDigitSumAtMost9 ->
-                { first = firstDigitSumAtMost9 |> N.minTo n1 |> N.inToNumber
-                , afterFirst = digitsAfterFirstSum.inRange
-                }
+
+toDigits : NaturalAtLeast1Base10 -> List (N (In N0 N9))
+toDigits =
+    \naturalAtLeast1Base10 ->
+        (naturalAtLeast1Base10.first |> N.inToOn |> N.minTo0 |> N.inToNumber)
+            :: naturalAtLeast1Base10.afterFirst
 
 
 addDigits :
@@ -241,7 +252,9 @@ addDigits toAdd =
                                     step.element
 
                                 stepSum =
-                                    step.folded |> N.add (digit |> digitToUp ( n0, n9 )) |> N.add (digitToAdd |> digitToUp ( n0, n9 ))
+                                    step.folded
+                                        |> N.add (digit |> digitToUp ( n0, n9 ))
+                                        |> N.add (digitToAdd |> digitToUp ( n0, n9 ))
                             in
                             case stepSum |> N.isAtLeast n10 of
                                 Ok digitSumAtLeast10 ->

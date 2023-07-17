@@ -2,8 +2,11 @@ module Morph.Test exposing (tests)
 
 import Email
 import Expect
+import Fuzz exposing (Fuzzer)
 import List.Morph
 import Morph exposing (toBroad, toNarrow)
+import N exposing (n0, n1, n9)
+import NaturalAtLeast1Base10 exposing (NaturalAtLeast1Base10)
 import Point
 import Test exposing (Test, test)
 import Tree
@@ -15,7 +18,32 @@ tests =
         "MorphRow"
         [ pointTest
         , emailTest
+        , Test.fuzz naturalAtLeast1Base10Fuzz
+            "base10: = to |> from Base2"
+            (\naturalAtLeast1Base10 ->
+                ( naturalAtLeast1Base10
+                , -- only added for debugging
+                  naturalAtLeast1Base10 |> NaturalAtLeast1Base10.toBase2
+                )
+                    |> Expect.equal
+                        ( naturalAtLeast1Base10
+                            |> NaturalAtLeast1Base10.toBase2
+                            |> NaturalAtLeast1Base10.fromBase2
+                        , naturalAtLeast1Base10 |> NaturalAtLeast1Base10.toBase2
+                        )
+            )
         ]
+
+
+naturalAtLeast1Base10Fuzz : Fuzzer NaturalAtLeast1Base10
+naturalAtLeast1Base10Fuzz =
+    Fuzz.constant (\first afterFirst -> { first = first, afterFirst = afterFirst })
+        |> Fuzz.andMap (Fuzz.map N.inToNumber (N.inFuzzUniform ( n1, n9 )))
+        |> Fuzz.andMap
+            (Fuzz.listOfLengthBetween 0
+                9
+                (Fuzz.map N.inToNumber (N.inFuzzUniform ( n0, n9 )))
+            )
 
 
 
