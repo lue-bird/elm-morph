@@ -1,6 +1,7 @@
 ## TODO
 
   - add more tests
+  - `N.Morph.char` → `N.Morph.charIn ( min, le9 )`
 
 # change log
 
