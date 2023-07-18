@@ -2603,7 +2603,7 @@ type alias MorphRow narrow broadElement =
 {-| Incomplete [`MorphRow`](#MorphRow) for a thing composed of multiple parts = group.
 It's what you supply during a [`Morph.succeed`](Morph#succeed)`|>`[`grab`](#grab)/[`match`](#match) build
 -}
-type alias MorphRowIndependently beforeToBroad narrow broadElement =
+type alias MorphRowIndependently narrow beforeToBroad broadElement =
     MorphIndependently
         (List broadElement
          ->
@@ -2749,7 +2749,7 @@ is already nicer
 -}
 succeed :
     narrowConstant
-    -> MorphRowIndependently beforeBroaden_ narrowConstant broadElement_
+    -> MorphRowIndependently narrowConstant beforeBroaden_ broadElement_
 succeed narrowConstant =
     { description = SucceedDescription
     , toNarrow =
@@ -2768,16 +2768,16 @@ succeed narrowConstant =
 next :
     (groupNarrow -> partNextBeforeToBroad)
     -> (partNextNarrow -> (groupNarrowConstruct -> groupNarrowConstructChanged))
-    -> MorphRowIndependently partNextBeforeToBroad partNextNarrow broadElement
+    -> MorphRowIndependently partNextNarrow partNextBeforeToBroad broadElement
     ->
         (MorphRowIndependently
-            groupNarrow
             groupNarrowConstruct
+            groupNarrow
             broadElement
          ->
             MorphRowIndependently
-                groupNarrow
                 groupNarrowConstructChanged
+                groupNarrow
                 broadElement
         )
 next partAccess partChange nextMorphRow =
@@ -2830,16 +2830,16 @@ and channel it back up to the [`Morph.succeed`](Morph#succeed) grouping
 -}
 grab :
     (groupNarrow -> partNextBeforeToBroad)
-    -> MorphRowIndependently partNextBeforeToBroad partNextNarrow broadElement
+    -> MorphRowIndependently partNextNarrow partNextBeforeToBroad broadElement
     ->
         (MorphRowIndependently
-            groupNarrow
             (partNextNarrow -> groupNarrowFurther)
+            groupNarrow
             broadElement
          ->
             MorphRowIndependently
-                groupNarrow
                 groupNarrowFurther
+                groupNarrow
                 broadElement
         )
 grab partAccess grabbedNextMorphRow =
@@ -2931,12 +2931,12 @@ Have a better example showing a valid use-case? → PR
 
 -}
 overRow :
-    MorphRowIndependently beforeToBroad beforeToNarrow broadElement
+    MorphRowIndependently beforeToNarrow beforeToBroad broadElement
     ->
         (MorphIndependently
             (beforeToNarrow -> Result Error narrow)
             (beforeBeforeBroaden -> beforeToBroad)
-         -> MorphRowIndependently beforeBeforeBroaden narrow broadElement
+         -> MorphRowIndependently narrow beforeBeforeBroaden broadElement
         )
 overRow morphRowBeforeMorph =
     \narrowMorph ->
@@ -3313,7 +3313,7 @@ untilNextFold config =
 
 See [`broadEnd`](#broadEnd).
 
-Fun fact: This exact use-case was the original motivation for creating `elm-morph`.
+Fun fact: This use-case was the original motivation for creating `elm-morph`.
 
 If you just want to repeat elements until the next `end` element regardless of whether there are
 more elements after it, use [`untilNext`](#untilNext).
@@ -3447,8 +3447,8 @@ If you need to carry information to the next element (which is super rare), try 
 
 -}
 whilePossible :
-    MorphRowIndependently elementBeforeToBroad elementNarrow broadElement
-    -> MorphRowIndependently (List elementBeforeToBroad) (List elementNarrow) broadElement
+    MorphRowIndependently elementNarrow elementBeforeToBroad broadElement
+    -> MorphRowIndependently (List elementNarrow) (List elementBeforeToBroad) broadElement
 whilePossible element =
     { description = WhilePossibleDescription (element |> description)
     , toBroad =
@@ -4431,7 +4431,7 @@ better would be
 -}
 rowTry :
     (possibilityNarrow -> choiceNarrow)
-    -> MorphRowIndependently possibilityBeforeToBroad possibilityNarrow broadElement
+    -> MorphRowIndependently possibilityNarrow possibilityBeforeToBroad broadElement
     ->
         (ChoiceMorphRowEmptiable
             noTryPossiblyOrNever_

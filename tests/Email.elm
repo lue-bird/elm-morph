@@ -6,7 +6,7 @@ import ArraySized exposing (ArraySized)
 import ArraySized.Morph exposing (atLeast)
 import Char.Morph
 import Linear exposing (Direction(..))
-import Morph exposing (Morph, MorphRow, MorphRowIndependently, grab, match, whilePossible)
+import Morph exposing (Morph, MorphRow, grab, match, whilePossible)
 import N exposing (In, Min, N, N0, N1, N2, N9, On, n1)
 import N.Morph
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
@@ -52,11 +52,7 @@ local =
         )
 
 
-localPart :
-    MorphRowIndependently
-        (ArraySized LocalSymbol (In (On N1) max_))
-        LocalPart
-        Char
+localPart : MorphRow LocalPart Char
 localPart =
     atLeast n1 (localSymbol |> Morph.one)
 

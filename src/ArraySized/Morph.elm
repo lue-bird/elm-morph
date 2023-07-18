@@ -431,8 +431,16 @@ Here's some ugly consequences if we use `using` instead of a less generic `exact
 -}
 exactlyWith :
     MorphRow (N range) broadElement
-    -> MorphRowIndependently elementBeforeToBroad elementNarrow broadElement
-    -> MorphRowIndependently (ArraySized elementBeforeToBroad range) (ArraySized elementNarrow range) broadElement
+    ->
+        MorphRowIndependently
+            elementNarrow
+            elementBeforeToBroad
+            broadElement
+    ->
+        MorphRowIndependently
+            (ArraySized elementNarrow range)
+            (ArraySized elementBeforeToBroad range)
+            broadElement
 exactlyWith lengthMorphRow elementMorphRow =
     { description =
         Morph.SequenceDescription
@@ -691,11 +699,11 @@ or equal to the resulting narrow minimum length.
 -}
 atLeast :
     N (In (On lowerLimit) (Up lowerLimitToBroad_ To broadLowerLimit))
-    -> MorphRowIndependently beforeToBroad narrow broadElement
+    -> MorphRowIndependently narrow beforeToBroad broadElement
     ->
         MorphRowIndependently
-            (ArraySized beforeToBroad (In (On broadLowerLimit) max_))
             (ArraySized narrow (Min (On lowerLimit)))
+            (ArraySized beforeToBroad (In (On broadLowerLimit) max_))
             broadElement
 atLeast minimum elementStepMorphRow =
     Morph.oneToOne identity ArraySized.maxToInfinity
@@ -833,8 +841,8 @@ atMost :
     -> MorphRow element broadElement
     ->
         MorphRowIndependently
-            (ArraySized element (In beforeToNarrowMin_ (Up maxX To maxPlusX)))
             (ArraySized element (In (Up0 narrowMinX_) (Up maxX To maxPlusX)))
+            (ArraySized element (In beforeToNarrowMin_ (Up maxX To maxPlusX)))
             broadElement
 atMost upperLimit element =
     Morph.named
