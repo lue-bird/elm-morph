@@ -1,6 +1,5 @@
 ## TODO
 
-  - swap `MorphRowIndependently beforeToBroad narrow broadElement` to `MorphRowIndependently narrow beforeToBroad broadElement`
   - add more tests
 
 # change log
