@@ -2894,7 +2894,25 @@ match ignoredNextMorphRow =
 -- chain
 
 
-{-| Describe how to reach an even broader list type.
+{-| Chain to an even more broad type.
+
+[`Morph.overRow`](#overRow)
+is nice to translate the narrow result your [`MorphRow`](#MorphRow) produces:
+
+    import Morph
+    import String.Morph
+    import Integer.Morph
+    import Int.Morph
+    import List.Morph
+
+    "12,34"
+        |> Morph.toNarrow
+            (Int.Morph.integer
+                |> Morph.overRow Integer.Morph.chars
+                |> Morph.rowFinish
+                |> Morph.over List.Morph.string
+            )
+    --> Ok { x = 12, y = 34 }
 
 Try to keep [`Morph.overRow`](#overRow) filters/validations to a minimum to get
 
