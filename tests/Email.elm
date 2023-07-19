@@ -7,7 +7,7 @@ import ArraySized.Morph exposing (atLeast)
 import Char.Morph
 import Linear exposing (Direction(..))
 import Morph exposing (Morph, MorphRow, grab, match, whilePossible)
-import N exposing (In, Min, N, N0, N1, N2, N9, On, n1)
+import N exposing (In, Min, N, N0, N1, N2, N9, On, n0, n1, n9)
 import N.Morph
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import String.Morph
@@ -77,7 +77,7 @@ localSymbol =
                 (AToZ.Morph.broadCase AToZ.CaseLower
                     |> Morph.over AToZ.Morph.char
                 )
-            |> Morph.try LocalSymbol0To9 N.Morph.char
+            |> Morph.try LocalSymbol0To9 (N.Morph.inChar ( n0, n9 ))
             |> Morph.choiceFinish
         )
 
@@ -191,7 +191,7 @@ hostLabelSideableSymbol =
             (AToZ.Morph.broadCase AToZ.CaseLower
                 |> Morph.over AToZ.Morph.char
             )
-        |> Morph.try HostLabelSideSymbol0To9 N.Morph.char
+        |> Morph.try HostLabelSideSymbol0To9 (N.Morph.inChar ( n0, n9 ))
         |> Morph.choiceFinish
 
 
@@ -250,7 +250,7 @@ domainTopLevel =
                 }
             )
             |> grab .startDigits
-                (whilePossible (N.Morph.char |> Morph.one))
+                (whilePossible (N.Morph.inChar ( n0, n9 ) |> Morph.one))
             |> -- guarantees it can't be numeric only
                grab .firstAToZ
                 (AToZ.Morph.broadCase AToZ.CaseLower
@@ -282,7 +282,7 @@ domainTopLevelAfterFirstAToZSymbol =
                 |> Morph.over AToZ.Morph.char
             )
         |> Morph.try DomainTopLevelSymbol0To9
-            N.Morph.char
+            (N.Morph.inChar ( n0, n9 ))
         |> Morph.choiceFinish
 
 

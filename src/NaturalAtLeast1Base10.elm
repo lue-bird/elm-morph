@@ -331,14 +331,13 @@ chars =
         (Morph.succeed (\first afterFirst -> { first = first, afterFirst = afterFirst })
             |> grab .first
                 (Morph.oneToOne N.inToNumber N.inToOn
-                    |> Morph.over (N.Morph.in_ ( n1, n9 ))
-                    |> Morph.over N.Morph.char
+                    |> Morph.over (N.Morph.inChar ( n1, n9 ))
                     |> Morph.one
                 )
             |> grab .afterFirst
                 (Morph.whilePossible
                     (Morph.oneToOne N.inToNumber N.inToOn
-                        |> Morph.over N.Morph.char
+                        |> Morph.over (N.Morph.inChar ( n0, n9 ))
                         |> Morph.one
                     )
                 )

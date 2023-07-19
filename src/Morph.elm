@@ -19,7 +19,7 @@ module Morph exposing
     , over, overRow
     , PartsMorphEmptiable
     , parts, part, partsFinish
-    , choiceEquivalent
+    , tryTopToBottom
     , VariantsMorphEmptiable, variants, variant, variantsFinish
     , choice
     , ChoiceMorphEmptiable, try, choiceFinish
@@ -109,7 +109,7 @@ try [`ArraySized.Morph.exactlyWith`](ArraySized-Morph#exactlyWith).
 
 [`Morph`](#Morph) a union `type`
 
-@docs choiceEquivalent
+@docs tryTopToBottom
 
 
 ### morph by variant
@@ -2916,9 +2916,9 @@ import List.Morph
         (N.Morph.in_ ( n0, n9 )
             |> Morph.overRow
                 (Morph.succeed (\a b -> a |> N.add b)
-                    |> Morph.grab (\_ -> n0 |> N.maxTo n9) N.Morph.char
+                    |> Morph.grab (\_ -> n0 |> N.maxTo n9) (N.Morph.inChar ( n0, n9 ))
                     |> Morph.match (String.Morph.only "-")
-                    |> Morph.grab identity N.Morph.char
+                    |> Morph.grab identity (N.Morph.inChar ( n0, n9 ))
                 )
             |> Morph.rowFinish
             |> Morph.over List.Morph.string
@@ -3892,28 +3892,61 @@ for an explicit tagged union `type`
 because you'll have the option to preserve what was [narrowed](Morph#toNarrow).
 (Remember: you can always discard that info and set a preferred option with [`Morph.broad`](Morph#broad))
 
-Use [`choiceEquivalent`](#choiceEquivalent) if you have a "dynamic" list of aliases/morphs to treat equally.
+Use [`tryTopToBottom`](#tryTopToBottom) if you have a "dynamic" list of equal type morphs.
 An example is defined variable names
 
-    -- use it with plain Morphs
-    Morph.choiceEquivalent Char.Morph.only
-        { tryEarly = []
-        , broad = '∨'
-        , tryLate = [ '⋁', '|', 'ᚖ' ]
-        }
+    import Stack
+    import String.Morph
 
-    -- use it with MorphRows
-    Morph.choiceEquivalent String.Morph.only
-        { tryEarly = []
-        , broad = "∨"
-        , alternatives = [ "||", "|", "or" ]
-        }
+    Morph.oneToOne .info (\info -> { tag = "±", info = info })
+        |> Morph.over
+            (Morph.tryTopToBottom String.Morph.only
+                (Stack.topBelow "±" [ "pm", "plusminus" ])
+            )
 
-    Morph.choiceEquivalent String.Morph.only
-        { tryEarly = []
-        , broad = = "±"
-        , tryLate = [ "pm", "plusminus" ]
-        }
+That looks really cursed. Let me try to explain:
+
+Let's call these stacked elements like `"pm"` and `"plusminus"` "tags".
+They are used to build a morph for each tag, tried in the order in the stack,
+here `String.Morph.only`.
+
+Let's call what you morph to `info`, in this case it's `()`
+because `String.Morph.only : MorphRow () Char` only has one valid value.
+
+Now how can the printer choose which of the tags should be used?
+Someone needs to tell it.
+The most generic way to do so is by setting the printer as
+
+    toBroad : { tag, info } -> broad
+
+because if we have the `tag`, we know which morph's printer to use!
+
+The other direction, narrowing, is similar.
+
+Say you wanted a morph with a dynamic stack of letters.
+
+    Morph.tryTopToBottom Char.Morph.only yourLetters
+
+if we just return what the tried morph with a matching tag returns, we'd have
+
+    toNarrow : beforeToNarrow -> Result ... ()
+
+That does not seem very useful, we want to know what possibility worked as well!
+
+    toNarrow : beforeToNarrow -> Result ... { info = (), tag = Char }
+
+Now all that's left to do is wire everything
+so that the narrow thing doesn't show the empty info:
+
+    Morph.oneToOne .tag (\tag -> { tag = tag, info = () })
+        |> Morph.over
+            (Morph.tryTopToBottom Char.Morph.only yourLetters)
+
+This is not exactly pretty but it's versatile at the very least.
+We can provide default tags (see example at the top) and
+we can set the tag as the narrow value when the `info = ()`.
+
+I welcome every question on github or @lue on slack.
 
 Performance note: This could be optimized
 as shown in ["Fast parsing of String Sets in Elm" by Marcelo Lazaroni](https://lazamar.github.io/fast-parsing-of-string-sets-in-elm/)
@@ -3928,68 +3961,67 @@ which means we would have to write a complete trie implementation from scratch i
 Happy to merge your contributions!
 
 -}
-choiceEquivalent :
-    (broadPossibility
+tryTopToBottom :
+    (tag
      ->
         MorphIndependently
             (beforeToNarrow
-             -> Result (ErrorWithDeadEnd deadEnd) narrow
+             -> Result (ErrorWithDeadEnd deadEnd) possibilityInfoNarrow
             )
-            broaden
+            (possibilityInfoBeforeToBroad -> broad)
     )
-    ->
-        { tryEarly : List broadPossibility
-        , broad : broadPossibility
-        , tryLate : List broadPossibility
-        }
+    -> Emptiable (Stacked tag) Never
     ->
         MorphIndependently
             (beforeToNarrow
-             -> Result (ErrorWithDeadEnd deadEnd) narrow
+             -> Result (ErrorWithDeadEnd deadEnd) { tag : tag, info : possibilityInfoNarrow }
             )
-            broaden
-choiceEquivalent traversePossibility possibilities =
-    let
-        possibilitiesStack : Emptiable (Stacked broadPossibility) never_
-        possibilitiesStack =
-            Stack.fromList possibilities.tryEarly
-                |> Stack.attachAdapt Up
-                    (Stack.topBelow possibilities.broad possibilities.tryLate)
-    in
+            ({ tag : tag, info : possibilityInfoBeforeToBroad } -> broad)
+tryTopToBottom traversePossibility tags =
     { description =
-        possibilitiesStack
-            |> Stack.map (\_ possibility -> possibility |> traversePossibility |> description)
+        tags
+            |> Stack.map (\_ tag -> tag |> traversePossibility |> description)
             |> ChoiceDescription
     , toNarrow =
         \beforeToNarrow ->
             beforeToNarrow
-                |> choiceEquivalentToNarrow traversePossibility possibilitiesStack
+                |> tryTopToBottomToNarrow
+                    (\tag onTagBeforeToNarrow ->
+                        onTagBeforeToNarrow
+                            |> toNarrow (traversePossibility tag)
+                            |> Result.map (\info -> { tag = tag, info = info })
+                    )
+                    tags
     , toBroad =
-        (traversePossibility possibilities.broad).toBroad
+        \possibilityBeforeToBroad ->
+            let
+                possibilityBroad =
+                    possibilityBeforeToBroad
+
+                possibility =
+                    possibilityBroad |> .tag |> traversePossibility
+            in
+            possibilityBroad |> .info |> possibility.toBroad
     }
 
 
-choiceEquivalentToNarrow :
-    (element
-     ->
-        MorphIndependently
-            (beforeToNarrow
-             -> Result (ErrorWithDeadEnd deadEnd) narrow
-            )
-            broaden_
+tryTopToBottomToNarrow :
+    (tag
+     -> beforeToNarrow
+     -> Result (ErrorWithDeadEnd deadEnd) narrow
     )
-    -> Emptiable (Stacked element) Never
+    -> Emptiable (Stacked tag) Never
     ->
         (beforeToNarrow
          -> Result (ErrorWithDeadEnd deadEnd) narrow
         )
-choiceEquivalentToNarrow traverseTry possibilities =
+tryTopToBottomToNarrow traverseTry possibilities =
     \beforeToNarrow ->
         possibilities
             |> Stack.foldFromOne
                 (\top ->
                     beforeToNarrow
-                        |> toNarrow (traverseTry top)
+                        |> traverseTry top
                         |> Result.mapError Stack.one
                 )
                 Up
@@ -3998,7 +4030,7 @@ choiceEquivalentToNarrow traverseTry possibilities =
                         |> recoverTry
                             (\errorsSoFar ->
                                 beforeToNarrow
-                                    |> toNarrow (traverseTry elementForMorph)
+                                    |> traverseTry elementForMorph
                                     |> Result.mapError
                                         (\error -> errorsSoFar |> Stack.onTopLay error)
                             )
@@ -4341,7 +4373,7 @@ try this [`MorphRow`](#MorphRow).
             |> Morph.rowTry Letters
                 (atLeast n1 (AToZ.Morph.lowerChar |> Morph.one))
             |> Morph.rowTry Digits
-                (atLeast n1 (N.Morph.char |> Morph.one))
+                (atLeast n1 (N.Morph.inChar ( n0, n9 ) |> Morph.one))
             |> Morph.choiceFinish
 
     -- try letters, or else give me some digits

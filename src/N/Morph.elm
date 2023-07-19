@@ -1,6 +1,6 @@
 module N.Morph exposing
     ( in_
-    , natural, toNatural, char
+    , natural, toNatural, inChar
     )
 
 {-| [`Morph`](Morph#Morph) a [natural number of type `N`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bounded-nat/latest/)
@@ -13,14 +13,16 @@ module N.Morph exposing
 
 ## transform
 
-@docs natural, toNatural, char
+@docs natural, toNatural, inChar
 
 -}
 
 import Char.Morph.Internal
+import Emptiable exposing (Emptiable)
 import Morph exposing (MorphIndependently)
-import N exposing (Add1, In, Min, N, N9, To, Up, Up0, Up9, n0, n1, n2, n3, n4, n5, n6, n7, n8, n9)
+import N exposing (Add1, In, Min, N, N9, On, To, Up, Up0, n0, n9)
 import Natural exposing (Natural)
+import Stack exposing (Stacked)
 
 
 {-| [`Morph`](Morph#Morph) the `N` to a more narrow range
@@ -85,72 +87,90 @@ natural =
 
 {-| [`Morph`](Morph#Morph) a digit in a given range
 
-You can require a maximum ≥ 10.
-In that case, the [narrowed](Morph#toNarrow) `N` will also have a maximum ≥ 10
-even though every possible `Char` can only show a digit ≤ 9
+    import Morph
+    import N exposing (n1, n2, n7, n9)
+
+    '5'
+        |> Morph.toNarrow (N.Morph.inChar ( n1, n7 ))
+        |> Result.map N.toInt
+    --> Ok 5
+
+    '1'
+        |> Morph.toNarrow (N.Morph.inChar ( n2, n9 ))
+        |> Result.toMaybe
+    --> Nothing
 
 -}
-char :
-    MorphIndependently
-        (Char
-         ->
-            Result
-                Morph.Error
-                (N (In (Up0 broadMinX_) (Up9 broadMax_)))
-        )
-        (N (In narrowMin_ (Up narrowMaxTo9_ To N9)) -> Char)
-char =
-    Morph.named "0|..|9"
-        (Morph.choice
-            (\v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 n ->
-                case n |> N.toInt of
-                    0 ->
-                        v0 ()
-
-                    1 ->
-                        v1 ()
-
-                    2 ->
-                        v2 ()
-
-                    3 ->
-                        v3 ()
-
-                    4 ->
-                        v4 ()
-
-                    5 ->
-                        v5 ()
-
-                    6 ->
-                        v6 ()
-
-                    7 ->
-                        v7 ()
-
-                    8 ->
-                        v8 ()
-
-                    -- 9
-                    _ ->
-                        v9 ()
+inChar :
+    ( N (In lowerLimitMin (Up lowerLimitMaxToUpperLimitMin_ To upperLimitMin))
+    , N (In (On upperLimitMin) upperLimitMax)
+    )
+    ->
+        MorphIndependently
+            (Char
+             ->
+                Result
+                    Morph.Error
+                    (N (In lowerLimitMin upperLimitMax))
             )
-            |> Morph.try (\() -> n0 |> withDigitRange) (Char.Morph.Internal.only '0')
-            |> Morph.try (\() -> n1 |> withDigitRange) (Char.Morph.Internal.only '1')
-            |> Morph.try (\() -> n2 |> withDigitRange) (Char.Morph.Internal.only '2')
-            |> Morph.try (\() -> n3 |> withDigitRange) (Char.Morph.Internal.only '3')
-            |> Morph.try (\() -> n4 |> withDigitRange) (Char.Morph.Internal.only '4')
-            |> Morph.try (\() -> n5 |> withDigitRange) (Char.Morph.Internal.only '5')
-            |> Morph.try (\() -> n6 |> withDigitRange) (Char.Morph.Internal.only '6')
-            |> Morph.try (\() -> n7 |> withDigitRange) (Char.Morph.Internal.only '7')
-            |> Morph.try (\() -> n8 |> withDigitRange) (Char.Morph.Internal.only '8')
-            |> Morph.try (\() -> n9 |> withDigitRange) (Char.Morph.Internal.only '9')
-            |> Morph.choiceFinish
+            (N (In narrowMin_ (Up narrowMaxTo9_ To N9)) -> Char)
+inChar ( lowerLimit, upperLimit ) =
+    Morph.oneToOne .tag
+        (\n -> { tag = n |> N.toIn ( lowerLimit, upperLimit ), info = () })
+        |> Morph.over
+            (Morph.tryTopToBottom
+                (\n ->
+                    Char.Morph.Internal.only
+                        (n |> N.toIn ( n0, n9 ) |> digitToChar)
+                )
+                (stackRange ( lowerLimit, upperLimit ))
+            )
+
+
+stackRange :
+    ( N (In lowerLimitMin (Up lowerLimitMaxToUpperLimitMin_ To upperLimitMin))
+    , N (In (On upperLimitMin) upperLimitMax)
+    )
+    -> Emptiable (Stacked (N (In lowerLimitMin upperLimitMax))) never_
+stackRange ( start, end ) =
+    -- ↓ I was very lazy. Better implement it natively
+    Stack.topBelow (start |> N.toIn ( start, end ))
+        (List.range ((start |> N.toInt) - 1) (end |> N.toInt)
+            |> List.map (N.intToIn ( start, end ))
         )
 
 
-withDigitRange :
-    N (In (N.On minX_) (Up max_ To N9))
-    -> N (In (Up0 resultMinX_) (Up9 resultMaxX_))
-withDigitRange digit =
-    digit |> N.minTo n0 |> N.maxTo n9
+digitToChar : N (In narrowMin_ (Up narrowMaxTo9_ To N9)) -> Char
+digitToChar =
+    \n ->
+        case n |> N.toInt of
+            0 ->
+                '0'
+
+            1 ->
+                '1'
+
+            2 ->
+                '2'
+
+            3 ->
+                '3'
+
+            4 ->
+                '4'
+
+            5 ->
+                '5'
+
+            6 ->
+                '6'
+
+            7 ->
+                '7'
+
+            8 ->
+                '8'
+
+            -- 9
+            _ ->
+                '9'

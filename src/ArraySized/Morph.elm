@@ -859,11 +859,13 @@ atMost upperLimit element =
                             |> ArraySized.toList
                             |> List.reverse
                  in
-                 Morph.choiceEquivalent
-                    (\count -> exactly count element)
-                    { tryEarly = possibleCounts
-                    , broad = n0 |> N.maxTo upperLimit
-                    , tryLate = []
-                    }
+                 Morph.oneToOne .info (\value -> { tag = n0 |> N.maxTo upperLimit, info = value })
+                    |> Morph.over
+                        (Morph.tryTopToBottom
+                            (\count -> exactly count element)
+                            (Stack.fromList possibleCounts
+                                |> Stack.attachAdapt Up (Stack.one (n0 |> N.maxTo upperLimit))
+                            )
+                        )
                 )
         )
