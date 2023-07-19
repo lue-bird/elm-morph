@@ -135,7 +135,7 @@ stackRange :
 stackRange ( start, end ) =
     -- ↓ I was very lazy. Better implement it natively
     Stack.topBelow (start |> N.toIn ( start, end ))
-        (List.range ((start |> N.toInt) - 1) (end |> N.toInt)
+        (List.range ((start |> N.toInt) + 1) (end |> N.toInt)
             |> List.map (N.intToIn ( start, end ))
         )
 
