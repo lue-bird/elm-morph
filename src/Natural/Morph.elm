@@ -1,11 +1,11 @@
 module Natural.Morph exposing
-    ( integer
+    ( integer, n
     , chars, bits, bitsVariableCount
     )
 
 {-| [`Morph`](Morph#Morph) for an [arbitrary-sized `Natural`](Natural#Natural)
 
-@docs integer
+@docs integer, n
 
 
 ## [row](Morph#MorphRow)
@@ -18,8 +18,8 @@ import Bit exposing (Bit)
 import Bit.Morph
 import Bytes
 import Integer exposing (Integer)
-import Morph exposing (Morph, MorphRow)
-import N exposing (In, N, To, Up)
+import Morph exposing (Morph, MorphIndependently, MorphRow)
+import N exposing (In, Min, N, To, Up, Up0)
 import Natural exposing (Natural(..))
 import Natural.Internal
 import NaturalAtLeast1
@@ -36,6 +36,16 @@ from an unsigned [`Integer`](Integer#Integer)
 integer : Morph Natural Integer
 integer =
     Natural.Internal.integer
+
+
+{-| [`Morph`](Morph#Morph) to a [fixed-size `N`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bounded-nat/latest/).
+
+Inverse of [`N.Morph.natural`](N-Morph#natural)
+
+-}
+n : MorphIndependently (N range_ -> Result error_ Natural) (Natural -> N (Min (Up0 minX_)))
+n =
+    Morph.oneToOne Natural.fromN Natural.toN
 
 
 

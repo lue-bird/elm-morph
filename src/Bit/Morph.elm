@@ -1,8 +1,8 @@
-module Bit.Morph exposing (char, n, toN, only)
+module Bit.Morph exposing (char, n, only)
 
 {-| [`Morph`](Morph#Morph) for a [`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bit)
 
-@docs char, n, toN, only
+@docs char, n, only
 
 -}
 
@@ -20,16 +20,6 @@ n :
         (Bit -> N (In (Up0 minX_) (Up1 maxX_)))
 n =
     Morph.oneToOne Bit.fromN Bit.toN
-
-
-{-| `O` ↔ `n0`, `I` ↔ `n1`
--}
-toN :
-    MorphIndependently
-        (Bit -> Result error_ (N (In (Up0 minX_) (Up1 maxX_))))
-        (N (In min_ (Up maxTo1_ To N1)) -> Bit)
-toN =
-    Morph.invert n
 
 
 {-| `'0'` or `'1'`

@@ -1,6 +1,6 @@
 module N.Morph exposing
     ( in_
-    , natural, toNatural, inChar
+    , natural, bit, inChar
     )
 
 {-| [`Morph`](Morph#Morph) for a [natural number of type `N`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bounded-nat/latest/)
@@ -13,16 +13,27 @@ module N.Morph exposing
 
 ## transform
 
-@docs natural, toNatural, inChar
+@docs natural, bit, inChar
 
 -}
 
+import Bit exposing (Bit)
 import Char.Morph.Internal
 import Emptiable exposing (Emptiable)
 import Morph exposing (MorphIndependently)
-import N exposing (Add1, In, Min, N, N9, On, To, Up, Up0, n0, n9)
+import N exposing (Add1, In, Min, N, N1, N9, On, To, Up, Up0, Up1, n0, n9)
 import Natural exposing (Natural)
 import Stack exposing (Stacked)
+
+
+rangeDescription : ( N minRange_, N maxRange_ ) -> String
+rangeDescription =
+    \( min, max ) ->
+        [ min |> N.toInt |> String.fromInt
+        , "|..|"
+        , max |> N.toInt |> String.fromInt
+        ]
+            |> String.concat
 
 
 {-| [`Morph`](Morph#Morph) the `N` to a more narrow range
@@ -61,28 +72,27 @@ in_ ( lowerLimit, upperLimit ) =
         }
 
 
-rangeDescription : ( N minRange_, N maxRange_ ) -> String
-rangeDescription =
-    \( min, max ) ->
-        [ min |> N.toInt |> String.fromInt
-        , "|..|"
-        , max |> N.toInt |> String.fromInt
-        ]
-            |> String.concat
+{-| [`Morph`](Morph#Morph) from a [`Natural`](Natural#Natural).
 
+Inverse of [`Natural.Morph.n`](Natural-Morph#n)
 
-{-| [`Morph`](Morph#Morph) ta a [`Natural`](Natural#Natural)
--}
-toNatural : MorphIndependently (N range_ -> Result error_ Natural) (Natural -> N (Min (Up0 minX_)))
-toNatural =
-    Morph.oneToOne Natural.fromN Natural.toN
-
-
-{-| [`Morph`](Morph#Morph) from a [`Natural`](Natural#Natural)
 -}
 natural : MorphIndependently (Natural -> Result error_ (N (Min (Up0 minX_)))) (N range_ -> Natural)
 natural =
-    Morph.invert toNatural
+    Morph.oneToOne Natural.toN Natural.fromN
+
+
+{-| `Bit.O` ↔ `n0`, `Bit.I` ↔ `n1`.
+
+Inverse of [`Bit.Morph.n`](Bit-Morph#n)
+
+-}
+bit :
+    MorphIndependently
+        (Bit -> Result error_ (N (In (Up0 minX_) (Up1 maxX_))))
+        (N (In min_ (Up maxTo1_ To N1)) -> Bit)
+bit =
+    Morph.oneToOne Bit.toN Bit.fromN
 
 
 {-| [`Morph`](Morph#Morph) a digit in a given range
