@@ -74,7 +74,7 @@ in_ ( lowerLimit, upperLimit ) =
 
 {-| [`Morph`](Morph#Morph) from a [`Natural`](Natural#Natural).
 
-Inverse of [`Natural.Morph.n`](Natural-Morph#n)
+[Inverse](Morph#invert) of [`Natural.Morph.n`](Natural-Morph#n)
 
 -}
 natural : MorphIndependently (Natural -> Result error_ (N (Min (Up0 minX_)))) (N range_ -> Natural)
@@ -84,7 +84,7 @@ natural =
 
 {-| `Bit.O` ↔ `n0`, `Bit.I` ↔ `n1`.
 
-Inverse of [`Bit.Morph.n`](Bit-Morph#n)
+[Inverse](Morph#invert) of [`Bit.Morph.n`](Bit-Morph#n)
 
 -}
 bit :

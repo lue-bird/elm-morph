@@ -16,7 +16,7 @@ and an `Int`.
 Keep in mind that `Integer -> Int` can overflow
 since `Int` is fixed in bit size while [`Integer`](Integer#Integer) is not.
 
-[Inverse] of [`Integer.Morph.int`](Integer-Morph#int)
+[Inverse](Morph#invert) of [`Integer.Morph.int`](Integer-Morph#int)
 
 -}
 integer : MorphOrError Int Integer error_

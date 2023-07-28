@@ -117,7 +117,7 @@ value =
 Keep in mind that `Integer -> Int` can overflow
 since `Int` is fixed in bit size while [`Integer`](Integer#Integer) is not.
 
-[Inverse] of [`Int.Morph.integer`](Int-Morph#integer)
+[Inverse](Morph#invert) of [`Int.Morph.integer`](Int-Morph#integer)
 
 -}
 int : MorphOrError Integer Int error_

@@ -40,7 +40,7 @@ integer =
 
 {-| [`Morph`](Morph#Morph) to a [fixed-size `N`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bounded-nat/latest/).
 
-Inverse of [`N.Morph.natural`](N-Morph#natural)
+[Inverse](Morph#invert) of [`N.Morph.natural`](N-Morph#natural)
 
 -}
 n : MorphIndependently (N range_ -> Result error_ Natural) (Natural -> N (Min (Up0 minX_)))
