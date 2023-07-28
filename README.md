@@ -56,7 +56,8 @@ or step =
     let
         spaces : MorphRow (List ()) Char
         spaces =
-            Morph.whilePossible (String.Morph.only " ")
+            Morph.named "spaces"
+                (Morph.whilePossible (String.Morph.only " "))
     in
     Morph.succeed
         (\left right -> { left = left, right = right })
