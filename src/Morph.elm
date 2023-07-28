@@ -3736,7 +3736,7 @@ rowFinish =
             morphRowThenEnd =
                 succeed (\before_ -> before_) |> grab (\before_ -> before_) morphRow |> match end
         in
-        { description = morphRow.description
+        { description = morphRowThenEnd |> description
         , toNarrow =
             \broadElements ->
                 broadElements
