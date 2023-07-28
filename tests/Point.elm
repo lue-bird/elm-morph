@@ -11,26 +11,20 @@ chars : MorphRow Point Char
 chars =
     Morph.succeed (\x y -> { x = x, y = y })
         |> match (String.Morph.only "(")
-        |> match
-            (broad [ () ]
-                |> Morph.overRow (Morph.whilePossible (String.Morph.only " "))
-            )
+        |> match (broad [ () ] |> Morph.overRow spaces)
         |> grab .x Decimal.Morph.chars
-        |> match
-            (broad []
-                |> Morph.overRow (Morph.whilePossible (String.Morph.only " "))
-            )
+        |> match (broad [] |> Morph.overRow spaces)
         |> match (String.Morph.only ",")
-        |> match
-            (broad [ () ]
-                |> Morph.overRow (Morph.whilePossible (String.Morph.only " "))
-            )
+        |> match (broad [ () ] |> Morph.overRow spaces)
         |> grab .y Decimal.Morph.chars
-        |> match
-            (broad [ () ]
-                |> Morph.overRow (Morph.whilePossible (String.Morph.only " "))
-            )
+        |> match (broad [ () ] |> Morph.overRow spaces)
         |> match (String.Morph.only ")")
+
+
+spaces : MorphRow (List ()) Char
+spaces =
+    Morph.named "spaces"
+        (Morph.whilePossible (String.Morph.only " "))
 
 
 type alias Point =
