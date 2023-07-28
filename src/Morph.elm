@@ -579,7 +579,7 @@ descriptionToTree description_ =
                 |> groupDescriptionTreesAs "chained"
 
         ChoiceDescription possibilities ->
-            Tree.tree { kind = DescriptionStructureKind, text = "choice between" }
+            Tree.tree { kind = DescriptionStructureKind, text = "either" }
                 (possibilities
                     |> Stack.toList
                     |> List.map descriptionToTree
@@ -590,7 +590,7 @@ descriptionToTree description_ =
                 [ elementDescription |> descriptionToTree ]
 
         PartsDescription partsDescription ->
-            Tree.tree { kind = DescriptionStructureKind, text = "parts" }
+            Tree.tree { kind = DescriptionStructureKind, text = "both" }
                 (partsDescription
                     |> Stack.toList
                     |> List.map
@@ -755,7 +755,7 @@ errorToTree =
                             )
 
             PartsError partErrors ->
-                Tree.tree "parts"
+                Tree.tree "both"
                     (partErrors
                         |> Stack.toList
                         |> List.map
@@ -961,7 +961,7 @@ descriptionAndErrorToTree description_ =
                 -- TODO check who got the furthest and show that first
                 case error of
                     ChoiceError tryErrors ->
-                        Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "choice between" }
+                        Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "either" }
                             (List.map2
                                 (\elementDescription elementError ->
                                     descriptionAndErrorToTree elementDescription elementError
@@ -996,7 +996,7 @@ descriptionAndErrorToTree description_ =
             \error ->
                 case error of
                     PartsError partsError ->
-                        Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "parts" }
+                        Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "both" }
                             (partsDescription
                                 |> Stack.toList
                                 |> List.indexedMap
