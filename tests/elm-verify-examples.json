@@ -3,6 +3,7 @@
   "tests": [
     "Morph",
     "Maybe.Morph",
+    "Result.Morph",
     "Char.Morph",
     "Bit.Morph",
     "AToZ",

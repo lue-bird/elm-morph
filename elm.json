@@ -6,6 +6,8 @@
     "version": "1.0.0",
     "exposed-modules": [
         "Morph",
+        "Maybe.Morph",
+        "Result.Morph",
         "Char.Morph",
         "Bit.Morph",
         "AToZ",
@@ -21,7 +23,6 @@
         "Decimal.Morph",
         "Float.Morph",
         "N.Morph",
-        "Maybe.Morph",
         "String.Morph",
         "List.Morph",
         "Stack.Morph",
