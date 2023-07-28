@@ -968,6 +968,7 @@ descriptionAndErrorToTree description_ =
                                 )
                                 (possibilities |> Stack.toList)
                                 (tryErrors |> Stack.toList)
+                                -- TODO reversing sometimes seems not correct (for example Maybe.Morph.row)
                                 |> List.reverse
                             )
 
