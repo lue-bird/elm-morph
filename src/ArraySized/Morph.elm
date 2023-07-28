@@ -36,7 +36,7 @@ import Rope
 import Stack exposing (Stacked)
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `Array` to `ArraySized`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from an `Array`
 
     import ArraySized
     import Array
@@ -63,7 +63,7 @@ array =
     Morph.oneToOne ArraySized.fromArray ArraySized.toArray
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `List` to `ArraySized`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a `List`
 
     import ArraySized
     import Morph
@@ -90,7 +90,7 @@ list =
     Morph.oneToOne ArraySized.fromList ArraySized.toList
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `String` to `ArraySized`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a `String` to `ArraySized ... Char`
 
     import ArraySized
     import Morph
@@ -117,10 +117,11 @@ string =
     Morph.oneToOne ArraySized.fromString ArraySized.toString
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `Emptiable (Stacked ...) ...` to `ArraySized`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a [stack](https://dark.elm.dmy.fr/packages/lue-bird/elm-emptiness-typed/latest/Stack)
 
     import ArraySized
     import Morph
+    import Stack
 
     Stack.topBelow 0 [ 1, 2, 3, 4 ]
         |> Morph.mapTo ArraySized.Morph.stack

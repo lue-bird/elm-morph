@@ -30,7 +30,7 @@ import Value
 import Value.Morph.Internal exposing (MorphValue)
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `List` to `Array`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a `List`
 
     import Array
     import Morph
@@ -50,7 +50,7 @@ list =
     Morph.oneToOne Array.fromList Array.toList
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `List` to `Array`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a [stack](https://dark.elm.dmy.fr/packages/lue-bird/elm-emptiness-typed/latest/Stack)
 
     import Morph
     import Array
@@ -75,7 +75,7 @@ stack =
         |> Morph.narrowErrorMap Morph.deadEndNever
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `String` to `Array Char`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a `String` to `Array Char`
 
     import Array
     import Morph
@@ -94,7 +94,7 @@ string =
         |> Morph.narrowErrorMap Morph.deadEndNever
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `ArraySized` to `Array`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from an [`ArraySized`](https://dark.elm.dmy.fr/packages/lue-bird/elm-typesafe-array/latest/)
 
     import ArraySized
     import Array
