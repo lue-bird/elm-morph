@@ -4,7 +4,7 @@ module Integer.Morph exposing
     , chars, bits
     )
 
-{-| [`Integer`](Integer#Integer) [`Morph`](Morph#Morph)
+{-| [`Morph`](Morph#Morph) for an [arbitrary-sized `Integer`](Integer#Integer)
 
 @docs int, decimal
 @docs value

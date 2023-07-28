@@ -5,7 +5,7 @@ module String.Morph exposing
     , sequenceMap, broadSequenceMap
     )
 
-{-| [`Morph`](Morph#Morph)s for an [`elm/core` `String`](https://dark.elm.dmy.fr/packages/elm/core/latest/String#String)
+{-| [`Morph`](Morph#Morph) for an [`elm/core` `String`](https://dark.elm.dmy.fr/packages/elm/core/latest/String#String)
 
 
 ## alter
