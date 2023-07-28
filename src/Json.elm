@@ -23,7 +23,7 @@ type alias Json tag =
     AtomOrComposed Atom (Composed tag)
 
 
-{-| json atom. null, bool, number, string
+{-| json atom. null/bool/[number](Decimal#Decimal) or string
 -}
 type Atom
     = Null ()
