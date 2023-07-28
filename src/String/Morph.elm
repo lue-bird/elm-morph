@@ -183,11 +183,19 @@ See [`sequenceMap`](#sequenceMap), [`broadSequenceMap`](#broadSequenceMap) to co
 
 -}
 only : String -> MorphRow () Char
-only expectedText =
-    Morph.named ([ "\"", expectedText, "\"" ] |> String.concat)
+only specificValidBroadString =
+    let
+        nameIfMultiple =
+            if (specificValidBroadString |> String.length) <= 1 then
+                identity
+
+            else
+                Morph.named ([ "\"", specificValidBroadString, "\"" ] |> String.concat)
+    in
+    nameIfMultiple
         (broadSequenceMap
             (Char.Morph.only >> Morph.one)
-            expectedText
+            specificValidBroadString
         )
 
 
