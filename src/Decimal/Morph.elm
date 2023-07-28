@@ -335,9 +335,15 @@ an [`elm/core` `Float`](https://dark.elm.dmy.fr/packages/elm/core/latest/Basics#
 to a [`Result Exception Decimal`](Decimal#Exception)
 
 Keep in mind that `DecimalOrException -> Float` can be lossy
-since `Float` is fixed in bit size while [`Decimal`](Decimal#Decimal) is not
+since `Float` is fixed in bit size while [`Decimal`](Decimal#Decimal) is not.
 
-[Inverse] of [`Float.Morph.decimalOrException`](Float-Morph#decimalOrException)
+[Inverse](Morph#invert) of [`Float.Morph.decimalOrException`](Float-Morph#decimalOrException)
+
+If you need a narrow [`Decimal`](Decimal#Decimal), not a result, try
+
+    Decimal.Morph.orExceptionFloat
+        |> Morph.narrowErrorMap Decimal.exceptionToString
+        |> Morph.over Result.Morph.toOk
 
 -}
 orExceptionFloat : MorphOrError (Result Exception Decimal) Float error_
