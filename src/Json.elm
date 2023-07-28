@@ -3,7 +3,7 @@ module Json exposing
     , tagMap
     )
 
-{-| JSON. See [`Json.Morph`](Json-Morph) for conversions
+{-| JSON. See also [`Json.Morph`](Json-Morph)
 
 @docs Json, Atom, Composed, Tagged
 @docs tagMap

@@ -1,6 +1,6 @@
 module AToZ exposing (AToZ(..), Case(..))
 
-{-| Basic latin letter a|...|z
+{-| Basic latin letter a|...|z. See also [`AToZ.Morph`](AToZ-Morph)
 
 @docs AToZ, Case
 

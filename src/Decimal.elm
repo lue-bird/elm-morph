@@ -8,6 +8,7 @@ module Decimal exposing
 
 {-| Arbitrary-size, safe floating point number
 with the explicit _option_ of allowing of [exceptions](Decimal#Exception) or not.
+See also [`Decimal.Morph`](Decimal-Morph)
 
 @docs Decimal, Signed, SignedAbsolute, Fraction, AtLeast1
 @docs Exception

@@ -1,6 +1,6 @@
 module Sign exposing (Sign(..), opposite)
 
-{-| Number sign
+{-| Number sign. See also [`Sign.Morph`](Sign-Morph)
 
 @docs Sign, opposite
 

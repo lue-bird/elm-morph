@@ -5,7 +5,7 @@ module Integer exposing
     , toInt
     )
 
-{-| Arbitrary-precision whole number
+{-| Arbitrary-precision whole number. See also [`Integer.Morph`](Integer-Morph)
 
 @docs Integer, Signed
 

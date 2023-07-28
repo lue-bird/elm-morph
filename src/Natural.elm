@@ -4,7 +4,7 @@ module Natural exposing
     , toN
     )
 
-{-| Natural number ≥ 0
+{-| Arbitrary-size, safe natural number ≥ 0. See also [`Natural.Morph`](Natural-Morph)
 
 @docs Natural, AtLeast1
 
