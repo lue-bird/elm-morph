@@ -2,13 +2,13 @@ module Value.Morph.Internal exposing
     ( MorphValue
     , MorphValueGroupEmptiable
     , PartsError(..)
-    , atom
     , choiceFinish
-    , composed
+    , composedToRecord
     , group
     , groupFinish
     , part
-    , recordComposed
+    , toAtom
+    , toComposed
     , unit
     , variant
     )
@@ -31,7 +31,7 @@ type alias MorphValue narrow =
         (narrow -> Value IndexAndName)
 
 
-atom :
+toAtom :
     Morph.MorphIndependently
         (AtomOrComposed narrowAtom narrowComposed_
          -> Result Morph.Error narrowAtom
@@ -39,7 +39,7 @@ atom :
         (broadAtom
          -> AtomOrComposed broadAtom broadComposed_
         )
-atom =
+toAtom =
     { description = Morph.CustomDescription
     , toBroad = Atom
     , toNarrow =
@@ -53,7 +53,7 @@ atom =
     }
 
 
-composed :
+toComposed :
     MorphIndependently
         (AtomOrComposed narrowAtom_ narrowComposed
          -> Result Morph.Error narrowComposed
@@ -61,7 +61,7 @@ composed :
         (broadComposed
          -> AtomOrComposed broadAtom_ broadComposed
         )
-composed =
+toComposed =
     { description = Morph.CustomDescription
     , toBroad = Composed
     , toNarrow =
@@ -88,7 +88,7 @@ unit =
                 atomExceptUnit ->
                     atomExceptUnit |> Value.atomKindToString |> Morph.DeadEnd |> Err
     }
-        |> Morph.over atom
+        |> Morph.over toAtom
 
 
 group :
@@ -244,8 +244,8 @@ groupFinish =
     \groupMorphComplete ->
         groupMorphComplete
             |> partsFinish
-            |> Morph.over recordComposed
-            |> Morph.over composed
+            |> Morph.over composedToRecord
+            |> Morph.over toComposed
 
 
 partsFinish :
@@ -280,11 +280,11 @@ partsFinish =
         }
 
 
-recordComposed :
+composedToRecord :
     MorphIndependently
         (Composed IndexOrName -> Result Morph.Error (Record IndexOrName))
         (Record IndexAndName -> Composed IndexAndName)
-recordComposed =
+composedToRecord =
     Morph.custom "record"
         { toBroad = Record
         , toNarrow =
@@ -423,7 +423,7 @@ choiceFinish =
         choiceMorphComplete
             |> Morph.choiceFinish
             |> Morph.over variantComposed
-            |> Morph.over composed
+            |> Morph.over toComposed
 
 
 variantComposed :

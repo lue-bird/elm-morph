@@ -407,7 +407,7 @@ value elementMorph =
                 , toBroad = Value.List
                 }
             )
-        |> Morph.over Value.Morph.Internal.composed
+        |> Morph.over Value.Morph.Internal.toComposed
 
 
 {-| [`Morph`](Morph#Morph) all elements.

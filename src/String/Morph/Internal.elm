@@ -18,4 +18,4 @@ value =
                     atomExceptString ->
                         atomExceptString |> Value.atomKindToString |> Err
         }
-        |> Morph.over Value.Morph.Internal.atom
+        |> Morph.over Value.Morph.Internal.toAtom

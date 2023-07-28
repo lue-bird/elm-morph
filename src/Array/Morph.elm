@@ -141,7 +141,7 @@ value elementMorph =
                 , toBroad = \array -> array |> Array.toList |> Value.List
                 }
             )
-        |> Morph.over Value.Morph.Internal.composed
+        |> Morph.over Value.Morph.Internal.toComposed
 
 
 {-| [`Morph`](Morph#Morph) all elements.

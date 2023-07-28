@@ -287,7 +287,7 @@ value =
                         atomExceptDecimal |> Value.atomKindToString |> Err
         , toBroad = Value.Number
         }
-        |> Morph.over Value.Morph.Internal.atom
+        |> Morph.over Value.Morph.Internal.toAtom
 
 
 
@@ -378,7 +378,7 @@ decimalInternalValue =
                             |> Err
         , toBroad = Value.Number
         }
-        |> Morph.over Value.Morph.Internal.atom
+        |> Morph.over Value.Morph.Internal.toAtom
 
 
 {-| `MorphRow` from from `Bit`s to a [`Decimal`](Decimal#Decimal)

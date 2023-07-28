@@ -5,7 +5,7 @@ module Value.Morph exposing
     , group, part, groupFinish
     , variant, choiceFinish
     , descriptive, compact, eachTag
-    , atom, composed
+    , toAtom, toComposed
     , bits
     )
 
@@ -72,7 +72,7 @@ build on existing ones
 
 or define new atoms, composed structures, ... (↓ are used by [`Json`](Json) for example)
 
-@docs atom, composed
+@docs toAtom, toComposed
 
 
 ## supported default broad formats
@@ -207,7 +207,7 @@ type alias MorphValue narrow =
 
 {-| [`Morph`](Morph#Morph) to a [`AtomOrComposed`](Value#AtomOrComposed)'s atom if possible
 -}
-atom :
+toAtom :
     Morph.MorphIndependently
         (Value.AtomOrComposed narrowAtom narrowComposed_
          -> Result Morph.Error narrowAtom
@@ -215,13 +215,13 @@ atom :
         (broadAtom
          -> Value.AtomOrComposed broadAtom broadComposed_
         )
-atom =
-    Value.Morph.Internal.atom
+toAtom =
+    Value.Morph.Internal.toAtom
 
 
 {-| [`Morph`](Morph#Morph) to a [`AtomOrComposed`](Value#AtomOrComposed)'s composed if possible
 -}
-composed :
+toComposed :
     MorphIndependently
         (Value.AtomOrComposed narrowAtom_ narrowComposed
          -> Result Morph.Error narrowComposed
@@ -229,8 +229,8 @@ composed :
         (broadComposed
          -> Value.AtomOrComposed broadAtom_ broadComposed
         )
-composed =
-    Value.Morph.Internal.composed
+toComposed =
+    Value.Morph.Internal.toComposed
 
 
 {-| `()` [`MorphValue`](#MorphValue)
@@ -479,8 +479,8 @@ groupFinish =
     \groupMorphComplete ->
         groupMorphComplete
             |> partsFinish
-            |> Morph.over Value.Morph.Internal.recordComposed
-            |> Morph.over composed
+            |> Morph.over Value.Morph.Internal.composedToRecord
+            |> Morph.over toComposed
 
 
 partsFinish :
