@@ -6,8 +6,8 @@ module Decimal exposing
     , toFloat, orExceptionToFloat, exceptionToFloat, exceptionToString
     )
 
-{-| safe and explicit floating point number
-without the possibility of [exceptions](Decimal#Exception)
+{-| Arbitrary-size, safe floating point number
+with the explicit _option_ of allowing of [exceptions](Decimal#Exception) or not.
 
 @docs Decimal, Signed, SignedAbsolute, Fraction, AtLeast1
 @docs Exception
