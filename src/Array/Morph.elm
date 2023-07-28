@@ -4,7 +4,7 @@ module Array.Morph exposing
     , value
     )
 
-{-| [`Morph`](Morph) an `Array`
+{-| [`Morph`](Morph) for an [`elm/core` `Array element`](https://dark.elm.dmy.fr/packages/elm/core/latest/Array#Array)
 
 
 ## alter

@@ -3,7 +3,7 @@ module N.Morph exposing
     , natural, toNatural, inChar
     )
 
-{-| [`Morph`](Morph#Morph) a [natural number of type `N`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bounded-nat/latest/)
+{-| [`Morph`](Morph#Morph) for a [natural number of type `N`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bounded-nat/latest/)
 
 
 ## alter

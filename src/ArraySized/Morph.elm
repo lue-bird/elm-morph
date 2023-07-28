@@ -5,7 +5,7 @@ module ArraySized.Morph exposing
     , sequenceMap, broadSequenceMap
     )
 
-{-| [`Morph`](Morph) on an `Array`
+{-| [`Morph`](Morph) for an [`ArraySized element lengthRange`](https://dark.elm.dmy.fr/packages/lue-bird/elm-typesafe-array/latest/)
 
 
 ## alter

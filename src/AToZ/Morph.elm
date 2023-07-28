@@ -3,7 +3,7 @@ module AToZ.Morph exposing
     , lowerChar, upperChar, char
     )
 
-{-| Morphs for [basic latin letters a|...|z](AToZ#AToZ)
+{-| [`Morph`](Morph#Morph) for a [basic latin letter a|...|z](AToZ#AToZ)
 
 
 ## [`Morph`](Morph#Morph)

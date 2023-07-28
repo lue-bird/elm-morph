@@ -3,7 +3,7 @@ module Natural.Morph exposing
     , chars, bits, bitsVariableCount
     )
 
-{-| [`Natural`](Natural#Natural) [`Morph`](Morph#Morph)
+{-| [`Morph`](Morph#Morph) for an [arbitrary-sized `Natural`](Natural#Natural)
 
 @docs integer
 

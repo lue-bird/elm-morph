@@ -5,7 +5,7 @@ module Decimal.Morph exposing
     , orExceptionFloat
     )
 
-{-| [`Decimal`](Decimal#Decimal) [`Morph`](Morph#Morph)
+{-| [`Morph`](Morph#Morph) for an [arbitrary-sized `Decimal`](Decimal#Decimal)
 
 @docs orException, value
 
