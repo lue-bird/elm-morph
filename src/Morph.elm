@@ -681,7 +681,7 @@ errorToTree =
     \error ->
         case error of
             DeadEnd deadEnd ->
-                Tree.singleton deadEnd
+                Tree.singleton ("but I found " ++ deadEnd)
 
             UntilError untilError ->
                 Tree.tree "until"
@@ -1732,7 +1732,7 @@ broad broadConstantSeed =
     oneToOne (\_ -> ()) (\() -> broadConstantSeed)
 
 
-{-| Match only the specific given broad input.
+{-| Match only the specific given broad element.
 
 Make helpers for each type of constant for convenience
 
@@ -1744,19 +1744,18 @@ only :
     (broadConstant -> String)
     -> broadConstant
     -> Morph () broadConstant
-only broadConstantToString broadConstant =
-    { description = OnlyDescription (broadConstant |> broadConstantToString)
+only broadElementToString specificValidBroadElement =
+    { description = OnlyDescription (specificValidBroadElement |> broadElementToString)
     , toNarrow =
         \broadValue ->
-            if broadValue == broadConstant then
+            if broadValue == specificValidBroadElement then
                 () |> Ok
 
             else
-                broadValue
-                    |> broadConstantToString
+                (broadValue |> broadElementToString)
                     |> DeadEnd
                     |> Err
-    , toBroad = \() -> broadConstant
+    , toBroad = \() -> specificValidBroadElement
     }
 
 
@@ -1765,6 +1764,26 @@ only broadConstantToString broadConstant =
   - a `String` description
   - `toNarrow`: a transformation that can fail with any error consistent with your other errors (so most likely a string)
   - `toBroad`: a transformation that can build the parsed value back to what a value that can be parsed
+
+A common use-case is narrowing to one of multiple variants.
+Example: only succeed with an int-like expression:
+
+    intLike : Morph Int Number
+    intLike =
+        Morph.custom "int-like"
+            { toBroad = IntValue
+            , toNarrow =
+                \value ->
+                    case value of
+                        IntValue intValue ->
+                            intValue |> Ok
+
+                        HexValue hexIntValue ->
+                            hexIntValue |> Ok
+
+                        FloatValue _ ->
+                            "float" |> Err
+            }
 
 -}
 custom :
