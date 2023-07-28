@@ -1,13 +1,44 @@
-module Maybe.Morph exposing (value, row)
+module Maybe.Morph exposing (value, toJust, row)
 
 {-| [`Morph`](Morph#Morph) a `Maybe`
 
-@docs value, row
+@docs value, toJust, row
 
 -}
 
-import Morph exposing (MorphRow)
+import Morph exposing (MorphIndependently, MorphRow)
 import Value.Morph.Internal exposing (MorphValue)
+
+
+{-| `Just content` succeeds with the `content`, `Nothing` fails.
+
+    import Morph
+    import String.Morph
+
+    Just "Hi"
+        |> Morph.toNarrow
+            (String.Morph.only "Hi"
+                |> Morph.over Maybe.Morph.toJust
+            )
+    --> Ok ()
+
+-}
+toJust :
+    MorphIndependently
+        (Maybe narrowContent -> Result Morph.Error narrowContent)
+        (broadContent -> Maybe broadContent)
+toJust =
+    Morph.custom "just"
+        { toBroad = Just
+        , toNarrow =
+            \maybe ->
+                case maybe of
+                    Nothing ->
+                        "nothing" |> Err
+
+                    Just content ->
+                        content |> Ok
+        }
 
 
 {-| `Maybe` [`MorphValue`](Value-Morph#MorphValue)
