@@ -9,7 +9,7 @@ module Value.Morph exposing
     , bits
     )
 
-{-| Morph your types over a [generic, `case`-able elm value](Value)
+{-| [Morph](Morph#Morph) your types over a [generic, `case`-able elm value](Value)
 
 @docs MorphValue
 @docs unit

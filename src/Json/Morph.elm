@@ -5,7 +5,7 @@ module Json.Morph exposing
     , JsValueMagic, jsValueMagic
     )
 
-{-| Morph [JSON](Json)
+{-| [Morph](Morph#Morph) [JSON](Json)
 
 
 ## morph
