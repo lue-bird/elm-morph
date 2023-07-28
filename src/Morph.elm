@@ -1066,15 +1066,15 @@ collapseSequenceDescriptionAndError sequenceDescription sequenceError =
                         NamedDescription namedDescription ->
                             [ descriptionAndErrorToTree (NamedDescription namedDescription) sequenceError.error ]
 
-                        SequenceDescription lateSequenceDescription ->
+                        SequenceDescription earlySequenceDescription ->
                             case sequenceError.error of
-                                SequenceError lateSequenceError ->
+                                SequenceError earlySequenceError ->
                                     collapseSequenceDescriptionAndError
-                                        lateSequenceDescription
-                                        lateSequenceError
+                                        earlySequenceDescription
+                                        earlySequenceError
 
                                 unexpectedError ->
-                                    [ unexpectedErrorToTree unexpectedError (SequenceDescription lateSequenceDescription) ]
+                                    [ unexpectedErrorToTree unexpectedError (SequenceDescription earlySequenceDescription) ]
 
                         earlyNonSequenceDescription ->
                             [ descriptionAndErrorToTree earlyNonSequenceDescription sequenceError.error ]
@@ -1147,15 +1147,15 @@ collapseChainDescriptionAndError chainDescription chainError =
                         NamedDescription namedDescription ->
                             [ descriptionAndErrorToTree (NamedDescription namedDescription) chainError.error ]
 
-                        ChainDescription broadChainDescription ->
+                        ChainDescription narrowChainDescription ->
                             case chainError.error of
-                                ChainError broadChainError ->
+                                ChainError narrowChainError ->
                                     collapseChainDescriptionAndError
-                                        broadChainDescription
-                                        broadChainError
+                                        narrowChainDescription
+                                        narrowChainError
 
                                 unexpectedError ->
-                                    [ unexpectedErrorToTree unexpectedError (ChainDescription broadChainDescription) ]
+                                    [ unexpectedErrorToTree unexpectedError (ChainDescription narrowChainDescription) ]
 
                         narrowNonChainDescription ->
                             [ descriptionAndErrorToTree narrowNonChainDescription chainError.error ]
