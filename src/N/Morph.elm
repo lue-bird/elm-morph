@@ -115,16 +115,18 @@ inChar :
             )
             (N (In narrowMin_ (Up narrowMaxTo9_ To N9)) -> Char)
 inChar ( lowerLimit, upperLimit ) =
-    Morph.oneToOne .tag
-        (\n -> { tag = n |> N.toIn ( lowerLimit, upperLimit ), info = () })
-        |> Morph.over
-            (Morph.tryTopToBottom
-                (\n ->
-                    Char.Morph.Internal.only
-                        (n |> N.toIn ( n0, n9 ) |> digitToChar)
+    Morph.named (( lowerLimit, upperLimit ) |> rangeDescription)
+        (Morph.oneToOne .tag
+            (\n -> { tag = n |> N.toIn ( lowerLimit, upperLimit ), info = () })
+            |> Morph.over
+                (Morph.tryTopToBottom
+                    (\n ->
+                        Char.Morph.Internal.only
+                            (n |> N.toIn ( n0, n9 ) |> digitToChar)
+                    )
+                    (stackRange ( lowerLimit, upperLimit ))
                 )
-                (stackRange ( lowerLimit, upperLimit ))
-            )
+        )
 
 
 stackRange :
