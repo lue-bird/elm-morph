@@ -1,6 +1,6 @@
 module Maybe.Morph exposing (value, toJust, row)
 
-{-| [`Morph`](Morph#Morph) a `Maybe`
+{-| [`Morph`](Morph#Morph) for an [`elm/core` `Maybe content`](https://dark.elm.dmy.fr/packages/elm/core/latest/Maybe#Maybe)
 
 @docs value, toJust, row
 
@@ -13,11 +13,11 @@ import Value.Morph.Internal exposing (MorphValue)
 {-| `Just content` succeeds with the `content`, `Nothing` fails.
 
     import Morph
-    import String.Morph
+    import Char.Morph
 
-    Just "Hi"
+    Just 'Y'
         |> Morph.toNarrow
-            (String.Morph.only "Hi"
+            (Char.Morph.only 'Y'
                 |> Morph.over Maybe.Morph.toJust
             )
     --> Ok ()

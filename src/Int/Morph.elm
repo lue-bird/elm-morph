@@ -1,6 +1,6 @@
 module Int.Morph exposing (integer)
 
-{-| `Int` [`Morph`](Morph#Morph)s
+{-| [`Morph`](Morph#Morph) for an [`elm/core` `Int`](https://dark.elm.dmy.fr/packages/elm/core/latest/Basics#Int)
 
 @docs integer
 

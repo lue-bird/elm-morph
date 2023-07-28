@@ -2924,14 +2924,14 @@ is nice to translate the narrow result your [`MorphRow`](#MorphRow) produces:
     import Int.Morph
     import List.Morph
 
-    "12,34"
+    "12"
         |> Morph.toNarrow
             (Int.Morph.integer
                 |> Morph.overRow Integer.Morph.chars
                 |> Morph.rowFinish
                 |> Morph.over List.Morph.string
             )
-    --> Ok { x = 12, y = 34 }
+    --> Ok 12
 
 Try to keep [`Morph.overRow`](#overRow) filters/validations to a minimum to get
 
@@ -4355,7 +4355,7 @@ variantsFinish =
 -- MorphRow
 
 
-{-| Possibly incomplete [`MorphRow`](#MorphRow) to and from a Morph.choice.
+{-| Possibly incomplete [`MorphRow`](#MorphRow) for a choice/variant type/custom type.
 See [`Morph.choice`](Morph#choice), [`Morph.rowTry`](#try), [`Morph.choiceFinish`](#choiceFinish)
 -}
 type alias ChoiceMorphRowEmptiable noTryPossiblyOrNever choiceNarrow choiceBroaden broadElement =

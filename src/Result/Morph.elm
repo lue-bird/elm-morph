@@ -1,30 +1,29 @@
 module Result.Morph exposing (toOk, toErr)
 
-{-| [`Morph`](Morph#Morph) a `Result error success`
+{-| [`Morph`](Morph#Morph) an [`elm/core` `Result error success`](https://dark.elm.dmy.fr/packages/elm/core/latest/Result#Result)
 
 @docs toOk, toErr
 
 -}
 
-import Morph exposing (MorphIndependently, MorphRow)
-import Value.Morph.Internal exposing (MorphValue)
+import Morph exposing (MorphIndependently)
 
 
 {-| `Ok success` succeeds with the `success`, `Err error` fails with the `error`.
 
     import Morph
-    import String.Morph
+    import Char.Morph
 
-    Ok "Hi"
+    Ok 'Y'
         |> Morph.toNarrow
-            (String.Morph.only "Hi"
+            (Char.Morph.only 'Y'
                 |> Morph.over Result.Morph.toOk
             )
     --> Ok ()
 
-    Err [ "Bye", "!" ]
+    Err [ "Hiyo", "!" ]
         |> Morph.toNarrow Result.Morph.toOk
-    --> Err (Morph.DeadEnd [ "Bye", "!" ])
+    --> Err (Morph.DeadEnd [ "Hiyo", "!" ])
 
 If your error type is not a `String`,
 you will need [`|> Morph.narrowErrorMap ..your error to String..`](Morph#narrowErrorMap)
@@ -54,17 +53,17 @@ toOk =
 {-| `Err error` succeeds with the `error`, `Ok` fails.
 
     import Morph
-    import String.Morph
+    import Char.Morph
 
-    Err "Hi"
+    Err 'Y'
         |> Morph.toNarrow
-            (String.Morph.only "Hi"
-                |> Morph.over Result.Morph.toOk
+            (Char.Morph.only 'Y'
+                |> Morph.over Result.Morph.toErr
             )
     --> Ok ()
 
     Ok [ "Bye", "!" ]
-        |> Morph.toNarrow Result.Morph.toOk
+        |> Morph.toNarrow Result.Morph.toErr
     --> Err (Morph.DeadEnd "ok")
 
 -}

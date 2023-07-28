@@ -3,7 +3,7 @@ module Set.Morph exposing
     , list, value
     )
 
-{-| [`Morph`](Morph) a `Set`
+{-| [`Morph`](Morph) an [`elm/core` `Set element`](https://dark.elm.dmy.fr/packages/elm/core/latest/Set#Set)
 
 
 ## alter

@@ -4,7 +4,7 @@ module Dict.Morph exposing
     , value
     )
 
-{-| [`Morph`](Morph#Morph) to and from a `Dict`
+{-| [`Morph`](Morph#Morph) for an [`elm/core` `Dict key value`](https://dark.elm.dmy.fr/packages/elm/core/latest/Dict#Dict)
 
 
 ## alter

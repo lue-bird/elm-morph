@@ -4,7 +4,7 @@ module Char.Morph exposing
     , bits
     )
 
-{-|
+{-| [`Morph`](Morph#Morph) for an [`elm/core` `Char`](https://dark.elm.dmy.fr/packages/elm/core/latest/Char#Char)
 
 @docs only
 @docs code, string, value

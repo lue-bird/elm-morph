@@ -1,6 +1,6 @@
 module Float.Morph exposing (decimalOrException)
 
-{-| [`Morph`](Morph#Morph) an [`elm/core` `Float`](https://dark.elm.dmy.fr/packages/elm/core/latest/Basics#Float)
+{-| [`Morph`](Morph#Morph) for an [`elm/core` `Float`](https://dark.elm.dmy.fr/packages/elm/core/latest/Basics#Float)
 
 @docs decimalOrException
 

@@ -5,7 +5,7 @@ module List.Morph exposing
     , bytes, value
     )
 
-{-| [`Morph`](Morph#Morph) to and from a `List`
+{-| [`Morph`](Morph#Morph) for an [`elm/core` `List element`](https://dark.elm.dmy.fr/packages/elm/core/latest/List)
 
 
 ## alter
