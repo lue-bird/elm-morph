@@ -1062,7 +1062,6 @@ descriptionAndErrorToTree description_ =
 
         ChoiceDescription possibilities ->
             \error ->
-                -- TODO check who got the furthest and show that first
                 case error of
                     ChoiceError tryErrors ->
                         Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "either" }
@@ -1358,13 +1357,15 @@ descriptionCustomNameAlter nameAlter =
                 notNamedDescription
 
 
-{-| Where [narrowing](#toNarrow) has failed.
+{-| Where and why [narrowing](#toNarrow) has failed.
 
-`String` is not enough for display?
-→ use [`MorphOrError`](#MorphOrError) [`ErrorWithDeadEnd`](#ErrorWithDeadEnd) doing [`deadEndMap`](#deadEndMap)
-on [`Morph`](#Morph) that are returned
+Each dead is a `String`.
 
-Have trouble doing so because some API is too strict on errors? → issue
+Open an issue if a String is not enough for the kinds of errors you want to display.
+
+In theory one can use [`MorphOrError`](#MorphOrError) [`ErrorWithDeadEnd`](#ErrorWithDeadEnd)
+doing [`deadEndMap`](#deadEndMap) on [`Morph`](#Morph)s like `only`
+but the current API is quite restrictive on errors to avoid complexity in Morph types.
 
 -}
 type alias Error =
@@ -1674,7 +1675,6 @@ Same as writing:
 
   - [`oneToOne`](#oneToOne)`identity identity`
   - [`toggle`](#toggle)`identity` when broad and narrow types match
-  - [`validate`](#validate)`Ok`
   - `custom ... { toBroad = identity, toNarrow = Ok }`
 
 -}
@@ -2369,6 +2369,9 @@ Therefore, you can treat it as _any_ value.
 
 Under the hood, only [`Basics.never`](https://dark.elm.dmy.fr/packages/elm/core/latest/Basics#never)
 it's as safe as any other elm code.
+
+[`deadEndNever`](#deadEndNever) can be useful with [`narrowErrorMap`](#narrowErrorMap)
+to convert a `MorphOrError ... (ErrorWithDeadEnd Never)` to `MorphOrError ... anyError_`
 
 -}
 deadEndNever : ErrorWithDeadEnd Never -> any_
