@@ -1,7 +1,7 @@
 module Morph exposing
     ( Morph, OneToOne, MorphOrError, MorphIndependently
     , oneToOne, broad, toggle, keep, oneToOneOn
-    , only, custom, validate
+    , only, custom
     , recursive
     , end, one, succeed, grab, match
     , named
@@ -38,7 +38,59 @@ We call it
 ## create
 
 @docs oneToOne, broad, toggle, keep, oneToOneOn
-@docs only, custom, validate
+@docs only, custom
+
+Note that there are no "validate" or "filter" primitives
+to encourage narrowing down the type when limiting values:
+["Parse, don't validate"](https://elm-radio.com/episode/parse-dont-validate/).
+That's a core idea in elm. You'll find lots of legendary resources on this topic.
+
+Narrowing gives you
+
+  - a better error description out of the box
+  - a more descriptive and correct type
+  - building invalid values becomes impossible
+
+```
+printable : Morph LocalSymbolPrintable Char (Morph.Error Char)
+printable =
+    Morph.choice
+        (\exclamationMark numberSign dollarSign percentSign ampersand asterisk lowLine hyphenMinus backSlash printable ->
+            case printable of
+                ExclamationMark ->
+                    exclamationMark ()
+
+                NumberSign ->
+                    numberSign ()
+
+                DollarSign ->
+                    dollarSign ()
+
+                PercentSign ->
+                    percentSign ()
+
+                Ampersand ->
+                    ampersand ()
+
+                Asterisk ->
+                    asterisk ()
+
+                LowLine ->
+                    lowLine ()
+
+                HyphenMinus ->
+                    hyphenMinus ()
+        )
+        |> Morph.try (\() -> ExclamationMark) (Char.Morph.only '!')
+        |> Morph.try (\() -> NumberSign) (Char.Morph.only '#')
+        |> Morph.try (\() -> DollarSign) (Char.Morph.only '$')
+        |> Morph.try (\() -> PercentSign) (Char.Morph.only '%')
+        |> Morph.try (\() -> Ampersand) (Char.Morph.only '&')
+        |> Morph.try (\() -> Asterisk) (Char.Morph.only '*')
+        |> Morph.try (\() -> LowLine) (Char.Morph.only '_')
+        |> Morph.try (\() -> HyphenMinus) (Char.Morph.only '-')
+        |> Morph.choiceFinish
+```
 
 @docs recursive
 
@@ -1543,74 +1595,6 @@ mapTo translate_ =
 
 
 --
-
-
-{-| Filter specific values.
-
-In general, try to narrow down the type when limiting values:
-["Parse, don't validate"](https://elm-radio.com/episode/parse-dont-validate/).
-That's a core idea in elm. You'll find lots of legendary resources on this topic.
-
-Narrowing gives you
-
-  - a better error description out of the box
-  - a more descriptive and correct type
-  - building invalid values becomes impossible
-
-```
-printable : Morph LocalSymbolPrintable Char (Morph.Error Char)
-printable =
-    Morph.choice
-        (\exclamationMark numberSign dollarSign percentSign ampersand asterisk lowLine hyphenMinus backSlash printable ->
-            case printable of
-                ExclamationMark ->
-                    exclamationMark ()
-
-                NumberSign ->
-                    numberSign ()
-
-                DollarSign ->
-                    dollarSign ()
-
-                PercentSign ->
-                    percentSign ()
-
-                Ampersand ->
-                    ampersand ()
-
-                Asterisk ->
-                    asterisk ()
-
-                LowLine ->
-                    lowLine ()
-
-                HyphenMinus ->
-                    hyphenMinus ()
-        )
-        |> Morph.try (\() -> ExclamationMark) (Char.Morph.only '!')
-        |> Morph.try (\() -> NumberSign) (Char.Morph.only '#')
-        |> Morph.try (\() -> DollarSign) (Char.Morph.only '$')
-        |> Morph.try (\() -> PercentSign) (Char.Morph.only '%')
-        |> Morph.try (\() -> Ampersand) (Char.Morph.only '&')
-        |> Morph.try (\() -> Asterisk) (Char.Morph.only '*')
-        |> Morph.try (\() -> LowLine) (Char.Morph.only '_')
-        |> Morph.try (\() -> HyphenMinus) (Char.Morph.only '-')
-        |> Morph.choiceFinish
-```
-
--}
-validate :
-    String
-    -> (narrow -> Result deadEnd narrow)
-    ->
-        MorphIndependently
-            (narrow -> Result (ErrorWithDeadEnd deadEnd) narrow)
-            (broad -> broad)
-validate descriptionCustom narrowConvert =
-    custom descriptionCustom
-        { toNarrow = narrowConvert
-        , toBroad = identity
-        }
 
 
 {-| [`Morph`](#Morph) between representations
