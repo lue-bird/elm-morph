@@ -1690,7 +1690,7 @@ toggle changeToOpposite =
 
 
 {-| A [`Morph`](#Morph) that doesn't transform anything.
-Any possible input stays, remains the same. A no-op.
+Any possible input stays the same in both directions.
 
 Same as writing:
 
