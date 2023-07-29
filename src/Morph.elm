@@ -445,7 +445,7 @@ type
       -- others
     | NamedDescription { name : String, description : Description }
     | OnlyDescription String
-    | RecursiveDescription String (() -> Description)
+    | RecursiveDescription { name : String, description : () -> Description }
     | ChainDescription ChainDescription
       -- group morph
     | ElementsDescription Description
@@ -533,7 +533,7 @@ isDescriptive =
             OnlyDescription _ ->
                 True
 
-            RecursiveDescription _ _ ->
+            RecursiveDescription _ ->
                 True
 
             InverseDescription inverseDescription ->
@@ -641,10 +641,10 @@ descriptionToTree description_ =
                 , text = "only " ++ onlyDescription
                 }
 
-        RecursiveDescription recursiveStructureName _ ->
+        RecursiveDescription recursiveStructure ->
             Tree.singleton
                 { kind = DescriptionStructureKind
-                , text = "recursive: " ++ recursiveStructureName
+                , text = "recursive: " ++ recursiveStructure.name
                 }
 
         WhilePossibleDescription elementDescription ->
@@ -963,10 +963,10 @@ descriptionAndErrorToTree description_ =
                     }
                     [ error |> errorToLabelTree ]
 
-        RecursiveDescription _ lazyDescription ->
+        RecursiveDescription recursiveDescription ->
             \error ->
                 descriptionAndErrorToTree
-                    (lazyDescription ()
+                    (recursiveDescription.description ()
                         |> descriptionCustomNameAlter (\s -> "recursive: " ++ s)
                     )
                     error
@@ -1936,7 +1936,11 @@ lazy :
     -> (() -> MorphIndependently (beforeToNarrow -> narrow) (beforeToBroad -> broad))
     -> MorphIndependently (beforeToNarrow -> narrow) (beforeToBroad -> broad)
 lazy structureName morphLazy =
-    { description = RecursiveDescription structureName (\unit -> morphLazy unit |> description)
+    { description =
+        RecursiveDescription
+            { name = structureName
+            , description = \unit -> morphLazy unit |> description
+            }
     , toNarrow = \beforeToNarrow -> beforeToNarrow |> toNarrow (morphLazy ())
     , toBroad = \beforeToBroad -> beforeToBroad |> toBroad (morphLazy ())
     }
