@@ -136,7 +136,7 @@ Maybe you've found or built some nice tree-view? Please share it :)
 @docs treeToLines
 
 
-## scan
+## convert using a morph
 
 @docs toBroad, toNarrow, mapTo
 
