@@ -2284,10 +2284,10 @@ See also: [`deadEndNever`](#deadEndNever)
 
 -}
 deadEndMap :
-    (deadEnd -> deadEndMapped)
+    (deadEnd -> deadEndChanged)
     ->
         (ErrorWithDeadEnd deadEnd
-         -> ErrorWithDeadEnd deadEndMapped
+         -> ErrorWithDeadEnd deadEndChanged
         )
 deadEndMap deadEndChange =
     \error ->
