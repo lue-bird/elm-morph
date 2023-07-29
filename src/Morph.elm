@@ -2764,9 +2764,9 @@ One example you'll run into when using other parsers is using
 
 it gets pretty hard to read as you have to jump around the code to know what you're actually producing
 
-    Morph.succeed (\decimal -> decimal)
+    Morph.succeed (\fileSize -> fileSize)
         |> ...
-        |> grab (\decimal -> decimal) ...
+        |> grab (\fileSize -> fileSize) ...
 
 is already nicer
 
