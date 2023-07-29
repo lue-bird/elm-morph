@@ -29,8 +29,7 @@ module Integer exposing
 import ArraySized
 import BitArray
 import BitArray.Extra
-import Linear exposing (Direction(..))
-import N exposing (n0, n1)
+import N exposing (n0)
 import N.Local exposing (n32)
 import Natural exposing (Natural)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
@@ -125,12 +124,12 @@ fromInt =
                 |> N.intToAtLeast n0
                 |> BitArray.fromN n32
                 |> BitArray.Extra.unpad
-                |> ArraySized.hasAtLeast n1
+                |> ArraySized.toList
         of
-            Err _ ->
+            [] ->
                 N0
 
-            Ok absoluteAtLeast1 ->
+            _ :: absoluteAtLeast1AfterI ->
                 Signed
                     { sign =
                         if intBroad >= 0 then
@@ -139,11 +138,7 @@ fromInt =
                         else
                             Sign.Negative
                     , absolute =
-                        { bitsAfterI =
-                            absoluteAtLeast1
-                                |> ArraySized.removeMin ( Up, n1 )
-                                |> ArraySized.toList
-                        }
+                        { bitsAfterI = absoluteAtLeast1AfterI }
                     }
 
 

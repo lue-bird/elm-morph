@@ -6,9 +6,8 @@ import Bit exposing (Bit)
 import BitArray.Extra
 import Bytes
 import Integer exposing (Integer)
-import Linear exposing (Direction(..))
 import Morph exposing (Morph, MorphIndependently, MorphRow)
-import N exposing (In, N, To, Up, n1)
+import N exposing (In, N, To, Up)
 import Natural exposing (Natural)
 import NaturalAtLeast1
 import Sign exposing (Sign(..))
@@ -116,14 +115,10 @@ toBitArrayOfSize bitCount =
 fromBitArray : ArraySized Bit (In min_ max_) -> Natural
 fromBitArray =
     \arraySized ->
-        case arraySized |> BitArray.Extra.unpad |> ArraySized.hasAtLeast n1 of
-            Err _ ->
+        case arraySized |> BitArray.Extra.unpad |> ArraySized.toList of
+            [] ->
                 Natural.N0
 
-            Ok unpaddedAtLeast1 ->
+            _ :: unpaddedAtLeast1AfterI ->
                 Natural.AtLeast1
-                    { bitsAfterI =
-                        unpaddedAtLeast1
-                            |> ArraySized.removeMin ( Up, n1 )
-                            |> ArraySized.toList
-                    }
+                    { bitsAfterI = unpaddedAtLeast1AfterI }
