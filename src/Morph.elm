@@ -1514,16 +1514,6 @@ More `named` = •ᴗ•.
             )
     --> Ok { x = 12, y = 34 }
 
-    -- we can get the error context stack as well as where they started matching
-    "(a,b)"
-        |> Morph.toNarrow
-            (point
-                |> Morph.rowFinish
-                |> Morph.over List.Morph.string
-            )
-        |> Result.toMaybe
-    --> Nothing
-
 Especially for [`oneToOne`](#oneToOne) etc,
 adding a description doesn't really add value
 as users often don't need to know that you for example converted a [stack to a list](List-Morph#stack)
