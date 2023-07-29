@@ -115,14 +115,14 @@ import Value.Morph.Internal
 
 {-| with readable names. Use in combination with [`eachTag`](#eachTag)
 
-  - field tag = name given to the [`part` `MorphValue`](#part)
+  - part tag = name given to the [`part` `MorphValue`](#part)
   - variant tag = name given to the [`variant` `MorphValue`](#variant)
   - →
       - readable by humans
       - readable by other tools
       - debuggable
-      - shuffling fields [`MorphValue`](#MorphValue) order → no change
-      - renaming fields → breaking change
+      - shuffling [`Value.Morph.part`](#part) order → no change
+      - renaming [`Value.Morph.part`](#part)s → breaking change
       - not [`compact`](#compact)
 
 -}
@@ -332,8 +332,8 @@ group groupNarrowAssemble =
 building:
 
   - start with [`group`](#group)
-  - continue with [`field`](#part)
-  - finish with [`groupFinish`](#groupFinish)
+  - continue with [`|> part`](#part)
+  - finish with [`|> groupFinish`](#groupFinish)
 
 -}
 type alias MorphValueGroupEmptiable noPartPossiblyOrNever groupNarrow groupNarrowFurther =
@@ -358,70 +358,70 @@ Finish with [`groupFinish`](#groupFinish)
 
 -}
 part :
-    ( group -> fieldValueNarrow
+    ( group -> partValueNarrow
     , String
     )
-    -> MorphValue fieldValueNarrow
+    -> MorphValue partValueNarrow
     ->
         (MorphValueGroupEmptiable
             noPartPossiblyOrNever_
             group
-            (fieldValueNarrow -> groupNarrowFurther)
+            (partValueNarrow -> groupNarrowFurther)
          ->
             MorphValueGroupEmptiable
                 noPartNever_
                 group
                 groupNarrowFurther
         )
-part ( accessFieldValue, fieldName ) fieldValueMorph =
+part ( accessPartValue, partName ) partValueMorph =
     \groupMorphSoFar ->
         let
             tag : IndexAndName
             tag =
                 { index = groupMorphSoFar.description |> Stack.length
-                , name = fieldName
+                , name = partName
                 }
         in
         { description =
             groupMorphSoFar.description
                 |> Stack.onTopLay
-                    { tag = tag.name, value = fieldValueMorph.description }
+                    { tag = tag.name, value = partValueMorph.description }
         , toNarrow =
             \groupBroad ->
-                partValueNarrow tag fieldValueMorph groupMorphSoFar.toNarrow groupBroad
+                partValueNarrow tag partValueMorph groupMorphSoFar.toNarrow groupBroad
         , toBroad =
             \wholeNarrow ->
                 let
-                    fieldValueBroad : Value IndexAndName
-                    fieldValueBroad =
+                    partValueBroad : Value IndexAndName
+                    partValueBroad =
                         wholeNarrow
-                            |> accessFieldValue
-                            |> Morph.toBroad fieldValueMorph
+                            |> accessPartValue
+                            |> Morph.toBroad partValueMorph
 
-                    fieldBroad : Tagged IndexAndName
-                    fieldBroad =
+                    partBroad : Tagged IndexAndName
+                    partBroad =
                         { tag = tag
-                        , value = fieldValueBroad
+                        , value = partValueBroad
                         }
                 in
                 wholeNarrow
                     |> groupMorphSoFar.toBroad
-                    |> (::) fieldBroad
+                    |> (::) partBroad
         }
 
 
 partValueNarrow :
     IndexAndName
-    -> MorphValue fieldValueNarrow
+    -> MorphValue partValueNarrow
     ->
         (List (Tagged IndexOrName)
-         -> Result PartsError (fieldValueNarrow -> groupNarrowFurther)
+         -> Result PartsError (partValueNarrow -> groupNarrowFurther)
         )
     ->
         (List (Tagged IndexOrName)
          -> Result PartsError groupNarrowFurther
         )
-partValueNarrow tag fieldValueMorph groupSoFarNarrow =
+partValueNarrow tag partValueMorph groupSoFarNarrow =
     let
         matches : IndexOrName -> Bool
         matches =
@@ -438,13 +438,13 @@ partValueNarrow tag fieldValueMorph groupSoFarNarrow =
             wholeAssemblyResult :
                 Result
                     PartsError
-                    (fieldValueNarrow -> groupNarrowFurther)
+                    (partValueNarrow -> groupNarrowFurther)
             wholeAssemblyResult =
                 groupBroad |> groupSoFarNarrow
         in
         case groupBroad |> List.filter (.tag >> matches) of
             partBroad :: _ ->
-                case partBroad.value |> Morph.toNarrow fieldValueMorph of
+                case partBroad.value |> Morph.toNarrow partValueMorph of
                     Ok partNarrow ->
                         wholeAssemblyResult
                             |> Result.map (\eat -> eat partNarrow)
@@ -473,7 +473,7 @@ partValueNarrow tag fieldValueMorph groupSoFarNarrow =
                 TagsMissing (Stack.onTopLay tag.index tagsMissingSoFar) |> Err
 
 
-{-| Conclude the [`group`](#group) |> [`field`](#part) chain
+{-| Conclude the [`group`](#group) [`|> part`](#part) chain
 -}
 groupFinish :
     MorphValueGroupEmptiable Never record record
