@@ -3342,7 +3342,7 @@ untilNextFold config =
     import AToZ.Morph
     import AToZ exposing (..)
 
-    "listDecoder userDecoder"
+    "listDecoderDecoder userDecoder"
         |> Morph.toNarrow
             (Morph.succeed (\called arg -> { called = called, arg = arg })
                 |> Morph.grab .called decoderNameSubject
@@ -3352,7 +3352,10 @@ untilNextFold config =
                 |> Morph.over List.Morph.string
             )
     --> Ok
-    -->     { called = [ L, I, S, T ] |> List.map (\l -> { case_ = AToZ.CaseLower, letter = l })
+    -->     { called =
+    -->         ([ L, I, S, T ] |> List.map (\l -> { case_ = AToZ.CaseLower, letter = l }))
+    -->             ++ [ { case_ = AToZ.CaseUpper, letter = D } ]
+    -->             ++ ([ E, C, O, D, E, R ] |> List.map (\l -> { case_ = AToZ.CaseLower, letter = l }))
     -->     , arg = [ U, S, E, R ] |> List.map (\l -> { case_ = AToZ.CaseLower, letter = l })
     -->     }
 
