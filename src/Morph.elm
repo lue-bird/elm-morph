@@ -1071,7 +1071,6 @@ descriptionAndErrorToTree description_ =
                                 )
                                 (possibilities |> Stack.toList)
                                 (tryErrors |> Stack.toList)
-                                |> List.reverse
                             )
 
                     unexpectedError ->
@@ -4013,7 +4012,6 @@ tryTopToBottom traversePossibility tags =
     { description =
         tags
             |> Stack.map (\_ tag -> tag |> traversePossibility |> description)
-            |> Stack.reverse
             |> ChoiceDescription
     , toNarrow =
         \beforeToNarrow ->
@@ -4068,7 +4066,7 @@ tryTopToBottomToNarrow traverseTry possibilities =
                                         (\error -> errorsSoFar |> Stack.onTopLay error)
                             )
                 )
-            |> Result.mapError ChoiceError
+            |> Result.mapError (\errors -> errors |> Stack.reverse |> ChoiceError)
 
 
 {-| Builder for a [`Morph`](#Morph) to a choice. Possibly incomplete
@@ -4560,12 +4558,12 @@ choiceFinish :
 choiceFinish =
     \choiceMorphComplete ->
         { description =
-            choiceMorphComplete.description |> ChoiceDescription
+            choiceMorphComplete.description |> Stack.reverse |> ChoiceDescription
         , toNarrow =
             \beforeToNarrow ->
                 beforeToNarrow
                     |> choiceMorphComplete.toNarrow
-                    |> Result.mapError ChoiceError
+                    |> Result.mapError (\errors -> errors |> Stack.reverse |> ChoiceError)
         , toBroad =
             choiceMorphComplete.toBroad
         }
