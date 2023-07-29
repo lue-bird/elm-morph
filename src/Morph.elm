@@ -18,10 +18,10 @@ module Morph exposing
     , over, overRow
     , PartsMorphEmptiable
     , parts, part, partsFinish
-    , tryTopToBottom
     , VariantsMorphEmptiable, variants, variant, variantsFinish
     , choice
     , ChoiceMorphEmptiable, try, choiceFinish
+    , tryTopToBottom
     , ChoiceMorphRowEmptiable, rowTry
     , MorphRow, MorphRowIndependently, rowFinish
     , whilePossible
@@ -159,14 +159,17 @@ try [`ArraySized.Morph.exactlyWith`](ArraySized-Morph#exactlyWith).
 
 [`Morph`](#Morph) a union `type`
 
-@docs tryTopToBottom
-
 
 ### morph by variant
 
 @docs VariantsMorphEmptiable, variants, variant, variantsFinish
 @docs choice
 @docs ChoiceMorphEmptiable, try, choiceFinish
+
+
+### dynamic list of possibilities
+
+@docs tryTopToBottom
 
 
 ## choice [`MorphRow`](#MorphRow)
