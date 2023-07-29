@@ -1071,7 +1071,6 @@ descriptionAndErrorToTree description_ =
                                 )
                                 (possibilities |> Stack.toList)
                                 (tryErrors |> Stack.toList)
-                                -- TODO reversing sometimes seems not correct (for example Maybe.Morph.row)
                                 |> List.reverse
                             )
 
@@ -4014,6 +4013,7 @@ tryTopToBottom traversePossibility tags =
     { description =
         tags
             |> Stack.map (\_ tag -> tag |> traversePossibility |> description)
+            |> Stack.reverse
             |> ChoiceDescription
     , toNarrow =
         \beforeToNarrow ->
