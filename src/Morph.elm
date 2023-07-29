@@ -3,6 +3,8 @@ module Morph exposing
     , oneToOne, broad, toggle, keep, oneToOneOn
     , only, custom
     , recursive
+    , toBroad, toNarrow, mapTo
+    , MorphRow, MorphRowIndependently, rowFinish
     , end, one, succeed, grab, match
     , named
     , invert
@@ -14,7 +16,6 @@ module Morph exposing
     , descriptionToTree, DescriptionKind(..)
     , descriptionAndErrorToTree, DescriptionOrErrorKind(..)
     , treeToLines
-    , toBroad, toNarrow, mapTo
     , over, overRow
     , PartsMorphEmptiable
     , parts, part, partsFinish
@@ -23,7 +24,6 @@ module Morph exposing
     , ChoiceMorphEmptiable, try, choiceFinish
     , tryTopToBottom
     , ChoiceMorphRowEmptiable, rowTry
-    , MorphRow, MorphRowIndependently, rowFinish
     , whilePossible
     , untilNext, broadEnd, untilLast
     , whilePossibleFold, untilNextFold, untilLastFold
@@ -95,6 +95,16 @@ printable =
 @docs recursive
 
 
+# convert using a morph
+
+@docs toBroad, toNarrow, mapTo
+
+
+# row
+
+@docs MorphRow, MorphRowIndependently, rowFinish
+
+
 ## create row
 
 @docs end, one, succeed, grab, match
@@ -136,11 +146,6 @@ Maybe you've found or built some nice tree-view? Please share it :)
 @docs treeToLines
 
 
-# convert using a morph
-
-@docs toBroad, toNarrow, mapTo
-
-
 # chain
 
 @docs over, overRow
@@ -177,12 +182,7 @@ try [`ArraySized.Morph.exactlyWith`](ArraySized-Morph#exactlyWith).
 @docs ChoiceMorphRowEmptiable, rowTry
 
 
-# row
-
-@docs MorphRow, MorphRowIndependently, rowFinish
-
-
-## sequence
+# sequence
 
   - optional → [`Maybe.Morph.row`](Maybe-Morph#row)
   - [`atLeast`](ArraySized-Morph#atLeast)
