@@ -38,7 +38,7 @@ import String.Morph.Internal
 import Value.Morph.Internal exposing (MorphValue)
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `List Char` to a `String`.
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a `List Char`.
 
     import Morph
 
@@ -67,7 +67,8 @@ list =
     Morph.oneToOne String.fromList String.toList
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from a stack of `Char`s to a `String`.
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a
+[stack](https://dark.elm.dmy.fr/packages/lue-bird/elm-emptiness-typed/latest/Stack) of `Char`s.
 
     import Stack
     import Morph
@@ -88,7 +89,8 @@ stack =
     Morph.oneToOne Stack.toString Stack.fromString
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `ArraySized` to `String`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from an
+[`ArraySized`](https://dark.elm.dmy.fr/packages/lue-bird/elm-typesafe-array/latest/) of `Char`s
 
     import ArraySized
     import Morph
@@ -112,7 +114,7 @@ arraySized =
     Morph.oneToOne ArraySized.toString ArraySized.fromString
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `ArraySized` to `String`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from an `Array Char`
 
     import Array
     import Morph

@@ -65,10 +65,13 @@ build on existing ones
     -}
     posixValue : MorphValue Posix
     posixValue =
-        Morph.oneToOne
-            Time.posixToMillis
-            Time.millisToPosix
-            |> Morph.over Int.Morph.value
+        Morph.named "posix"
+            (Morph.oneToOne
+                Time.posixToMillis
+                Time.millisToPosix
+                |> Morph.over Int.Morph.integer
+                |> Morph.over Integer.Morph.value
+            )
 
 or define new atoms, composed structures, ... (↓ are used by [`Json`](Json) for example)
 

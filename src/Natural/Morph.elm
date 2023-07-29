@@ -38,7 +38,7 @@ integer =
     Natural.Internal.integer
 
 
-{-| [`Morph`](Morph#Morph) to a [fixed-size `N`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bounded-nat/latest/).
+{-| [`Morph`](Morph#Morph) from a [fixed-size `N`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bounded-nat/latest/).
 
 [Inverse](Morph#invert) of [`N.Morph.natural`](N-Morph#natural)
 

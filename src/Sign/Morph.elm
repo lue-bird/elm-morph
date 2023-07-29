@@ -65,7 +65,7 @@ bit =
 
 
 {-| An optional `'-'` sign → [`Negative`](Sign#Sign),
-else [narrows to](Morph#toNarrow) [`Positive`](Sign#Sign)
+else [`Positive`](Sign#Sign) without consuming `Char`s.
 -}
 maybeMinusChar : MorphRow Sign Char
 maybeMinusChar =

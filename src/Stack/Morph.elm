@@ -128,7 +128,7 @@ each elementMorph =
 -- transform
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `List` to a stack.
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a `List`.
 
     import Stack
     import Morph
@@ -156,7 +156,7 @@ list =
     Morph.oneToOne Stack.fromList Stack.toList
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `List` to a stack.
+{-| [`Morph.OneToOne`](Morph#OneToOne) from an `Array`.
 
     import Stack
     import Array
@@ -187,7 +187,7 @@ array =
         |> Morph.narrowErrorMap Morph.deadEndNever
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `ArraySized` to `Emptiable (Stacked ...) ...`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from an [`ArraySized`](https://dark.elm.dmy.fr/packages/lue-bird/elm-typesafe-array/latest/)
 
     import ArraySized
     import Morph
@@ -215,7 +215,7 @@ arraySized =
     Morph.oneToOne ArraySized.toStack ArraySized.fromStack
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `String` to a stack of `Char`s.
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a `String` to a stack of `Char`s.
 
     import Stack
     import Morph

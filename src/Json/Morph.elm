@@ -194,7 +194,7 @@ jsValueMagic =
         }
 
 
-{-| [Morph](Morph#Morph) to valid [`Json` value](Json#Json) format from a `String`
+{-| [Morph](Morph#Morph) from a `String`
 
 [Broadens](Morph#toBroad) to a compact `String`.
 To adjust format readability → [`stringBroadWith`](#stringBroadWith)
@@ -334,7 +334,7 @@ atomFromValue =
                 decimal |> Json.Number
 
 
-{-| Convert a [representation of an elm value](Value#Value) to a [valid `Json` value](Json#Json)
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a [generic representation of an elm value](Value#Value)
 -}
 value :
     MorphIndependently
@@ -395,13 +395,13 @@ composedFromValue =
 where [`Json.tagMap`](Json#tagMap) is called in both directions
 
     ...
-        |> Morph.over (Json.eachTag Value.compact)
+        |> Morph.over (Json.Morph.eachTag Value.Morph.compact)
 
     -- or
     ...
-        |> Morph.over (Json.eachTag Value.descriptive)
+        |> Morph.over (Json.Morph.eachTag Value.Morph.descriptive)
 
-Links: [`Value.compact`](Value-Morph#compact), [`Value.descriptive`](Value-Morph#descriptive)
+Links: [`Value.Morph.compact`](Value-Morph#compact), [`Value.Morph.descriptive`](Value-Morph#descriptive)
 
 -}
 eachTag :

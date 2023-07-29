@@ -12,7 +12,7 @@ module Value exposing
 json encoders/decoders are pretty low-level which makes them mildly unpleasant for serialization,
 explicitly describing **how** to serialize individual data types.
 Data that has same shape could at the low level be coded differently,
-so each time you have to spell it out.
+which means you have to spell it out explicitly each time.
 
 Switching to a different format would also be a lot of work;
 some low-level primitives like bools might not be supported etc.

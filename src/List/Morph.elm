@@ -143,7 +143,8 @@ Because of this, `List.Morph` only exposes `sequenceMap`, not `sequence`,
 making misuse a bit more obvious.
 
 If each element's [`MorphRow`](Morph#MorphRow)
-will always produce the same broad value like `String.Morph.only`, use [`broadSequenceMap`](#broadSequenceMap)
+will always produce the same broad value like [`String.Morph.only`](String-Morph#only),
+use [`broadSequenceMap`](#broadSequenceMap)
 
 -}
 sequenceMap :
@@ -245,10 +246,9 @@ sequence toSequence =
 --
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from a stack to a `List`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a [stack](https://dark.elm.dmy.fr/packages/lue-bird/elm-emptiness-typed/latest/Stack)
 
     import Stack
-    import Stack.Morph
     import Morph
 
     Stack.topBelow 0 [ 12, 3 ]
@@ -270,7 +270,7 @@ stack =
     Morph.oneToOne Stack.toList Stack.fromList
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `Array` to `List`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from an `Array`
 
     import Array
     import Morph
@@ -290,7 +290,7 @@ array =
     Morph.oneToOne Array.toList Array.fromList
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `ArraySized` to `List`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from an [`ArraySized`](https://dark.elm.dmy.fr/packages/lue-bird/elm-typesafe-array/latest/)
 
     import ArraySized
     import Morph
@@ -314,7 +314,7 @@ arraySized =
     Morph.oneToOne ArraySized.toList ArraySized.fromList
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from a `String` to a `List` of `Char`s.
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a `String` to a `List Char`.
 
 [Inverse](Morph#invert) of [`String.Morph.list`](String-Morph#list)
 
@@ -324,7 +324,7 @@ string =
     Morph.oneToOne String.toList String.fromList
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from `Set` to `List`
+{-| [`Morph.OneToOne`](Morph#OneToOne) from a `Set`
 
     import Set
     import Morph
@@ -478,7 +478,7 @@ each elementMorph =
         }
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/)
+{-| [`Morph.OneToOne`](Morph#OneToOne) from [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/)
 to a list of individual bits.
 Now you can [morph them as a row](Morph#MorphRow)!
 -}

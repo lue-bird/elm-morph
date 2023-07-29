@@ -37,7 +37,7 @@ import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFuncti
 
 
 {-| Whole number (integer) ≥ 0 of arbitrary precision.
-Either 0 directly or a positive number represented by the bit `I` followed by at most a given count of
+Either 0 directly or a positive number represented by the bit `I` followed by some
 [`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bit)s
 
 Why does the type look like this?
