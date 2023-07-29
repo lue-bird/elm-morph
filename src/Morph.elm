@@ -35,7 +35,7 @@ We call it
 @docs Morph, OneToOne, MorphOrError, MorphIndependently
 
 
-## create
+# create
 
 @docs oneToOne, broad, toggle, keep, oneToOneOn
 @docs only, custom
@@ -95,12 +95,12 @@ printable =
 @docs recursive
 
 
-### create row
+## create row
 
 @docs end, one, succeed, grab, match
 
 
-## alter
+# alter
 
 @docs named
 @docs invert
@@ -108,18 +108,18 @@ printable =
 @docs deadEndNever, narrowErrorMap
 
 
-## error
+# error
 
 @docs Error, ErrorWithDeadEnd, PartsError, SequenceError, SequencePlace, ChainError, ChainPlace, UntilError, CountAndExactlyElementSequenceError
 
 
-## describe
+# describe
 
 @docs description
 @docs Description, ChainDescription, SequenceDescription, UntilDescription
 
 
-## error and description visualization
+# error and description visualization
 
 @docs descriptionToTree, DescriptionKind
 @docs descriptionAndErrorToTree, DescriptionOrErrorKind
@@ -136,12 +136,12 @@ Maybe you've found or built some nice tree-view? Please share it :)
 @docs treeToLines
 
 
-## convert using a morph
+# convert using a morph
 
 @docs toBroad, toNarrow, mapTo
 
 
-## chain
+# chain
 
 @docs over, overRow
 
@@ -149,35 +149,35 @@ If you're missing something more "I need a length andThen I can construct this m
 try [`ArraySized.Morph.exactlyWith`](ArraySized-Morph#exactlyWith).
 
 
-## group
+# [`Morph`](Morph#Morph) by part
 
 @docs PartsMorphEmptiable
 @docs parts, part, partsFinish
 
 
-## choice [`Morph`](Morph#Morph)
+# choice [`Morph`](Morph#Morph)
 
 [`Morph`](#Morph) a union `type`
 
 
-### morph by variant
+## [`Morph`](Morph#Morph) by variant
 
 @docs VariantsMorphEmptiable, variants, variant, variantsFinish
 @docs choice
 @docs ChoiceMorphEmptiable, try, choiceFinish
 
 
-### dynamic list of possibilities
+## dynamic list of possibilities
 
 @docs tryTopToBottom
 
 
-## choice [`MorphRow`](#MorphRow)
+# choice [`MorphRow`](#MorphRow)
 
 @docs ChoiceMorphRowEmptiable, rowTry
 
 
-## row
+# row
 
 @docs MorphRow, MorphRowIndependently, rowFinish
 
@@ -199,7 +199,7 @@ you can experiment with new primitives etc. without needing to fork `elm-morph`.
 I'd love to hear about your findings!
 
 
-### oh look! other projects do similar things
+## oh look! other projects do similar things
 
   - haskell: [`invertible-syntax`](https://hackage.haskell.org/package/invertible-syntax),
     [`partial-isomorphisms`](https://hackage.haskell.org/package/partial-isomorphisms)
@@ -210,7 +210,7 @@ I'd love to hear about your findings!
   - custom: [FliPpr](https://link.springer.com/article/10.1007/s00354-018-0033-7)
   - parse-build an enum over a String: [`jmpavlick/bimap`](https://dark.elm.dmy.fr/packages/jmpavlick/bimap/latest/), [`toastal/select-prism`](https://package.elm-lang.org/packages/toastal/select-prism/latest/), [`Herteby/enum`](https://package.elm-lang.org/packages/Herteby/enum/latest), [`genthaler/elm-enum`](https://package.elm-lang.org/packages/genthaler/elm-enum/latest/), [`the-sett/elm-refine` `Enum`](https://package.elm-lang.org/packages/the-sett/elm-refine/latest/Enum)
   - equivalent to [`Morph.OneToOne`](#OneToOne): [`arturopala/elm-monocle` `Monocle.Iso`](https://package.elm-lang.org/packages/arturopala/elm-monocle/latest/Monocle-Iso), [`Heimdell/elm-optics` `Optics.Core.Iso`](https://package.elm-lang.org/packages/Heimdell/elm-optics/latest/Optics-Core#Iso), [`erlandsona/elm-accessors` `Accessors.Iso`](https://dark.elm.dmy.fr/packages/erlandsona/elm-accessors/latest/Accessors#Iso), [`fujiy/elm-json-convert` `Json.Convert.Iso`](https://package.elm-lang.org/packages/fujiy/elm-json-convert/latest/Json-Convert#Iso)
-  - I expect there to be lots more, please send some (PR, issue etc)!
+  - I expect there to be lots more out there, please send some (PR, issue etc)!
 
 ---
 
@@ -1953,7 +1953,7 @@ lazy structureName morphLazy =
 
 
 {-| [`Morph`](#Morph) on groups in progress.
-Start with [`group`](#group), complete with [`part`](#part), finally [`partsFinish`](#partsFinish)
+Start with [`parts`](#parts), assemble with [`|> part`](#part), finally [`partsFinish`](#partsFinish)
 -}
 type alias PartsMorphEmptiable noPartPossiblyOrNever narrow broaden =
     RecordWithoutConstructorFunction
@@ -1967,7 +1967,7 @@ type alias PartsMorphEmptiable noPartPossiblyOrNever narrow broaden =
 
 {-| Assemble a group from narrow and broad [`part`](#part)s
 
-Use [`group`](#group)
+Use [`parts`](#parts)
 when each broad, toNarrow [`part`](#part) always has their respective counterpart
 
     import Int.Morph
@@ -2018,7 +2018,7 @@ parts ( narrowAssemble, broadAssemble ) =
     }
 
 
-{-| The [`Morph`](#Morph) of the next part in a [`group`](#group).
+{-| The [`Morph`](#Morph) of the next part in [`parts`](#parts).
 
     Morph.parts
         ( \nameFirst nameLast email ->
@@ -2135,7 +2135,7 @@ narrowPart index broadPartAccess narrowPartMorph =
                         |> Result.map (\eat -> eat partNarrow)
 
 
-{-| Conclude a [`Group.build`](#group) |> [`Group.part`](#part) chain
+{-| Conclude a [`Morph.parts`](#parts) [`|> Morph.part`](#part) builder.
 -}
 partsFinish :
     PartsMorphEmptiable
@@ -2533,7 +2533,7 @@ So to morph broad characters,
         MorphRow narrow Char
 
 
-## example: 2D point
+### example: 2D point
 
     import Morph exposing (MorphRow, match, grab, broad)
     import Integer.Morph
