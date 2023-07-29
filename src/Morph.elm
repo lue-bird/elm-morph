@@ -2162,18 +2162,41 @@ partsFinish =
         }
 
 
-{-| Go over an additional step of [`Morph`](#Morph) on its broad type
+{-| Chain additional [`Morph`](#Morph) step from its broad side. You can think of it as
 
-Chaining
+  - `<<` in the `toBroad` direction
+  - `<< Result.andThen` in the `toNarrow` direction
 
-  - `<<` on the broad side
-  - `<< Result.andThen` on the narrow side
+```
+Int.Morph.integer
+    |> Morph.over Integer.Morph.value
+--: MorphValue Int
 
-This can be used to, for example
+-- allow any case but print them lower case
+Morph.oneToOne .letter (\letter -> { letter = letter, case_ = AToZ.CaseLower }
+    |> Morph.over AToZ.Morph.char
+--: Morph AToZ Char
 
-  - [`Morph.OneToOne`](#OneToOne) what was [narrowed](#toNarrow)
-  - narrow only one variant,
-    then of that variant's value type one of their variants
+-- allow any letter but always print 'f'
+Morph.broad AToZ.F
+    |> Morph.over AToZ.Morph.lowerChar
+--: Morph () Char
+
+Morph.custom "int"
+    { toBroad = IntExpression
+    , toNarrow =
+        \number ->
+            case number of
+                IntExpression int ->
+                    int |> Ok
+                FloatExpression _ ->
+                    "float" |> Err
+    }
+    |> Morph.over Value.Morph.toAtom
+--: Morph Int (AtomOrComposed NumberExpression NumberOpExpression)
+```
+
+(For the `oneToOne .letter ...` there's a shortcut: [`AToZ.Morph.broadCase AToZ.CaseLower`](AToZ-Morph#broadCase))
 
 -}
 over :
