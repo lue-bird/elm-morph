@@ -2698,15 +2698,13 @@ one =
         }
 
 
-{-| Never consumes anything.
-Always returns the given narrow constant.
-Never fails.
+{-| Doesn't consume anything and always returns the given narrow constant.
 
 For anything composed of multiple parts,
-first declaratively describes what you expect to get in the end,
-then [grabbing (taking)](#grab) and [matching (dropping/skipping)](#match) what you need
+`succeed` first declaratively describes what you expect to get in the end,
+then you feed it by [grabbing (taking)](#grab) what you need.
 
-    import Morph
+    import Morph exposing (grab, match)
     import String.Morph
     import Integer.Morph
     import Int.Morph
@@ -2766,7 +2764,7 @@ is already nicer
 -}
 succeed :
     narrowConstant
-    -> MorphRowIndependently narrowConstant beforeBroaden_ broadElement_
+    -> MorphRowIndependently narrowConstant beforeToBroad_ broadElement_
 succeed narrowConstant =
     { description = SucceedDescription
     , toNarrow =
