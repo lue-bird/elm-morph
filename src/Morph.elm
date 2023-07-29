@@ -334,10 +334,28 @@ type alias MorphIndependently toNarrow toBroad =
 
 
 {-| [`Morph`](#Morph) that can [narrow](#toNarrow)
-to an error that can be different from the default [`Error`](#Error)
+to an error that can be different from the default [`Error`](#Error).
 
     type alias OneToOne mapped unmapped =
         MorphOrError mapped unmapped (ErrorWithDeadEnd Never)
+
+    type alias Morph narrow broad =
+        MorphOrError narrow broad (ErrorWithDeadEnd String)
+
+This type is used to annotate [`Morph.OneToOne`](#OneToOne) results,
+so instead of
+
+    String.Morph.list : Morph.OneToOne String (List Char)
+    String.Morph.list =
+        Morph.oneToOne String.fromList String.toList
+
+it's annotated
+
+    String.Morph.list : MorphOrError String (List Char) error_
+    String.Morph.list =
+        Morph.oneToOne String.fromList String.toList
+
+to allow mixing `String.Morph.list` with fallible morphs.
 
 -}
 type alias MorphOrError narrow broad error =
