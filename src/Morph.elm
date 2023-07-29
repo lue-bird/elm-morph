@@ -1563,12 +1563,15 @@ toNarrow =
     .toNarrow
 
 
-{-| Convert values of the arbitrarily chosen types `unmapped -> mapped`.
+{-| Convert `unmapped -> mapped`. This can never fail.
 
     import List.Morph
 
     "3456" |> Morph.mapTo List.Morph.string
     --> [ '3', '4', '5', '6' ]
+
+If your morph is fallible, you'll get a compiler error.
+In that case, use [`Morph.toNarrow`](#toNarrow) to get a `Result` with a possible error.
 
 -}
 mapTo :
