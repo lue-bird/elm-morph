@@ -2522,26 +2522,23 @@ oneToOneOn ( structureMap, structureUnmap ) elementTranslate =
 
 {-| Parser-printer:
 
-  - grab some elements from an input stack,
-    and return either a value or else an [`Error`](#Error)
+  - The parser part: Consume some broad elements
+    and return either a narrow value or an [`Error`](#Error)
 
-  - take the value and turn it back into an input stack
+  - The printer part: Turn a narrow value back into broad elements
 
-```
-{-| [`MorphRow`](#MorphRow) on input characters
--}
-type alias MorphText narrow =
-    MorphRow narrow Char
-```
+So to morph broad characters,
 
-[`MorphRow`](#MorphRow) is inspired by [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/parser/latest/)
+    type alias MorphString narrow =
+        MorphRow narrow Char
 
 
 ## example: 2D point
 
-    import Morph exposing (MorphRow, atLeast, match, Morph.succeed, grab)
-    import Char.Morph as Char
-    import String.Morph as Text exposing (number)
+    import Morph exposing (MorphRow, match, grab, broad)
+    import Decimal.Morph
+    import String.Morph
+    import List.Morph
     -- from lue-bird/elm-no-record-type-alias-constructor-function
     import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 
@@ -2621,10 +2618,9 @@ Note before we start:
 
     – xarvh (Francesco Orsenigo) on slack
 
-  - 👍 errors will always show all options and why they failed,
-    showing those that came the furthest first
+  - 👍 errors will always show all options and why they failed
 
-  - 👎 performs worse as there are more [possibilities](Morph#try) to parse to know it failed
+  - 👎 performs worse as there are more [possibilities](Morph#rowTry) to parse to know it failed
 
 -}
 type alias MorphRow narrow broadElement =
@@ -4224,10 +4220,10 @@ try possibilityToChoice possibilityMorph =
 
 {-| Initialize a [variants morph](#VariantsMorphEmptiable)
 by discriminating `(` the broad`,` the narrow `)` choices,
-then `|>` [`Morph.try`](Morph#try)ing each possibility,
-concluding the printer with [`Morph.choiceFinish`](#choiceFinish)
+then go through each [`Morph.variant`](Morph#variant),
+concluding the builder with [`Morph.choiceFinish`](#choiceFinish)
 
-A use case is [morphing](Morph#Morph) from and to an internal type
+One use case is [morphing](Morph#Morph) from and to an internal type
 
     absoluteInternal : MorphOrError Absolute Decimal.Internal.Absolute error_
     absoluteInternal =
@@ -4383,7 +4379,7 @@ variantsFinish =
 
 
 {-| Possibly incomplete [`MorphRow`](#MorphRow) for a choice/variant type/custom type.
-See [`Morph.choice`](Morph#choice), [`Morph.rowTry`](#try), [`Morph.choiceFinish`](#choiceFinish)
+See [`Morph.choice`](Morph#choice), [`Morph.rowTry`](#rowTry), [`Morph.choiceFinish`](#choiceFinish)
 -}
 type alias ChoiceMorphRowEmptiable noTryPossiblyOrNever choiceNarrow choiceToBroad broadElement =
     RecordWithoutConstructorFunction
