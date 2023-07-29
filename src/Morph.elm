@@ -199,28 +199,24 @@ import Util exposing (recoverTry, stackInit, stackLast)
 -}
 
 
-{-| Conversion functions from a more general to
-a more specific format and back.
+{-| Conversion functions from a more general → broad to
+a more specific → narrow format and back.
 
-There's no use-case implied.
-You can always chain, [group](#group), [choose](#choice), ...
-
-👀 Each type `Morph narrow broad`,
-for example `Morph Email String`, can
+Each type `Morph narrow broad`,
+say for example `Morph Email String`, can convert
 
 
-### `broaden : narrow -> broad`
+### `toBroad : narrow -> broad`
 
   - example: `Email -> String`
   - going from a specific type to a general one
-  - any specific value can be turned back successfully
+  - always successful
   - can loose information on its way
 
 
-### `narrow : broad -> Result error narrow`
+### `toNarrow : broad -> Result error narrow`
 
   - example: `String -> Result Morph.Error Email`
-      - ↑ is exactly how running your typical parser looks like
   - going from a general type to a specific one
   - the result can always be turned back successfully
   - 📰 [blog post "A Broader Take on Parsing" by Joël Quenneville](https://thoughtbot.com/blog/a-broader-take-on-parsing?utm_campaign=Elm%20Weekly&utm_medium=email&utm_source=Revue%20newsletter)
@@ -234,42 +230,73 @@ for example `Morph Email String`, can
             that interrupts the work when you're swamped with today
       - opaque types don't save complexity in validation, tests, documentation anyway
           - doesn't communicate business rules (requirements, ...)
-              - including for other developers,
-                "allowing for improved reasoning across the codebase"
+            including for other developers,
+            "allowing for improved reasoning across the codebase"
   - 🎙️ [podcast "Parse, don't validate"](https://elm-radio.com/episode/parse-dont-validate/)
-
-
-#### Why `Morph.Error` in `Morph` this when I could [use custom errors](#MorphOrError) everywhere?
-
-Errors with more narrow structural information are mostly useful for recovery based on what went wrong.
-
-You _can_ use [`MorphOrError`](#MorphOrError) in these cases.
-
-Without needing to recover, benefits of having narrow error types for every interaction
-aren't worth
-
-  - making new structure-specific types for
-  - the extra type variable which decreases simplicity
 
 
 ## limits
 
-This can only fail one way and that might not fit the actual narrow-ness of parts.
+A Morph can only fail one way
+but what if some parts of the broad format are actually more narrow?
 
-An example is translating one programming language to another,
+
+### solution: require the narrow structure to have equally narrow parts
+
+Example: Your narrow elm value has a `Float` but the broad JSON's number can't have Nan or infinity.
+
+What `MorphValue` has settled on is the following:
+
+JSON uses the [`Decimal`](Decimal#Decimal) type which doesn't have exception states.
+
+Now the user has a choice:
+
+  - use [`Decimal`](Decimal#Decimal) instead of `Float` in your code, too, if you don't expect exceptions
+
+  - explicitly encode the exception as well
+
+        Float.Morph.decimalOrException
+            |> Morph.over Decimal.Morph.orExceptionValue
+
+This is pretty idealistic but if you can do something like this, give it a shot.
+
+
+### solution: 2 separate morphs
+
+Example: translating one programming language to another,
 where both can represent stuff the other can't.
-This can fail in both directions
+This can fail in both directions.
 
-I haven't done something like that,
-but the answer to these questions is often to have
+I haven't done something like that but both directions to a subset combine well
 
-    Morph LanguageBSubset LanguageA
-    -- LanguageBSubset -> LanguageA will always work
+    LanguageABSubset.a : Morph LanguageABSubset LanguageA
+    -- LanguageABSubset -> LanguageA will always work
 
-and
+    -- and
 
-    Morph LanguageBSubset LanguageB
-    -- LanguageBSubset -> LanguageB will always work
+    LanguageABSubset.b : Morph LanguageABSubset LanguageB
+    -- LanguageABSubset -> LanguageB will always work
+
+    -- combine
+
+    --: LanguageA -> Result Morph.Error LanguageB
+    Morph.toNarrow LanguageABSubset.a >> Result.map (Morph.toBroad LanguageABSubset.b)
+
+    --: LanguageB -> Result Morph.Error LanguageA
+    Morph.toNarrow LanguageABSubset.b >> Result.map (Morph.toBroad LanguageABSubset.a)
+
+
+### Why do most primitives here not allow custom error types?
+
+They [could](#MorphOrError) but what is the problem you are trying to solve?
+
+Errors with more narrow structural information are mostly useful for recovery based on what went wrong.
+
+In that case you probably want
+
+    Morph.OneToOne (Result YourRecoverable YourNarrow) YourBroad
+
+So always having an extra type variable just adds complexity to the types.
 
 -}
 type alias Morph narrow broad =
