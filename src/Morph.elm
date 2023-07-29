@@ -1,8 +1,7 @@
 module Morph exposing
     ( Morph, OneToOne, MorphOrError, MorphIndependently
-    , toBroadOnly
-    , custom, only, validate
     , oneToOne, broad, toggle, keep, oneToOneOn
+    , only, custom, validate
     , recursive
     , end, one, succeed, grab, match
     , named
@@ -38,9 +37,8 @@ We call it
 
 ## create
 
-@docs toBroadOnly
-@docs custom, only, validate
 @docs oneToOne, broad, toggle, keep, oneToOneOn
+@docs only, custom, validate
 
 @docs recursive
 
@@ -1732,43 +1730,6 @@ oneToOne map unmap =
     , toNarrow = \beforeMap -> beforeMap |> map |> Ok
     , toBroad = unmap
     }
-
-
-{-| Only broadens (unmaps), doesn't narrow.
-What comes out as the broad result will be transformed.
-
-What is great is using this to make inputs more "user-usable":
-
-    ArraySized.Morph.maxToInfinity :
-        MorphIndependently
-            (narrow -> Result error_ narrow)
-            (ArraySized element (In (On min) max_)
-             -> ArraySized element (In (On min) Infinity)
-            )
-    ArraySized.Morph.maxToInfinity =
-        Morph.toBroad ArraySized.maxToInfinity
-
-However! This can also often be an anti-pattern. See [`validate`](#validate).
-
-    "WOW"
-        |> Morph.toBroad
-            (Morph.toBroadOnly String.toLower
-                |> Morph.over stringValidation
-            )
-    --→ "wow"
-
-The fact that the name "only" already exists [in a different context](#only) is unfortunate,
-suggestions welcome!
-
--}
-toBroadOnly :
-    (beforeToBroad -> broad)
-    ->
-        MorphIndependently
-            (narrow -> Result error_ narrow)
-            (beforeToBroad -> broad)
-toBroadOnly broadenFromNarrow =
-    oneToOne identity broadenFromNarrow
 
 
 {-| [`Morph`](#Morph) that when calling [`toBroad`](Morph#toBroad) always returns a given constant.

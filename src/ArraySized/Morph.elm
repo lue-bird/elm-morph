@@ -805,7 +805,7 @@ in_ :
             (ArraySized element (In min max))
             broadElement
 in_ ( lowerLimit, upperLimit ) repeatedElementMorphRow =
-    Morph.toBroadOnly ArraySized.maxToOn
+    Morph.oneToOne identity ArraySized.maxToOn
         |> Morph.overRow
             (Morph.succeed
                 (\minimumList overMinimum ->
