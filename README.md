@@ -11,7 +11,7 @@ Below some appetizers
 
 ## [`MorphRow`](Morph#MorphRow)
 
-![a combined error and description tree view, partially expanded](https://github.com/lue-bird/elm-morph/blob/master/social/point-example-error-description-tree.png)
+![screenshot of a combined error and description tree view, partially expanded](https://github.com/lue-bird/elm-morph/blob/master/social/point-example-error-description-tree.png?raw=true)
 
 Know `Parser`s? [`MorphRow`](Morph#MorphRow) simply always creates a printer alongside. Think
 
