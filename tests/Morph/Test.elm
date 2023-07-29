@@ -47,13 +47,16 @@ tests =
         , Test.fuzz (Fuzz.map N.intToAbsolute Fuzz.int)
             "Natural: = to |> from N"
             (\naturalAtLeast1Base10 ->
-                naturalAtLeast1Base10
-                    |> N.toInt
+                ( naturalAtLeast1Base10 |> N.toInt
+                , -- only added for debugging
+                  naturalAtLeast1Base10 |> Natural.fromN
+                )
                     |> Expect.equal
-                        (naturalAtLeast1Base10
+                        ( naturalAtLeast1Base10
                             |> Natural.fromN
                             |> Natural.toN
                             |> N.toInt
+                        , naturalAtLeast1Base10 |> Natural.fromN
                         )
             )
         ]
