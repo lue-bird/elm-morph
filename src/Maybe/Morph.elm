@@ -95,11 +95,11 @@ row contentMorphRow =
     Morph.choice
         (\justVariant nothingVariant maybeNarrow ->
             case maybeNarrow of
-                Nothing ->
-                    nothingVariant ()
-
                 Just justValue ->
                     justVariant justValue
+
+                Nothing ->
+                    nothingVariant ()
         )
         |> Morph.rowTry Just contentMorphRow
         |> Morph.rowTry (\() -> Nothing)

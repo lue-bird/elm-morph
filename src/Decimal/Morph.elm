@@ -170,11 +170,11 @@ chars =
                 (Morph.choice
                     (\signedVariant n0Variant numberNarrow ->
                         case numberNarrow of
-                            N0 ->
-                                n0Variant ()
-
                             Signed signedValue ->
                                 signedVariant signedValue
+
+                            N0 ->
+                                n0Variant ()
                     )
                     |> Morph.rowTry Signed signedChars
                     |> Morph.rowTry (\() -> N0) (String.Morph.only "0.")
