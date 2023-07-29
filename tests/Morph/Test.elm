@@ -3,6 +3,7 @@ module Morph.Test exposing (tests)
 import Email
 import Expect
 import Fuzz exposing (Fuzzer)
+import Integer
 import List.Morph
 import Morph exposing (toBroad, toNarrow)
 import N exposing (n0, n1, n9)
@@ -30,6 +31,16 @@ tests =
                             |> NaturalAtLeast1Base10.toBase2
                             |> NaturalAtLeast1Base10.fromBase2
                         , naturalAtLeast1Base10 |> NaturalAtLeast1Base10.toBase2
+                        )
+            )
+        , Test.fuzz Fuzz.int
+            "Integer: = to |> from Int"
+            (\naturalAtLeast1Base10 ->
+                naturalAtLeast1Base10
+                    |> Expect.equal
+                        (naturalAtLeast1Base10
+                            |> Integer.fromInt
+                            |> Integer.toInt
                         )
             )
         ]
