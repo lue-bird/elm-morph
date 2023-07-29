@@ -7,6 +7,7 @@ import Integer
 import List.Morph
 import Morph exposing (toBroad, toNarrow)
 import N exposing (n0, n1, n9)
+import Natural
 import NaturalAtLeast1Base10 exposing (NaturalAtLeast1Base10)
 import Point
 import Test exposing (Test, test)
@@ -41,6 +42,18 @@ tests =
                         (naturalAtLeast1Base10
                             |> Integer.fromInt
                             |> Integer.toInt
+                        )
+            )
+        , Test.fuzz (Fuzz.map N.intToAbsolute Fuzz.int)
+            "Natural: = to |> from N"
+            (\naturalAtLeast1Base10 ->
+                naturalAtLeast1Base10
+                    |> N.toInt
+                    |> Expect.equal
+                        (naturalAtLeast1Base10
+                            |> Natural.fromN
+                            |> Natural.toN
+                            |> N.toInt
                         )
             )
         ]
