@@ -2536,7 +2536,8 @@ So to morph broad characters,
 ## example: 2D point
 
     import Morph exposing (MorphRow, match, grab, broad)
-    import Decimal.Morph
+    import Integer.Morph
+    import Int.Morph
     import String.Morph
     import List.Morph
     -- from lue-bird/elm-no-record-type-alias-constructor-function
@@ -2545,27 +2546,27 @@ So to morph broad characters,
     type alias Point =
         -- makes `Point` constructor function unavailable
         RecordWithoutConstructorFunction
-            { x : Float
-            , y : Float
+            { x : Int
+            , y : Int
             }
 
     -- successful parsing looks like
-    "(2.71, 3.14)"
+    "(271, 314)"
         |> Morph.toNarrow
             (point
                 |> Morph.rowFinish
-                |> Morph.over List.Morph.sting
+                |> Morph.over List.Morph.string
             )
-    --> Ok { x = 2.71, y = 3.14 }
+    --> Ok { x = 271, y = 314 }
 
     -- building always works
-    { x = 2.71, y = 3.14 }
+    { x = 271, y = 314 }
         |> Morph.toBroad
             (point
                 |> Morph.rowFinish
-                |> Morph.over List.Morph.sting
+                |> Morph.over List.Morph.string
             )
-    --> "( 2.71, 3.14 )"
+    --> "( 271, 314 )"
 
     point : MorphRow Point Char
     point =
@@ -2575,7 +2576,7 @@ So to morph broad characters,
                 (broad [ () ]
                     |> Morph.overRow (Morph.whilePossible (String.Morph.only " "))
                 )
-            |> grab .x Decimal.Morph.chars
+            |> grab .x (Int.Morph.integer |> Morph.overRow Integer.Morph.chars)
             |> match
                 (broad []
                     |> Morph.overRow (Morph.whilePossible (String.Morph.only " "))
@@ -2585,18 +2586,18 @@ So to morph broad characters,
                 (broad [ () ]
                     |> Morph.overRow (Morph.whilePossible (String.Morph.only " "))
                 )
-            |> grab .y Decimal.Morph.chars
+            |> grab .y (Int.Morph.integer |> Morph.overRow Integer.Morph.chars)
             |> match
                 (broad [ () ]
                     |> Morph.overRow (Morph.whilePossible (String.Morph.only " "))
                 )
             |> match (String.Morph.only ")")
 
-    "(2.71, x)"
+    "(271, x)"
         |> Morph.toNarrow
             (point
                 |> Morph.rowFinish
-                |> Morph.over List.Morph.sting
+                |> Morph.over List.Morph.string
             )
         |> Result.toMaybe
     --> Nothing
