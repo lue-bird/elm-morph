@@ -41,7 +41,7 @@
         "elm/core": "1.0.5 <= v < 2.0.0",
         "elm/json": "1.1.3 <= v < 2.0.0",
         "lue-bird/elm-allowable-state": "1.0.2 <= v < 2.0.0",
-        "lue-bird/elm-bits": "9.0.0 <= v < 10.0.0",
+        "lue-bird/elm-bits": "9.0.1 <= v < 10.0.0",
         "lue-bird/elm-bounded-nat": "34.1.0 <= v < 35.0.0",
         "lue-bird/elm-emptiness-typed": "9.2.1 <= v < 10.0.0",
         "lue-bird/elm-linear-direction": "11.2.0 <= v < 12.0.0",
