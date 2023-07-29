@@ -4450,7 +4450,7 @@ try this [`MorphRow`](#MorphRow).
     --> Nothing
 
 
-## anti-example: using `MorphRow` for what could be a `Morph` of a single element
+### anti-example: using `MorphRow` for what could be a `Morph` of a single element
 
     import Morph
     import AToZ exposing (AToZ(..))
