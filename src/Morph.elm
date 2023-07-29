@@ -235,7 +235,7 @@ say for example `Morph Email String`, can convert
   - 🎙️ [podcast "Parse, don't validate"](https://elm-radio.com/episode/parse-dont-validate/)
 
 
-## limits
+## advanced: limits
 
 A Morph can only fail one way
 but what if some parts of the broad format are actually more narrow?
