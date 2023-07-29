@@ -1715,7 +1715,7 @@ keep =
     String.Morph.toList =
         Morph.oneToOne String.toList String.fromList
 
-See the type's documentation for more detail
+See the [`Morph.OneToOne`](#OneToOne) documentation for more detail
 
 -}
 oneToOne :
