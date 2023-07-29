@@ -2572,26 +2572,19 @@ So to morph broad characters,
     point =
         Morph.succeed (\x y -> { x = x, y = y })
             |> match (String.Morph.only "(")
-            |> match
-                (broad [ () ]
-                    |> Morph.overRow (Morph.whilePossible (String.Morph.only " "))
-                )
+            |> match (broad [ () ] |> Morph.overRow spaces)
             |> grab .x (Int.Morph.integer |> Morph.overRow Integer.Morph.chars)
-            |> match
-                (broad []
-                    |> Morph.overRow (Morph.whilePossible (String.Morph.only " "))
-                )
+            |> match (broad [] |> Morph.overRow spaces)
             |> match (String.Morph.only ",")
-            |> match
-                (broad [ () ]
-                    |> Morph.overRow (Morph.whilePossible (String.Morph.only " "))
-                )
+            |> match (broad [ () ] |> Morph.overRow spaces)
             |> grab .y (Int.Morph.integer |> Morph.overRow Integer.Morph.chars)
-            |> match
-                (broad [ () ]
-                    |> Morph.overRow (Morph.whilePossible (String.Morph.only " "))
-                )
+            |> match (broad [ () ] |> Morph.overRow spaces)
             |> match (String.Morph.only ")")
+
+    spaces : MorphRow (List ()) Char
+    spaces =
+        Morph.named "spaces"
+            (Morph.whilePossible (String.Morph.only " "))
 
     "(271, x)"
         |> Morph.toNarrow
