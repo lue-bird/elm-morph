@@ -2226,13 +2226,11 @@ Second, the inverse [`String.Morph.list`](String-Morph#list) also exists)
 
 This can be used to easily create a `fromX`/`toX` pair
 
-    module Stack.Morph exposing (fromListNonEmpty)
-
     import Emptiable exposing (Emptiable)
     import List.NonEmpty
     import Stack exposing (Stacked)
 
-    fromListNonEmpty :
+    stackFromListNonEmpty :
         MorphIndependently
             (List.NonEmpty.NonEmpty element
              -> Result error_ (Emptiable (Stacked element) never_)
@@ -2240,10 +2238,10 @@ This can be used to easily create a `fromX`/`toX` pair
             (Emptiable (Stacked element) Never
              -> List.NonEmpty.NonEmpty element
             )
-    fromListNonEmpty =
+    stackFromListNonEmpty =
         toListNonEmpty |> Morph.invert
 
-    toListNonEmpty :
+    listNonEmptyFromStack :
         MorphIndependently
             (Emptiable (Stacked element) Never
              -> Result error_ (List.NonEmpty.NonEmpty element)
@@ -2251,7 +2249,7 @@ This can be used to easily create a `fromX`/`toX` pair
             (List.NonEmpty.NonEmpty element
              -> Emptiable (Stacked element) never_
             )
-    toListNonEmpty =
+    listNonEmptyFromStack =
         Morph.oneToOne Stack.toTopBelow Stack.fromTopBelow
 
 -}
