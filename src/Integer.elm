@@ -24,6 +24,13 @@ module Integer exposing
 
 @docs toInt
 
+The type is rarely useful in its current state,
+as the only thing you can do is convert from and to other types.
+
+This is enough for my use-cases
+but feel free to PR or open an issue if you'd like to see support
+for arbitrary-precision arithmetic like addition, multiplication, ...
+
 -}
 
 import ArraySized
