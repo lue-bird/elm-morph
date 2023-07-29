@@ -35,19 +35,19 @@ like
 for a [`Natural`](Natural#Natural)
 
 
-### grouping
+## grouping
 
 @docs MorphValueGroupEmptiable, PartsError
 @docs group, part, groupFinish
 
 
-### choice
+## choice
 
 variant union [`MorphValue`](#MorphValue)
 
-  - starting from [`Morph.choice`](Morph#choice)
-  - over [`Value.Morph.variant`](#variant)
-  - and completed with [`Value.Morph.choiceFinish`](#choiceFinish)
+  - start with [`Morph.choice`](Morph#choice)
+  - add each [`|> Value.Morph.variant`](#variant)
+  - complete with [`Value.Morph.choiceFinish`](#choiceFinish)
 
 @docs variant, choiceFinish
 
