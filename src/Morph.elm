@@ -190,6 +190,11 @@ try [`ArraySized.Morph.exactlyWith`](ArraySized-Morph#exactlyWith).
 @docs untilNext, broadEnd, untilLast
 @docs whilePossibleFold, untilNextFold, untilLastFold
 
+Since there is nothing opaque in the Morph type,
+you can experiment with new primitives etc. without needing to fork `elm-morph`.
+
+I'd love to hear about your findings!
+
 
 ### oh look! other projects do similar things
 
