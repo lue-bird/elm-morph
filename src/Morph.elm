@@ -1600,23 +1600,27 @@ and can be mapped 1:1 into each other.
 
 Examples:
 
-  - some [`Morph`](#Morph) needs a different narrow type
+  - you need a different narrow type
 
         Morph.oneToOne Set.toList Set.fromList
-            |> Morph.over
-                (Value.list elementMorph)
+            |> Morph.over (Value.list elementMorph)
+
+    Btw that `oneToOne` is available as [`Set.Morph.list`](Set-Morph#list). Other examples
 
       - [`List.Morph.array`](List-Morph#array), [`Array.Morph.list`](Array-Morph#list)
       - [`String.Morph.stack`](String-Morph#stack), [`Stack.Morph.string`](Stack-Morph#string)
       - ...
 
   - strip unnecessary information
-    ~`{ end : (), before :`~`List element`~`}`~
+    `{ end : (), before : List element } -> List element`
 
         Morph.oneToOne .before
             (\before_ -> { before = before_, end = () })
 
-Only use [`Morph.OneToOne`](#OneToOne) to annotate arguments. For results,
+    Btw that `oneToOne` is available as [`broadEnd`](#broadEnd)
+
+Only use [`Morph.OneToOne`](#OneToOne) to annotate _arguments_.
+For results, leave the error variable.
 
     MorphOrError (List Char) String error_
 
@@ -1625,14 +1629,14 @@ allows it to be mixed with other [`Morph`](#Morph)s that can actually fail.
 Since both type arguments of `OneToOne` are equally narrow/broad,
 choosing one as the `mapped` and one as the `unmapped` is rather arbitrary.
 
-That's the reason we usually expose 2 versions: `A.Morph.b` & `A.Morph.toB`.
+That's the reason we usually expose 2 versions: `A.Morph.b` & `B.Morph.a`.
 
-**!** Note that information _can_ get lost on the way:
+Note that `OneToOne` doesn't mean that information can't get lost on the way:
 
     dictFromListMorph =
         Morph.oneToOne Dict.fromList Dict.toList
 
-Still, it's a `OneToOne` because there's no narrowing necessary to translate one state to the other
+`OneToOne` just means that there's no narrowing necessary to translate one state to the other
 
 -}
 type alias OneToOne mapped unmapped =
