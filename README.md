@@ -11,9 +11,7 @@ Below some appetizers
 
 ## [`MorphRow`](Morph#MorphRow)
 
-![screenshot of a combined error and description tree view, partially expanded](https://github.com/lue-bird/elm-morph/blob/master/social/point-example-error-description-tree.png?raw=true)
-
-Know `Parser`s? [`MorphRow`](Morph#MorphRow) simply always creates a printer alongside. Think
+Know parsers? [`MorphRow`](Morph#MorphRow) simply always creates a printer alongside. Think
 
   - `Email/Id/Time/Path/Url.fromString` ⇄ `Email/Id/Time/Path/Url.toString`
   - `Midi.fromBitList` ⇄ `Midi.toBitList`
@@ -87,7 +85,11 @@ What's different from writing a parser?
   - [`Morph.choice (\... -> case ... of ...)`](Morph#choice) matches possibilities exhaustively
   - [`grab ... ...`](Morph#grab) also shows how to access the part
   - [`broad ...`](Morph#broad) provides a "default value" for the printer
-  - no `loop` and no classic `andThen`! Instead we have atLeast, between, exactly, optional, while possible, until, ... See [section sequence in the `Morph` module documentation](Morph#sequence)
+
+Morph also doesn't have `loop` or a classic `andThen`! Instead we have [atLeast, between, exactly, optional, while possible, until next, until last, ...](Morph#sequence)
+
+This allows the quality of errors to be different to what you're used to. Here's a section of the [example app](https://github.com/lue-bird/elm-morph/blob/master/example):
+![screenshot of a combined error and description tree view, partially expanded](https://github.com/lue-bird/elm-morph/blob/master/social/point-example-error-description-tree.png?raw=true)
 
 ## [`MorphValue`](Value-Morph)
 
@@ -141,7 +143,7 @@ The simplest of them all: convert between any two types where nothing can fail. 
 
   - [`List Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bit) ⇄ [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/), see [`List.Morph.bytes`](List-Morph#bytes)
   - case-able [`Value`](Value) ⇄ [`Json`](Json) – both just elm union `type`s, see [`Json.Morph.value`](Json-Morph#value)
-  - package-facing type ⇄ package-internal type
+  - type exposed from package ⇄ package-internal type
   - decompiled AST ⇄ generated code
 
 ## [`Morph`](Morph#Morph)
