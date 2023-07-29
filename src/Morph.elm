@@ -2364,11 +2364,11 @@ deadEndMap deadEndChange =
 
 {-| An [`Error`](#ErrorWithDeadEnd) where running into a dead end is impossible.
 
-Because each kind of error needs at least one dead end, tho, no such error can be created.
+Because each kind of error needs at least one dead end, no such error can be created.
 Therefore, you can treat it as _any_ value.
 
 Under the hood, only [`Basics.never`](https://dark.elm.dmy.fr/packages/elm/core/latest/Basics#never)
-is used so it's completely safe to use.
+it's as safe as any other elm code.
 
 -}
 deadEndNever : ErrorWithDeadEnd Never -> any_
