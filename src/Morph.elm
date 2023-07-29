@@ -1694,7 +1694,6 @@ Any possible input stays, remains the same. A no-op.
 
 Same as writing:
 
-  - [`toBroad`](#toBroad)`identity`
   - [`oneToOne`](#oneToOne)`identity identity`
   - [`toggle`](#toggle)`identity` when broad and narrow types match
   - [`validate`](#validate)`Ok`
@@ -1703,8 +1702,8 @@ Same as writing:
 -}
 keep :
     MorphIndependently
-        (a -> Result error_ a)
-        (b -> b)
+        (narrow -> Result error_ narrow)
+        (broad -> broad)
 keep =
     oneToOne identity identity
 
