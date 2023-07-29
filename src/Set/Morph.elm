@@ -65,7 +65,7 @@ each :
         (comparableBeforeNarrow
          -> Result (Morph.ErrorWithDeadEnd deadEnd) comparableNarrow
         )
-        (comparableBeforeBroaden -> comparableBroad)
+        (comparableBeforeToBroad -> comparableBroad)
     ->
         MorphIndependently
             (Set comparableBeforeNarrow
@@ -74,7 +74,7 @@ each :
                     (Morph.ErrorWithDeadEnd deadEnd)
                     (Set comparableNarrow)
             )
-            (Set comparableBeforeBroaden -> Set comparableBroad)
+            (Set comparableBeforeToBroad -> Set comparableBroad)
 each elementMorph =
     Morph.named "all"
         { description =

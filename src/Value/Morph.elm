@@ -555,7 +555,7 @@ variant :
             ((possibilityNarrow
               -> Tagged IndexAndName
              )
-             -> choiceBroadenFurther
+             -> choiceToBroadFurther
             )
             Morph.Error
          ->
@@ -563,7 +563,7 @@ variant :
                 noTryNever_
                 choiceNarrow
                 (Tagged IndexOrName)
-                choiceBroadenFurther
+                choiceToBroadFurther
                 Morph.Error
         )
 variant ( possibilityToChoice, possibilityTag ) possibilityMorph =

@@ -2044,9 +2044,9 @@ part :
              ->
                 Result
                     (PartsError partError)
-                    (partNarrow -> groupNarrowFurther)
+                    (partNarrow -> groupToNarrowFurther)
             )
-            (groupNarrow -> (partBroad -> groupBroadenFurther))
+            (groupNarrow -> (partBroad -> groupToBroadFurther))
          ->
             PartsMorphEmptiable
                 noPartNever_
@@ -2054,9 +2054,9 @@ part :
                  ->
                     Result
                         (PartsError partError)
-                        groupNarrowFurther
+                        groupToNarrowFurther
                 )
-                (groupNarrow -> groupBroadenFurther)
+                (groupNarrow -> groupToBroadFurther)
         )
 part partTagName ( narrowPartAccess, broadPartAccess ) partMorph =
     \groupMorphSoFar ->
@@ -2079,13 +2079,13 @@ broadenPart :
     (groupNarrow -> partNarrow)
     -> (partNarrow -> partBroad)
     ->
-        ((groupNarrow -> (partBroad -> groupBroadenFurther))
-         -> (groupNarrow -> groupBroadenFurther)
+        ((groupNarrow -> (partBroad -> groupToBroadFurther))
+         -> (groupNarrow -> groupToBroadFurther)
         )
 broadenPart narrowPartAccess broadenPartMorph =
-    \groupMorphSoFarBroaden ->
+    \groupMorphSoFarToBroad ->
         \groupNarrow ->
-            (groupNarrow |> groupMorphSoFarBroaden)
+            (groupNarrow |> groupMorphSoFarToBroad)
                 (groupNarrow
                     |> narrowPartAccess
                     |> broadenPartMorph
@@ -2101,14 +2101,14 @@ narrowPart :
           ->
             Result
                 (PartsError partError)
-                (partNarrow -> groupNarrowFurther)
+                (partNarrow -> groupToNarrowFurther)
          )
          ->
             (groupBroad
              ->
                 Result
                     (PartsError partError)
-                    groupNarrowFurther
+                    groupToNarrowFurther
             )
         )
 narrowPart index broadPartAccess narrowPartMorph =
@@ -2184,11 +2184,11 @@ over :
     ->
         (MorphIndependently
             (beforeToNarrow -> Result (ErrorWithDeadEnd deadEnd) narrow)
-            (beforeBeforeBroaden -> beforeToBroad)
+            (beforeBeforeToBroad -> beforeToBroad)
          ->
             MorphIndependently
                 (beforeBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) narrow)
-                (beforeBeforeBroaden -> broad)
+                (beforeBeforeToBroad -> broad)
         )
 over morphBroad =
     \narrowMorph ->
@@ -2782,16 +2782,16 @@ succeed narrowConstant =
 -}
 next :
     (groupNarrow -> partNextBeforeToBroad)
-    -> (partNextNarrow -> (groupNarrowConstruct -> groupNarrowConstructChanged))
+    -> (partNextNarrow -> (groupNarrowAssemble -> groupNarrowAssembleChanged))
     -> MorphRowIndependently partNextNarrow partNextBeforeToBroad broadElement
     ->
         (MorphRowIndependently
-            groupNarrowConstruct
+            groupNarrowAssemble
             groupNarrow
             broadElement
          ->
             MorphRowIndependently
-                groupNarrowConstructChanged
+                groupNarrowAssembleChanged
                 groupNarrow
                 broadElement
         )
@@ -2848,12 +2848,12 @@ grab :
     -> MorphRowIndependently partNextNarrow partNextBeforeToBroad broadElement
     ->
         (MorphRowIndependently
-            (partNextNarrow -> groupNarrowFurther)
+            (partNextNarrow -> groupToNarrowFurther)
             groupNarrow
             broadElement
          ->
             MorphRowIndependently
-                groupNarrowFurther
+                groupToNarrowFurther
                 groupNarrow
                 broadElement
         )
@@ -2897,8 +2897,8 @@ it allows choosing a default possibility for building.
 match :
     MorphRow () broadElement
     ->
-        (MorphRowIndependently groupNarrow groupNarrowConstruct broadElement
-         -> MorphRowIndependently groupNarrow groupNarrowConstruct broadElement
+        (MorphRowIndependently groupNarrow groupNarrowAssemble broadElement
+         -> MorphRowIndependently groupNarrow groupNarrowAssemble broadElement
         )
 match ignoredNextMorphRow =
     \groupMorphRowSoFar ->
@@ -2968,8 +2968,8 @@ overRow :
     ->
         (MorphIndependently
             (beforeToNarrow -> Result Error narrow)
-            (beforeBeforeBroaden -> beforeToBroad)
-         -> MorphRowIndependently narrow beforeBeforeBroaden broadElement
+            (beforeBeforeToBroad -> beforeToBroad)
+         -> MorphRowIndependently narrow beforeBeforeToBroad broadElement
         )
 overRow morphRowBeforeMorph =
     \narrowMorph ->
@@ -3769,7 +3769,7 @@ rowFinish =
 {-| Possibly incomplete [`Morph`](Morph#Morph) for a choice type.
 See [`Morph.choice`](Morph#choice), [`try`](#try), [`choiceFinish`](#choiceFinish)
 -}
-type alias ChoiceMorphEmptiable noTryPossiblyOrNever choiceNarrow choiceBeforeNarrow choiceBroaden error =
+type alias ChoiceMorphEmptiable noTryPossiblyOrNever choiceNarrow choiceBeforeNarrow choiceToBroad error =
     RecordWithoutConstructorFunction
         { description :
             Emptiable (Stacked Description) noTryPossiblyOrNever
@@ -3781,7 +3781,7 @@ type alias ChoiceMorphEmptiable noTryPossiblyOrNever choiceNarrow choiceBeforeNa
                      Emptiable (Stacked error) noTryPossiblyOrNever
                     )
                     choiceNarrow
-        , toBroad : choiceBroaden
+        , toBroad : choiceToBroad
         }
 
 
@@ -3907,12 +3907,11 @@ choice :
             choiceBroad_
             broadenByPossibility
             error_
-choice choiceBroadenDiscriminatedByPossibility =
+choice choiceToBroadByDiscriminatingByPossibility =
     { description = Emptiable.empty
     , toNarrow =
-        \_ ->
-            Emptiable.empty |> Err
-    , toBroad = choiceBroadenDiscriminatedByPossibility
+        \_ -> Emptiable.empty |> Err
+    , toBroad = choiceToBroadByDiscriminatingByPossibility
     }
 
 
@@ -4141,14 +4140,14 @@ try :
             (possibilityBeforeNarrow
              -> Result error possibilityNarrow
             )
-            (possibilityBeforeBroaden -> possibilityBroad)
+            (possibilityBeforeToBroad -> possibilityBroad)
     ->
         (ChoiceMorphEmptiable
             noTryPossiblyOrNever_
             narrowChoice
             possibilityBeforeNarrow
-            ((possibilityBeforeBroaden -> possibilityBroad)
-             -> choiceBroadenFurther
+            ((possibilityBeforeToBroad -> possibilityBroad)
+             -> choiceToBroadFurther
             )
             error
          ->
@@ -4156,7 +4155,7 @@ try :
                 noTryNever_
                 narrowChoice
                 possibilityBeforeNarrow
-                choiceBroadenFurther
+                choiceToBroadFurther
                 error
         )
 try possibilityToChoice possibilityMorph =
@@ -4234,8 +4233,8 @@ a simple [`oneToOne`](Morph#oneToOne) also does the job
                     Sign.Internal.Positive ->
                         Sign.Positive
             )
-            (\signBeforeBroaden ->
-                case signBeforeBroaden of
+            (\signBeforeToBroad ->
+                case signBeforeToBroad of
                     Sign.Negative ->
                         Sign.Internal.Negative
 
@@ -4354,7 +4353,7 @@ variantsFinish =
 {-| Possibly incomplete [`MorphRow`](#MorphRow) for a choice/variant type/custom type.
 See [`Morph.choice`](Morph#choice), [`Morph.rowTry`](#try), [`Morph.choiceFinish`](#choiceFinish)
 -}
-type alias ChoiceMorphRowEmptiable noTryPossiblyOrNever choiceNarrow choiceBroaden broadElement =
+type alias ChoiceMorphRowEmptiable noTryPossiblyOrNever choiceNarrow choiceToBroad broadElement =
     RecordWithoutConstructorFunction
         { description :
             Emptiable (Stacked Description) noTryPossiblyOrNever
@@ -4368,7 +4367,7 @@ type alias ChoiceMorphRowEmptiable noTryPossiblyOrNever choiceNarrow choiceBroad
                     { narrow : choiceNarrow
                     , broad : List broadElement
                     }
-        , toBroad : choiceBroaden
+        , toBroad : choiceToBroad
         }
 
 
@@ -4502,14 +4501,14 @@ rowTry :
             noTryPossiblyOrNever_
             choiceNarrow
             ((possibilityBeforeToBroad -> Rope broadElement)
-             -> choiceBroadenFurther
+             -> choiceToBroadFurther
             )
             broadElement
          ->
             ChoiceMorphRowEmptiable
                 never_
                 choiceNarrow
-                choiceBroadenFurther
+                choiceToBroadFurther
                 broadElement
         )
 rowTry possibilityToChoice possibilityMorph =
@@ -4549,14 +4548,14 @@ choiceFinish :
         Never
         choiceNarrow
         choiceBeforeNarrow
-        (choiceBeforeBroaden -> choiceBroad)
+        (choiceBeforeToBroad -> choiceBroad)
         (ErrorWithDeadEnd deadEnd)
     ->
         MorphIndependently
             (choiceBeforeNarrow
              -> Result (ErrorWithDeadEnd deadEnd) choiceNarrow
             )
-            (choiceBeforeBroaden -> choiceBroad)
+            (choiceBeforeToBroad -> choiceBroad)
 choiceFinish =
     \choiceMorphComplete ->
         { description =
