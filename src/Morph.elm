@@ -1494,7 +1494,6 @@ More `named` = •ᴗ•.
             , y : Int
             }
 
-    -- we can use `expect` to have more context when an error happens
     point : MorphRow Point Char
     point =
         Morph.named "point"
