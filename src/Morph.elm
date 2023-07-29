@@ -2210,15 +2210,19 @@ over morphBroad =
         }
 
 
-{-| `OneToOne a <-> b`
-by swapping the functions [`map`](#mapTo) <-> [`unmap`](#toBroad).
+{-| `OneToOne a b` → `OneToOne b a`
+by swapping the internal functions [`map`](#mapTo) and [`unmap`](#toBroad).
 
     import Morph
-    import String.Morph
+    import List.Morph
 
     [ 'O', 'h', 'a', 'y', 'o' ]
-        |> Morph.mapTo String.Morph.list
+        |> Morph.mapTo (Morph.invert List.Morph.string)
     --> "Ohayo"
+
+(Only for illustration.
+First, `mapTo (... |> invert)` is just [`toBroad ...`](#toBroad).
+Second, the inverse [`String.Morph.list`](String-Morph#list) also exists)
 
 This can be used to easily create a `fromX`/`toX` pair
 
@@ -2249,8 +2253,6 @@ This can be used to easily create a `fromX`/`toX` pair
             )
     toListNonEmpty =
         Morph.oneToOne Stack.toTopBelow Stack.fromTopBelow
-
-[`toBroad`](#toBroad) `...` is equivalent to `mapTo (... |> invert)`.
 
 -}
 invert :
