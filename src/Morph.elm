@@ -9,7 +9,7 @@ module Morph exposing
     , named
     , invert
     , deadEndMap
-    , deadEndNever, narrowErrorMap
+    , deadEndNever, errorMap
     , Error, ErrorWithDeadEnd(..), PartsError, SequenceError, SequencePlace(..), ChainError, ChainPlace(..), UntilError, CountAndExactlyElementSequenceError(..)
     , description
     , Description(..), ChainDescription, SequenceDescription, UntilDescription
@@ -115,7 +115,7 @@ printable =
 @docs named
 @docs invert
 @docs deadEndMap
-@docs deadEndNever, narrowErrorMap
+@docs deadEndNever, errorMap
 
 
 # error
@@ -2401,7 +2401,7 @@ Therefore, you can treat it as _any_ value.
 Under the hood, only [`Basics.never`](https://dark.elm.dmy.fr/packages/elm/core/latest/Basics#never)
 it's as safe as any other elm code.
 
-[`deadEndNever`](#deadEndNever) can be useful with [`narrowErrorMap`](#narrowErrorMap)
+[`deadEndNever`](#deadEndNever) can be useful with [`errorMap`](#errorMap)
 to convert a `MorphOrError ... (ErrorWithDeadEnd Never)` to `MorphOrError ... anyError_`
 
 -}
@@ -2457,7 +2457,7 @@ deadEndNever =
   - [`deadEndMap`](#deadEndMap)
 
 -}
-narrowErrorMap :
+errorMap :
     (error -> errorMapped)
     ->
         MorphIndependently
@@ -2467,7 +2467,7 @@ narrowErrorMap :
         MorphIndependently
             (beforeToNarrow -> Result errorMapped narrowed)
             toBroad
-narrowErrorMap errorChange =
+errorMap errorChange =
     \morph ->
         { description = morph |> description
         , toBroad = toBroad morph

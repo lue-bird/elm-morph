@@ -162,7 +162,7 @@ decimalFloatMorph : Morph Decimal Float
 decimalFloatMorph =
     Result.Morph.toOk
         |> Morph.over Decimal.Morph.orExceptionFloat
-        |> Morph.narrowErrorMap (Morph.deadEndMap Decimal.exceptionToString)
+        |> Morph.errorMap (Morph.deadEndMap Decimal.exceptionToString)
 
 
 {-| [Morph](Morph#Morph) to valid [`Json` value](Json#Json) format from [`JsValueMagic`](#JsValueMagic)

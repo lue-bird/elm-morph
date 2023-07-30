@@ -130,7 +130,7 @@ array : MorphOrError String (Array Char) error_
 array =
     list
         |> Morph.over (Morph.oneToOne Array.toList Array.fromList)
-        |> Morph.narrowErrorMap Morph.deadEndNever
+        |> Morph.errorMap Morph.deadEndNever
 
 
 

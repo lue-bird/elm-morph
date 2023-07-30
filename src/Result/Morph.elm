@@ -26,7 +26,7 @@ import Morph exposing (MorphIndependently)
     --> Err (Morph.DeadEnd [ "Hiyo", "!" ])
 
 If your error type is not a `String`,
-you will need [`|> Morph.narrowErrorMap`](Morph#narrowErrorMap) [`(Morph.deadEndMap ..your error to String..)`](Morph#deadEndMap)
+you will need [`|> Morph.errorMap`](Morph#errorMap) [`(Morph.deadEndMap ..your error to String..)`](Morph#deadEndMap)
 to make dead end types unify.
 
 -}

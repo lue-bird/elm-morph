@@ -72,7 +72,7 @@ stack :
 stack =
     list
         |> Morph.over (Morph.oneToOne Stack.toList Stack.fromList)
-        |> Morph.narrowErrorMap Morph.deadEndNever
+        |> Morph.errorMap Morph.deadEndNever
 
 
 {-| [`Morph.OneToOne`](Morph#OneToOne) from a `String` to `Array Char`
@@ -91,7 +91,7 @@ string : MorphOrError (Array Char) String error_
 string =
     list
         |> Morph.over (Morph.oneToOne String.toList String.fromList)
-        |> Morph.narrowErrorMap Morph.deadEndNever
+        |> Morph.errorMap Morph.deadEndNever
 
 
 {-| [`Morph.OneToOne`](Morph#OneToOne) from an [`ArraySized`](https://dark.elm.dmy.fr/packages/lue-bird/elm-typesafe-array/latest/)

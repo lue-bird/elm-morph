@@ -324,7 +324,7 @@ If you need a narrow [`Decimal`](Decimal#Decimal), not a result, try
 
     Result.Morph.toOk
         |> Morph.over Decimal.Morph.orExceptionFloat
-        |> Morph.narrowErrorMap (Morph.deadEndMap Decimal.exceptionToString)
+        |> Morph.errorMap (Morph.deadEndMap Decimal.exceptionToString)
 
 -}
 orExceptionFloat : MorphOrError (Result Exception Decimal) Float error_

@@ -184,7 +184,7 @@ array :
 array =
     list
         |> Morph.over (Morph.oneToOne Array.toList Array.fromList)
-        |> Morph.narrowErrorMap Morph.deadEndNever
+        |> Morph.errorMap Morph.deadEndNever
 
 
 {-| [`Morph.OneToOne`](Morph#OneToOne) from an [`ArraySized`](https://dark.elm.dmy.fr/packages/lue-bird/elm-typesafe-array/latest/)
