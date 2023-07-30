@@ -165,3 +165,4 @@ Confused? Hyped? Hit @lue up on anything on slack!
   - Many ideas in [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/parser/latest/) inspired [`MorphRow`](#MorphRow)'s initial design
   - [`zwilias/elm-bytes-parser`](https://dark.elm.dmy.fr/packages/zwilias/elm-bytes-parser/latest/Bytes-Parser)
     showed me how to convert a list of bits from and to `Bytes` and gave me the courage to make `MorphRow ... Bit`s
+  - all the elm tools, especially [`elm-verify-examples`](https://github.com/stoeffel/elm-verify-examples) and [`elm-review-documentation`](https://dark.elm.dmy.fr/packages/jfmengels/elm-review-documentation/latest/)
