@@ -199,7 +199,82 @@ you can experiment with new primitives etc. without needing to fork `elm-morph`.
 I'd love to hear about your findings!
 
 
-## oh look! other projects do similar things
+# limits of `Morph`
+
+
+## A Morph can only fail one way
+
+But what if some parts of the broad format are actually more narrow?
+
+
+### solution: require the narrow structure to have equally narrow parts
+
+Example: Your narrow elm value has a `Float` but the broad JSON's number can't have Nan or infinity.
+
+What `MorphValue` has settled on is the following:
+
+JSON uses the [`Decimal`](Decimal#Decimal) type which doesn't have exception states.
+
+Now the user has a choice:
+
+  - use [`Decimal`](Decimal#Decimal) instead of `Float` in your code, too, if you don't expect exceptions
+
+  - explicitly encode the exception as well
+
+        Float.Morph.decimalOrException
+            |> Morph.over Decimal.Morph.orExceptionValue
+
+This is pretty idealistic but if you can do something like this, give it a shot.
+
+
+### solution: 2 separate morphs
+
+Example: translating one programming language to another,
+where both can represent stuff the other can't.
+This can fail in both directions.
+
+I haven't done something like that but both directions to a subset combine well
+
+    LanguageABSubset.a : Morph LanguageABSubset LanguageA
+    -- LanguageABSubset -> LanguageA will always work
+
+    -- and
+
+    LanguageABSubset.b : Morph LanguageABSubset LanguageB
+    -- LanguageABSubset -> LanguageB will always work
+
+    -- combine
+
+    --: LanguageA -> Result Morph.Error LanguageB
+    Morph.toNarrow LanguageABSubset.a >> Result.map (Morph.toBroad LanguageABSubset.b)
+
+    --: LanguageB -> Result Morph.Error LanguageA
+    Morph.toNarrow LanguageABSubset.b >> Result.map (Morph.toBroad LanguageABSubset.a)
+
+
+### Why do most primitives here not allow custom error types?
+
+They [could](#MorphOrError) but what is the problem you are trying to solve?
+
+Errors with more narrow structural information are mostly useful for recovery based on what went wrong.
+
+In that case you probably want
+
+    Morph.OneToOne (Result YourRecoverable YourNarrow) YourBroad
+
+So always having an extra type variable just adds complexity to the types.
+
+
+## A Morph is not a multi-tool
+
+Each `Morph` has one use-case in mind.
+There is no way to use one Morph
+to build a `Form`, a `Random.Generator`, a `Fuzzer`, a `Decoder`, ...
+
+One attempt at something like that is [`edkelly303/elm-multitool`](https://dark.elm.dmy.fr/packages/edkelly303/elm-multitool/latest/).
+
+
+# oh look! other projects do similar things
 
   - haskell: [`invertible-syntax`](https://hackage.haskell.org/package/invertible-syntax),
     [`partial-isomorphisms`](https://hackage.haskell.org/package/partial-isomorphisms)
@@ -290,70 +365,6 @@ say for example `Morph Email String`, can convert
             including for other developers,
             "allowing for improved reasoning across the codebase"
   - 🎙️ [podcast "Parse, don't validate"](https://elm-radio.com/episode/parse-dont-validate/)
-
-
-## advanced: limits
-
-A Morph can only fail one way
-but what if some parts of the broad format are actually more narrow?
-
-
-### solution: require the narrow structure to have equally narrow parts
-
-Example: Your narrow elm value has a `Float` but the broad JSON's number can't have Nan or infinity.
-
-What `MorphValue` has settled on is the following:
-
-JSON uses the [`Decimal`](Decimal#Decimal) type which doesn't have exception states.
-
-Now the user has a choice:
-
-  - use [`Decimal`](Decimal#Decimal) instead of `Float` in your code, too, if you don't expect exceptions
-
-  - explicitly encode the exception as well
-
-        Float.Morph.decimalOrException
-            |> Morph.over Decimal.Morph.orExceptionValue
-
-This is pretty idealistic but if you can do something like this, give it a shot.
-
-
-### solution: 2 separate morphs
-
-Example: translating one programming language to another,
-where both can represent stuff the other can't.
-This can fail in both directions.
-
-I haven't done something like that but both directions to a subset combine well
-
-    LanguageABSubset.a : Morph LanguageABSubset LanguageA
-    -- LanguageABSubset -> LanguageA will always work
-
-    -- and
-
-    LanguageABSubset.b : Morph LanguageABSubset LanguageB
-    -- LanguageABSubset -> LanguageB will always work
-
-    -- combine
-
-    --: LanguageA -> Result Morph.Error LanguageB
-    Morph.toNarrow LanguageABSubset.a >> Result.map (Morph.toBroad LanguageABSubset.b)
-
-    --: LanguageB -> Result Morph.Error LanguageA
-    Morph.toNarrow LanguageABSubset.b >> Result.map (Morph.toBroad LanguageABSubset.a)
-
-
-### Why do most primitives here not allow custom error types?
-
-They [could](#MorphOrError) but what is the problem you are trying to solve?
-
-Errors with more narrow structural information are mostly useful for recovery based on what went wrong.
-
-In that case you probably want
-
-    Morph.OneToOne (Result YourRecoverable YourNarrow) YourBroad
-
-So always having an extra type variable just adds complexity to the types.
 
 -}
 type alias Morph narrow broad =
