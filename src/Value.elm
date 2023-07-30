@@ -230,7 +230,7 @@ composedMap composedChange =
                     |> Composed
 
 
-{-| If the [`AtomOrComposed`](#AtomOrComposed) is a [`Composed`](#AtomOrComposed),
+{-| If the [`AtomOrComposed`](#AtomOrComposed) is an [`Atom`](#AtomOrComposed),
 change in a given way
 -}
 atomMap :
