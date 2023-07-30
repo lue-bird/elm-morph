@@ -67,7 +67,7 @@ list =
 --
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) each value in a `Dict`
+{-| [`Morph.OneToOne`](Morph#OneToOne) each value in a `Dict key value`
 -}
 eachValue :
     MorphIndependently
