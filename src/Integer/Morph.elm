@@ -196,7 +196,7 @@ chars =
 
 signedChars : MorphRow Integer.Signed Char
 signedChars =
-    Morph.succeed
+    Morph.narrow
         (\signPart absolutePart ->
             { sign = signPart
             , absolute = absolutePart

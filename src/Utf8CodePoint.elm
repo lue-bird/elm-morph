@@ -60,12 +60,12 @@ bits =
                     fourBytes fourBytesValue
         )
         |> Morph.rowTry OneByte
-            (Morph.succeed identity
+            (Morph.narrow identity
                 |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
                 |> Morph.grab identity (ArraySized.Morph.exactly n7 (Morph.keep |> Morph.one))
             )
         |> Morph.rowTry TwoBytes
-            (Morph.succeed (\f s -> { first = f, second = s })
+            (Morph.narrow (\f s -> { first = f, second = s })
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                 |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
@@ -73,7 +73,7 @@ bits =
                 |> Morph.grab .second followingByte
             )
         |> Morph.rowTry ThreeBytes
-            (Morph.succeed (\f s t -> { first = f, second = s, third = t })
+            (Morph.narrow (\f s t -> { first = f, second = s, third = t })
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
@@ -83,7 +83,7 @@ bits =
                 |> Morph.grab .third followingByte
             )
         |> Morph.rowTry FourBytes
-            (Morph.succeed (\fi s t fo -> { first = fi, second = s, third = t, fourth = fo })
+            (Morph.narrow (\fi s t fo -> { first = fi, second = s, third = t, fourth = fo })
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
@@ -99,7 +99,7 @@ bits =
 
 followingByte : MorphRow (ArraySized Bit (Exactly (On N6))) Bit
 followingByte =
-    Morph.succeed identity
+    Morph.narrow identity
         |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
         |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
         |> Morph.grab identity (ArraySized.Morph.exactly n6 (Morph.keep |> Morph.one))

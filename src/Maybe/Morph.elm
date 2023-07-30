@@ -103,5 +103,5 @@ row contentMorphRow =
         )
         |> Morph.rowTry Just contentMorphRow
         |> Morph.rowTry (\() -> Nothing)
-            (Morph.named "nothing" (Morph.succeed ()))
+            (Morph.named "nothing" (Morph.narrow ()))
         |> Morph.choiceFinish

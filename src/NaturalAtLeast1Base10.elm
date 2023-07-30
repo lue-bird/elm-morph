@@ -328,7 +328,7 @@ digitFor10Exponent n10Exponent =
 chars : MorphRow NaturalAtLeast1Base10 Char
 chars =
     Morph.named "natural ≥ 1"
-        (Morph.succeed (\first afterFirst -> { first = first, afterFirst = afterFirst })
+        (Morph.narrow (\first afterFirst -> { first = first, afterFirst = afterFirst })
             |> grab .first
                 (Morph.oneToOne N.inToNumber N.inToOn
                     |> Morph.over (N.Morph.inChar ( n1, n9 ))

@@ -60,7 +60,7 @@ or step =
             Morph.named "spaces"
                 (Morph.whilePossible (String.Morph.only " "))
     in
-    Morph.succeed
+    Morph.narrow
         (\left right -> { left = left, right = right })
         |> match (String.Morph.only "(")
         |> match (broad [] |> Morph.overRow spaces)

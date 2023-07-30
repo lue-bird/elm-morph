@@ -5,7 +5,7 @@ module Morph exposing
     , recursive
     , toBroad, toNarrow, mapTo
     , MorphRow, MorphRowIndependently, rowFinish
-    , end, one, succeed, grab, match
+    , end, one, narrow, grab, match
     , named
     , invert
     , deadEndMap
@@ -107,7 +107,7 @@ printable =
 
 ## create row
 
-@docs end, one, succeed, grab, match
+@docs end, one, narrow, grab, match
 
 
 # alter
@@ -1509,7 +1509,7 @@ More `named` = •ᴗ•.
     point : MorphRow Point Char
     point =
         Morph.named "point"
-            (Morph.succeed (\x y -> { x = x, y = y })
+            (Morph.narrow (\x y -> { x = x, y = y })
                 |> match (String.Morph.only "(")
                 |> grab .x (Int.Morph.integer |> Morph.overRow Integer.Morph.chars)
                 |> match (String.Morph.only ",")
@@ -1847,7 +1847,7 @@ custom descriptionCustom morphTransformations =
                     )
                     |> Morph.rowTry (\() -> End) (String.Morph.only "[]")
                     |> Morph.rowTry Next
-                        (Morph.succeed (\h t -> { head = h, tail = t })
+                        (Morph.narrow (\h t -> { head = h, tail = t })
                             |> grab .head (Int.Morph.integer |> Morph.overRow Integer.Morph.chars)
                             |> match
                                 (broad (ArraySized.one ())
@@ -2584,7 +2584,7 @@ So to morph broad characters,
 
     point : MorphRow Point Char
     point =
-        Morph.succeed (\x y -> { x = x, y = y })
+        Morph.narrow (\x y -> { x = x, y = y })
             |> match (String.Morph.only "(")
             |> match (broad [ () ] |> Morph.overRow spaces)
             |> grab .x (Int.Morph.integer |> Morph.overRow Integer.Morph.chars)
@@ -2650,7 +2650,7 @@ type alias MorphRow narrow broadElement =
 
 
 {-| Incomplete [`MorphRow`](#MorphRow) for a thing composed of multiple parts = group.
-It's what you supply during a [`Morph.succeed`](Morph#succeed)`|>`[`grab`](#grab)/[`match`](#match) build
+It's what you supply during a [`Morph.narrow`](Morph#narrow)`|>`[`grab`](#grab)/[`match`](#match) build
 -}
 type alias MorphRowIndependently narrow beforeToBroad broadElement =
     MorphIndependently
@@ -2733,7 +2733,7 @@ one =
 {-| Doesn't consume anything and always returns the given narrow constant.
 
 For anything composed of multiple parts,
-`succeed` first declaratively describes what you expect to get in the end,
+`narrow` first declaratively describes what you expect to get in the end,
 then you feed it by [grabbing (taking)](#grab) what you need.
 
     import Morph exposing (grab, match)
@@ -2753,7 +2753,7 @@ then you feed it by [grabbing (taking)](#grab) what you need.
 
     point : MorphRow Point Char
     point =
-        Morph.succeed (\x y -> { x = x, y = y })
+        Morph.narrow (\x y -> { x = x, y = y })
             |> grab .x (Int.Morph.integer |> Morph.overRow Integer.Morph.chars)
             |> match (String.Morph.only ",")
             |> grab .y (Int.Morph.integer |> Morph.overRow Integer.Morph.chars)
@@ -2766,22 +2766,22 @@ then you feed it by [grabbing (taking)](#grab) what you need.
 
 ### example: infix-separated elements
 
-    Morph.succeed Stack.topBelow
+    Morph.narrow Stack.topBelow
         |> grab Stack.top element
         |> grab (Stack.removeTop >> Stack.toList)
             (Morph.whilePossible
-                (Morph.succeed (\separator element -> { element = element, separator = separator })
+                (Morph.narrow (\separator element -> { element = element, separator = separator })
                     |> grab .separator separator
                     |> grab .element element
                 )
             )
 
 
-### `Morph.succeed` anti-patterns
+### `Morph.narrow` anti-patterns
 
 One example you'll run into when using other parsers is using
 
-    Morph.succeed identity
+    Morph.narrow identity
         |> match
             ...
         |> match
@@ -2791,17 +2791,17 @@ One example you'll run into when using other parsers is using
 
 it gets pretty hard to read as you have to jump around the code to know what you're actually producing
 
-    Morph.succeed (\fileSize -> fileSize)
+    Morph.narrow (\fileSize -> fileSize)
         |> ...
         |> grab (\fileSize -> fileSize) ...
 
 is already nicer
 
 -}
-succeed :
+narrow :
     narrowConstant
     -> MorphRowIndependently narrowConstant beforeToBroad_ broadElement_
-succeed narrowConstant =
+narrow narrowConstant =
     { description = SucceedDescription
     , toNarrow =
         \broad_ ->
@@ -2877,7 +2877,7 @@ next partAccess partChange nextMorphRow =
 
 
 {-| Take what we get from [converting](#MorphRow) the next section
-and channel it back up to the [`Morph.succeed`](Morph#succeed) grouping
+and channel it back up to the [`Morph.narrow`](Morph#narrow) grouping
 -}
 grab :
     (groupNarrow -> partNextBeforeToBroad)
@@ -2910,7 +2910,7 @@ On the parsing side, this is often called "skip" or "drop", `elm/parser` uses `|
     -- parse a simple email, but we're only interested in the username
     "user@example.com"
         |> Morph.toNarrow
-            (Morph.succeed (\userName -> { username = userName })
+            (Morph.narrow (\userName -> { username = userName })
                 |> grab .username
                     (Morph.whilePossible (AToZ.Morph.lowerChar |> Morph.one))
                 |> match (String.Morph.only "@")
@@ -2984,7 +2984,7 @@ import List.Morph
         -- and we're only interested in the sum
         (N.Morph.in_ ( n0, n9 )
             |> Morph.overRow
-                (Morph.succeed (\a b -> a |> N.add b)
+                (Morph.narrow (\a b -> a |> N.add b)
                     |> Morph.grab (\_ -> n0 |> N.maxTo n9) (N.Morph.inChar ( n0, n9 ))
                     |> Morph.match (String.Morph.only "-")
                     |> Morph.grab identity (N.Morph.inChar ( n0, n9 ))
@@ -3095,7 +3095,7 @@ An example: going through all declarations, which one is a decoder and for what?
             |> Morph.overRow
                 (Morph.untilNext
                     { end =
-                        Morph.succeed ()
+                        Morph.narrow ()
                             |> match (String.Morph.only "Decoder")
                             |> match Morph.end
                     , element = Morph.keep |> Morph.one
@@ -3358,7 +3358,7 @@ untilNextFold config =
 
     "listDecoderDecoder userDecoder"
         |> Morph.toNarrow
-            (Morph.succeed (\called arg -> { called = called, arg = arg })
+            (Morph.narrow (\called arg -> { called = called, arg = arg })
                 |> Morph.grab .called decoderNameSubject
                 |> Morph.match (String.Morph.only " ")
                 |> Morph.grab .arg decoderNameSubject
@@ -3788,7 +3788,7 @@ rowFinish =
         let
             morphRowThenEnd : MorphRow narrow broadElement
             morphRowThenEnd =
-                succeed (\before_ -> before_) |> grab (\before_ -> before_) morphRow |> match end
+                narrow (\before_ -> before_) |> grab (\before_ -> before_) morphRow |> match end
         in
         { description = morphRowThenEnd |> description
         , toNarrow =
@@ -3797,7 +3797,7 @@ rowFinish =
                     |> toNarrow morphRowThenEnd
                     |> Result.map .narrow
         , toBroad =
-            \narrow -> narrow |> toBroad morphRowThenEnd |> Rope.toList
+            \narrow_ -> narrow_ |> toBroad morphRowThenEnd |> Rope.toList
         }
 
 
@@ -3900,7 +3900,7 @@ type alias ChoiceMorphEmptiable noTryPossiblyOrNever choiceNarrow choiceBeforeNa
         = InputEnd
         | Return Return
 
-    {-| Consume the end of the current line or Morph.succeed if there are
+    {-| Consume the end of the current line or Morph.narrow if there are
     no more remaining characters in the input text.
 
     > ℹ️ Equivalent regular expression: `$`
@@ -4348,8 +4348,8 @@ variant variantTagName ( possibilityToChoice, possibilityFromChoice ) possibilit
                 )
         , toBroad =
             choiceMorphSoFar.toBroad
-                (\narrow ->
-                    narrow
+                (\narrow_ ->
+                    narrow_
                         |> toBroad possibilityMorph
                         |> possibilityFromChoice
                 )

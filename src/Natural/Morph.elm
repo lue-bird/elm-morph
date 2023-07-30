@@ -144,7 +144,7 @@ bitsVariableCount =
         )
         |> Morph.rowTry (\() -> N0) (Bit.Morph.only Bit.O |> Morph.one)
         |> Morph.rowTry AtLeast1
-            (Morph.succeed (\atLeast1 -> atLeast1)
+            (Morph.narrow (\atLeast1 -> atLeast1)
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                 |> Morph.grab (\atLeast1 -> atLeast1) NaturalAtLeast1.bits
             )

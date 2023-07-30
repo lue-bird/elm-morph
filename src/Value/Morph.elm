@@ -643,12 +643,12 @@ bits =
                             composedVariant composedValue
                 )
                 |> Morph.rowTry Value.Atom
-                    (Morph.succeed (\atom_ -> atom_)
+                    (Morph.narrow (\atom_ -> atom_)
                         |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
                         |> Morph.grab (\atom_ -> atom_) atomBits
                     )
                 |> Morph.rowTry Value.Composed
-                    (Morph.succeed (\composed_ -> composed_)
+                    (Morph.narrow (\composed_ -> composed_)
                         |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                         |> Morph.grab (\composed_ -> composed_) (composedBits step)
                     )
@@ -693,18 +693,18 @@ atomBits =
                     stringVariant stringValue
         )
         |> Morph.rowTry Value.Unit
-            (Morph.succeed ()
+            (Morph.narrow ()
                 |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
                 |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
             )
         |> Morph.rowTry Value.Number
-            (Morph.succeed (\number_ -> number_)
+            (Morph.narrow (\number_ -> number_)
                 |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                 |> Morph.grab (\number_ -> number_) numberBits
             )
         |> Morph.rowTry Value.String
-            (Morph.succeed (\string_ -> string_)
+            (Morph.narrow (\string_ -> string_)
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                 |> Morph.grab (\string_ -> string_) stringBits
             )
@@ -749,7 +749,7 @@ taggedBits :
     MorphRow (Value String) Bit
     -> MorphRow (Tagged String) Bit
 taggedBits step =
-    Morph.succeed (\tag value -> { tag = tag, value = value })
+    Morph.narrow (\tag value -> { tag = tag, value = value })
         |> Morph.grab .tag (Morph.named "tag" stringBits)
         |> Morph.grab .value (Morph.named "value" step)
 

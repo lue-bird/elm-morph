@@ -243,7 +243,7 @@ sequence toSequence =
     { description =
         case toSequence |> ArraySized.toList of
             [] ->
-                Morph.succeed ArraySized.empty |> Morph.description
+                Morph.narrow ArraySized.empty |> Morph.description
 
             inSequence0 :: inSequence1Up ->
                 Morph.Internal.sequenceDescriptionFromStack
@@ -635,13 +635,13 @@ you might as well use [`Morph.whilePossible`](Morph#whilePossible) instead of
         atLeast n1 (AToZ.Morph.lowerChar |> Morph.one)
 
     tags =
-        Morph.succeed Stack.onTopLay
+        Morph.narrow Stack.onTopLay
             |> grab Stack.top tag
             |> grab Stack.removeTop
                 (List.Morph.arraySized
                     |> Morph.overRow
                         (atLeast n0
-                            (Morph.succeed (\tag -> tag)
+                            (Morph.narrow (\tag -> tag)
                                 |> match separator
                                 |> grab (\tag -> tag) tag
                             )
@@ -661,12 +661,12 @@ you might as well use [`Morph.whilePossible`](Morph#whilePossible) instead of
 
 ### anti-example: parsing infinitely
 
-    Morph.succeed ...
+    Morph.narrow ...
         |> grab ... (atLeast n0 (Morph.keep |> Morph.one))
         |> grab ...
 
 would only parse the first part until the end
-because it always [`succeed`](Morph#succeed)s.
+because it always [`narrow`](Morph#narrow)s.
 Nothing after would ever be parsed, making the whole thing fail.
 
 
@@ -709,7 +709,7 @@ atLeast :
 atLeast minimum elementStepMorphRow =
     Morph.oneToOne identity ArraySized.maxToInfinity
         |> Morph.overRow
-            (Morph.succeed
+            (Morph.narrow
                 (\minimumArraySized overMinimum ->
                     minimumArraySized
                         |> ArraySized.attachMin Up overMinimum
@@ -807,7 +807,7 @@ in_ :
 in_ ( lowerLimit, upperLimit ) repeatedElementMorphRow =
     Morph.oneToOne identity ArraySized.maxToOn
         |> Morph.overRow
-            (Morph.succeed
+            (Morph.narrow
                 (\minimumList overMinimum ->
                     minimumList
                         |> ArraySized.minToOn

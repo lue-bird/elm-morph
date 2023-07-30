@@ -9,7 +9,7 @@ import String.Morph
 
 chars : MorphRow Point Char
 chars =
-    Morph.succeed (\x y -> { x = x, y = y })
+    Morph.narrow (\x y -> { x = x, y = y })
         |> match (String.Morph.only "(")
         |> match (broad [ () ] |> Morph.overRow spaces)
         |> grab .x Decimal.Morph.chars

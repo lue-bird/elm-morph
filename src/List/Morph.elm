@@ -136,7 +136,7 @@ Some also call this "traverse" (or "for" when the arguments are flipped)
 
 **Don't try to be clever with this.**
 
-The usual [`Morph.succeed`](Morph#succeed)`(\... -> ...) |>`[`grab`](Morph#grab)-[`match`](Morph#match) chain
+The usual [`Morph.narrow`](Morph#narrow)`(\... -> ...) |>`[`grab`](Morph#grab)-[`match`](Morph#match) chain
 is often more explicit, descriptive and type-safe.
 
 Because of this, `List.Morph` only exposes `sequenceMap`, not `sequence`,
@@ -165,7 +165,7 @@ sequence :
 sequence toSequence =
     case toSequence of
         [] ->
-            Morph.succeed []
+            Morph.narrow []
 
         toSequence0 :: toSequence1Up ->
             { description =

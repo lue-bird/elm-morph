@@ -20,7 +20,7 @@ import String.Morph
 chars : MorphRow Email Char
 chars =
     Morph.named "email"
-        (Morph.succeed
+        (Morph.narrow
             (\local_ domain_ ->
                 { local = local_
                 , domain = domain_
@@ -35,7 +35,7 @@ chars =
 local : MorphRow Local Char
 local =
     Morph.named "local"
-        (Morph.succeed
+        (Morph.narrow
             (\first afterFirst ->
                 ArraySized.one first
                     |> ArraySized.attachMin Up
@@ -44,7 +44,7 @@ local =
             |> grab (ArraySized.element ( Up, n1 )) localPart
             |> grab (ArraySized.removeMin ( Up, n1 ))
                 (atLeast n1
-                    (Morph.succeed (\part -> part)
+                    (Morph.narrow (\part -> part)
                         |> match (String.Morph.only ".")
                         |> grab (\part -> part) localPart
                     )
@@ -159,7 +159,7 @@ localSymbolPrintable =
 domain : MorphRow Domain Char
 domain =
     Morph.named "domain"
-        (Morph.succeed
+        (Morph.narrow
             (\first hostLabels topLevel ->
                 { first = first, hostLabels = hostLabels, topLevel = topLevel }
             )
@@ -167,7 +167,7 @@ domain =
             |> Morph.match (String.Morph.only ".")
             |> Morph.grab .hostLabels
                 (whilePossible
-                    (Morph.succeed (\label -> label)
+                    (Morph.narrow (\label -> label)
                         |> Morph.grab (\label -> label) hostLabel
                         |> Morph.match (String.Morph.only ".")
                     )
@@ -198,7 +198,7 @@ hostLabelSideableSymbol =
 hostLabel : MorphRow HostLabel Char
 hostLabel =
     Morph.named "host label"
-        (Morph.succeed
+        (Morph.narrow
             (\firstSymbol afterFirstSymbol ->
                 { firstSymbol = firstSymbol
                 , afterFirstSymbol = afterFirstSymbol
@@ -223,7 +223,7 @@ hostLabelSectionAfterFirst =
                     sideableVariant sideableValue
         )
         |> Morph.rowTry HostLabelStartingWithHyphenMinus
-            (Morph.succeed
+            (Morph.narrow
                 (\hyphenMinusCount next ->
                     { hyphenMinusCount = hyphenMinusCount, next = next }
                 )
@@ -242,7 +242,7 @@ hostLabelSectionAfterFirst =
 domainTopLevel : MorphRow DomainTopLevel Char
 domainTopLevel =
     Morph.named "domain top-level"
-        (Morph.succeed
+        (Morph.narrow
             (\startDigits firstAToZ afterFirstAToZ ->
                 { startDigits = startDigits
                 , firstAToZ = firstAToZ

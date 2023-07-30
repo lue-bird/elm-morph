@@ -110,7 +110,7 @@ base10 =
 bits : MorphRow Natural.AtLeast1 Bit
 bits =
     Morph.named "≥ 1"
-        (Morph.succeed (\bitsAfterI -> { bitsAfterI = bitsAfterI })
+        (Morph.narrow (\bitsAfterI -> { bitsAfterI = bitsAfterI })
             |> Morph.grab .bitsAfterI bitsVariableCount
         )
 
@@ -122,7 +122,7 @@ bitsVariableCount =
             (Morph.untilNext
                 { end = Bit.Morph.only Bit.O |> Morph.one
                 , element =
-                    Morph.succeed (\bit -> bit)
+                    Morph.narrow (\bit -> bit)
                         |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                         |> Morph.grab (\bit -> bit)
                             (Morph.keep |> Morph.one)

@@ -146,7 +146,7 @@ It's not that scary I swear!
 chars : MorphRow Decimal Char
 chars =
     Morph.named "decimal"
-        (Morph.succeed (\decimal -> decimal)
+        (Morph.narrow (\decimal -> decimal)
             |> Morph.grab (\decimal -> decimal)
                 (Morph.choice
                     (\signedVariant n0Variant numberNarrow ->
@@ -174,7 +174,7 @@ chars =
 signedChars : MorphRow Decimal.Signed Char
 signedChars =
     Morph.named "signed"
-        (Morph.succeed
+        (Morph.narrow
             (\signPart absolutePart ->
                 { sign = signPart
                 , absolute = absolutePart
@@ -222,7 +222,7 @@ fractionAfterPointChars =
 atLeast1Chars : MorphRow Decimal.AtLeast1 Char
 atLeast1Chars =
     Morph.named "≥ 1"
-        (Morph.succeed
+        (Morph.narrow
             (\wholePart fractionPart ->
                 { whole = wholePart
                 , fraction = fractionPart
@@ -237,7 +237,7 @@ atLeast1Chars =
 fractionChars : MorphRow Fraction Char
 fractionChars =
     Morph.named "fraction"
-        (Morph.succeed (\fraction_ -> fraction_)
+        (Morph.narrow (\fraction_ -> fraction_)
             |> match
                 (Morph.broad (Just ())
                     |> Morph.overRow
@@ -385,7 +385,7 @@ bitsVariableCount =
             |> Morph.rowTry (\() -> Decimal.N0)
                 (Morph.named "0" (Bit.Morph.only Bit.O |> Morph.one))
             |> Morph.rowTry Decimal.Signed
-                (Morph.succeed (\signed -> signed)
+                (Morph.narrow (\signed -> signed)
                     |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                     |> Morph.grab (\signed -> signed) signedBits
                 )
@@ -398,7 +398,7 @@ bitsVariableCount =
 signedBits : MorphRow Decimal.Signed Bit
 signedBits =
     Morph.named "signed"
-        (Morph.succeed (\sign absolute -> { sign = sign, absolute = absolute })
+        (Morph.narrow (\sign absolute -> { sign = sign, absolute = absolute })
             |> Morph.grab .sign (Sign.Morph.bit |> Morph.one)
             |> Morph.grab .absolute signedAbsoluteBits
         )
@@ -481,7 +481,7 @@ fractionBits =
                 }
             )
             |> Morph.overRow
-                (Morph.succeed
+                (Morph.narrow
                     (\initial0Count after0s end ->
                         { initial0Count = initial0Count, after0s = after0s, end = end }
                     )
@@ -598,12 +598,12 @@ signedAbsoluteBits =
                         atLeast1 atLeast1Value
             )
             |> Morph.rowTry Decimal.Fraction
-                (Morph.succeed (\fraction -> fraction)
+                (Morph.narrow (\fraction -> fraction)
                     |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
                     |> Morph.grab (\fraction -> fraction) fractionBits
                 )
             |> Morph.rowTry Decimal.AtLeast1
-                (Morph.succeed (\atLeast1 -> atLeast1)
+                (Morph.narrow (\atLeast1 -> atLeast1)
                     |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                     |> Morph.grab (\atLeast1 -> atLeast1) atLeast1Bits
                 )
@@ -614,7 +614,7 @@ signedAbsoluteBits =
 atLeast1Bits : MorphRow Decimal.AtLeast1 Bit
 atLeast1Bits =
     Morph.named "≥ 1"
-        (Morph.succeed (\whole fraction -> { whole = whole, fraction = fraction })
+        (Morph.narrow (\whole fraction -> { whole = whole, fraction = fraction })
             |> Morph.grab .whole NaturalAtLeast1.bits
             |> Morph.grab .fraction (maybeBits fractionBits)
         )
@@ -634,7 +634,7 @@ maybeBits contentMorphRow =
         |> Morph.rowTry (\() -> Nothing)
             (Bit.Morph.only Bit.O |> Morph.one)
         |> Morph.rowTry Just
-            (Morph.succeed (\content -> content)
+            (Morph.narrow (\content -> content)
                 |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
                 |> Morph.grab (\content -> content) contentMorphRow
             )
