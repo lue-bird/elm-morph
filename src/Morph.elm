@@ -3817,7 +3817,7 @@ type alias ChoiceMorphEmptiable noTryPossiblyOrNever choiceNarrow choiceBeforeNa
     type Blank
         = Space
         | Tab
-        | Return Line.Return
+        | Return Return
         | FormFeed
 
     blankChar : Morph Blank Char (Morph.Error Char)
@@ -3840,7 +3840,7 @@ type alias ChoiceMorphEmptiable noTryPossiblyOrNever choiceNarrow choiceBeforeNa
                 )
                 |> Morph.try (\() -> Space) (Char.Morph.only ' ')
                 |> Morph.try (\() -> Tab) (Char.Morph.only '\t')
-                |> Morph.try Return Line.returnChar
+                |> Morph.try Return returnChar
                 |> Morph.try (\() -> FormFeed)
                     -- \f
                     (Char.Morph.only '\u{000C}')
@@ -4566,7 +4566,7 @@ rowTry possibilityToChoice possibilityMorph =
         }
 
 
-{-| Always the last step of a [`Morph.choice`](Morph#choice) `|>` [`Morph.try`](Morph#try) or `|>` [`Morph.rowTry`](#rowTry) builder.
+{-| Always the last step of a [`Morph.choice`](Morph#choice) [`|> Morph.try`](Morph#try) or [`|> Morph.rowTry`](#rowTry) builder
 -}
 choiceFinish :
     ChoiceMorphEmptiable
