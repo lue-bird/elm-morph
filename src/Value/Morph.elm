@@ -260,6 +260,7 @@ An example translated from [`elm/json`](https://dark.elm.dmy.fr/packages/elm/jso
     import Value
 
     type alias Cause =
+        -- from lue-bird/elm-no-record-type-alias-constructor-function
         RecordWithoutConstructorFunction
             { name : String
             , percent : Decimal
