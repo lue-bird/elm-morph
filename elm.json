@@ -3,7 +3,7 @@
     "name": "lue-bird/elm-morph",
     "summary": "a parser-printer: developer-friendly, general-purpose, great errors",
     "license": "MIT",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "exposed-modules": [
         "Morph",
         "Maybe.Morph",
