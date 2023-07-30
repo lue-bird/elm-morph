@@ -257,8 +257,8 @@ import Util exposing (recoverTry, stackInit, stackLast)
 -}
 
 
-{-| Conversion functions from a more general → broad to
-a more specific → narrow format and back.
+{-| Conversion functions from a more general (we say broad) to
+a more specific (we say narrow) format and back.
 
 Each type `Morph narrow broad`,
 say for example `Morph Email String`, can convert
@@ -269,7 +269,6 @@ say for example `Morph Email String`, can convert
   - example: `Email -> String`
   - going from a specific type to a general one
   - always successful
-  - can loose information on its way
 
 
 ### `toNarrow : broad -> Result error narrow`
