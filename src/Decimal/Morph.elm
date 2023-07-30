@@ -1,5 +1,5 @@
 module Decimal.Morph exposing
-    ( orException, value
+    ( value
     , chars, bitsVariableCount
     , orExceptionValue, exceptionValue
     , orExceptionFloat
@@ -7,7 +7,7 @@ module Decimal.Morph exposing
 
 {-| [`Morph`](Morph#Morph) for an [arbitrary-sized `Decimal`](Decimal#Decimal)
 
-@docs orException, value
+@docs value
 
 
 ## row
@@ -33,7 +33,7 @@ import Bit.Morph
 import Decimal exposing (Decimal(..), Exception(..), Fraction, SignedAbsolute(..))
 import List.Morph
 import Maybe.Morph
-import Morph exposing (Morph, MorphOrError, MorphRow, grab, match)
+import Morph exposing (MorphOrError, MorphRow, grab, match)
 import N exposing (Add1, In, N, N1, N9, To, Up, n0, n1, n2, n3, n4, n5, n6, n7, n8, n9)
 import N.Morph
 import Natural
@@ -45,25 +45,6 @@ import Sign.Morph
 import String.Morph
 import Value
 import Value.Morph.Internal exposing (MorphValue)
-
-
-{-| [`Morph`](Morph#Morph)
-a value
-to a [`Result Exception value`](Decimal#Exception)
--}
-orException : Morph aValue (Result Exception aValue)
-orException =
-    Morph.custom "without exception"
-        { toNarrow =
-            \floatExplicit_ ->
-                case floatExplicit_ of
-                    Ok number ->
-                        number |> Ok
-
-                    Err exception ->
-                        ("exception: " ++ (exception |> Decimal.exceptionToString)) |> Err
-        , toBroad = Ok
-        }
 
 
 {-| [`MorphRow`](Morph#MorphRow) from chars to a [`Decimal`](Decimal#Decimal) number.
@@ -341,9 +322,9 @@ since `Float` is fixed in bit size while [`Decimal`](Decimal#Decimal) is not.
 
 If you need a narrow [`Decimal`](Decimal#Decimal), not a result, try
 
-    Decimal.Morph.orExceptionFloat
-        |> Morph.narrowErrorMap Decimal.exceptionToString
-        |> Morph.over Result.Morph.toOk
+    Result.Morph.toOk
+        |> Morph.over Decimal.Morph.orExceptionFloat
+        |> Morph.narrowErrorMap (Morph.deadEndMap Decimal.exceptionToString)
 
 -}
 orExceptionFloat : MorphOrError (Result Exception Decimal) Float error_

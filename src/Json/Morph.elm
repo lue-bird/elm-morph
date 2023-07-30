@@ -26,6 +26,7 @@ import Json.Decode
 import Json.Encode
 import Morph exposing (Morph, MorphIndependently)
 import Possibly exposing (Possibly(..))
+import Result.Morph
 import Stack
 import Tree
 import Value exposing (AtomOrComposed(..))
@@ -111,8 +112,7 @@ atomJsValueMagicEncode =
 
             Json.Number floatAtom ->
                 floatAtom
-                    |> Morph.toBroad
-                        (Decimal.Morph.orException |> Morph.over Decimal.Morph.orExceptionFloat)
+                    |> Morph.toBroad decimalFloatMorph
                     |> Json.Encode.float
 
             Json.String stringAtom ->
@@ -160,8 +160,9 @@ jsonAtomDecoder =
 
 decimalFloatMorph : Morph Decimal Float
 decimalFloatMorph =
-    Decimal.Morph.orException
+    Result.Morph.toOk
         |> Morph.over Decimal.Morph.orExceptionFloat
+        |> Morph.narrowErrorMap (Morph.deadEndMap Decimal.exceptionToString)
 
 
 {-| [Morph](Morph#Morph) to valid [`Json` value](Json#Json) format from [`JsValueMagic`](#JsValueMagic)
