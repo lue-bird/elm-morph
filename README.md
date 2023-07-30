@@ -15,8 +15,7 @@ Know parsers? [`MorphRow`](Morph#MorphRow) simply always creates a printer along
 
   - `Email/Id/Time/Path/Url.fromString` ⇄ `Email/Id/Time/Path/Url.toString`
   - `Midi.fromBitList` ⇄ `Midi.toBitList`
-  - concrete syntax tree parser ⇄ syntax token builder
-  - ...
+  - parse a syntax tree from tokens ⇄ build tokens from a syntax tree
 
 Like [`Morph`](Morph#Morph), [`MorphRow`](Morph#MorphRow) makes the process simpler and more reliable
 
