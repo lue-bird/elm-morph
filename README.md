@@ -44,8 +44,10 @@ boolean =
                         BooleanOr arguments ->
                             variantOr arguments
                 )
-                |> Morph.rowTry (\() -> BooleanTrue) (String.Morph.only "true")
-                |> Morph.rowTry (\() -> BooleanFalse) (String.Morph.only "false")
+                |> Morph.rowTry (\() -> BooleanTrue)
+                    (String.Morph.only "true")
+                |> Morph.rowTry (\() -> BooleanFalse)
+                    (String.Morph.only "false")
                 |> Morph.rowTry BooleanOr (or (step ()))
                 |> Morph.choiceFinish
         )
