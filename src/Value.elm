@@ -1,10 +1,10 @@
 module Value exposing
-    ( AtomOrComposed(..)
-    , composedMap
-    , Value, Atom(..), Composed(..), Record, Tagged
+    ( Value, Atom(..), Composed(..), Record, Tagged
     , atomKindToString, composedKindToString
     , Name, Index, IndexOrName(..), IndexAndName
     , tagMap
+    , AtomOrComposed(..)
+    , composedMap, atomMap
     )
 
 {-| Generic, `case`-able elm value
@@ -18,10 +18,8 @@ Switching to a different format would also be a lot of work;
 some low-level primitives like bools might not be supported etc.
 
 This module has all the types and operations for these generic [`Value`](#Value)s
-while [`MorphValue`](Value-Morph) is used to convert your types.
+while [`Value.Morph`](Value-Morph) and most other modules contain morphs to convert your types.
 
-@docs AtomOrComposed
-@docs composedMap
 @docs Value, Atom, Composed, Record, Tagged
 @docs atomKindToString, composedKindToString
 
@@ -30,6 +28,12 @@ while [`MorphValue`](Value-Morph) is used to convert your types.
 
 @docs Name, Index, IndexOrName, IndexAndName
 @docs tagMap
+
+
+## an abstract concept: atom or composed
+
+@docs AtomOrComposed
+@docs composedMap, atomMap
 
 
 ## oh look! other projects do similar things
@@ -70,7 +74,7 @@ type Atom
     | String String
 
 
-{-| elm value. Either
+{-| Either
 
   - an atom that don't itself contain values
   - a composed structure that can itself contain recursive values
@@ -226,13 +230,32 @@ composedMap composedChange =
                     |> Composed
 
 
+{-| If the [`AtomOrComposed`](#AtomOrComposed) is a [`Composed`](#AtomOrComposed),
+change in a given way
+-}
+atomMap :
+    (atom -> atomMapped)
+    ->
+        (AtomOrComposed atom composed
+         -> AtomOrComposed atomMapped composed
+        )
+atomMap atomChange =
+    \value ->
+        case value of
+            Atom atom_ ->
+                atom_ |> atomChange |> Atom
+
+            Composed composed_ ->
+                composed_ |> Composed
+
+
 {-| Describe the type of [`Atom`](#Atom)
 -}
 atomKindToString : Atom -> String
 atomKindToString =
     \atom_ ->
         case atom_ of
-            Unit _ ->
+            Unit () ->
                 "Unit"
 
             Number _ ->
