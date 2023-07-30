@@ -1609,7 +1609,7 @@ mapTo translate_ =
 {-| [`Morph`](#Morph) between representations
 that have the same structural information
 and can be mapped 1:1 into each other.
-[narrowing](#mapTo) can `Never` fail
+[narrowing](#mapTo) can `Never` fail.
 
 Examples:
 
