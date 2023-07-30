@@ -32,7 +32,7 @@ while [`MorphValue`](Value-Morph) is used to convert your types.
 @docs tagMap
 
 
-## prior art
+## oh look! other projects do similar things
 
   - [`bundsol/`: `Boxed`](https://package.elm-lang.org/packages/bundsol/boxed/2.0.0/Boxed)
       - 👎 no box-unbox conversion pairs
