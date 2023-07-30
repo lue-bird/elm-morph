@@ -525,25 +525,44 @@ partsFinish =
 
 {-| Describe another variant [`MorphValue`](#MorphValue)
 
-Done? → [`Value.Morph.choiceFinish`](#choiceFinish)
+When you're done, end the builder with [`|> Value.Morph.choiceFinish`](#choiceFinish)
 
-If a variant doesn't have any value attached, use [`unit`](#unit)
+    type User
+        = Guest GuestData
+        | SignedIn SignedInData
 
-    {-| `Bool` `MorphValue`
-    -}
-    boolValue : MorphValue Bool
-    boolValue =
+    value : MorphValue User
+    value =
         Morph.choice
-            (\true false bool ->
-                case bool of
-                    True ->
-                        true ()
+            (\variantGuest variantSignedIn user ->
+                case user of
+                    Guest guest ->
+                        variantGuest guest
 
-                    False ->
-                        false ()
+                    SignedIn signedIn ->
+                        variantSignedIn signedIn
             )
-            |> Value.Morph.variant ( \() -> True, "True" ) unit
-            |> Value.Morph.variant ( \() -> False, "False" ) unit
+            |> Value.Morph.variant ( Guest, "guest" ) guestValue
+            |> Value.Morph.variant ( SignedIn, "signed in" ) signedInValue
+            |> Value.Morph.choiceFinish
+
+where `guestValue : MorphValue GuestData` and `signedInValue : MorphValue SignedInData`.
+
+If a variant has no attached thing, use [`Value.Morph.unit`](#unit)
+
+    signValue : MorphValue Sign
+    signValue =
+        Morph.choice
+            (\positive negative sign ->
+                case sign of
+                    Positive ->
+                        positive ()
+
+                    Negative ->
+                        negative ()
+            )
+            |> Value.Morph.variant ( \() -> Positive, "Positive" ) Value.Morph.unit
+            |> Value.Morph.variant ( \() -> Negative, "Negative" ) Value.Morph.unit
             |> Value.Morph.choiceFinish
 
 -}
