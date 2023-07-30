@@ -618,7 +618,7 @@ choiceFinish =
         choiceMorphComplete |> Value.Morph.Internal.choiceFinish
 
 
-{-| [`MorphRow`](Morph#MorphRow) from `Bit`s to a [`Value`](Value#Value).
+{-| [`MorphRow`](Morph#MorphRow) from [`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bit)s.
 
 Since it takes a `Value String`, you use it
 with [`compact`](#compact) or [`descriptive`](#descriptive)

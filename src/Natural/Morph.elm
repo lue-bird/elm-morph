@@ -107,7 +107,9 @@ chars =
 -- bits
 
 
-{-| [`MorphRow`](Morph#MorphRow) for a [`Natural`](Natural#Natural) from a given amount of bits.
+{-| [`MorphRow`](Morph#MorphRow) for a [`Natural`](Natural#Natural)
+from a given count of [`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bit)s
+and with a given [endianness](https://dark.elm.dmy.fr/packages/elm/bytes/latest/Bytes#Endianness).
 
 Note that the bit count can be any number like `n7` or `n128`. Numbers greater than `n16`
 can quickly be generated locally, see [this section in the `N` module documentation](https://dark.elm.dmy.fr/packages/lue-bird/elm-bounded-nat/latest/N#specific-numbers)

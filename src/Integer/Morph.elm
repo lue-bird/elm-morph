@@ -207,10 +207,9 @@ signedChars =
         |> Morph.grab .absolute NaturalAtLeast1.chars
 
 
-{-| [`MorphRow`](Morph#MorphRow) for an [`Integer`](Integer#Integer)
-from a given amount of bits
+{-| [`MorphRow`](Morph#MorphRow) from a given count of [`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bit)s
 in 2's complement,
-and with a given [endianness](https://dark.elm.dmy.fr/packages/elm/bytes/latest/Bytes#Endianness)
+and with a given [endianness](https://dark.elm.dmy.fr/packages/elm/bytes/latest/Bytes#Endianness).
 
 For [`toBroad`](Morph#toBroad): If the number is greater than the capacity possible with the given bit count,
 the greatest possible value will be returned instead.

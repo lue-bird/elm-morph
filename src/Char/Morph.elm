@@ -57,7 +57,7 @@ code =
 
 {-| `Char` [`MorphValue`](Value-Morph#MorphValue)
 
-Be aware, that [special-cased characters as the result of `Char.toUpper`](https://github.com/elm/core/issues/1001)
+Be aware that [special-cased characters as the result of `Char.toUpper`](https://github.com/elm/core/issues/1001)
 are [broadened](Morph#toBroad) as 2 `Char`s in a [`Value.String`](Value#Value)
 and therefore [narrowing](Morph#toNarrow) to a `Char` will fail.
 
@@ -103,7 +103,7 @@ only broadConstant =
     Char.Morph.Internal.only broadConstant
 
 
-{-| [`MorphRow`](Morph#MorphRow) for a `Char`.
+{-| [`MorphRow`](Morph#MorphRow) from [`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bit)s.
 
 Note that a `Char` isn't equivalent to a visual unit like 🇨🇿 or 🦸🏽‍♂️ or ả̴̫̼̫̀̅
 (→ see [grapheme](https://dark.elm.dmy.fr/packages/BrianHicks/elm-string-graphemes/latest/)).
