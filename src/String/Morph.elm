@@ -148,7 +148,7 @@ each :
     Morph.OneToOne Char Char
     -> MorphOrError String String error_
 each elementCharTranslate =
-    Morph.oneToOneOn ( String.map, String.map ) elementCharTranslate
+    Morph.oneToOneOn String.map String.map elementCharTranslate
 
 
 

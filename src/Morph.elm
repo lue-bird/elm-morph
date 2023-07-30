@@ -2494,15 +2494,17 @@ errorMap errorChange =
 {-| Morph the structure's elements
 
     listMapOneToOne elementMorphOneToOne =
-        oneToOneOn ( List.map, List.map ) elementMorphOneToOne
+        oneToOneOn List.map List.map elementMorphOneToOne
 
 -}
 oneToOneOn :
-    ( (elementBeforeMap -> elementMapped)
-      -> (structureBeforeMap -> structureMapped)
-    , (elementBeforeUnmap -> elementUnmapped)
-      -> (structureBeforeUnmap -> structureUnmapped)
+    ((elementBeforeMap -> elementMapped)
+     -> (structureBeforeMap -> structureMapped)
     )
+    ->
+        ((elementBeforeUnmap -> elementUnmapped)
+         -> (structureBeforeUnmap -> structureUnmapped)
+        )
     ->
         (MorphIndependently
             (elementBeforeMap
@@ -2514,16 +2516,18 @@ oneToOneOn :
                 (structureBeforeMap -> Result error_ structureMapped)
                 (structureBeforeUnmap -> structureUnmapped)
         )
-oneToOneOn ( structureMap, structureUnmap ) elementTranslate =
-    { description = CustomDescription
-    , toNarrow =
-        \broad_ ->
-            broad_
-                |> structureMap (mapTo elementTranslate)
-                |> Ok
-    , toBroad =
-        structureUnmap (toBroad elementTranslate)
-    }
+oneToOneOn structureMap structureUnmap elementMorphOneToOne =
+    oneToOne
+        (\beforeToNarrow ->
+            beforeToNarrow
+                |> structureMap
+                    (\element -> element |> mapTo elementMorphOneToOne)
+        )
+        (\beforeToBroad ->
+            beforeToBroad
+                |> structureUnmap
+                    (\element -> element |> toBroad elementMorphOneToOne)
+        )
 
 
 

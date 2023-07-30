@@ -187,7 +187,7 @@ eachTag :
             )
             (Value tagBeforeUnmap -> Value tagUnmapped)
 eachTag tagTranslate_ =
-    Morph.oneToOneOn ( Value.tagMap, Value.tagMap ) tagTranslate_
+    Morph.oneToOneOn Value.tagMap Value.tagMap tagTranslate_
 
 
 

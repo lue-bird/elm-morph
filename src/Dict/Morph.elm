@@ -82,14 +82,14 @@ eachValue :
              -> Dict broadKey unmappedValue
             )
 eachValue entryValueTranslate =
-    Morph.oneToOneOn ( eachValueMap, eachValueMap ) entryValueTranslate
+    Morph.oneToOneOn eachValueMap eachValueMap entryValueTranslate
 
 
 eachValueMap :
     (value -> valueMapped)
     -> (Dict key value -> Dict key valueMapped)
 eachValueMap valueMap =
-    Dict.map (\_ -> valueMap)
+    \dict -> dict |> Dict.map (\_ -> valueMap)
 
 
 

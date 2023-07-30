@@ -416,4 +416,4 @@ eachTag :
             )
             (Json tagBeforeUnmap -> Json tagUnmapped)
 eachTag tagTranslate_ =
-    Morph.oneToOneOn ( Json.tagMap, Json.tagMap ) tagTranslate_
+    Morph.oneToOneOn Json.tagMap Json.tagMap tagTranslate_
