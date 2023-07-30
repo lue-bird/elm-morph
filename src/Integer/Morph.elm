@@ -36,9 +36,8 @@ import String.Morph
 import Value.Morph.Internal exposing (MorphValue)
 
 
-{-| [`Morph`](Morph#Morph) an [`Integer`](Integer#Integer)
-from a [`Decimal`](Decimal#Decimal)
-without digits after the decimal point
+{-| [`Morph`](Morph#Morph) from a [`Decimal`](Decimal#Decimal)
+without digits after the decimal point.
 
 Other possibilities of handling the fraction after the decimal points are
 
@@ -112,7 +111,7 @@ value =
     decimal |> Morph.over Decimal.Morph.value
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) between an `Int` and a [decimal representation](Integer#Integer).
+{-| [`Morph.OneToOne`](Morph#OneToOne) from an `Int`.
 
 Keep in mind that `Integer -> Int` can overflow
 since `Int` is fixed in bit size while [`Integer`](Integer#Integer) is not.
@@ -125,9 +124,9 @@ int =
     Morph.oneToOne Integer.fromInt Integer.toInt
 
 
-{-| [`Integer`](Integer#Integer) [`MorphRow`](Morph#MorphRow).
+{-| [`MorphRow`](Morph#MorphRow) from `Char`s.
 
-You can of course work with the [`Integer`](Decimal#Decimal) type directly,
+You can then of course work with the [`Integer`](Integer#Integer) type directly,
 or convert it to for example an `Int`
 
     import Morph
