@@ -123,7 +123,8 @@ import Value.Morph.Internal
       - debuggable
       - shuffling [`Value.Morph.part`](#part) order → no change
       - renaming [`Value.Morph.part`](#part)s → breaking change
-      - not [`compact`](#compact)
+
+See also [`compact`](#compact)
 
 -}
 descriptive :
@@ -141,7 +142,13 @@ descriptive =
   - part tag = [`part` `MorphValue`](#part) index index in the builder
   - variant tag = [`variant` `MorphValue`](#variant) index in the builder
   - →
-      - not [`descriptive`](#descriptive)
+      - unreadable to humans
+      - only readable by other tools if they know the variant and field order
+      - not easily debuggable
+      - shuffling [`Value.Morph.part`](#part) order → breaking change
+      - renaming [`Value.Morph.part`](#part)s → no change
+
+See also [`descriptive`](#descriptive)
 
 -}
 compact :
