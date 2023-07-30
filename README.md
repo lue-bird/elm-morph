@@ -17,7 +17,7 @@ Know parsers? [`MorphRow`](Morph#MorphRow) simply always creates a printer along
   - `Midi.fromBitList` ⇄ `Midi.toBitList`
   - parse a syntax tree from tokens ⇄ build tokens from a syntax tree
 
-Like [`Morph`](Morph#Morph), [`MorphRow`](Morph#MorphRow) makes the process simpler and more reliable
+Building both in one is simpler and more reliable.
 
 A 1:1 port of [an example from `elm/parser`](https://dark.elm.dmy.fr/packages/elm/parser/latest/Parser#lazy):
 ```elm
