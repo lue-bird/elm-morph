@@ -355,7 +355,11 @@ type PartsError
 
 {-| Continue a group assembly [`MorphValue`](#MorphValue).
 
-Finish with [`groupFinish`](#groupFinish)
+For example to morph a name String field, add
+
+    |> Value.Morph.part ( .name, "name" ) String.Morph.value
+
+Once you've assembled all parts, end the builder with [`groupFinish`](#groupFinish).
 
 -}
 part :
@@ -474,7 +478,7 @@ partValueNarrow tag partValueMorph groupSoFarNarrow =
                 TagsMissing (Stack.onTopLay tag.index tagsMissingSoFar) |> Err
 
 
-{-| Conclude the [`group`](#group) [`|> part`](#part) chain
+{-| Conclude the [`Value.Morph.group`](#group) [`|> Value.Morph.part`](#part) builder
 -}
 groupFinish :
     MorphValueGroupEmptiable Never record record
@@ -573,7 +577,7 @@ variant ( possibilityToChoice, possibilityTag ) possibilityMorph =
             |> Value.Morph.Internal.variant ( possibilityToChoice, possibilityTag ) possibilityMorph
 
 
-{-| Conclude a [`Morph.choice`](Morph#choice) |> [`Value.Morph.variant`](#variant) chain
+{-| Conclude a [`Morph.choice`](Morph#choice) [`|> Value.Morph.variant`](#variant) builder.
 -}
 choiceFinish :
     ChoiceMorphEmptiable
