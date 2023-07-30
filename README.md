@@ -157,3 +157,11 @@ The parent of `MorphRow`, `MorphValue`, `Morph.OneToOne` etc.: convert between a
 -------
 
 Confused? Hyped? Hit @lue up on anything on slack!
+
+## thanks 🌸
+
+  - [`miniBill/elm-rope`](https://dark.elm.dmy.fr/packages/miniBill/elm-rope/latest/)
+    allows our nested printer to still be `O(n)`
+  - Many ideas in [`lambda-phi/parser`](https://dark.elm.dmy.fr/packages/lambda-phi/parser/latest/) inspired [`MorphRow`](#MorphRow)'s initial design
+  - [`zwilias/elm-bytes-parser`](https://dark.elm.dmy.fr/packages/zwilias/elm-bytes-parser/latest/Bytes-Parser)
+    showed me how to convert a list of bits from and to `Bytes` and gave me the courage to make `MorphRow ... Bit`s
