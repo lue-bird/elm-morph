@@ -2493,8 +2493,8 @@ errorMap errorChange =
 
 {-| Morph the structure's elements
 
-    List.Morph.elementTranslate elementTranslate =
-        oneToOneOn ( List.map, List.map ) elementTranslate
+    listMapOneToOne elementMorphOneToOne =
+        oneToOneOn ( List.map, List.map ) elementMorphOneToOne
 
 -}
 oneToOneOn :
