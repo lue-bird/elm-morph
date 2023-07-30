@@ -247,9 +247,9 @@ unit =
     Value.Morph.Internal.unit
 
 
-{-| Start assembling multiple part [`MorphValue`](#MorphValue)s
+{-| Start assembling multiple parts.
 
-Continue with [`part`](#part)
+Continue with [`|> part`](#part) and after you're done, [`|> groupFinish`](#groupFinish).
 
 An example translated from [`elm/json`](https://dark.elm.dmy.fr/packages/elm/json/latest/)
 
