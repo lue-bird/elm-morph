@@ -279,6 +279,7 @@ One attempt at something like that is [`edkelly303/elm-multitool`](https://dark.
   - haskell: [`invertible-syntax`](https://hackage.haskell.org/package/invertible-syntax),
     [`partial-isomorphisms`](https://hackage.haskell.org/package/partial-isomorphisms)
   - python: [`construct`](https://construct.readthedocs.io/en/latest/intro.html) from and to broad bits
+  - rust: [`parse_display`](https://docs.rs/parse-display/latest/parse_display/) for text, less safe and more restrictive
   - kotlin: [`searles/parsing`](https://github.com/searles/parsing)
   - js: [`nearley.js`](https://nearley.js.org/)
   - prolog: [`phrase/2`](https://www.swi-prolog.org/pldoc/doc_for?object=phrase/2) is somewhat similar for text
