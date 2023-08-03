@@ -1,5 +1,6 @@
 module Morph.Test exposing (tests)
 
+import Boolean exposing (Boolean(..))
 import Email
 import Expect
 import Fuzz exposing (Fuzzer)
@@ -20,6 +21,7 @@ tests =
         "MorphRow"
         [ pointTest
         , emailTest
+        , booleanTest
         , Test.fuzz naturalAtLeast1Base10Fuzz
             "base10: = to |> from Base2"
             (\naturalAtLeast1Base10 ->
@@ -176,3 +178,18 @@ emailTest =
                     )
             )
         ]
+
+
+booleanTest : Test
+booleanTest =
+    test "Boolean.char succeeds correctly"
+        (\() ->
+            "((true || false) || false)"
+                |> Morph.toNarrow
+                    (Boolean.chars
+                        |> Morph.rowFinish
+                        |> Morph.over List.Morph.string
+                    )
+                |> Expect.equal
+                    (Ok (BooleanOr { left = BooleanOr { left = BooleanTrue, right = BooleanFalse }, right = BooleanFalse }))
+        )

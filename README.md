@@ -48,7 +48,7 @@ boolean =
                     (String.Morph.only "true")
                 |> Morph.rowTry (\() -> BooleanFalse)
                     (String.Morph.only "false")
-                |> Morph.rowTry BooleanOr (or (step ()))
+                |> Morph.rowTry BooleanOr (or step)
                 |> Morph.choiceFinish
         )
 

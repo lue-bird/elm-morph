@@ -1837,7 +1837,7 @@ custom descriptionCustom morphTransformations =
     intList : MorphRow IntList Char
     intList =
         Morph.recursive "int list"
-            (\innerIntList ->
+            (\intListStep ->
                 Morph.choice
                     (\endVariant nextVariant intListChoice ->
                         case intListChoice of
@@ -1861,7 +1861,7 @@ custom descriptionCustom morphTransformations =
                                     |> Morph.overRow
                                         (atLeast n1 (String.Morph.only " "))
                                 )
-                            |> grab .tail (innerIntList ())
+                            |> grab .tail intListStep
                         )
                     |> Morph.choiceFinish
             )
@@ -1935,17 +1935,12 @@ More notes:
 recursive :
     String
     ->
-        ((() -> MorphIndependently (beforeToNarrow -> narrow) (beforeToBroad -> broad))
+        (MorphIndependently (beforeToNarrow -> narrow) (beforeToBroad -> broad)
          -> MorphIndependently (beforeToNarrow -> narrow) (beforeToBroad -> broad)
         )
     -> MorphIndependently (beforeToNarrow -> narrow) (beforeToBroad -> broad)
 recursive structureName morphLazy =
-    let
-        morphRecursive : () -> MorphIndependently (beforeToNarrow -> narrow) (beforeToBroad -> broad)
-        morphRecursive () =
-            morphLazy (\() -> lazy structureName morphRecursive)
-    in
-    named structureName (morphRecursive ())
+    morphLazy (lazy structureName (\() -> recursive structureName morphLazy))
 
 
 lazy :
