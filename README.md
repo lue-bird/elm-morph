@@ -1,6 +1,6 @@
 ## [elm morph](https://dark.elm.dmy.fr/packages/lue-bird/elm-morph/latest/)
 
-a parser-printer: developer-friendly, general-purpose, great errors
+a parser-printer: dev-friendly, general-purpose, great errors
 
   - 📻 related: ["codecs" elm-radio episode](https://elm-radio.com/episode/codecs/)
   - 🎧 while reading: ["Morphable", microtonal electronic music by Sevish](https://youtu.be/J-JZhCWsk3M?t=733)

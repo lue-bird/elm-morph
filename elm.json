@@ -1,7 +1,7 @@
 {
     "type": "package",
     "name": "lue-bird/elm-morph",
-    "summary": "a parser-printer: developer-friendly, general-purpose, great errors",
+    "summary": "a parser-printer: dev-friendly, general-purpose, great errors",
     "license": "MIT",
     "version": "2.0.0",
     "exposed-modules": [
