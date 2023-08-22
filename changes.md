@@ -2,6 +2,7 @@
 
 ### 1.2.0
 
+  - `module Tree.Morph exposing (value)` add
   - `Bit.Morph.value` add
 
 ### 1.1.0
