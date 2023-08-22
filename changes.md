@@ -1,5 +1,9 @@
 # change log
 
+### 1.2.0
+
+  - `Bit.Morph.value` add
+
 ### 1.1.0
 
   - `Value.atomMap` add
