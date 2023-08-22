@@ -17,3 +17,18 @@
 
   - `module Tree.Morph exposing (value)` add
   - `Bit.Morph.value` add
+
+## 3.0.0
+
+  - type `Json tag` → `Json` with string tags just like the actual format
+      - `Json.tagMap` remove
+      - `Json.Morph.eachTag` remove
+  - `Value.Morph.bits` now always print just the index
+  - Rework tag morphs to convert to broad `String`
+      - `Json.Morph.compact` now only prints valid json field names
+      - `Value.Index`, `Value.Name` remove
+  - `Integer.Morph`
+      - `fromNatural` add
+  - `Json`
+      - `fromValue` add
+      - `toValue` add
