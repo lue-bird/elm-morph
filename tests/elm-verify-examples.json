@@ -28,6 +28,7 @@
     "ArraySized.Morph",
     "Set.Morph",
     "Dict.Morph",
+    "Tree.Morph",
     "Value",
     "Value.Morph",
     "Value.Morph.Internal",
