@@ -100,6 +100,13 @@ jsValueMagicEncode () =
                 composed |> composedJsValueMagicEncode ()
 
 
+decimalFloatMorph : Morph Decimal Float
+decimalFloatMorph =
+    Result.Morph.toOk
+        |> Morph.over Decimal.Morph.orExceptionFloat
+        |> Morph.errorMap (Morph.deadEndMap Decimal.exceptionToString)
+
+
 atomJsValueMagicEncode : Json.Atom -> JsValueMagic
 atomJsValueMagicEncode =
     \atom ->
@@ -156,13 +163,6 @@ jsonAtomDecoder =
             Json.Decode.float
         , Json.Decode.map Json.String Json.Decode.string
         ]
-
-
-decimalFloatMorph : Morph Decimal Float
-decimalFloatMorph =
-    Result.Morph.toOk
-        |> Morph.over Decimal.Morph.orExceptionFloat
-        |> Morph.errorMap (Morph.deadEndMap Decimal.exceptionToString)
 
 
 {-| [Morph](Morph#Morph) to valid [`Json` value](Json#Json) format from [`JsValueMagic`](#JsValueMagic)
