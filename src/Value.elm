@@ -1,7 +1,7 @@
 module Value exposing
     ( Value, Atom(..), Composed(..), Record, Tagged
     , atomKindToString, composedKindToString
-    , Name, Index, IndexOrName(..), IndexAndName
+    , IndexOrName(..), IndexAndName
     , tagMap
     , AtomOrComposed(..)
     , composedMap, atomMap
@@ -26,7 +26,7 @@ while [`Value.Morph`](Value-Morph) and most other modules contain morphs to conv
 
 ## tag
 
-@docs Name, Index, IndexOrName, IndexAndName
+@docs IndexOrName, IndexAndName
 @docs tagMap
 
 
@@ -126,9 +126,9 @@ type alias Record tag =
     List (Tagged tag)
 
 
-{-| Either [`Index`](#Index) or [`Name`](#Name)
+{-| Either an index Int or a name String that can identify a record part or variant.
 
-Used as the narrow argument of a [`MorphValue`](Value-Morph#MorphValue)
+Used as the tag in the narrowed result of a [`MorphValue`](Value-Morph#MorphValue)
 
 -}
 type IndexOrName
@@ -136,23 +136,9 @@ type IndexOrName
     | Name String
 
 
-{-| Only its index identifies the variant or field
--}
-type alias Index =
-    RecordWithoutConstructorFunction
-        { index : Int }
+{-| Both an index Int and a name String that can identify a record part or variant.
 
-
-{-| Only its name identifies the variant or field
--}
-type alias Name =
-    RecordWithoutConstructorFunction
-        { name : String }
-
-
-{-| Both [`Index`](#Index) and [`Name`](#Name)
-
-Used as the broad result of a [`MorphValue`](Value-Morph#MorphValue)
+Used as the tag in the broadened result of a [`MorphValue`](Value-Morph#MorphValue)
 
 -}
 type alias IndexAndName =

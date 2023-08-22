@@ -1,12 +1,22 @@
 module Json exposing
     ( Json, Atom(..), Composed(..), Tagged
-    , tagMap
+    , fromValue
+    , toValue
     )
 
 {-| JSON. See also [`Json.Morph`](Json-Morph)
 
 @docs Json, Atom, Composed, Tagged
-@docs tagMap
+
+
+## create
+
+@docs fromValue
+
+
+## transform
+
+@docs toValue
 
 -}
 
@@ -19,8 +29,8 @@ import Value exposing (AtomOrComposed(..))
 {-| A valid JSON value. `case`able. Elm doesn't crash on `==`.
 Can't contain any [spooky impure stuff](Json-Morph#JsValueMagic)
 -}
-type alias Json tag =
-    AtomOrComposed Atom (Composed tag)
+type alias Json =
+    AtomOrComposed Atom Composed
 
 
 {-| json atom. null/bool/[number](Decimal#Decimal) or string
@@ -34,43 +44,120 @@ type Atom
 
 {-| json structure. record/object/dict or array
 -}
-type Composed tag
-    = Array (Array.Array (Json tag))
-    | Object (List (Tagged tag))
+type Composed
+    = Array (Array.Array Json)
+    | Object (List Tagged)
 
 
 {-| tag-[value](#Json) pair used to represent a field
 -}
-type alias Tagged tag =
+type alias Tagged =
     RecordWithoutConstructorFunction
-        { tag : tag, value : Json tag }
+        { tag : String, value : Json }
 
 
-{-| Reduce the amount of tag information.
-Used to make its representation [`compact`](Value-Morph#compact) or [`descriptive`](Value-Morph#descriptive)
+{-| Convert from a [generic representation of an elm value](Value#Value)
 -}
-tagMap : (tag -> tagMapped) -> (Json tag -> Json tagMapped)
-tagMap tagChange =
+fromValue : Value.Value String -> Json
+fromValue =
     \json ->
-        json |> Value.composedMap (composedTagMap tagChange)
+        case json of
+            Atom atom ->
+                atom |> atomFromValue |> Atom
+
+            Composed composed ->
+                composed |> composedFromValue |> Composed
 
 
-composedTagMap :
-    (tag -> tagMapped)
-    -> (Composed tag -> Composed tagMapped)
-composedTagMap tagChange =
+atomFromValue : Value.Atom -> Atom
+atomFromValue =
+    \atom ->
+        case atom of
+            Value.Unit () ->
+                Null ()
+
+            Value.String stringAtom ->
+                stringAtom |> String
+
+            Value.Number decimal ->
+                decimal |> Number
+
+
+composedFromValue : Value.Composed String -> Composed
+composedFromValue =
+    \composed ->
+        case composed of
+            Value.List list ->
+                list |> List.map fromValue |> Array.fromList |> Array
+
+            Value.Record record ->
+                record
+                    |> List.map
+                        (\field ->
+                            { tag = field.tag
+                            , value = field.value |> fromValue
+                            }
+                        )
+                    |> Object
+
+            Value.Variant variant ->
+                { tag = variant.tag, value = variant.value |> fromValue }
+                    |> List.singleton
+                    |> Object
+
+
+{-| Convert to a [generic representation of an elm value](Value#Value)
+-}
+toValue : Json -> Value.Value String
+toValue =
+    \json ->
+        case json of
+            Atom atom ->
+                atom |> atomToValue
+
+            Composed composed ->
+                composed |> composedToValue |> Composed
+
+
+atomToValue : Atom -> Value.Value String
+atomToValue =
+    \atom ->
+        case atom of
+            Null unit ->
+                unit |> Value.Unit |> Atom
+
+            Number decimal ->
+                decimal |> Value.Number |> Atom
+
+            String string_ ->
+                string_ |> Value.String |> Atom
+
+            Bool isTrue ->
+                { value = () |> Value.Unit |> Atom
+                , tag =
+                    if isTrue then
+                        "true"
+
+                    else
+                        "false"
+                }
+                    |> Value.Variant
+                    |> Composed
+
+
+composedToValue : Composed -> Value.Composed String
+composedToValue =
     \composed ->
         case composed of
             Array array ->
-                array |> Array.map (tagMap tagChange) |> Array
+                array |> Array.toList |> List.map toValue |> Value.List
 
             Object object ->
-                object |> List.map (taggedTagMap tagChange) |> Object
-
-
-taggedTagMap : (tag -> tagMapped) -> (Tagged tag -> Tagged tagMapped)
-taggedTagMap tagChange =
-    \tagged ->
-        { tag = tagged.tag |> tagChange
-        , value = tagged.value |> tagMap tagChange
-        }
+                object
+                    |> List.map
+                        (\tagged ->
+                            { tag = tagged.tag
+                            , value = tagged.value |> toValue
+                            }
+                        )
+                    |> Value.Record

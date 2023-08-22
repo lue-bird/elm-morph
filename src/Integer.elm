@@ -1,6 +1,6 @@
 module Integer exposing
     ( Integer(..), Signed
-    , fromInt
+    , fromInt, fromNatural
     , absolute, negate
     , toInt
     )
@@ -12,7 +12,7 @@ module Integer exposing
 
 ## create
 
-@docs fromInt
+@docs fromInt, fromNatural
 
 
 ## alter
@@ -118,6 +118,19 @@ absolute =
                ( Positive, Negative ) ->
                    signed.absolute |> Natural.AtLeast1.subtract toAdd.absolute
 -}
+
+
+{-| Convert from a [`Natural`](Natural#Natural)
+-}
+fromNatural : Natural -> Integer
+fromNatural =
+    \natural ->
+        case natural of
+            Natural.N0 ->
+                N0
+
+            Natural.AtLeast1 atLeast1Value ->
+                Signed { sign = Sign.Positive, absolute = atLeast1Value }
 
 
 {-| Convert from an `Int`

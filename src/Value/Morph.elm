@@ -4,9 +4,9 @@ module Value.Morph exposing
     , MorphValueGroupEmptiable, PartsError(..)
     , group, part, groupFinish
     , variant, choiceFinish
-    , descriptive, compact, eachTag
+    , eachTag, descriptive
     , toAtom, toComposed
-    , bits
+    , bits, json
     )
 
 {-| [Morph](Morph#Morph) your types over a [generic, `case`-able elm value](Value)
@@ -54,7 +54,7 @@ variant union [`MorphValue`](#MorphValue)
 
 ## tag
 
-@docs descriptive, compact, eachTag
+@docs eachTag, descriptive
 
 
 ## spin your own
@@ -80,12 +80,12 @@ or define new atoms, composed structures, ... (↓ are used by [`Json`](Json) fo
 
 ## supported default broad formats
 
-[`Json`](Json)
+@docs bits, json
+
+from [`Json`](Json)
 
   - [`Json.Morph.jsValueMagic`](Json-Morph#jsValueMagic)
   - [`Json.Morph.string`](Json-Morph#string)
-
-@docs bits
 
 -}
 
@@ -96,8 +96,11 @@ import Bytes
 import Decimal exposing (Decimal)
 import Decimal.Morph
 import Emptiable exposing (Emptiable)
+import Int.Morph
+import Integer
+import Json exposing (Json)
 import List.Morph
-import Morph exposing (ChoiceMorphEmptiable, ErrorWithDeadEnd(..), MorphIndependently, MorphRow, MorphRowIndependently)
+import Morph exposing (ChoiceMorphEmptiable, ErrorWithDeadEnd(..), MorphIndependently, MorphOrError, MorphRow, MorphRowIndependently)
 import N.Local exposing (n32)
 import N.Morph
 import Natural.Morph
@@ -105,7 +108,7 @@ import Possibly exposing (Possibly(..))
 import Stack exposing (Stacked)
 import String.Morph
 import Utf8CodePoint
-import Value exposing (Index, IndexAndName, IndexOrName(..), Name, Record, Tagged, Value)
+import Value exposing (IndexAndName, IndexOrName(..), Record, Tagged, Value)
 import Value.Morph.Internal
 
 
@@ -124,56 +127,56 @@ import Value.Morph.Internal
       - shuffling [`Value.Morph.part`](#part) order → no change
       - renaming [`Value.Morph.part`](#part)s → breaking change
 
-See also [`compact`](#compact)
+Another option to morph tags is [`Json.Morph.compact`](Json-Morph#compact)
 
 -}
 descriptive :
     MorphIndependently
-        (Name -> Result error_ IndexOrName)
-        (IndexAndName -> Name)
+        (String -> Result error_ IndexOrName)
+        (IndexAndName -> String)
 descriptive =
+    Morph.oneToOne Name .name
+
+
+{-| [`Morph.OneToOne`](Morph#OneToOne) the tags of a [`Value`](Value#Value).
+
+  - From one side, a tag will contain all the information that is available,
+    namely [`IndexAndName`](Value#IndexAndName). Your specified morph can choose one,
+    maybe even formatted in some way
+
+  - From the other side, a tag will come as what you chose/formatted.
+    Now it's your jon to recreate either an [`IndexOrName`](Value#IndexOrName)
+
+The simplest such tag morph is [`descriptive`](#descriptive), which is simply
+
+    Morph.oneToOne Value.Name .name
+
+We keep only the `.name` and we reconstruct any tag as a name.
+
+A more complex example is [`Json.Morph.compact`](Json-Morph#compact)
+
     Morph.oneToOne
-        (\tag -> tag.name |> Name)
-        (\tag -> { name = tag.name })
+        (\tag ->
+            case tag |> String.uncons of
+                Just ( 'a', tagAfterA ) ->
+                    case tagAfterA |> String.toInt of
+                        Just index ->
+                            index |> Value.Index
+                        ...
+        )
+        (\tag -> "a" ++ (tag.index |> String.fromInt))
 
+We keep the `.index` but prefixed with "a" to make it a field name.
+When recovering, we have to drop the "a" and then extract the index again.
+For all the cases where extracting fails, it's usually nice to just return them as a `Value.Name`
+since we do actually know how to decode only based on name.
 
-{-| With compact indexes. Use in combination with [`eachTag`](#eachTag)
+An example chain that uses [`eachTag`](#eachTag) to decode a project to a compact [`Json.Encode.Value`](Json-Morph#JsValueMagic):
 
-  - part tag = [`part` `MorphValue`](#part) index index in the builder
-  - variant tag = [`variant` `MorphValue`](#variant) index in the builder
-  - →
-      - unreadable to humans
-      - only readable by other tools if they know the variant and field order
-      - not easily debuggable
-      - shuffling [`Value.Morph.part`](#part) order → breaking change
-      - renaming [`Value.Morph.part`](#part)s → no change
-
-See also [`descriptive`](#descriptive)
-
--}
-compact :
-    MorphIndependently
-        (Index -> Result error_ IndexOrName)
-        (IndexAndName -> Index)
-compact =
-    Morph.oneToOne
-        (\tag -> tag.index |> Index)
-        (\tag -> { index = tag.index })
-
-
-{-| [`Morph.OneToOne`](Morph#OneToOne) from a [`Value`](Value#Value),
-reducing the amount of tag information in both directions
-
-For [`Value`](Value#Value), it's
-
-    ...
-        |> Morph.over (eachTag compact)
-
-    -- or
-    ...
-        |> Morph.over (eachTag descriptive)
-
-but the same thing works for [`Json`](Json), ... as well
+    Project.Morph.value
+        |> Morph.over (Value.Morph.eachTag Json.Morph.compact)
+        |> Morph.over Value.Morph.json
+        |> Morph.over Json.Morph.jsValueMagic
 
 -}
 eachTag :
@@ -197,10 +200,8 @@ eachTag tagTranslate_ =
 {-| [`Morph`](Morph#Morph) between a given narrow value
 and a [generic value](Value#Value)
 
-The way it's set up, it allows tags that are either
-
-  - [`descriptive`](#descriptive)
-  - [`compact`](#compact)
+The way it's set up, it allows build up tags as both [`IndexAndName`](Value#IndexAndName)
+which means you can sometimes choose which one yuo want to display for a more broad format. See [`eachTag`](#eachTag)
 
 -}
 type alias MorphValue narrow =
@@ -618,19 +619,33 @@ choiceFinish =
         choiceMorphComplete |> Value.Morph.Internal.choiceFinish
 
 
-{-| [`MorphRow`](Morph#MorphRow) from [`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bit)s.
+{-| [`Morph.OneToOne`](Morph#OneToOne) from [`Json`](Json#Json)
 
-Since it takes a `Value String`, you use it
-with [`compact`](#compact) or [`descriptive`](#descriptive)
-to chain it with a [`MorphValue`](#MorphValue):
-
-    yourTypeMorphValue
-        |> Morph.over (Value.Morph.eachTag Value.Morph.compact)
-        |> Morph.overRow Value.Morph.bits
+[Inverse](Morph#invert) of [`Json.Morph.value`](Json-Morph#value)
 
 -}
-bits : MorphRow (Value String) Bit
+json : MorphOrError (Value.Value String) Json error_
+json =
+    Morph.oneToOne Json.toValue Json.fromValue
+
+
+{-| [`MorphRow`](Morph#MorphRow) from [`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bit)s.
+
+Example chain converting to [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/)
+
+    yourTypeMorphValue
+        |> Morph.overRow Value.Morph.bits
+        |> Morph.over List.Morph.bytes
+
+-}
+bits : MorphRowIndependently (Value IndexOrName) (Value IndexAndName) Bit
 bits =
+    eachTag (Morph.oneToOne Value.Index .index)
+        |> Morph.overRow intTaggedBits
+
+
+intTaggedBits : MorphRow (Value Int) Bit
+intTaggedBits =
     Morph.recursive "generic value"
         (\step ->
             Morph.choice
@@ -717,8 +732,8 @@ numberBits =
 
 
 composedBits :
-    MorphRow (Value String) Bit
-    -> MorphRow (Value.Composed String) Bit
+    MorphRow (Value Int) Bit
+    -> MorphRow (Value.Composed Int) Bit
 composedBits step =
     Morph.choice
         (\listVariant recordVariant taggedVariant composedChoice ->
@@ -745,25 +760,26 @@ listBits step =
     Morph.named "list" (listUnnamedBits step)
 
 
-taggedBits :
-    MorphRow (Value String) Bit
-    -> MorphRow (Tagged String) Bit
+taggedBits : MorphRow (Value Int) Bit -> MorphRow (Tagged Int) Bit
 taggedBits step =
     Morph.narrow (\tag value -> { tag = tag, value = value })
-        |> Morph.grab .tag (Morph.named "tag" stringBits)
+        |> Morph.grab .tag
+            (Morph.named "tag"
+                (Int.Morph.integer
+                    -- to save bits
+                    |> Morph.over (Morph.oneToOne Integer.fromNatural Integer.absolute)
+                    |> Morph.overRow Natural.Morph.bitsVariableCount
+                )
+            )
         |> Morph.grab .value (Morph.named "value" step)
 
 
-recordBits :
-    MorphRow (Value String) Bit
-    -> MorphRow (Record String) Bit
+recordBits : MorphRow (Value Int) Bit -> MorphRow (Record Int) Bit
 recordBits step =
     Morph.named "record"
         (listUnnamedBits (taggedBits step))
 
 
-variantBits :
-    MorphRow (Value String) Bit
-    -> MorphRow (Tagged String) Bit
+variantBits : MorphRow (Value Int) Bit -> MorphRow (Tagged Int) Bit
 variantBits step =
     Morph.named "variant" (taggedBits step)

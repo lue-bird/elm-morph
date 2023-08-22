@@ -5,14 +5,17 @@ import Email
 import Expect
 import Fuzz exposing (Fuzzer)
 import Integer
+import Json.Morph
 import List.Morph
 import Morph exposing (toBroad, toNarrow)
 import N exposing (n0, n1, n9)
 import Natural
 import NaturalAtLeast1Base10 exposing (NaturalAtLeast1Base10)
 import Point
+import Project
 import Test exposing (Test, test)
 import Tree
+import Value.Morph
 
 
 tests : Test
@@ -22,6 +25,7 @@ tests =
         [ pointTest
         , emailTest
         , booleanTest
+        , projectTest
         , Test.fuzz naturalAtLeast1Base10Fuzz
             "base10: = to |> from Base2"
             (\naturalAtLeast1Base10 ->
@@ -192,4 +196,20 @@ booleanTest =
                     )
                 |> Expect.equal
                     (Ok (BooleanOr { left = BooleanOr { left = BooleanTrue, right = BooleanFalse }, right = BooleanFalse }))
+        )
+
+
+projectTest : Test
+projectTest =
+    test "prints correctly as compact json string"
+        (\() ->
+            { name = "example", description = "increment and decrement" }
+                |> Morph.toBroad
+                    (Project.morphValue
+                        |> Morph.over (Value.Morph.eachTag Json.Morph.compact)
+                        |> Morph.over Value.Morph.json
+                        |> Morph.over Json.Morph.string
+                    )
+                |> Expect.equal
+                    """{"a1":"increment and decrement","a0":"example"}"""
         )

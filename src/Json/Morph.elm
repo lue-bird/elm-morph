@@ -1,30 +1,24 @@
 module Json.Morph exposing
-    ( value
+    ( compact, value
     , string, stringBroadWith
-    , eachTag
     , JsValueMagic, jsValueMagic
     )
 
 {-| [Morph](Morph#Morph) [JSON](Json)
 
-
-## morph
-
-@docs value
+@docs compact, value
 @docs string, stringBroadWith
-@docs eachTag
 @docs JsValueMagic, jsValueMagic
 
 -}
 
-import Array
 import Decimal exposing (Decimal)
 import Decimal.Morph
 import Emptiable
 import Json exposing (Json)
 import Json.Decode
 import Json.Encode
-import Morph exposing (Morph, MorphIndependently)
+import Morph exposing (Morph, MorphIndependently, MorphOrError)
 import Possibly exposing (Possibly(..))
 import Result.Morph
 import Stack
@@ -89,7 +83,7 @@ decodeErrorToMorph =
                     |> Morph.DeadEnd
 
 
-jsValueMagicEncode : () -> (Json String -> JsValueMagic)
+jsValueMagicEncode : () -> (Json -> JsValueMagic)
 jsValueMagicEncode () =
     \jsonAny ->
         case jsonAny of
@@ -134,7 +128,7 @@ which is an opaque type and can't be constructed (for example by from `Json.Deco
 In general, try to use [`Json.jsValueMagic`](#jsValueMagic) instead wherever possible
 
 -}
-jsValueMagicDecoder : Json.Decode.Decoder (Json String)
+jsValueMagicDecoder : Json.Decode.Decoder Json
 jsValueMagicDecoder =
     Json.Decode.oneOf
         [ Json.Decode.map Atom jsonAtomDecoder
@@ -182,7 +176,7 @@ About json numbers...
 [json]: https://www.json.org/
 
 -}
-jsValueMagic : Morph (Json String) JsValueMagic
+jsValueMagic : Morph Json JsValueMagic
 jsValueMagic =
     Morph.named "JSON"
         { description = Morph.CustomDescription
@@ -201,7 +195,7 @@ jsValueMagic =
 To adjust format readability → [`stringBroadWith`](#stringBroadWith)
 
 -}
-string : Morph (Json String) String
+string : Morph Json String
 string =
     stringBroadWith { indentation = 0 }
 
@@ -213,7 +207,7 @@ I bet we could make this cleaner with a custom [`MorphRow`](Morph#MorphRow)
 and a nice pretty-printable broad representation like [`the-sett/elm-pretty-printer`](https://github.com/the-sett/elm-pretty-printer/blob/3.0.0/src/Internals.elm#L4).
 
 -}
-stringBroadWith : { indentation : Int } -> Morph (Json String) String
+stringBroadWith : { indentation : Int } -> Morph Json String
 stringBroadWith { indentation } =
     Morph.named "JSON"
         { description = Morph.CustomDescription
@@ -230,7 +224,7 @@ stringBroadWith { indentation } =
         }
 
 
-composedJsValueMagicEncode : () -> (Json.Composed String -> JsValueMagic)
+composedJsValueMagicEncode : () -> (Json.Composed -> JsValueMagic)
 composedJsValueMagicEncode () =
     \composedAny ->
         case composedAny of
@@ -249,7 +243,7 @@ composedJsValueMagicEncode () =
                     |> Json.Encode.object
 
 
-jsonComposedDecoder : Json.Decode.Decoder (Json.Composed String)
+jsonComposedDecoder : Json.Decode.Decoder Json.Composed
 jsonComposedDecoder =
     Json.Decode.lazy
         (\() ->
@@ -269,151 +263,51 @@ jsonComposedDecoder =
         )
 
 
-toValue : Json Value.IndexAndName -> Value.Value Value.IndexAndName
-toValue =
-    \json ->
-        case json of
-            Atom atom ->
-                atom |> atomToValue
-
-            Composed composed ->
-                composed |> composedToValue |> Composed
-
-
-atomToValue : Json.Atom -> Value.Value Value.IndexAndName
-atomToValue =
-    \atom ->
-        case atom of
-            Json.Null unit ->
-                unit |> Value.Unit |> Atom
-
-            Json.Number decimal ->
-                decimal |> Value.Number |> Atom
-
-            Json.String string_ ->
-                string_ |> Value.String |> Atom
-
-            Json.Bool bool ->
-                { value = () |> Value.Unit |> Atom
-                , tag =
-                    if bool then
-                        { index = 0, name = "False" }
-
-                    else
-                        { index = 1, name = "True" }
-                }
-                    |> Value.Variant
-                    |> Composed
-
-
-fromValueImplementation : Value.Value tag -> Json tag
-fromValueImplementation =
-    \json ->
-        case json of
-            Atom atom ->
-                atom |> atomFromValue |> Atom
-
-            Composed composed ->
-                composed |> composedFromValue |> Composed
-
-
-
--- tag
-
-
-atomFromValue : Value.Atom -> Json.Atom
-atomFromValue =
-    \atom ->
-        case atom of
-            Value.Unit () ->
-                Json.Null ()
-
-            Value.String stringAtom ->
-                stringAtom |> Json.String
-
-            Value.Number decimal ->
-                decimal |> Json.Number
-
-
 {-| [`Morph.OneToOne`](Morph#OneToOne) from a [generic representation of an elm value](Value#Value)
+
+[Inverse](Morph#invert) of [`Value.Morph.json`](Value-Morph#json)
+
 -}
-value :
-    MorphIndependently
-        (Value.Value narrowTag
-         -> Result error_ (Json narrowTag)
-        )
-        (Json Value.IndexAndName
-         -> Value.Value Value.IndexAndName
-        )
+value : MorphOrError Json (Value.Value String) error_
 value =
-    Morph.oneToOne fromValueImplementation toValue
+    Morph.oneToOne Json.fromValue Json.toValue
 
 
-composedToValue :
-    Json.Composed Value.IndexAndName
-    -> Value.Composed Value.IndexAndName
-composedToValue =
-    \composed ->
-        case composed of
-            Json.Array array ->
-                array |> Array.toList |> List.map toValue |> Value.List
+{-| With compact indexes. Use in combination with [`Value.Morph.eachTag`](Value-Morph#eachTag)
+just before chaining to [`Value.Morph.json`](Value-Morph#json)
 
-            Json.Object object ->
-                object
-                    |> List.map
-                        (\tagged ->
-                            { tag = tagged.tag
-                            , value = tagged.value |> toValue
-                            }
-                        )
-                    |> Value.Record
+  - part tag = [`part` `MorphValue`](Value-Morph#part) index index in the builder
+  - variant tag = [`variant` `MorphValue`](Value-Morph#variant) index in the builder
+  - →
+      - unreadable to humans
+      - only readable by other tools if they know the variant and field order
+      - not easily debuggable
+      - shuffling [`Value.Morph.part`](Value-Morph#part) order → breaking change
+      - renaming [`Value.Morph.part`](Value-Morph#part)s → no change
 
-
-composedFromValue : Value.Composed tag -> Json.Composed tag
-composedFromValue =
-    \composed ->
-        case composed of
-            Value.List list ->
-                list |> List.map fromValueImplementation |> Array.fromList |> Json.Array
-
-            Value.Record record ->
-                record
-                    |> List.map
-                        (\field ->
-                            { tag = field.tag
-                            , value = field.value |> fromValueImplementation
-                            }
-                        )
-                    |> Json.Object
-
-            Value.Variant variant ->
-                { tag = variant.tag, value = variant.value |> fromValueImplementation }
-                    |> List.singleton
-                    |> Json.Object
-
-
-{-| [`Morph.OneToOne`](Morph#OneToOne) for [`Json`](Json#Json)
-where [`Json.tagMap`](Json#tagMap) is called in both directions
-
-    ...
-        |> Morph.over (Json.Morph.eachTag Value.Morph.compact)
-
-    -- or
-    ...
-        |> Morph.over (Json.Morph.eachTag Value.Morph.descriptive)
-
-Links: [`Value.Morph.compact`](Value-Morph#compact), [`Value.Morph.descriptive`](Value-Morph#descriptive)
+See also [`Value.Morph.descriptive`](Value-Morph#descriptive)
 
 -}
-eachTag :
+compact :
     MorphIndependently
-        (tagBeforeMap -> Result (Morph.ErrorWithDeadEnd Never) tagMapped)
-        (tagBeforeUnmap -> tagUnmapped)
-    ->
-        MorphIndependently
-            (Json tagBeforeMap
-             -> Result (Morph.ErrorWithDeadEnd never_) (Json tagMapped)
-            )
-            (Json tagBeforeUnmap -> Json tagUnmapped)
-eachTag tagTranslate_ =
-    Morph.oneToOneOn Json.tagMap Json.tagMap tagTranslate_
+        (String -> Result error_ Value.IndexOrName)
+        (Value.IndexAndName -> String)
+compact =
+    Morph.oneToOne
+        (\tag ->
+            case tag |> String.uncons of
+                Just ( 'a', tagAfterA ) ->
+                    case tagAfterA |> String.toInt of
+                        Nothing ->
+                            String.cons 'a' tagAfterA |> Value.Name
+
+                        Just index ->
+                            index |> Value.Index
+
+                Just ( firstCharNotA, tagAfterFirstChar ) ->
+                    String.cons firstCharNotA tagAfterFirstChar |> Value.Name
+
+                Nothing ->
+                    "" |> Value.Name
+        )
+        (\tag -> "a" ++ (tag.index |> String.fromInt))
