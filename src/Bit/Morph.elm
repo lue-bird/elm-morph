@@ -57,6 +57,6 @@ value =
                 Bit.I ->
                     i ()
         )
-        |> Value.Morph.Internal.variant ( \() -> Bit.O, "0" ) Value.Morph.Internal.unit
-        |> Value.Morph.Internal.variant ( \() -> Bit.I, "1" ) Value.Morph.Internal.unit
+        |> Value.Morph.Internal.variant ( \() -> Bit.O, "zero" ) Value.Morph.Internal.unit
+        |> Value.Morph.Internal.variant ( \() -> Bit.I, "one" ) Value.Morph.Internal.unit
         |> Value.Morph.Internal.choiceFinish
