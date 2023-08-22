@@ -1,15 +1,16 @@
-module Bit.Morph exposing (char, n, only)
+module Bit.Morph exposing (char, n, only, value)
 
 {-| [`Morph`](Morph#Morph) for a [`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bit)
 
-@docs char, n, only
+@docs char, n, only, value
 
 -}
 
 import Bit exposing (Bit)
-import Char.Morph.Internal
+import Bit.Morph.Internal
 import Morph exposing (Morph, MorphIndependently)
 import N exposing (In, N, N1, To, Up, Up0, Up1)
+import Value.Morph.Internal exposing (MorphValue)
 
 
 {-| `n0` ↔ `O`, `n1` ↔ `I`
@@ -26,18 +27,7 @@ n =
 -}
 char : Morph Bit Char
 char =
-    Morph.choice
-        (\o i bit ->
-            case bit of
-                Bit.O ->
-                    o ()
-
-                Bit.I ->
-                    i ()
-        )
-        |> Morph.try (\() -> Bit.O) (Char.Morph.Internal.only '0')
-        |> Morph.try (\() -> Bit.I) (Char.Morph.Internal.only '1')
-        |> Morph.choiceFinish
+    Bit.Morph.Internal.char
 
 
 {-| Match a specific given `Bit` and not the other one.
@@ -51,6 +41,22 @@ char =
 -}
 only : Bit -> Morph () Bit
 only broadConstant =
-    Morph.only
-        (\bit -> bit |> Morph.toBroad char |> String.fromChar)
-        broadConstant
+    Bit.Morph.Internal.only broadConstant
+
+
+{-| [`MorphValue`](Value-Morph#MorphValue) from a [`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bit)
+-}
+value : MorphValue Bit
+value =
+    Morph.choice
+        (\o i bit ->
+            case bit of
+                Bit.O ->
+                    o ()
+
+                Bit.I ->
+                    i ()
+        )
+        |> Value.Morph.Internal.variant ( \() -> Bit.O, "0" ) Value.Morph.Internal.unit
+        |> Value.Morph.Internal.variant ( \() -> Bit.I, "1" ) Value.Morph.Internal.unit
+        |> Value.Morph.Internal.choiceFinish

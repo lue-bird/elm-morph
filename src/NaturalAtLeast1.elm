@@ -29,7 +29,7 @@ module NaturalAtLeast1 exposing
 
 import ArraySized exposing (ArraySized)
 import Bit exposing (Bit)
-import Bit.Morph
+import Bit.Morph.Internal
 import BitArray.Extra
 import Linear exposing (Direction(..))
 import Morph exposing (Morph, MorphRow)
@@ -120,10 +120,10 @@ bitsVariableCount =
     Morph.broadEnd
         |> Morph.overRow
             (Morph.untilNext
-                { end = Bit.Morph.only Bit.O |> Morph.one
+                { end = Bit.Morph.Internal.only Bit.O |> Morph.one
                 , element =
                     Morph.narrow (\bit -> bit)
-                        |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
+                        |> Morph.match (Bit.Morph.Internal.only Bit.I |> Morph.one)
                         |> Morph.grab (\bit -> bit)
                             (Morph.keep |> Morph.one)
                 }
