@@ -199,6 +199,18 @@ you can experiment with new primitives etc. without needing to fork `elm-morph`.
 I'd love to hear about your findings!
 
 
+# 🦆 Why is my code not compiling
+
+  - does your code have [`try`](#try) where [`rowTry`](#rowTry) would be correct?
+  - is [`|> Morph.choiceFinish`](#choiceFinish) always present?
+  - do you want to morph a single element in a [`MorphRow`](#MorphRow)? Use [`Morph.one`](Morph#one)
+  - is the type of your declaration correct?
+  - does your code use [`|> Morph.choiceFinish`](#choiceFinish) for a [`MorphValue`](Value-Morph#MorphValue)
+    instead of [`|> Value.Morph.choiceFinish`](Value-Morph#choiceFinish)?
+  - is [`|> Value.Morph.groupFinish`](Value-Morph#groupFinish) present?
+  - something else was confusing? → issue
+
+
 # limits of `Morph`
 
 
