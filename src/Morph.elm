@@ -205,6 +205,7 @@ I'd love to hear about your findings!
   - is [`|> Morph.choiceFinish`](#choiceFinish) always present?
   - do you want to morph a single element in a [`MorphRow`](#MorphRow)? Use [`Morph.one`](Morph#one)
   - is the type of your declaration correct?
+  - is the order of your [`try`](#try)/[`rowTry`](#rowTry)s correct? E.g. if you parse `f` as a variable before trying to parse it as a function call `f x`
   - does your code use [`|> Morph.choiceFinish`](#choiceFinish) for a [`MorphValue`](Value-Morph#MorphValue)
     instead of [`|> Value.Morph.choiceFinish`](Value-Morph#choiceFinish)?
   - is [`|> Value.Morph.groupFinish`](Value-Morph#groupFinish) present?
