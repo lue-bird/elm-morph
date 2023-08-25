@@ -1,5 +1,11 @@
 # change log
 
+#### 3.0.1
+
+  - `bits` → >= 9.0.2
+  - `bounded-nat` → >= 35.0.0
+  - `typesafe-array` → >= 34.0.1
+
 ## 3.0.0
 
   - type `Json tag` → `Json` with string tags just like the actual format
