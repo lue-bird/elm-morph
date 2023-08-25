@@ -403,7 +403,7 @@ For example:
   - [`MorphValue`](Value-Morph#MorphValue): [`toBroad`](#toBroad) returns a value where we know
     **both index and name** for each field/variant,
     whereas [`toNarrow`](#toNarrow) allows **either index or name** for each field/variant.
-    This allows us to choose whether we want a [`descriptive`](Value-Morph#descriptive) or [`compact`](Value-Morph#compact)
+    This allows us to choose whether we want a [`descriptive`](Value-Morph#descriptive) or [`compact`](Json-Morph#compact)
     view at the end, being able to switch anytime or use both for different situations.
   - [`MorphRow`](#MorphRow): [`toNarrow`](#toNarrow) accepts a row of elements
     but [`toBroad`](#toBroad) results in a [`Rope`](https://dark.elm.dmy.fr/packages/miniBill/elm-rope/latest/) for better performance
