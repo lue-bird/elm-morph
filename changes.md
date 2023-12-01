@@ -1,3 +1,7 @@
+## 4.0.0 plans
+  - `List.Morph.bytes` use `List Bit` instead of `Emptiable (Stacked Bit) Possibly`
+  - upgrade [zwilias/elm-rosetree](https://dark.elm.dmy.fr/packages/zwilias/elm-rosetree/latest/) to [gampleman/elm-rosetree](https://dark.elm.dmy.fr/packages/gampleman/elm-rosetree/latest/)
+
 # change log
 
 #### 3.0.1
