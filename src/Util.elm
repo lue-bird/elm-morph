@@ -1,13 +1,10 @@
-module Util exposing
-    ( onErr
-    , resultFromMaybeLazy
-    )
+module Util exposing (onErr, resultFromMaybeLazy)
 
 {-| Helpers
 
 Putting them in a separate `module` helps with testing as well as preventing import cycles
 
-@docs onErr
+@docs onErr, resultFromMaybeLazy
 
 -}
 
