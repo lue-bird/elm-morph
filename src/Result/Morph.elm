@@ -23,7 +23,7 @@ import Morph exposing (MorphIndependently)
 
     Err [ "Hiyo", "!" ]
         |> Morph.toNarrow Result.Morph.toOk
-    --> Err (Morph.DeadEnd [ "Hiyo", "!" ])
+    --> Err (Morph.DeadEnd "err")
 
 If your error type is not a `String`,
 you will need [`|> Morph.errorMap`](Morph#errorMap) [`(Morph.deadEndMap ..your error to String..)`](Morph#deadEndMap)
@@ -32,8 +32,8 @@ to make dead end types unify.
 -}
 toOk :
     MorphIndependently
-        (Result narrowError narrowSuccess
-         -> Result (Morph.ErrorWithDeadEnd narrowError) narrowSuccess
+        (Result narrowError_ narrowSuccess
+         -> Result Morph.Error narrowSuccess
         )
         (broadSuccess -> Result broadSuccess_ broadSuccess)
 toOk =
@@ -45,8 +45,8 @@ toOk =
                     Ok success ->
                         success |> Ok
 
-                    Err error ->
-                        error |> Err
+                    Err _ ->
+                        Err "err"
         }
 
 
@@ -55,7 +55,7 @@ toOk =
     import Morph
     import Char.Morph
 
-    Err 'Y'
+    Err 'y'
         |> Morph.toNarrow
             (Char.Morph.only 'Y'
                 |> Morph.over Result.Morph.toErr

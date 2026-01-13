@@ -1,7 +1,6 @@
 module Char.Morph exposing
     ( only
     , code, string, value
-    , bits
     )
 
 {-| [`Morph`](Morph#Morph) for an [`elm/core` `Char`](https://dark.elm.dmy.fr/packages/elm/core/latest/Char#Char)
@@ -16,7 +15,6 @@ import Bit exposing (Bit)
 import Char.Morph.Internal
 import Morph exposing (Morph, MorphRow)
 import String.Morph.Internal
-import Utf8CodePoint
 import Value.Morph.Internal exposing (MorphValue)
 
 
@@ -103,13 +101,16 @@ only broadConstant =
     Char.Morph.Internal.only broadConstant
 
 
-{-| [`MorphRow`](Morph#MorphRow) from [`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bit)s.
 
-Note that a `Char` isn't equivalent to a visual unit like 🇨🇿 or 🦸🏽‍♂️ or ả̴̫̼̫̀̅
-(→ see [grapheme](https://dark.elm.dmy.fr/packages/BrianHicks/elm-string-graphemes/latest/)).
-Instead, it's just one UTF-8 code point.
+{- {-| [`MorphRow`](Morph#MorphRow) from [`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bit)s.
+
+   Note that a `Char` isn't equivalent to a visual unit like 🇨🇿 or 🦸🏽‍♂️ or ả̴̫̼̫̀̅
+   (→ see [grapheme](https://dark.elm.dmy.fr/packages/BrianHicks/elm-string-graphemes/latest/)).
+   Instead, it's just one UTF-8 code point.
+
+   -}
+   bits : MorphRow Char Bit
+   bits =
+   Utf8CodePoint.charBits
 
 -}
-bits : MorphRow Char Bit
-bits =
-    Utf8CodePoint.charBits

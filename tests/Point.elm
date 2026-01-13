@@ -1,7 +1,6 @@
 module Point exposing (Point, chars)
 
-import Decimal exposing (Decimal)
-import Decimal.Morph
+import Int.Morph
 import Morph exposing (MorphRow, broad, grab, match)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import String.Morph
@@ -12,11 +11,11 @@ chars =
     Morph.narrow (\x y -> { x = x, y = y })
         |> match (String.Morph.only "(")
         |> match (broad [ () ] |> Morph.overRow spaces)
-        |> grab .x Decimal.Morph.chars
+        |> grab .x Int.Morph.chars
         |> match (broad [] |> Morph.overRow spaces)
         |> match (String.Morph.only ",")
         |> match (broad [ () ] |> Morph.overRow spaces)
-        |> grab .y Decimal.Morph.chars
+        |> grab .y Int.Morph.chars
         |> match (broad [ () ] |> Morph.overRow spaces)
         |> match (String.Morph.only ")")
 
@@ -29,4 +28,4 @@ spaces =
 
 type alias Point =
     RecordWithoutConstructorFunction
-        { x : Decimal, y : Decimal }
+        { x : Int, y : Int }

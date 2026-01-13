@@ -4,13 +4,9 @@ import Boolean exposing (Boolean(..))
 import Email
 import Expect
 import Fuzz exposing (Fuzzer)
-import Integer
 import Json.Morph
 import List.Morph
 import Morph exposing (toBroad, toNarrow)
-import N exposing (n0, n1, n9)
-import Natural
-import NaturalAtLeast1Base10 exposing (NaturalAtLeast1Base10)
 import Point
 import Project
 import Test exposing (Test, test)
@@ -26,57 +22,62 @@ tests =
         , emailTest
         , booleanTest
         , projectTest
-        , Test.fuzz naturalAtLeast1Base10Fuzz
-            "base10: = to |> from Base2"
-            (\naturalAtLeast1Base10 ->
-                ( naturalAtLeast1Base10
-                , -- only added for debugging
-                  naturalAtLeast1Base10 |> NaturalAtLeast1Base10.toBase2
-                )
-                    |> Expect.equal
-                        ( naturalAtLeast1Base10
-                            |> NaturalAtLeast1Base10.toBase2
-                            |> NaturalAtLeast1Base10.fromBase2
-                        , naturalAtLeast1Base10 |> NaturalAtLeast1Base10.toBase2
-                        )
-            )
-        , Test.fuzz Fuzz.int
-            "Integer: = to |> from Int"
-            (\naturalAtLeast1Base10 ->
-                naturalAtLeast1Base10
-                    |> Expect.equal
-                        (naturalAtLeast1Base10
-                            |> Integer.fromInt
-                            |> Integer.toInt
-                        )
-            )
-        , Test.fuzz (Fuzz.map N.intToAbsolute Fuzz.int)
-            "Natural: = to |> from N"
-            (\naturalAtLeast1Base10 ->
-                ( naturalAtLeast1Base10 |> N.toInt
-                , -- only added for debugging
-                  naturalAtLeast1Base10 |> Natural.fromN
-                )
-                    |> Expect.equal
-                        ( naturalAtLeast1Base10
-                            |> Natural.fromN
-                            |> Natural.toN
-                            |> N.toInt
-                        , naturalAtLeast1Base10 |> Natural.fromN
-                        )
-            )
+
+        {-
+              Test.fuzz naturalAtLeast1Base10Fuzz
+                  "base10: = to |> from Base2"
+                  (\naturalAtLeast1Base10 ->
+                      ( naturalAtLeast1Base10
+                      , -- only added for debugging
+                        naturalAtLeast1Base10 |> NaturalAtLeast1Base10.toBase2
+                      )
+                          |> Expect.equal
+                              ( naturalAtLeast1Base10
+                                  |> NaturalAtLeast1Base10.toBase2
+                                  |> NaturalAtLeast1Base10.fromBase2
+                              , naturalAtLeast1Base10 |> NaturalAtLeast1Base10.toBase2
+                              )
+                  )
+              , Test.fuzz Fuzz.int
+                  "Integer: = to |> from Int"
+                  (\naturalAtLeast1Base10 ->
+                      naturalAtLeast1Base10
+                          |> Expect.equal
+                              (naturalAtLeast1Base10
+                                  |> Integer.fromInt
+                                  |> Integer.toInt
+                              )
+                  )
+              , Test.fuzz (Fuzz.map N.intToAbsolute Fuzz.int)
+                  "Natural: = to |> from N"
+                  (\naturalAtLeast1Base10 ->
+                      ( naturalAtLeast1Base10 |> N.toInt
+                      , -- only added for debugging
+                        naturalAtLeast1Base10 |> Natural.fromN
+                      )
+                          |> Expect.equal
+                              ( naturalAtLeast1Base10
+                                  |> Natural.fromN
+                                  |> Natural.toN
+                                  |> N.toInt
+                              , naturalAtLeast1Base10 |> Natural.fromN
+                              )
+                  )
+
+
+           using
+
+               naturalAtLeast1Base10Fuzz : Fuzzer NaturalAtLeast1Base10
+               naturalAtLeast1Base10Fuzz =
+                   Fuzz.constant (\first afterFirst -> { first = first, afterFirst = afterFirst })
+                       |> Fuzz.andMap (Fuzz.map N.inToNumber (N.inFuzzUniform ( n1, n9 )))
+                       |> Fuzz.andMap
+                           (Fuzz.listOfLengthBetween 0
+                               9
+                               (Fuzz.map N.inToNumber (N.inFuzzUniform ( n0, n9 )))
+                           )
+        -}
         ]
-
-
-naturalAtLeast1Base10Fuzz : Fuzzer NaturalAtLeast1Base10
-naturalAtLeast1Base10Fuzz =
-    Fuzz.constant (\first afterFirst -> { first = first, afterFirst = afterFirst })
-        |> Fuzz.andMap (Fuzz.map N.inToNumber (N.inFuzzUniform ( n1, n9 )))
-        |> Fuzz.andMap
-            (Fuzz.listOfLengthBetween 0
-                9
-                (Fuzz.map N.inToNumber (N.inFuzzUniform ( n0, n9 )))
-            )
 
 
 
@@ -90,7 +91,7 @@ pointTest =
             (\() ->
                 let
                     narrowResult =
-                        "(3.00,  -9999.1240)"
+                        "(3,  -9998)"
                             |> toNarrow
                                 (Point.chars
                                     |> Morph.rowFinish
@@ -106,14 +107,49 @@ pointTest =
                             |> Expect.fail
 
                     Ok narrow ->
-                        narrow
-                            |> toBroad
-                                (Point.chars
-                                    |> Morph.rowFinish
-                                    |> Morph.over List.Morph.string
-                                )
-                            |> Expect.equal "( 3., -9999.124 )"
+                        Expect.all
+                            [ \() -> narrow |> Expect.equal { x = 3, y = -9998 }
+                            , \() ->
+                                narrow
+                                    |> toBroad
+                                        (Point.chars
+                                            |> Morph.rowFinish
+                                            |> Morph.over List.Morph.string
+                                        )
+                                    |> Expect.equal "( 3, -9998 )"
+                            ]
+                            ()
             )
+
+        {- test "toNarrow |> toBroad"
+           (\() ->
+               let
+                   narrowResult =
+                       "(3.00,  -9999.1240)"
+                           |> toNarrow
+                               (Point.chars
+                                   |> Morph.rowFinish
+                                   |> Morph.over List.Morph.string
+                               )
+               in
+               case narrowResult of
+                   Err error ->
+                       Morph.descriptionAndErrorToTree (Point.chars |> Morph.description) error
+                           |> Tree.map .text
+                           |> Morph.treeToLines
+                           |> String.join "\n"
+                           |> Expect.fail
+
+                   Ok narrow ->
+                       narrow
+                           |> toBroad
+                               (Point.chars
+                                   |> Morph.rowFinish
+                                   |> Morph.over List.Morph.string
+                               )
+                           |> Expect.equal "( 3., -9999.124 )"
+           )
+        -}
         ]
 
 

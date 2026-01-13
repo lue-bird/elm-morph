@@ -62,7 +62,6 @@ while [`Value.Morph`](Value-Morph) and most other modules contain morphs to conv
 
 -}
 
-import Decimal exposing (Decimal)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 
 
@@ -70,7 +69,7 @@ import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFuncti
 -}
 type Atom
     = Unit ()
-    | Number Decimal
+    | Number Float
     | String String
 
 
@@ -245,7 +244,7 @@ atomKindToString =
                 "Unit"
 
             Number _ ->
-                "Decimal"
+                "Number"
 
             String _ ->
                 "String"

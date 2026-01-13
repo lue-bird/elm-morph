@@ -32,16 +32,14 @@ import Bit exposing (Bit)
 import Linear exposing (Direction(..))
 import List.Linear
 import Morph exposing (MorphRow, grab)
-import N exposing (Add1, In, N, N0, N1, N9, On, Up0, Up9, n0, n1, n10, n2, n9)
-import N.Morph
 import Natural
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 
 
 type alias NaturalAtLeast1Base10 =
     RecordWithoutConstructorFunction
-        { first : N (In N1 N9)
-        , afterFirst : List (N (In N0 N9))
+        { first : N1To9
+        , afterFirst : List N0To9
         }
 
 
@@ -337,7 +335,7 @@ chars =
             |> grab .afterFirst
                 (Morph.whilePossible
                     (Morph.oneToOne N.inToNumber N.inToOn
-                        |> Morph.over (N.Morph.inChar ( n0, n9 ))
+                        |> Morph.over N0To9.morphChar
                         |> Morph.one
                     )
                 )

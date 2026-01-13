@@ -1,7 +1,7 @@
 module List.Morph exposing
     ( each
     , sequenceMap, broadSequenceMap
-    , stack, array, arraySized, string, set, dict
+    , array, string, set, dict
     , bytes, value
     )
 
@@ -20,27 +20,23 @@ module List.Morph exposing
 
 ## transform
 
-@docs stack, array, arraySized, string, set, dict
+@docs array, string, set, dict
 @docs bytes, value
 
 -}
 
 import Array exposing (Array)
-import ArraySized exposing (ArraySized)
 import Bit exposing (Bit)
-import BitArray
+import Bits
 import Bytes exposing (Bytes)
 import Bytes.Decode
 import Bytes.Encode
 import Dict exposing (Dict)
-import Emptiable exposing (Emptiable)
 import Linear exposing (Direction(..))
 import List.Linear
 import Morph exposing (MorphIndependently, MorphOrError, MorphRow, broad, toBroad, toNarrow)
 import Morph.Internal
-import N exposing (Min, Up0, n0, n8)
 import PartialOrComplete exposing (PartialOrComplete(..))
-import Possibly exposing (Possibly(..))
 import Rope
 import Set exposing (Set)
 import Stack exposing (Stacked)
@@ -170,8 +166,8 @@ sequence toSequence =
         toSequence0 :: toSequence1Up ->
             { description =
                 Morph.Internal.sequenceDescriptionFromStack
-                    (Stack.topBelow toSequence0 toSequence1Up
-                        |> Stack.map (\_ -> Morph.description)
+                    (( toSequence0, toSequence1Up )
+                        |> Stack.map Morph.description
                     )
             , toNarrow =
                 let
@@ -180,33 +176,32 @@ sequence toSequence =
                         ->
                             { broad : List broadElement
                             , narrow : List element
-                            , startsDown : Emptiable (Stacked Int) Never
+                            , startsDown : Stacked Int
                             }
                         ->
                             PartialOrComplete
                                 { broad : List broadElement
                                 , narrow : List element
-                                , startsDown : Emptiable (Stacked Int) Never
+                                , startsDown : Stacked Int
                                 }
                                 { error : Morph.Error
-                                , startsDown : Emptiable (Stacked Int) Never
+                                , startsDown : Stacked Int
                                 }
-                    step sequenceMorphRow =
-                        \soFar ->
-                            case soFar.broad |> toNarrow sequenceMorphRow of
-                                Ok stepParsed ->
-                                    { broad = stepParsed.broad
-                                    , narrow =
-                                        soFar.narrow |> (::) stepParsed.narrow
-                                    , startsDown =
-                                        soFar.startsDown
-                                            |> Stack.onTopLay (stepParsed.broad |> List.length)
-                                    }
-                                        |> Partial
+                    step sequenceMorphRow soFar =
+                        case soFar.broad |> toNarrow sequenceMorphRow of
+                            Ok stepParsed ->
+                                { broad = stepParsed.broad
+                                , narrow =
+                                    soFar.narrow |> (::) stepParsed.narrow
+                                , startsDown =
+                                    soFar.startsDown
+                                        |> Stack.cons (stepParsed.broad |> List.length)
+                                }
+                                    |> Partial
 
-                                Err error ->
-                                    { startsDown = soFar.startsDown, error = error }
-                                        |> Complete
+                            Err error ->
+                                { startsDown = soFar.startsDown, error = error }
+                                    |> Complete
                 in
                 \initialInput ->
                     let
@@ -246,30 +241,6 @@ sequence toSequence =
 --
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from a [stack](https://dark.elm.dmy.fr/packages/lue-bird/elm-emptiness-typed/latest/Stack)
-
-    import Stack
-    import Morph
-
-    Stack.topBelow 0 [ 12, 3 ]
-        |> Morph.mapTo List.Morph.stack
-    --> [ 0, 12, 3 ]
-
-[Inverse](Morph#invert) of [`Stack.Morph.list`](Stack-Morph#list)
-
--}
-stack :
-    MorphIndependently
-        (Emptiable (Stacked broadElement) Possibly
-         -> Result error_ (List broadElement)
-        )
-        (List narrowElement
-         -> Emptiable (Stacked narrowElement) Possibly
-        )
-stack =
-    Morph.oneToOne Stack.toList Stack.fromList
-
-
 {-| [`Morph.OneToOne`](Morph#OneToOne) from an `Array`
 
     import Array
@@ -288,30 +259,6 @@ array :
         (List element -> Array element)
 array =
     Morph.oneToOne Array.toList Array.fromList
-
-
-{-| [`Morph.OneToOne`](Morph#OneToOne) from an [`ArraySized`](https://dark.elm.dmy.fr/packages/lue-bird/elm-typesafe-array/latest/)
-
-    import ArraySized
-    import Morph
-
-    ArraySized.l4 0 1 2 3
-        |> Morph.mapTo List.Morph.arraySized
-    --> [ 0, 1, 2, 3 ]
-
-[Inverse](Morph#invert) of [`ArraySized.Morph.list`](ArraySized-Morph#list)
-
--}
-arraySized :
-    MorphIndependently
-        (ArraySized narrowElement narrowRange_
-         -> Result error_ (List narrowElement)
-        )
-        (List broadElement
-         -> ArraySized broadElement (Min (Up0 broadX_))
-        )
-arraySized =
-    Morph.oneToOne ArraySized.toList ArraySized.fromList
 
 
 {-| [`Morph.OneToOne`](Morph#OneToOne) from a `String` to a `List Char`.
@@ -421,7 +368,7 @@ If the element [`Morph`](Morph#Morph) is [`OneToOne`](Morph#OneToOne),
 each :
     MorphIndependently
         (beforeToNarrow
-         -> Result (Morph.ErrorWithDeadEnd deadEnd) narrow
+         -> Result Morph.Error narrow
         )
         (beforeToBroad -> broad)
     ->
@@ -429,12 +376,12 @@ each :
             (List beforeToNarrow
              ->
                 Result
-                    (Morph.ErrorWithDeadEnd deadEnd)
+                    Morph.Error
                     (List narrow)
             )
             (List beforeToBroad -> List broad)
 each elementMorph =
-    Morph.named "all"
+    Morph.named "each"
         { description =
             Morph.ElementsDescription (elementMorph |> Morph.description)
         , toNarrow =
@@ -450,31 +397,31 @@ each elementMorph =
 
                                     Err elementError ->
                                         let
+                                            errorsSoFar : List { index : Int, error : Morph.Error }
                                             errorsSoFar =
                                                 case collected of
                                                     Ok _ ->
-                                                        Emptiable.empty
+                                                        []
 
                                                     Err elementsAtIndexes ->
-                                                        elementsAtIndexes |> Emptiable.emptyAdapt (\_ -> Possible)
+                                                        elementsAtIndexes |> Stack.toList
                                         in
-                                        errorsSoFar
-                                            |> Stack.onTopLay
-                                                { index = index
-                                                , error = elementError
-                                                }
-                                            |> Err
+                                        Err
+                                            ( { index = index
+                                              , error = elementError
+                                              }
+                                            , errorsSoFar
+                                            )
                             , index = index - 1
                             }
                         )
-                        { collected = [] |> Ok
+                        { collected = Ok []
                         , index = (list |> List.length) - 1
                         }
                     |> .collected
                     |> Result.mapError Morph.PartsError
         , toBroad =
-            \list ->
-                list |> List.map (Morph.toBroad elementMorph)
+            \list -> list |> List.map (Morph.toBroad elementMorph)
         }
 
 
@@ -482,60 +429,6 @@ each elementMorph =
 to a list of individual bits.
 Now you can [morph them as a row](Morph#MorphRow)!
 -}
-bytes : MorphOrError (Emptiable (Stacked Bit) Possibly) Bytes error_
+bytes : MorphOrError (List Bit) Bytes error_
 bytes =
-    Morph.oneToOne
-        (\bytes_ ->
-            bytes_
-                |> Bytes.Decode.decode (byteList (bytes_ |> Bytes.width))
-                |> Maybe.withDefault []
-                |> Stack.fromList
-        )
-        (\bits ->
-            let
-                bytes_ =
-                    bits |> Stack.toList |> List.Linear.toChunksOf Up 8
-            in
-            bytes_.chunks
-                ++ [ bytes_.remainder ]
-                |> List.map
-                    (\unsignedInt8Bits ->
-                        unsignedInt8Bits
-                            |> ArraySized.fromList
-                            |> BitArray.toN
-                            |> N.toInt
-                            |> Bytes.Encode.unsignedInt8
-                    )
-                |> Bytes.Encode.sequence
-                |> Bytes.Encode.encode
-        )
-
-
-byteList : Int -> Bytes.Decode.Decoder (List Bit)
-byteList length =
-    Bytes.Decode.loop ( length, [] ) byteListStep
-
-
-byteListStep :
-    ( Int, List Bit )
-    ->
-        Bytes.Decode.Decoder
-            (Bytes.Decode.Step ( Int, List Bit ) (List Bit))
-byteListStep ( n, elements ) =
-    if n <= 0 then
-        Bytes.Decode.succeed (Bytes.Decode.Done (List.reverse elements))
-
-    else
-        Bytes.Decode.map
-            (\unsignedInt8 ->
-                Bytes.Decode.Loop
-                    ( n - 1
-                    , (unsignedInt8
-                        |> N.intToAtLeast n0
-                        |> BitArray.fromN n8
-                        |> ArraySized.toList
-                      )
-                        ++ elements
-                    )
-            )
-            Bytes.Decode.unsignedInt8
+    Morph.oneToOne Bits.fromBytes Bits.toBytes

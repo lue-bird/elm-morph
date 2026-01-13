@@ -1,7 +1,7 @@
 module String.Morph exposing
     ( each
     , only
-    , list, stack, array, arraySized, value
+    , list, array, value
     , sequenceMap, broadSequenceMap
     )
 
@@ -16,7 +16,7 @@ module String.Morph exposing
 
 ### transform
 
-@docs list, stack, array, arraySized, value
+@docs list, stack, array, value
 
 
 ## sequence
@@ -26,14 +26,9 @@ module String.Morph exposing
 -}
 
 import Array exposing (Array)
-import ArraySized exposing (ArraySized)
 import Char.Morph
-import Emptiable exposing (Emptiable)
 import List.Morph
 import Morph exposing (MorphIndependently, MorphOrError, MorphRow)
-import N exposing (Min, Up0)
-import Possibly exposing (Possibly)
-import Stack exposing (Stacked)
 import String.Morph.Internal
 import Value.Morph.Internal exposing (MorphValue)
 
@@ -67,53 +62,6 @@ list =
     Morph.oneToOne String.fromList String.toList
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from a
-[stack](https://dark.elm.dmy.fr/packages/lue-bird/elm-emptiness-typed/latest/Stack) of `Char`s.
-
-    import Stack
-    import Morph
-
-    Stack.topBelow '0' [ '1', '2' ]
-        |> Morph.mapTo String.Morph.stack
-    --> "012"
-
-[Inverse](Morph#invert) of [`Stack.Morph.string`](Stack-Morph#string)
-
--}
-stack :
-    MorphOrError
-        String
-        (Emptiable (Stacked Char) Possibly)
-        error_
-stack =
-    Morph.oneToOne Stack.toString Stack.fromString
-
-
-{-| [`Morph.OneToOne`](Morph#OneToOne) from an
-[`ArraySized`](https://dark.elm.dmy.fr/packages/lue-bird/elm-typesafe-array/latest/) of `Char`s
-
-    import ArraySized
-    import Morph
-
-    ArraySized.l4 '0' '1' '2' '3'
-        |> Morph.mapTo String.Morph.arraySized
-    --> "0123"
-
-[Inverse](Morph#invert) of [`ArraySized.Morph.string`](ArraySized-Morph#string)
-
--}
-arraySized :
-    MorphIndependently
-        (ArraySized Char narrowRange_
-         -> Result error_ String
-        )
-        (String
-         -> ArraySized Char (Min (Up0 broadX_))
-        )
-arraySized =
-    Morph.oneToOne ArraySized.toString ArraySized.fromString
-
-
 {-| [`Morph.OneToOne`](Morph#OneToOne) from an `Array Char`
 
     import Array
@@ -129,8 +77,7 @@ arraySized =
 array : MorphOrError String (Array Char) error_
 array =
     list
-        |> Morph.over (Morph.oneToOne Array.toList Array.fromList)
-        |> Morph.errorMap Morph.deadEndNever
+        |> Morph.overOneToOne (Morph.oneToOne Array.toList Array.fromList)
 
 
 

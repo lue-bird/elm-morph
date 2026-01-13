@@ -8,22 +8,21 @@ module Morph exposing
     , end, one, narrow, grab, match
     , named
     , invert
-    , deadEndMap
-    , deadEndNever, errorMap
-    , Error, ErrorWithDeadEnd(..), PartsError, SequenceError, SequencePlace(..), ChainError, ChainPlace(..), UntilError, CountAndExactlyElementSequenceError(..)
+    , errorMap
+    , Error(..), PartsError, SequenceError, SequencePlace(..), ChainError, ChainPlace(..), UntilError, CountAndExactlyElementSequenceError(..)
     , description
     , Description(..), ChainDescription, SequenceDescription, UntilDescription
     , descriptionToTree, DescriptionKind(..)
     , descriptionAndErrorToTree, DescriptionOrErrorKind(..)
     , treeToLines
-    , over, overRow
-    , PartsMorphEmptiable
+    , over, overOneToOne, overRow
+    , PartsMorphInProgress
     , parts, part, partsFinish
-    , VariantsMorphEmptiable, variants, variant, variantsFinish
+    , VariantsMorphInProgress, variants, variant, variantsFinish
     , choice
-    , ChoiceMorphEmptiable, try, choiceFinish
+    , ChoiceMorphInProgress, try, choiceFinish
     , tryTopToBottom
-    , ChoiceMorphRowEmptiable, rowTry
+    , ChoiceMorphRowInProgress, rowTry
     , whilePossible
     , untilNext, broadEnd, untilLast
     , whilePossibleFold, untilNextFold, untilLastFold
@@ -120,7 +119,7 @@ printable =
 
 # error
 
-@docs Error, ErrorWithDeadEnd, PartsError, SequenceError, SequencePlace, ChainError, ChainPlace, UntilError, CountAndExactlyElementSequenceError
+@docs Error, PartsError, SequenceError, SequencePlace, ChainError, ChainPlace, UntilError, CountAndExactlyElementSequenceError
 
 
 # describe
@@ -148,7 +147,7 @@ Maybe you've found or built some nice tree-view? Please share it :)
 
 # chain
 
-@docs over, overRow
+@docs over, overOneToOne, overRow
 
 If you're missing something more "I need a length andThen I can construct this many elements"-like,
 try [`ArraySized.Morph.exactlyWith`](ArraySized-Morph#exactlyWith).
@@ -156,7 +155,7 @@ try [`ArraySized.Morph.exactlyWith`](ArraySized-Morph#exactlyWith).
 
 # [`Morph`](Morph#Morph) by part
 
-@docs PartsMorphEmptiable
+@docs PartsMorphInProgress
 @docs parts, part, partsFinish
 
 
@@ -167,9 +166,9 @@ try [`ArraySized.Morph.exactlyWith`](ArraySized-Morph#exactlyWith).
 
 ## [`Morph`](Morph#Morph) by variant
 
-@docs VariantsMorphEmptiable, variants, variant, variantsFinish
+@docs VariantsMorphInProgress, variants, variant, variantsFinish
 @docs choice
-@docs ChoiceMorphEmptiable, try, choiceFinish
+@docs ChoiceMorphInProgress, try, choiceFinish
 
 
 ## dynamic list of possibilities
@@ -179,7 +178,7 @@ try [`ArraySized.Morph.exactlyWith`](ArraySized-Morph#exactlyWith).
 
 # choice [`MorphRow`](#MorphRow)
 
-@docs ChoiceMorphRowEmptiable, rowTry
+@docs ChoiceMorphRowInProgress, rowTry
 
 
 # sequence
@@ -312,15 +311,13 @@ Up for a challenge? implement & PR
 
 -}
 
-import Emptiable exposing (Emptiable)
 import Json.Decode exposing (Error)
 import Linear exposing (Direction(..))
-import Possibly exposing (Possibly(..))
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Rope exposing (Rope)
 import Stack exposing (Stacked)
 import Tree exposing (Tree)
-import Util exposing (recoverTry, stackInit, stackLast)
+import Util exposing (onErr)
 
 
 
@@ -423,7 +420,7 @@ type alias MorphIndependently toNarrow toBroad =
 to an error that can be different from the default [`Error`](#Error).
 
     type alias OneToOne mapped unmapped =
-        MorphOrError mapped unmapped (ErrorWithDeadEnd Never)
+        MorphOrError mapped unmapped Never
 
     type alias Morph narrow broad =
         MorphOrError narrow broad (ErrorWithDeadEnd String)
@@ -476,10 +473,10 @@ type
     | ChainDescription ChainDescription
       -- group morph
     | ElementsDescription Description
-    | PartsDescription (Emptiable (Stacked { tag : String, value : Description }) Never)
+    | PartsDescription (List { tag : String, value : Description })
       -- choice morph
-    | ChoiceDescription (Emptiable (Stacked Description) Never)
-    | VariantsDescription (Emptiable (Stacked { tag : String, value : Description }) Never)
+    | ChoiceDescription (List Description)
+    | VariantsDescription (List { tag : String, value : Description })
 
 
 {-| [`untilNext`](#untilNext) and [`untilNextFold`](#untilNextFold)-specific [`Description`](#Description)
@@ -585,14 +582,13 @@ isDescriptive =
                 elementDescription |> isDescriptive
 
             PartsDescription descriptionParts ->
-                descriptionParts |> Stack.toList |> List.any (\part_ -> part_.value |> isDescriptive)
+                descriptionParts |> List.any (\part_ -> part_.value |> isDescriptive)
 
             ChoiceDescription descriptionPossibilities ->
-                descriptionPossibilities |> Stack.toList |> List.any isDescriptive
+                descriptionPossibilities |> List.any isDescriptive
 
             VariantsDescription descriptionVariants ->
                 descriptionVariants
-                    |> Stack.toList
                     |> List.any (\variant_ -> variant_.value |> isDescriptive)
 
 
@@ -712,7 +708,6 @@ descriptionToTree description_ =
         ChoiceDescription possibilities ->
             Tree.tree { kind = DescriptionStructureKind, text = "either" }
                 (possibilities
-                    |> Stack.toList
                     |> List.map descriptionToTree
                 )
 
@@ -723,7 +718,6 @@ descriptionToTree description_ =
         PartsDescription partsDescription ->
             Tree.tree { kind = DescriptionStructureKind, text = "both" }
                 (partsDescription
-                    |> Stack.toList
                     |> List.map
                         (\partDescription ->
                             Tree.tree
@@ -737,7 +731,6 @@ descriptionToTree description_ =
         VariantsDescription variantsDescription ->
             Tree.tree { kind = DescriptionStructureKind, text = "variants" }
                 (variantsDescription
-                    |> Stack.toList
                     |> List.map
                         (\variantDescription ->
                             Tree.tree
@@ -808,104 +801,100 @@ startDownMessage =
 
 
 errorToTree : Error -> Tree String
-errorToTree =
-    \error ->
-        case error of
-            DeadEnd deadEnd ->
-                Tree.singleton ("but I found " ++ deadEnd)
+errorToTree error =
+    case error of
+        DeadEnd deadEnd ->
+            Tree.singleton ("but I found " ++ deadEnd)
 
-            UntilError untilError ->
-                Tree.tree "until"
-                    ((untilError.startsDownInBroadList
-                        |> Stack.removeTop
-                        |> Stack.toList
-                        |> List.reverse
-                        |> List.map
-                            (\startDown ->
-                                Tree.tree "successful element"
-                                    [ { startDownInBroadList = startDown } |> startDownMessage |> Tree.singleton ]
-                            )
-                     )
-                        ++ [ Tree.tree "end"
-                                [ untilError.endError |> errorToTree
-                                , { startDownInBroadList =
-                                        untilError.startsDownInBroadList |> Stack.top
-                                  }
-                                    |> startDownMessage
-                                    |> Tree.singleton
-                                ]
-                           ]
-                    )
+        UntilError untilError ->
+            Tree.tree "until"
+                ((untilError.startsDownInBroadList
+                    |> Stack.tail
+                    |> List.reverse
+                    |> List.map
+                        (\startDown ->
+                            Tree.tree "successful element"
+                                [ { startDownInBroadList = startDown } |> startDownMessage |> Tree.singleton ]
+                        )
+                 )
+                    ++ [ Tree.tree "end"
+                            [ untilError.endError |> errorToTree
+                            , { startDownInBroadList =
+                                    untilError.startsDownInBroadList |> Stack.head
+                              }
+                                |> startDownMessage
+                                |> Tree.singleton
+                            ]
+                       ]
+                )
 
-            SequenceError sequenceError ->
-                Tree.tree ([ sequenceError.place |> inSequencePlaceToString, " in sequence" ] |> String.concat)
-                    [ sequenceError.error |> errorToTree ]
+        SequenceError sequenceError ->
+            Tree.tree ([ sequenceError.place |> inSequencePlaceToString, " in sequence" ] |> String.concat)
+                [ sequenceError.error |> errorToTree ]
 
-            ChainError chainError ->
-                Tree.tree ([ chainError.place |> inChainPlaceToString, " in chain" ] |> String.concat)
-                    [ chainError.error |> errorToTree ]
+        ChainError chainError ->
+            Tree.tree ([ chainError.place |> inChainPlaceToString, " in chain" ] |> String.concat)
+                [ chainError.error |> errorToTree ]
 
-            ElementsError elementErrors ->
-                Tree.tree "elements"
-                    (elementErrors
-                        |> Stack.toList
-                        |> List.map
-                            (\elementError ->
-                                Tree.tree elementError.location
-                                    [ elementError.error |> errorToTree ]
-                            )
-                    )
+        ElementsError elementErrors ->
+            Tree.tree "elements"
+                (elementErrors
+                    |> Stack.toList
+                    |> List.map
+                        (\elementError ->
+                            Tree.tree elementError.location
+                                [ elementError.error |> errorToTree ]
+                        )
+                )
 
-            CountAndExactlyElementSequenceError countAndExactlyElementSequenceError ->
-                case countAndExactlyElementSequenceError of
-                    CountError countError ->
-                        Tree.tree "count" [ countError |> errorToTree ]
+        CountAndExactlyElementSequenceError countAndExactlyElementSequenceError ->
+            case countAndExactlyElementSequenceError of
+                CountError countError ->
+                    Tree.tree "count" [ countError |> errorToTree ]
 
-                    ExactlyCountElementSequenceError exactlyCountElementSequenceError ->
-                        Tree.tree "repeating element sequence"
-                            ((exactlyCountElementSequenceError.startsDownInBroadList
-                                |> Stack.removeTop
-                                |> Stack.toList
-                                |> List.reverse
-                                |> List.map
-                                    (\startDown ->
-                                        Tree.tree "successful element"
-                                            [ { startDownInBroadList = startDown } |> startDownMessage |> Tree.singleton ]
-                                    )
-                             )
-                                ++ [ Tree.tree
-                                        ([ "failed element" ] |> String.concat)
-                                        [ { startDownInBroadList =
-                                                exactlyCountElementSequenceError.startsDownInBroadList |> Stack.top
-                                          }
-                                            |> startDownMessage
-                                            |> Tree.singleton
-                                        , exactlyCountElementSequenceError.error |> errorToTree
-                                        ]
-                                   ]
-                            )
+                ExactlyCountElementSequenceError exactlyCountElementSequenceError ->
+                    Tree.tree "repeating element sequence"
+                        ((exactlyCountElementSequenceError.startsDownInBroadList
+                            |> Stack.tail
+                            |> List.reverse
+                            |> List.map
+                                (\startDown ->
+                                    Tree.tree "successful element"
+                                        [ { startDownInBroadList = startDown } |> startDownMessage |> Tree.singleton ]
+                                )
+                         )
+                            ++ [ Tree.tree
+                                    ([ "failed element" ] |> String.concat)
+                                    [ { startDownInBroadList =
+                                            exactlyCountElementSequenceError.startsDownInBroadList |> Stack.head
+                                      }
+                                        |> startDownMessage
+                                        |> Tree.singleton
+                                    , exactlyCountElementSequenceError.error |> errorToTree
+                                    ]
+                               ]
+                        )
 
-            PartsError partErrors ->
-                Tree.tree "both"
-                    (partErrors
-                        |> Stack.toList
-                        |> List.map
-                            (\elementError ->
-                                Tree.tree ([ "index ", elementError.index |> String.fromInt ] |> String.concat)
-                                    [ elementError.error |> errorToTree ]
-                            )
-                    )
+        PartsError partErrors ->
+            Tree.tree "both"
+                (partErrors
+                    |> Stack.toList
+                    |> List.map
+                        (\elementError ->
+                            Tree.tree ([ "index ", elementError.index |> String.fromInt ] |> String.concat)
+                                [ elementError.error |> errorToTree ]
+                        )
+                )
 
-            VariantError variantError ->
-                Tree.tree ([ "variant, index ", variantError.index |> String.fromInt ] |> String.concat)
-                    [ variantError.error |> errorToTree ]
+        VariantError variantError ->
+            Tree.tree ([ "variant, index ", variantError.index |> String.fromInt ] |> String.concat)
+                [ variantError.error |> errorToTree ]
 
-            ChoiceError possibilityErrors ->
-                Tree.tree "choice"
-                    (possibilityErrors
-                        |> Stack.toList
-                        |> List.map errorToTree
-                    )
+        ChoiceError possibilityErrors ->
+            Tree.tree "choice"
+                (possibilityErrors
+                    |> List.map errorToTree
+                )
 
 
 inChainPlaceToString : ChainPlace -> String
@@ -1016,8 +1005,7 @@ descriptionAndErrorToTree description_ =
                                 [ descriptionAndErrorToTree untilDescription.end untilError.endError
                                 ]
                                 :: (untilError.startsDownInBroadList
-                                        |> Stack.removeTop
-                                        |> Stack.toList
+                                        |> Stack.tail
                                         |> List.reverse
                                         |> List.map
                                             (\startDown ->
@@ -1029,7 +1017,7 @@ descriptionAndErrorToTree description_ =
                                    )
                                 ++ [ Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "element" }
                                         [ descriptionAndErrorToTree untilDescription.element untilError.elementError
-                                        , startDownLabel { startDownInBroadList = untilError.startsDownInBroadList |> Stack.top }
+                                        , startDownLabel { startDownInBroadList = untilError.startsDownInBroadList |> Stack.head }
                                         ]
                                    ]
                             )
@@ -1047,8 +1035,7 @@ descriptionAndErrorToTree description_ =
                                 [ descriptionAndErrorToTree untilDescription.end untilError.endError
                                 ]
                                 :: (untilError.startsDownInBroadList
-                                        |> stackInit
-                                        |> Stack.toList
+                                        |> Stack.init
                                         |> List.map
                                             (\startDown ->
                                                 Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "element" }
@@ -1059,7 +1046,7 @@ descriptionAndErrorToTree description_ =
                                    )
                                 ++ [ Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "element" }
                                         [ descriptionAndErrorToTree untilDescription.element untilError.elementError
-                                        , startDownLabel { startDownInBroadList = untilError.startsDownInBroadList |> stackLast }
+                                        , startDownLabel { startDownInBroadList = untilError.startsDownInBroadList |> Stack.last }
                                         ]
                                    ]
                             )
@@ -1096,8 +1083,8 @@ descriptionAndErrorToTree description_ =
                                 (\elementDescription elementError ->
                                     descriptionAndErrorToTree elementDescription elementError
                                 )
-                                (possibilities |> Stack.toList)
-                                (tryErrors |> Stack.toList)
+                                possibilities
+                                tryErrors
                             )
 
                     unexpectedError ->
@@ -1127,7 +1114,6 @@ descriptionAndErrorToTree description_ =
                     PartsError partsError ->
                         Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "both" }
                             (partsDescription
-                                |> Stack.toList
                                 |> List.indexedMap
                                     (\index partDescription ->
                                         Tree.tree
@@ -1153,7 +1139,6 @@ descriptionAndErrorToTree description_ =
                     VariantError variantError ->
                         Tree.tree { kind = DescriptionStructureKind |> DescriptionKind, text = "variants" }
                             (variantsDescription
-                                |> Stack.toList
                                 |> List.indexedMap
                                     (\index variantDescription ->
                                         Tree.tree
@@ -1388,44 +1373,17 @@ Each dead is a `String`.
 
 Open an issue if a String is not enough for the kinds of errors you want to display.
 
-In theory one can use [`MorphOrError`](#MorphOrError) [`ErrorWithDeadEnd`](#ErrorWithDeadEnd)
-doing [`deadEndMap`](#deadEndMap) on [`Morph`](#Morph)s like `only`
-but the current API is quite restrictive on errors to avoid complexity in Morph types.
-
 -}
-type alias Error =
-    ErrorWithDeadEnd String
-
-
-{-| [`Error`](#Error) with a custom value on `DeadEnd`
-
-    type alias OneToOne mapped unmapped =
-        MorphOrError mapped unmapped (ErrorWithDeadEnd Never)
-
-`deadEnd` could also be formatted text for display.
-For that, use [`MorphOrError`](#MorphOrError) [`ErrorWithDeadEnd`](#ErrorWithDeadEnd) doing [`deadEndMap`](#deadEndMap)
-on [`Morph`](#Morph) that are returned.
-
-Have trouble doing so because some API is too strict on errors? → issue
-
-Why do some variants have type aliases? → To concisely annotate them
-in the implementation of for example [`descriptionAndErrorToTree`](#descriptionAndErrorToTree).
-
--}
-type ErrorWithDeadEnd deadEnd
-    = DeadEnd deadEnd
-    | UntilError (UntilError (ErrorWithDeadEnd deadEnd))
-    | SequenceError (SequenceError (ErrorWithDeadEnd deadEnd))
-    | ChainError (ChainError (ErrorWithDeadEnd deadEnd))
-    | ElementsError
-        (Emptiable
-            (Stacked { location : String, error : ErrorWithDeadEnd deadEnd })
-            Never
-        )
-    | CountAndExactlyElementSequenceError (CountAndExactlyElementSequenceError (ErrorWithDeadEnd deadEnd))
-    | PartsError (PartsError (ErrorWithDeadEnd deadEnd))
-    | VariantError { index : Int, error : ErrorWithDeadEnd deadEnd }
-    | ChoiceError (Emptiable (Stacked (ErrorWithDeadEnd deadEnd)) Never)
+type Error
+    = DeadEnd String
+    | UntilError (UntilError Error)
+    | SequenceError (SequenceError Error)
+    | ChainError (ChainError Error)
+    | ElementsError (Stacked { location : String, error : Error })
+    | CountAndExactlyElementSequenceError (CountAndExactlyElementSequenceError Error)
+    | PartsError (PartsError Error)
+    | VariantError { index : Int, error : Error }
+    | ChoiceError (List Error)
 
 
 {-| An error when using [`ArraySized.Morph.exactlyWith`](ArraySized-Morph#exactlyWith)
@@ -1434,7 +1392,7 @@ type CountAndExactlyElementSequenceError error
     = CountError error
     | ExactlyCountElementSequenceError
         { error : error
-        , startsDownInBroadList : Emptiable (Stacked Int) Never
+        , startsDownInBroadList : Stacked Int
         }
 
 
@@ -1487,16 +1445,14 @@ type alias UntilError partError =
     RecordWithoutConstructorFunction
         { endError : partError
         , elementError : partError
-        , startsDownInBroadList : Emptiable (Stacked Int) Never
+        , startsDownInBroadList : Stacked Int
         }
 
 
 {-| A group's part [`Error`](#Error)s, each with their part index
 -}
 type alias PartsError partError =
-    Emptiable
-        (Stacked { index : Int, error : partError })
-        Never
+    Stacked { index : Int, error : partError }
 
 
 {-| Describe what you want to narrow to.
@@ -1603,7 +1559,7 @@ In that case, use [`Morph.toNarrow`](#toNarrow) to get a `Result` with a possibl
 -}
 mapTo :
     MorphIndependently
-        (unmapped -> Result (ErrorWithDeadEnd Never) mapped)
+        (unmapped -> Result Never mapped)
         broaden_
     -> (unmapped -> mapped)
 mapTo translate_ =
@@ -1613,7 +1569,7 @@ mapTo translate_ =
                 mappedNarrow
 
             Err error ->
-                error |> deadEndNever
+                error |> Basics.never
 
 
 
@@ -1667,7 +1623,8 @@ Note that `OneToOne` doesn't mean that information can't get lost on the way:
 
 -}
 type alias OneToOne mapped unmapped =
-    MorphOrError mapped unmapped (ErrorWithDeadEnd Never)
+    -- TODO avoid or only use for input
+    MorphOrError mapped unmapped Never
 
 
 {-| Switch between 2 opposite representations. Examples:
@@ -1809,12 +1766,12 @@ Example: only succeed with an int-like expression:
 custom :
     String
     ->
-        { toNarrow : beforeToNarrow -> Result deadEnd narrow
+        { toNarrow : beforeToNarrow -> Result String narrow
         , toBroad : beforeToBroad -> broad
         }
     ->
         MorphIndependently
-            (beforeToNarrow -> Result (ErrorWithDeadEnd deadEnd) narrow)
+            (beforeToNarrow -> Result Error narrow)
             (beforeToBroad -> broad)
 custom descriptionCustom morphTransformations =
     named descriptionCustom
@@ -1974,11 +1931,11 @@ lazy structureName morphLazy =
 {-| [`Morph`](#Morph) on groups in progress.
 Start with [`parts`](#parts), assemble with [`|> part`](#part), finally [`partsFinish`](#partsFinish)
 -}
-type alias PartsMorphEmptiable noPartPossiblyOrNever narrow broaden =
+type alias PartsMorphInProgress narrow broaden =
     RecordWithoutConstructorFunction
         { description :
             -- parts
-            Emptiable (Stacked { tag : String, value : Description }) noPartPossiblyOrNever
+            List { tag : String, value : Description }
         , toNarrow : narrow
         , toBroad : broaden
         }
@@ -2024,14 +1981,11 @@ parts :
     , broadAssemble
     )
     ->
-        PartsMorphEmptiable
-            Possibly
-            (broad_
-             -> Result error_ narrowAssemble
-            )
+        PartsMorphInProgress
+            (broad_ -> Result error_ narrowAssemble)
             (groupNarrow_ -> broadAssemble)
 parts ( narrowAssemble, broadAssemble ) =
-    { description = Emptiable.empty
+    { description = []
     , toNarrow = \_ -> narrowAssemble |> Ok
     , toBroad = \_ -> broadAssemble
     }
@@ -2059,8 +2013,7 @@ part :
         )
     -> MorphOrError partNarrow partBroad partError
     ->
-        (PartsMorphEmptiable
-            noPartPossiblyOrNever_
+        (PartsMorphInProgress
             (groupBroad
              ->
                 Result
@@ -2069,8 +2022,7 @@ part :
             )
             (groupNarrow -> (partBroad -> groupToBroadFurther))
          ->
-            PartsMorphEmptiable
-                noPartNever_
+            PartsMorphInProgress
                 (groupBroad
                  ->
                     Result
@@ -2082,16 +2034,16 @@ part :
 part partTagName ( narrowPartAccess, broadPartAccess ) partMorph =
     \groupMorphSoFar ->
         { description =
-            groupMorphSoFar.description
-                |> Stack.onTopLay { tag = partTagName, value = partMorph.description }
+            { tag = partTagName, value = partMorph.description }
+                :: groupMorphSoFar.description
         , toNarrow =
-            .toNarrow groupMorphSoFar
+            groupMorphSoFar.toNarrow
                 |> narrowPart
-                    (groupMorphSoFar.description |> Stack.length)
+                    (groupMorphSoFar.description |> List.length)
                     broadPartAccess
                     (toNarrow partMorph)
         , toBroad =
-            .toBroad groupMorphSoFar
+            groupMorphSoFar.toBroad
                 |> broadenPart narrowPartAccess (toBroad partMorph)
         }
 
@@ -2132,44 +2084,42 @@ narrowPart :
                     groupToNarrowFurther
             )
         )
-narrowPart index broadPartAccess narrowPartMorph =
-    \groupMorphSoFarNarrow ->
-        \groupBroad ->
-            case groupBroad |> broadPartAccess |> narrowPartMorph of
-                Err partError ->
-                    case groupBroad |> groupMorphSoFarNarrow of
+narrowPart index broadPartAccess narrowPartMorph groupMorphSoFarNarrow =
+    \groupBroad ->
+        case groupBroad |> broadPartAccess |> narrowPartMorph of
+            Err partError ->
+                Err
+                    (case groupBroad |> groupMorphSoFarNarrow of
                         Ok _ ->
                             { index = index, error = partError }
                                 |> Stack.one
-                                |> Err
 
                         Err partsSoFarError ->
                             partsSoFarError
-                                |> Stack.onTopLay { index = index, error = partError }
-                                |> Err
+                                |> Stack.cons { index = index, error = partError }
+                    )
 
-                Ok partNarrow ->
-                    groupBroad
-                        |> groupMorphSoFarNarrow
-                        |> Result.map (\eat -> eat partNarrow)
+            Ok partNarrow ->
+                groupBroad
+                    |> groupMorphSoFarNarrow
+                    |> Result.map (\eat -> eat partNarrow)
 
 
 {-| Conclude a [`Morph.parts`](#parts) [`|> Morph.part`](#part) builder.
 -}
 partsFinish :
-    PartsMorphEmptiable
-        Never
+    PartsMorphInProgress
         (beforeToNarrow
          ->
             Result
-                (PartsError (ErrorWithDeadEnd deadEnd))
+                (PartsError Error)
                 narrow
         )
         (beforeToBroad -> broad)
     ->
         MorphIndependently
             (beforeToNarrow
-             -> Result (ErrorWithDeadEnd deadEnd) narrow
+             -> Result Error narrow
             )
             (beforeToBroad -> broad)
 partsFinish =
@@ -2223,41 +2173,82 @@ Morph.custom "int"
 -}
 over :
     MorphIndependently
-        (beforeBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) beforeToNarrow)
+        (beforeBeforeNarrow -> Result Error beforeToNarrow)
         (beforeToBroad -> broad)
     ->
         (MorphIndependently
-            (beforeToNarrow -> Result (ErrorWithDeadEnd deadEnd) narrow)
+            (beforeToNarrow -> Result Error narrow)
             (beforeBeforeToBroad -> beforeToBroad)
          ->
             MorphIndependently
-                (beforeBeforeNarrow -> Result (ErrorWithDeadEnd deadEnd) narrow)
+                (beforeBeforeNarrow -> Result Error narrow)
                 (beforeBeforeToBroad -> broad)
         )
-over morphBroad =
-    \narrowMorph ->
-        { description =
-            ChainDescription
-                { broad = morphBroad |> description
-                , narrow = narrowMorph |> description
-                }
-        , toBroad =
-            \beforeToBroad ->
-                beforeToBroad
-                    |> toBroad narrowMorph
-                    |> toBroad morphBroad
-        , toNarrow =
-            \beforeToNarrow ->
-                beforeToNarrow
-                    |> toNarrow morphBroad
-                    |> Result.mapError (\error -> ChainError { place = ChainPlaceBroad, error = error })
-                    |> Result.andThen
-                        (\beforeNarrowNarrow ->
-                            beforeNarrowNarrow
-                                |> toNarrow narrowMorph
-                                |> Result.mapError (\error -> ChainError { place = ChainPlaceNarrow, error = error })
-                        )
-        }
+over morphBroad narrowMorph =
+    { description =
+        ChainDescription
+            { broad = morphBroad |> description
+            , narrow = narrowMorph |> description
+            }
+    , toBroad =
+        \beforeToBroad ->
+            beforeToBroad
+                |> toBroad narrowMorph
+                |> toBroad morphBroad
+    , toNarrow =
+        \beforeToNarrow ->
+            beforeToNarrow
+                |> toNarrow morphBroad
+                |> Result.mapError (\error -> ChainError { place = ChainPlaceBroad, error = error })
+                |> Result.andThen
+                    (\beforeNarrowNarrow ->
+                        beforeNarrowNarrow
+                            |> toNarrow narrowMorph
+                            |> Result.mapError (\error -> ChainError { place = ChainPlaceNarrow, error = error })
+                    )
+    }
+
+
+{-| Like [`over`](#over) but for [`Morph.OneToOne`](#OneToOne)
+
+TODO example
+
+-}
+overOneToOne :
+    MorphIndependently
+        (beforeBeforeNarrow -> Result Never beforeToNarrow)
+        (beforeToBroad -> broad)
+    ->
+        (MorphIndependently
+            (beforeToNarrow -> Result error narrow)
+            (beforeBeforeToBroad -> beforeToBroad)
+         ->
+            MorphIndependently
+                (beforeBeforeNarrow -> Result error narrow)
+                (beforeBeforeToBroad -> broad)
+        )
+overOneToOne morphBroad narrowMorph =
+    { description =
+        ChainDescription
+            { broad = morphBroad |> description
+            , narrow = narrowMorph |> description
+            }
+    , toBroad =
+        \beforeToBroad ->
+            beforeToBroad
+                |> toBroad narrowMorph
+                |> toBroad morphBroad
+    , toNarrow =
+        \beforeToNarrow ->
+            beforeToNarrow
+                |> toNarrow morphBroad
+                |> Result.mapError Basics.never
+                |> Result.andThen
+                    (\beforeNarrowNarrow ->
+                        beforeNarrowNarrow
+                            |> toNarrow narrowMorph
+                    )
+    }
 
 
 {-| `OneToOne a b` → `OneToOne b a`
@@ -2305,175 +2296,32 @@ This can be used to easily create a `fromX`/`toX` pair
 -}
 invert :
     MorphIndependently
-        (beforeMap -> Result (ErrorWithDeadEnd Never) mapped)
+        (beforeMap -> Result Never mapped)
         (beforeUnmap -> unmapped)
     ->
         MorphIndependently
             (beforeUnmap -> Result error_ unmapped)
             (beforeMap -> mapped)
-invert =
-    \translate_ ->
-        { toNarrow =
-            \beforeMap ->
-                beforeMap |> toBroad translate_ |> Ok
-        , toBroad = mapTo translate_
-        , description =
-            InverseDescription (translate_ |> description)
-        }
-
-
-{-| Change all [`DeadEnd`](#ErrorWithDeadEnd)s based on their current values.
-
-`deadEnd` can for example be changed to formatted text for display.
-For that, use [`MorphOrError`](#MorphOrError) [`ErrorWithDeadEnd`](#ErrorWithDeadEnd) doing [`deadEndMap`](#deadEndMap)
-on [`Morph`](#Morph) that are returned.
-
-Have trouble doing so because some API is too strict on errors? → issue
-
-See also: [`deadEndNever`](#deadEndNever)
-
--}
-deadEndMap :
-    (deadEnd -> deadEndChanged)
-    ->
-        (ErrorWithDeadEnd deadEnd
-         -> ErrorWithDeadEnd deadEndChanged
-        )
-deadEndMap deadEndChange =
-    \error ->
-        case error of
-            DeadEnd deadEnd ->
-                deadEnd |> deadEndChange |> DeadEnd
-
-            UntilError untilError ->
-                { startsDownInBroadList = untilError.startsDownInBroadList
-                , endError =
-                    untilError.endError |> deadEndMap deadEndChange
-                , elementError = untilError.elementError |> deadEndMap deadEndChange
-                }
-                    |> UntilError
-
-            SequenceError inSequence ->
-                SequenceError
-                    { place = inSequence.place
-                    , startDownInBroadList = inSequence.startDownInBroadList
-                    , error = inSequence.error |> deadEndMap deadEndChange
-                    }
-
-            ChainError inChain ->
-                ChainError
-                    { place = inChain.place
-                    , error = inChain.error |> deadEndMap deadEndChange
-                    }
-
-            PartsError parts_ ->
-                parts_
-                    |> Stack.map
-                        (\_ partError ->
-                            { index = partError.index
-                            , error = partError.error |> deadEndMap deadEndChange
-                            }
-                        )
-                    |> PartsError
-
-            ElementsError inElementsError ->
-                inElementsError
-                    |> Stack.map
-                        (\_ elementError ->
-                            { location = elementError.location
-                            , error = elementError.error |> deadEndMap deadEndChange
-                            }
-                        )
-                    |> ElementsError
-
-            ChoiceError possibilities ->
-                possibilities
-                    |> Stack.map
-                        (\_ -> deadEndMap deadEndChange)
-                    |> ChoiceError
-
-            VariantError variantError ->
-                { index = variantError.index
-                , error = variantError.error |> deadEndMap deadEndChange
-                }
-                    |> VariantError
-
-            CountAndExactlyElementSequenceError countAndElementsError ->
-                (case countAndElementsError of
-                    CountError countError ->
-                        countError |> deadEndMap deadEndChange |> CountError
-
-                    ExactlyCountElementSequenceError elementSequenceError ->
-                        { startsDownInBroadList = elementSequenceError.startsDownInBroadList
-                        , error = elementSequenceError.error |> deadEndMap deadEndChange
-                        }
-                            |> ExactlyCountElementSequenceError
-                )
-                    |> CountAndExactlyElementSequenceError
-
-
-{-| An [`Error`](#ErrorWithDeadEnd) where running into a dead end is impossible.
-
-Because each kind of error needs at least one dead end, no such error can be created.
-Therefore, you can treat it as _any_ value.
-
-Under the hood, only [`Basics.never`](https://dark.elm.dmy.fr/packages/elm/core/latest/Basics#never)
-it's as safe as any other elm code.
-
-[`deadEndNever`](#deadEndNever) can be useful with [`errorMap`](#errorMap)
-to convert a `MorphOrError ... (ErrorWithDeadEnd Never)` to `MorphOrError ... anyError_`
-
--}
-deadEndNever : ErrorWithDeadEnd Never -> any_
-deadEndNever =
-    \error ->
-        case error of
-            DeadEnd deadEnd ->
-                deadEnd |> never
-
-            UntilError untilError ->
-                untilError.elementError |> deadEndNever
-
-            SequenceError inSequence ->
-                inSequence.error |> deadEndNever
-
-            ChainError inChain ->
-                inChain.error |> deadEndNever
-
-            ElementsError inElementsError ->
-                inElementsError |> Stack.top |> .error |> deadEndNever
-
-            PartsError parts_ ->
-                parts_
-                    |> Stack.top
-                    |> .error
-                    |> deadEndNever
-
-            ChoiceError possibilities ->
-                possibilities
-                    |> Stack.top
-                    |> deadEndNever
-
-            VariantError variantError ->
-                variantError.error |> deadEndNever
-
-            CountAndExactlyElementSequenceError countAndElementsError ->
-                case countAndElementsError of
-                    CountError countError ->
-                        countError |> deadEndNever
-
-                    ExactlyCountElementSequenceError sequenceError ->
-                        sequenceError.error |> deadEndNever
+invert oneToOneToInvert =
+    { toNarrow =
+        \beforeMap ->
+            beforeMap |> toBroad oneToOneToInvert |> Ok
+    , toBroad = mapTo oneToOneToInvert
+    , description =
+        InverseDescription (oneToOneToInvert |> description)
+    }
 
 
 {-| Change the potential [`Error`](#Error). This is usually used with either
 
-  - [`deadEndNever : ErrorWithDeadEnd Never -> any_`](#deadEndNever)
+  - [`deadEndNever : Never -> any_`](#deadEndNever)
       - allows you to for example annotate a
         [`MorphOrError narrow broad (ErrorWithDeadEnd never_)`](#MorphOrError)
         as
         `MorphOrError narrow broad never_`
   - [`deadEndMap`](#deadEndMap)
+
+TODO remove
 
 -}
 errorMap :
@@ -2486,14 +2334,13 @@ errorMap :
         MorphIndependently
             (beforeToNarrow -> Result errorMapped narrowed)
             toBroad
-errorMap errorChange =
-    \morph ->
-        { description = morph |> description
-        , toBroad = toBroad morph
-        , toNarrow =
-            toNarrow morph
-                >> Result.mapError errorChange
-        }
+errorMap errorChange morph =
+    { description = morph |> description
+    , toBroad = toBroad morph
+    , toNarrow =
+        toNarrow morph
+            >> Result.mapError errorChange
+    }
 
 
 
@@ -2517,7 +2364,7 @@ oneToOneOn :
     ->
         (MorphIndependently
             (elementBeforeMap
-             -> Result (ErrorWithDeadEnd Never) elementMapped
+             -> Result Never elementMapped
             )
             (elementBeforeUnmap -> elementUnmapped)
          ->
@@ -2775,8 +2622,8 @@ then you feed it by [grabbing (taking)](#grab) what you need.
 
 ### example: infix-separated elements
 
-    Morph.narrow Stack.topBelow
-        |> grab Stack.top element
+    Morph.narrow (::)
+        |> grab Stack.head element
         |> grab (Stack.removeTop >> Stack.toList)
             (Morph.whilePossible
                 (Morph.narrow (\separator element -> { element = element, separator = separator })
@@ -2994,9 +2841,9 @@ import List.Morph
         (N.Morph.in_ ( n0, n9 )
             |> Morph.overRow
                 (Morph.narrow (\a b -> a |> N.add b)
-                    |> Morph.grab (\_ -> n0 |> N.maxTo n9) (N.Morph.inChar ( n0, n9 ))
+                    |> Morph.grab (\_ -> n0 |> N.maxTo n9) (N0To9.morphChar)
                     |> Morph.match (String.Morph.only "-")
-                    |> Morph.grab identity (N.Morph.inChar ( n0, n9 ))
+                    |> Morph.grab identity (N0To9.morphChar)
                 )
             |> Morph.rowFinish
             |> Morph.over List.Morph.string
@@ -3168,72 +3015,89 @@ untilNextFold :
             broadElement
 untilNextFold config =
     let
+        commit :
+            MorphIndependently
+                ({ beforeEnd : Maybe { folded : folded, stack : Stacked a }, end : endElement }
+                 -> Result error_ { beforeEnd : List a, end : endElement }
+                )
+                ({ beforeEnd : List e, end : endElement }
+                 ->
+                    { beforeEnd : Maybe { folded : folded, stack : Stacked e }
+                    , end : endElement
+                    }
+                )
         commit =
             oneToOne
                 (\beforeAndEnd ->
                     { end = beforeAndEnd.end
-                    , beforeEnd = beforeAndEnd.beforeEnd |> Stack.toList |> List.reverse
+                    , beforeEnd =
+                        case beforeAndEnd.beforeEnd of
+                            Nothing ->
+                                []
+
+                            Just beforeEnd ->
+                                beforeEnd.stack |> Stack.toList |> List.reverse
                     }
                 )
                 (\beforeAndEnd ->
-                    { end = beforeAndEnd.end
-                    , beforeEnd = beforeAndEnd.beforeEnd |> Stack.fromList
+                    { beforeEnd =
+                        case beforeAndEnd.beforeEnd of
+                            [] ->
+                                Nothing
+
+                            before0 :: before1Up ->
+                                Just
+                                    { stack = ( before0, before1Up )
+                                    , folded = config.initial
+                                    }
+                    , end = beforeAndEnd.end
                     }
                 )
-                |> over
-                    (oneToOne
-                        (\beforeAndEnd ->
-                            { end = beforeAndEnd.end
-                            , beforeEnd =
-                                beforeAndEnd.beforeEnd |> Emptiable.map .stack
-                            }
-                        )
-                        (\beforeAndEnd ->
-                            { beforeEnd =
-                                beforeAndEnd.beforeEnd
-                                    |> Emptiable.map (\before_ -> { stack = before_, folded = config.initial })
-                            , end = beforeAndEnd.end
-                            }
-                        )
-                    )
 
-        element =
-            \state ->
-                case state of
-                    Emptiable.Empty _ ->
-                        config.initial |> config.element
+        element :
+            Maybe { folded : folded, stack : Stacked element }
+            -> MorphRow element broadElement
+        element state =
+            case state of
+                Nothing ->
+                    config.initial |> config.element
 
-                    Emptiable.Filled folded ->
-                        folded.folded |> config.element
+                Just folded ->
+                    folded.folded |> config.element
 
+        fold :
+            OneToOne
+                { folded : folded, stack : Stacked element }
+                ( element, Maybe { folded : folded, stack : Stacked element } )
         fold =
             oneToOne
                 (\( top, state ) ->
                     case state of
-                        Emptiable.Empty _ ->
+                        Nothing ->
                             { folded = config.initial
-                            , stack = Stack.one top |> Emptiable.fill
+                            , stack = Stack.one top
                             }
 
-                        Emptiable.Filled folded ->
+                        Just folded ->
                             { folded = folded.folded |> config.fold top
-                            , stack = folded.stack |> Emptiable.filled |> Stack.onTopLay top |> Emptiable.fill
+                            , stack = Stack.cons top folded.stack
                             }
                 )
                 (\state ->
                     let
                         stackFilled =
-                            state.stack |> Emptiable.filled
+                            state.stack
                     in
-                    ( stackFilled |> Stack.top
-                    , stackFilled
-                        |> Stack.removeTop
-                        |> Emptiable.map
-                            (\stacked ->
-                                { folded = state.folded |> config.fold (stackFilled |> Stack.top)
-                                , stack = stacked
+                    ( stackFilled |> Stack.head
+                    , case stackFilled |> Stack.tail of
+                        [] ->
+                            Nothing
+
+                        stacked0 :: stacked1Up ->
+                            Just
+                                { folded = state.folded |> config.fold (stackFilled |> Stack.head)
+                                , stack = ( stacked0, stacked1Up )
                                 }
-                            )
                     )
                 )
     in
@@ -3245,30 +3109,28 @@ untilNextFold config =
     , toBroad =
         let
             step :
-                { previous : Emptiable { folded : folded, stack : Stacked element } Possibly
-                , rest : Emptiable { folded : folded, stack : Stacked element } Possibly
+                { previous : Maybe { folded : folded, stack : Stacked element }
+                , rest : Maybe { folded : folded, stack : Stacked element }
                 }
                 -> Rope broadElement
             step state =
                 case state.rest of
-                    Emptiable.Empty _ ->
+                    Nothing ->
                         Rope.empty
 
-                    Emptiable.Filled folded ->
+                    Just folded ->
                         let
                             ( elementBroad, rest ) =
                                 folded |> toBroad fold
 
                             previousWithElement =
-                                ( elementBroad, state.previous ) |> mapTo fold
+                                ( elementBroad, state.previous ) |> mapTo fold |> Just
                         in
-                        step { previous = previousWithElement |> Emptiable.filled, rest = rest }
+                        step { previous = previousWithElement, rest = rest }
                             |> Rope.prependTo
                                 (elementBroad
                                     |> toBroad
-                                        (element
-                                            (previousWithElement |> Emptiable.filled)
-                                        )
+                                        (element previousWithElement)
                                 )
         in
         \beforeToBroad ->
@@ -3276,7 +3138,10 @@ untilNextFold config =
                 uncommitted =
                     beforeToBroad |> toBroad commit
             in
-            step { previous = Emptiable.empty, rest = uncommitted.beforeEnd }
+            step
+                { previous = Nothing
+                , rest = uncommitted.beforeEnd
+                }
                 |> Rope.prependTo
                     (uncommitted.end
                         |> toBroad config.end
@@ -3284,68 +3149,59 @@ untilNextFold config =
     , toNarrow =
         let
             stepFrom :
-                Emptiable { folded : folded, stack : Stacked element } Possibly
+                Maybe { folded : folded, stack : Stacked element }
+                -> List broadElement
                 ->
-                    (List broadElement
-                     ->
-                        Result
-                            (UntilError Error)
-                            { broad : List broadElement
-                            , narrow : { beforeEnd : List element, end : endElement }
-                            }
-                    )
-            stepFrom state =
-                \beforeToNarrow ->
-                    let
-                        continue :
-                            { narrow : element, broad : List broadElement }
-                            -> Result (UntilError Error) { broad : List broadElement, narrow : { beforeEnd : List element, end : endElement } }
-                        continue elementParsed =
-                            let
-                                foldedWithStepped =
-                                    case state of
-                                        Emptiable.Empty _ ->
-                                            ( elementParsed.narrow, Emptiable.empty ) |> mapTo fold
-
-                                        Emptiable.Filled folded ->
-                                            ( elementParsed.narrow, folded |> Emptiable.filled ) |> mapTo fold
-                            in
-                            case elementParsed.broad |> stepFrom (foldedWithStepped |> Emptiable.filled) of
-                                Err error ->
-                                    { error
-                                        | startsDownInBroadList =
+                    Result
+                        (UntilError Error)
+                        { broad : List broadElement
+                        , narrow : { beforeEnd : List element, end : endElement }
+                        }
+            stepFrom state beforeToNarrow =
+                let
+                    continue :
+                        { narrow : element, broad : List broadElement }
+                        -> Result (UntilError Error) { broad : List broadElement, narrow : { beforeEnd : List element, end : endElement } }
+                    continue elementParsed =
+                        case
+                            elementParsed.broad
+                                |> stepFrom (Just (( elementParsed.narrow, state ) |> mapTo fold))
+                        of
+                            Err error ->
+                                { error
+                                    | startsDownInBroadList =
+                                        Stack.cons (elementParsed.broad |> List.length)
                                             error.startsDownInBroadList
-                                                |> Stack.onTopLay (elementParsed.broad |> List.length)
-                                    }
-                                        |> Err
+                                }
+                                    |> Err
 
-                                Ok result ->
-                                    result |> Ok
-                    in
-                    case beforeToNarrow |> toNarrow config.end of
-                        Err endError ->
-                            case beforeToNarrow |> toNarrow (element state) of
-                                Err elementError ->
+                            Ok result ->
+                                result |> Ok
+                in
+                case beforeToNarrow |> toNarrow config.end of
+                    Err endError ->
+                        case beforeToNarrow |> toNarrow (element state) of
+                            Err elementError ->
+                                Err
                                     { elementError = elementError
                                     , endError = endError
                                     , startsDownInBroadList = beforeToNarrow |> List.length |> Stack.one
                                     }
-                                        |> Err
 
-                                Ok elementParsed ->
-                                    continue elementParsed
+                            Ok elementParsed ->
+                                continue elementParsed
 
-                        Ok endElement ->
+                    Ok endElement ->
+                        Ok
                             { narrow =
                                 { end = endElement.narrow, beforeEnd = state }
                                     |> mapTo commit
                             , broad = endElement.broad
                             }
-                                |> Ok
         in
         \beforeToNarrow ->
             beforeToNarrow
-                |> stepFrom Emptiable.empty
+                |> stepFrom Nothing
                 |> Result.mapError
                     (\error ->
                         UntilError
@@ -3446,6 +3302,15 @@ untilLastFold config =
             }
     , toNarrow =
         let
+            step :
+                folded
+                -> List broadElement
+                ->
+                    Result
+                        (UntilError Error)
+                        { narrow : { end : end, beforeEnd : List element }
+                        , broad : List broadElement
+                        }
             step foldedSoFar beforeToNarrow =
                 case beforeToNarrow |> toNarrow (config.element foldedSoFar) of
                     Ok element ->
@@ -3474,7 +3339,7 @@ untilLastFold config =
                                             , endError = endError
                                             , startsDownInBroadList =
                                                 tailError.startsDownInBroadList
-                                                    |> Stack.onTopLay (beforeToNarrow |> List.length)
+                                                    |> Stack.cons (beforeToNarrow |> List.length)
                                             }
 
                     Err elementError ->
@@ -3588,59 +3453,60 @@ whilePossibleFold :
 whilePossibleFold config =
     oneToOne
         (\state ->
-            state
-                |> Emptiable.mapFlat
-                    (\folded ->
-                        folded
-                            |> .stack
-                            |> Emptiable.emptyAdapt (\_ -> Possible)
-                            |> Stack.reverse
-                    )
-                |> Stack.toList
+            case state of
+                Nothing ->
+                    []
+
+                Just folded ->
+                    folded
+                        |> .stack
+                        |> Stack.toList
+                        |> List.reverse
         )
         (\list ->
-            list
-                |> Stack.fromList
-                |> Emptiable.map
-                    (\stacked ->
-                        { stack = stacked |> Emptiable.filled
+            case list of
+                [] ->
+                    Nothing
+
+                stacked0 :: stacked1Up ->
+                    Just
+                        { stack = ( stacked0, stacked1Up )
                         , status = config.initial
                         }
-                    )
         )
         |> overRow
             (whilePossibleAsFold
                 { element =
                     \state ->
                         state
-                            |> Emptiable.map .status
-                            |> Emptiable.fillElseOnEmpty (\_ -> config.initial)
+                            |> Maybe.map .status
+                            |> Maybe.withDefault config.initial
                             |> config.element
                 , fold =
                     oneToOne
                         (\( top, below ) ->
                             case below of
-                                Emptiable.Empty _ ->
+                                Nothing ->
                                     { status = config.initial |> config.fold top
                                     , stack = top |> Stack.one
                                     }
 
-                                Emptiable.Filled belowFolded ->
+                                Just belowFolded ->
                                     { status = belowFolded.status |> config.fold top
-                                    , stack = belowFolded.stack |> Stack.onTopLay top
+                                    , stack = belowFolded.stack |> Stack.cons top
                                     }
                         )
                         (\state ->
-                            ( state.stack |> Stack.top
-                            , case state.stack |> Stack.removeTop of
-                                Emptiable.Empty _ ->
-                                    Emptiable.empty
+                            ( state.stack |> Stack.head
+                            , case state.stack |> Stack.tail of
+                                [] ->
+                                    Nothing
 
-                                Emptiable.Filled belowStacked ->
-                                    { status = state.status |> config.fold (state.stack |> Stack.top)
-                                    , stack = belowStacked |> Emptiable.filled
-                                    }
-                                        |> Emptiable.filled
+                                belowStacked0 :: belowStacked1Up ->
+                                    Just
+                                        { status = state.status |> config.fold (state.stack |> Stack.head)
+                                        , stack = ( belowStacked0, belowStacked1Up )
+                                        }
                             )
                         )
                 }
@@ -3648,27 +3514,27 @@ whilePossibleFold config =
 
 
 whilePossibleAsFold :
-    { element : Emptiable folded Possibly -> MorphRow element broadElement
-    , fold : OneToOne folded ( element, Emptiable folded Possibly )
+    { element : Maybe folded -> MorphRow element broadElement
+    , fold : OneToOne folded ( element, Maybe folded )
     }
-    -> MorphRow (Emptiable folded Possibly) broadElement
+    -> MorphRow (Maybe folded) broadElement
 whilePossibleAsFold config =
     { description =
         WhilePossibleDescription
-            (config.element Emptiable.empty |> description)
+            (config.element Nothing |> description)
     , toBroad =
         let
             step :
-                { previous : Emptiable folded Possibly
-                , rest : Emptiable folded Possibly
+                { previous : Maybe folded
+                , rest : Maybe folded
                 }
                 -> Rope broadElement
             step state =
                 case state.rest of
-                    Emptiable.Empty _ ->
+                    Nothing ->
                         Rope.empty
 
-                    Emptiable.Filled folded ->
+                    Just folded ->
                         let
                             ( element, rest ) =
                                 folded |> toBroad config.fold
@@ -3676,49 +3542,39 @@ whilePossibleAsFold config =
                             previousWithElement =
                                 ( element, state.previous ) |> mapTo config.fold
                         in
-                        step { previous = previousWithElement |> Emptiable.filled, rest = rest }
+                        step { previous = Just previousWithElement, rest = rest }
                             |> Rope.prependTo
                                 (element
                                     |> toBroad
                                         (config.element
-                                            (previousWithElement |> Emptiable.filled)
+                                            (Just previousWithElement)
                                         )
                                 )
         in
         \beforeToBroad ->
-            step { previous = Emptiable.empty, rest = beforeToBroad }
+            step { previous = Nothing, rest = beforeToBroad }
     , toNarrow =
         let
             stepFrom :
-                Emptiable folded Possibly
+                Maybe folded
+                -> List broadElement
                 ->
-                    (List broadElement
-                     ->
-                        { broad : List broadElement
-                        , narrow : Emptiable folded Possibly
-                        }
-                    )
-            stepFrom previousElement =
-                \beforeToNarrow ->
-                    case beforeToNarrow |> toNarrow (config.element previousElement) of
-                        Err _ ->
-                            { broad = beforeToNarrow, narrow = Emptiable.empty }
+                    { broad : List broadElement
+                    , narrow : Maybe folded
+                    }
+            stepFrom previousElement beforeToNarrow =
+                case beforeToNarrow |> toNarrow (config.element previousElement) of
+                    Err _ ->
+                        { broad = beforeToNarrow, narrow = Nothing }
 
-                        Ok stepped ->
-                            let
-                                foldedWithStepped =
-                                    case previousElement of
-                                        Emptiable.Empty _ ->
-                                            ( stepped.narrow, Emptiable.empty ) |> mapTo config.fold
-
-                                        Emptiable.Filled folded ->
-                                            ( stepped.narrow, folded |> Emptiable.filled ) |> mapTo config.fold
-                            in
-                            stepped.broad |> stepFrom (foldedWithStepped |> Emptiable.filled)
+                    Ok stepped ->
+                        stepped.broad
+                            |> stepFrom
+                                (Just (( stepped.narrow, previousElement ) |> mapTo config.fold))
         in
         \beforeToNarrow ->
             beforeToNarrow
-                |> stepFrom Emptiable.empty
+                |> stepFrom Nothing
                 |> Ok
     }
 
@@ -3817,16 +3673,15 @@ rowFinish =
 {-| Possibly incomplete [`Morph`](Morph#Morph) for a choice type.
 See [`Morph.choice`](Morph#choice), [`try`](#try), [`choiceFinish`](#choiceFinish)
 -}
-type alias ChoiceMorphEmptiable noTryPossiblyOrNever choiceNarrow choiceBeforeNarrow choiceToBroad error =
+type alias ChoiceMorphInProgress choiceNarrow choiceBeforeNarrow choiceToBroad error =
     RecordWithoutConstructorFunction
-        { description :
-            Emptiable (Stacked Description) noTryPossiblyOrNever
+        { description : List Description
         , toNarrow :
             choiceBeforeNarrow
             ->
                 Result
                     (-- tries
-                     Emptiable (Stacked error) noTryPossiblyOrNever
+                     List error
                     )
                     choiceNarrow
         , toBroad : choiceToBroad
@@ -3949,16 +3804,15 @@ type alias ChoiceMorphEmptiable noTryPossiblyOrNever choiceNarrow choiceBeforeNa
 choice :
     broadenByPossibility
     ->
-        ChoiceMorphEmptiable
-            Possibly
+        ChoiceMorphInProgress
             choiceNarrow_
             choiceBroad_
             broadenByPossibility
             error_
 choice choiceToBroadByDiscriminatingByPossibility =
-    { description = Emptiable.empty
+    { description = []
     , toNarrow =
-        \_ -> Emptiable.empty |> Err
+        \_ -> Err []
     , toBroad = choiceToBroadByDiscriminatingByPossibility
     }
 
@@ -3981,7 +3835,7 @@ An example is defined variable names
     Morph.oneToOne .info (\info -> { tag = "±", info = info })
         |> Morph.over
             (Morph.tryTopToBottom String.Morph.only
-                (Stack.topBelow "±" [ "pm", "plusminus" ])
+                ((::) "±" [ "pm", "plusminus" ])
             )
 
 That looks really cursed. Let me try to explain:
@@ -4046,21 +3900,21 @@ tryTopToBottom :
      ->
         MorphIndependently
             (beforeToNarrow
-             -> Result (ErrorWithDeadEnd deadEnd) possibilityInfoNarrow
+             -> Result Error possibilityInfoNarrow
             )
             (possibilityInfoBeforeToBroad -> broad)
     )
-    -> Emptiable (Stacked tag) Never
+    -> List tag
     ->
         MorphIndependently
             (beforeToNarrow
-             -> Result (ErrorWithDeadEnd deadEnd) { tag : tag, info : possibilityInfoNarrow }
+             -> Result Error { tag : tag, info : possibilityInfoNarrow }
             )
             ({ tag : tag, info : possibilityInfoBeforeToBroad } -> broad)
 tryTopToBottom traversePossibility tags =
     { description =
         tags
-            |> Stack.map (\_ tag -> tag |> traversePossibility |> description)
+            |> List.map (\tag -> tag |> traversePossibility |> description)
             |> ChoiceDescription
     , toNarrow =
         \beforeToNarrow ->
@@ -4088,34 +3942,26 @@ tryTopToBottom traversePossibility tags =
 tryTopToBottomToNarrow :
     (tag
      -> beforeToNarrow
-     -> Result (ErrorWithDeadEnd deadEnd) narrow
+     -> Result Error narrow
     )
-    -> Emptiable (Stacked tag) Never
-    ->
-        (beforeToNarrow
-         -> Result (ErrorWithDeadEnd deadEnd) narrow
-        )
-tryTopToBottomToNarrow traverseTry possibilities =
-    \beforeToNarrow ->
-        possibilities
-            |> Stack.foldFromOne
-                (\top ->
-                    beforeToNarrow
-                        |> traverseTry top
-                        |> Result.mapError Stack.one
-                )
-                Up
-                (\elementForMorph resultSoFar ->
-                    resultSoFar
-                        |> recoverTry
-                            (\errorsSoFar ->
-                                beforeToNarrow
-                                    |> traverseTry elementForMorph
-                                    |> Result.mapError
-                                        (\error -> errorsSoFar |> Stack.onTopLay error)
-                            )
-                )
-            |> Result.mapError (\errors -> errors |> Stack.reverse |> ChoiceError)
+    -> List tag
+    -> beforeToNarrow
+    -> Result Error narrow
+tryTopToBottomToNarrow traverseTry possibilities beforeToNarrow =
+    possibilities
+        |> List.foldl
+            (\elementForMorph resultSoFar ->
+                resultSoFar
+                    |> onErr
+                        (\errorsSoFar ->
+                            beforeToNarrow
+                                |> traverseTry elementForMorph
+                                |> Result.mapError
+                                    (\error -> error :: errorsSoFar)
+                        )
+            )
+            (Err [])
+        |> Result.mapError (\errors -> errors |> List.reverse |> ChoiceError)
 
 
 {-| Builder for a [`Morph`](#Morph) to a choice. Possibly incomplete
@@ -4123,12 +3969,10 @@ tryTopToBottomToNarrow traverseTry possibilities =
 Initialize with [`Morph.variants`](#variants)
 
 -}
-type alias VariantsMorphEmptiable noTryPossiblyOrNever narrow broaden =
+type alias VariantsMorphInProgress narrow broaden =
     RecordWithoutConstructorFunction
         { description :
-            Emptiable
-                (Stacked { tag : String, value : Description })
-                noTryPossiblyOrNever
+            List { tag : String, value : Description }
         , toNarrow : narrow
         , toBroad : broaden
         }
@@ -4190,8 +4034,7 @@ try :
             )
             (possibilityBeforeToBroad -> possibilityBroad)
     ->
-        (ChoiceMorphEmptiable
-            noTryPossiblyOrNever_
+        (ChoiceMorphInProgress
             narrowChoice
             possibilityBeforeNarrow
             ((possibilityBeforeToBroad -> possibilityBroad)
@@ -4199,8 +4042,7 @@ try :
             )
             error
          ->
-            ChoiceMorphEmptiable
-                noTryNever_
+            ChoiceMorphInProgress
                 narrowChoice
                 possibilityBeforeNarrow
                 choiceToBroadFurther
@@ -4209,24 +4051,19 @@ try :
 try possibilityToChoice possibilityMorph =
     \choiceMorphSoFar ->
         { description =
-            choiceMorphSoFar.description
-                |> Stack.onTopLay possibilityMorph.description
+            possibilityMorph.description :: choiceMorphSoFar.description
         , toNarrow =
             \broadValue ->
                 broadValue
                     |> choiceMorphSoFar.toNarrow
-                    |> recoverTry
+                    |> onErr
                         (\soFarTryErrors ->
                             case broadValue |> toNarrow possibilityMorph of
                                 Ok possibilityNarrow ->
-                                    possibilityNarrow
-                                        |> possibilityToChoice
-                                        |> Ok
+                                    Ok (possibilityNarrow |> possibilityToChoice)
 
                                 Err tryError ->
-                                    soFarTryErrors
-                                        |> Stack.onTopLay tryError
-                                        |> Err
+                                    Err (tryError :: soFarTryErrors)
                         )
         , toBroad =
             choiceMorphSoFar.toBroad
@@ -4238,7 +4075,7 @@ try possibilityToChoice possibilityMorph =
 -- each variant
 
 
-{-| Initialize a [variants morph](#VariantsMorphEmptiable)
+{-| Initialize a [variants morph](#VariantsMorphInProgress)
 by discriminating `(` the broad`,` the narrow `)` choices,
 then go through each [`Morph.variant`](Morph#variant),
 concluding the builder with [`Morph.choiceFinish`](#choiceFinish)
@@ -4295,13 +4132,9 @@ variants :
     ( narrowByPossibility
     , broadenByPossibility
     )
-    ->
-        VariantsMorphEmptiable
-            Possibly
-            narrowByPossibility
-            broadenByPossibility
+    -> VariantsMorphInProgress narrowByPossibility broadenByPossibility
 variants ( narrowByPossibility, broadenByPossibility ) =
-    { description = Emptiable.empty
+    { description = []
     , toNarrow = narrowByPossibility
     , toBroad = broadenByPossibility
     }
@@ -4323,8 +4156,7 @@ variant :
             )
             (beforeBroadVariantValue -> possibilityBroad)
     ->
-        (VariantsMorphEmptiable
-            noTryPossiblyOrNever_
+        (VariantsMorphInProgress
             ((beforeNarrowVariantValue
               -> Result { index : Int, error : error } narrowChoice
              )
@@ -4333,27 +4165,25 @@ variant :
             ((beforeBroadVariantValue -> broadChoice)
              -> broadenChoiceFurther
             )
-         ->
-            VariantsMorphEmptiable
-                noTryNever_
-                narrowChoiceFurther
-                broadenChoiceFurther
+         -> VariantsMorphInProgress narrowChoiceFurther broadenChoiceFurther
         )
 variant variantTagName ( possibilityToChoice, possibilityFromChoice ) possibilityMorph =
     \choiceMorphSoFar ->
         { description =
-            choiceMorphSoFar.description
-                |> Stack.onTopLay
-                    { tag = variantTagName, value = possibilityMorph.description }
+            { tag = variantTagName, value = possibilityMorph.description }
+                :: choiceMorphSoFar.description
         , toNarrow =
             choiceMorphSoFar.toNarrow
                 (\broad_ ->
                     case broad_ |> toNarrow possibilityMorph of
                         Ok possibility ->
-                            possibility |> possibilityToChoice |> Ok
+                            Ok (possibility |> possibilityToChoice)
 
                         Err error ->
-                            { index = choiceMorphSoFar.description |> Stack.length, error = error } |> Err
+                            Err
+                                { index = choiceMorphSoFar.description |> List.length
+                                , error = error
+                                }
                 )
         , toBroad =
             choiceMorphSoFar.toBroad
@@ -4368,16 +4198,15 @@ variant variantTagName ( possibilityToChoice, possibilityFromChoice ) possibilit
 {-| Conclude a [`Morph.variants`](Morph#variants) `|>` [`Morph.variant`](Morph#variant) builder
 -}
 variantsFinish :
-    VariantsMorphEmptiable
-        Never
+    VariantsMorphInProgress
         (beforeToNarrow
-         -> Result { index : Int, error : ErrorWithDeadEnd deadEnd } narrow
+         -> Result { index : Int, error : Error } narrow
         )
         broaden
     ->
         MorphIndependently
             (beforeToNarrow
-             -> Result (ErrorWithDeadEnd deadEnd) narrow
+             -> Result Error narrow
             )
             broaden
 variantsFinish =
@@ -4401,16 +4230,15 @@ variantsFinish =
 {-| Possibly incomplete [`MorphRow`](#MorphRow) for a choice/variant type/custom type.
 See [`Morph.choice`](Morph#choice), [`Morph.rowTry`](#rowTry), [`Morph.choiceFinish`](#choiceFinish)
 -}
-type alias ChoiceMorphRowEmptiable noTryPossiblyOrNever choiceNarrow choiceToBroad broadElement =
+type alias ChoiceMorphRowInProgress choiceNarrow choiceToBroad broadElement =
     RecordWithoutConstructorFunction
-        { description :
-            Emptiable (Stacked Description) noTryPossiblyOrNever
+        { description : List Description
         , toNarrow :
             List broadElement
             ->
                 Result
                     (-- tries
-                     Emptiable (Stacked Error) noTryPossiblyOrNever
+                     List Error
                     )
                     { narrow : choiceNarrow
                     , broad : List broadElement
@@ -4437,7 +4265,7 @@ try this [`MorphRow`](#MorphRow).
     import List.Morph
 
     type AlphaNum
-        = Digits (ArraySized (N (In (On N0) (On N9))) (Min (On N1)))
+        = Digits (ArraySized (N0To9) (Min (On N1)))
         | Letters (ArraySized AToZ (Min (On N1)))
 
     alphaNum : MorphRow AlphaNum Char
@@ -4453,7 +4281,7 @@ try this [`MorphRow`](#MorphRow).
             |> Morph.rowTry Letters
                 (atLeast n1 (AToZ.Morph.lowerChar |> Morph.one))
             |> Morph.rowTry Digits
-                (atLeast n1 (N.Morph.inChar ( n0, n9 ) |> Morph.one))
+                (atLeast n1 (N0To9.morphChar |> Morph.one))
             |> Morph.choiceFinish
 
     -- try letters, or else give me some digits
@@ -4545,16 +4373,14 @@ rowTry :
     (possibilityNarrow -> choiceNarrow)
     -> MorphRowIndependently possibilityNarrow possibilityBeforeToBroad broadElement
     ->
-        (ChoiceMorphRowEmptiable
-            noTryPossiblyOrNever_
+        (ChoiceMorphRowInProgress
             choiceNarrow
             ((possibilityBeforeToBroad -> Rope broadElement)
              -> choiceToBroadFurther
             )
             broadElement
          ->
-            ChoiceMorphRowEmptiable
-                never_
+            ChoiceMorphRowInProgress
                 choiceNarrow
                 choiceToBroadFurther
                 broadElement
@@ -4562,26 +4388,24 @@ rowTry :
 rowTry possibilityToChoice possibilityMorph =
     \choiceMorphSoFar ->
         { description =
-            choiceMorphSoFar.description
-                |> Stack.onTopLay (possibilityMorph |> description)
+            (possibilityMorph |> description)
+                :: choiceMorphSoFar.description
         , toNarrow =
             \choiceBroad ->
                 choiceBroad
                     |> choiceMorphSoFar.toNarrow
-                    |> recoverTry
+                    |> onErr
                         (\soFarErrorPossibilities ->
                             case choiceBroad |> toNarrow possibilityMorph of
                                 Ok possibilityParsed ->
-                                    { broad = possibilityParsed.broad
-                                    , narrow =
-                                        possibilityParsed.narrow |> possibilityToChoice
-                                    }
-                                        |> Ok
+                                    Ok
+                                        { broad = possibilityParsed.broad
+                                        , narrow =
+                                            possibilityParsed.narrow |> possibilityToChoice
+                                        }
 
                                 Err possibilityExpectation ->
-                                    soFarErrorPossibilities
-                                        |> Stack.onTopLay possibilityExpectation
-                                        |> Err
+                                    Err (possibilityExpectation :: soFarErrorPossibilities)
                         )
         , toBroad =
             choiceMorphSoFar.toBroad
@@ -4592,27 +4416,27 @@ rowTry possibilityToChoice possibilityMorph =
 {-| Always the last step of a [`Morph.choice`](Morph#choice) [`|> Morph.try`](Morph#try) or [`|> Morph.rowTry`](#rowTry) builder
 -}
 choiceFinish :
-    ChoiceMorphEmptiable
-        Never
+    ChoiceMorphInProgress
         choiceNarrow
         choiceBeforeNarrow
         (choiceBeforeToBroad -> choiceBroad)
-        (ErrorWithDeadEnd deadEnd)
+        Error
     ->
         MorphIndependently
             (choiceBeforeNarrow
-             -> Result (ErrorWithDeadEnd deadEnd) choiceNarrow
+             -> Result Error choiceNarrow
             )
             (choiceBeforeToBroad -> choiceBroad)
 choiceFinish =
     \choiceMorphComplete ->
         { description =
-            choiceMorphComplete.description |> Stack.reverse |> ChoiceDescription
+            ChoiceDescription (choiceMorphComplete.description |> List.reverse)
         , toNarrow =
             \beforeToNarrow ->
                 beforeToNarrow
                     |> choiceMorphComplete.toNarrow
-                    |> Result.mapError (\errors -> errors |> Stack.reverse |> ChoiceError)
+                    |> Result.mapError
+                        (\errors -> ChoiceError (errors |> List.reverse))
         , toBroad =
             choiceMorphComplete.toBroad
         }

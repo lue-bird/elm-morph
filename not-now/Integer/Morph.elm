@@ -16,8 +16,6 @@ module Integer.Morph exposing
 
 -}
 
-import ArraySized exposing (ArraySized)
-import ArraySized.Morph
 import Bit exposing (Bit)
 import BitArray.Extra
 import Bytes
@@ -26,7 +24,6 @@ import Decimal.Morph
 import Integer exposing (Integer)
 import Linear exposing (Direction(..))
 import Morph exposing (Morph, MorphOrError, MorphRow)
-import N exposing (Add1, In, N, On, To, Up, n1)
 import Natural
 import Natural.Internal
 import NaturalAtLeast1

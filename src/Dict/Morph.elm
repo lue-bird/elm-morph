@@ -21,7 +21,7 @@ module Dict.Morph exposing
 
 import Dict exposing (Dict)
 import List.Morph
-import Morph exposing (ErrorWithDeadEnd, MorphIndependently)
+import Morph exposing (Error, MorphIndependently)
 import Value.Morph.Internal exposing (MorphValue)
 
 
@@ -71,7 +71,7 @@ list =
 -}
 eachValue :
     MorphIndependently
-        (beforeMapValue -> Result (ErrorWithDeadEnd Never) mappedValue)
+        (beforeMapValue -> Result Never mappedValue)
         (beforeUnmapValue -> unmappedValue)
     ->
         MorphIndependently

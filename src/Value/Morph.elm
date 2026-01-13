@@ -1,12 +1,12 @@
 module Value.Morph exposing
     ( MorphValue
     , unit
-    , MorphValueGroupEmptiable, PartsError(..)
+    , MorphValueGroupInProgress, PartsError(..)
     , group, part, groupFinish
     , variant, choiceFinish
     , eachTag, descriptive
     , toAtom, toComposed
-    , bits, json
+    , json
     )
 
 {-| [Morph](Morph#Morph) your types over a [generic, `case`-able elm value](Value)
@@ -37,7 +37,7 @@ for a [`Natural`](Natural#Natural)
 
 ## grouping
 
-@docs MorphValueGroupEmptiable, PartsError
+@docs MorphValueGroupInProgress, PartsError
 @docs group, part, groupFinish
 
 
@@ -89,25 +89,15 @@ from [`Json`](Json)
 
 -}
 
-import ArraySized.Morph
 import Bit exposing (Bit)
 import Bit.Morph
 import Bytes
-import Decimal exposing (Decimal)
-import Decimal.Morph
-import Emptiable exposing (Emptiable)
 import Int.Morph
-import Integer
 import Json exposing (Json)
 import List.Morph
-import Morph exposing (ChoiceMorphEmptiable, ErrorWithDeadEnd(..), MorphIndependently, MorphOrError, MorphRow, MorphRowIndependently)
-import N.Local exposing (n32)
-import N.Morph
-import Natural.Morph
-import Possibly exposing (Possibly(..))
+import Morph exposing (ChoiceMorphInProgress, Error(..), MorphIndependently, MorphOrError, MorphRow, MorphRowIndependently)
 import Stack exposing (Stacked)
 import String.Morph
-import Utf8CodePoint
 import Value exposing (IndexAndName, IndexOrName(..), Record, Tagged, Value)
 import Value.Morph.Internal
 
@@ -181,12 +171,12 @@ An example chain that uses [`eachTag`](#eachTag) to decode a project to a compac
 -}
 eachTag :
     MorphIndependently
-        (tagBeforeMap -> Result (Morph.ErrorWithDeadEnd Never) tagMapped)
+        (tagBeforeMap -> Result Never tagMapped)
         (tagBeforeUnmap -> tagUnmapped)
     ->
         MorphIndependently
             (Value tagBeforeMap
-             -> Result (Morph.ErrorWithDeadEnd never_) (Value tagMapped)
+             -> Result never_ (Value tagMapped)
             )
             (Value tagBeforeUnmap -> Value tagUnmapped)
 eachTag tagTranslate_ =
@@ -322,16 +312,16 @@ Another example for tuples
         Morph.named "3-tuple"
             (Value.Morph.group
                 (\part0 part1 part2 -> ( part0, part1, part2 ))
-                |> Value.Morph.part ( \( part0, _, _ ) -> part0, "part0" ) part0Morph
-                |> Value.Morph.part ( \( _, part1, _ ) -> part1, "part1" ) part1Morph
-                |> Value.Morph.part ( \( _, _, part2 ) -> part2, "part2" ) part2Morph
+                |> Value.Morph.part ( \( v, _, _ ) -> v, "part0" ) part0Morph
+                |> Value.Morph.part ( \( _, v, _ ) -> v, "part1" ) part1Morph
+                |> Value.Morph.part ( \( _, _, v ) -> v, "part2" ) part2Morph
                 |> Value.Morph.groupFinish
             )
 
 -}
 group :
     groupNarrowAssemble
-    -> MorphValueGroupEmptiable Possibly groupNarrow_ groupNarrowAssemble
+    -> MorphValueGroupInProgress groupNarrow_ groupNarrowAssemble
 group groupNarrowAssemble =
     Morph.parts ( groupNarrowAssemble, [] )
 
@@ -345,9 +335,8 @@ building:
   - finish with [`|> groupFinish`](#groupFinish)
 
 -}
-type alias MorphValueGroupEmptiable noPartPossiblyOrNever groupNarrow groupNarrowFurther =
-    Morph.PartsMorphEmptiable
-        noPartPossiblyOrNever
+type alias MorphValueGroupInProgress groupNarrow groupNarrowFurther =
+    Morph.PartsMorphInProgress
         (Value.Record IndexOrName
          -> Result PartsError groupNarrowFurther
         )
@@ -357,7 +346,7 @@ type alias MorphValueGroupEmptiable noPartPossiblyOrNever groupNarrow groupNarro
 {-| What can go wrong while narrowing to a [`Record`](Value#Record)
 -}
 type PartsError
-    = TagsMissing (Emptiable (Stacked Int) Never)
+    = TagsMissing (Stacked Int)
     | ValueError { index : Int, error : Morph.Error }
 
 
@@ -371,56 +360,47 @@ Once you've assembled all parts, end the builder with [`groupFinish`](#groupFini
 
 -}
 part :
-    ( group -> partValueNarrow
-    , String
-    )
+    ( group -> partValueNarrow, String )
     -> MorphValue partValueNarrow
     ->
-        (MorphValueGroupEmptiable
-            noPartPossiblyOrNever_
+        (MorphValueGroupInProgress
             group
             (partValueNarrow -> groupNarrowFurther)
-         ->
-            MorphValueGroupEmptiable
-                noPartNever_
-                group
-                groupNarrowFurther
+         -> MorphValueGroupInProgress group groupNarrowFurther
         )
-part ( accessPartValue, partName ) partValueMorph =
-    \groupMorphSoFar ->
-        let
-            tag : IndexAndName
-            tag =
-                { index = groupMorphSoFar.description |> Stack.length
-                , name = partName
-                }
-        in
-        { description =
-            groupMorphSoFar.description
-                |> Stack.onTopLay
-                    { tag = tag.name, value = partValueMorph.description }
-        , toNarrow =
-            \groupBroad ->
-                partValueNarrow tag partValueMorph groupMorphSoFar.toNarrow groupBroad
-        , toBroad =
-            \wholeNarrow ->
-                let
-                    partValueBroad : Value IndexAndName
-                    partValueBroad =
-                        wholeNarrow
-                            |> accessPartValue
-                            |> Morph.toBroad partValueMorph
+part ( accessPartValue, partName ) partValueMorph groupMorphSoFar =
+    let
+        tag : IndexAndName
+        tag =
+            { index = groupMorphSoFar.description |> List.length
+            , name = partName
+            }
+    in
+    { description =
+        { tag = tag.name, value = partValueMorph.description }
+            :: groupMorphSoFar.description
+    , toNarrow =
+        \groupBroad ->
+            partValueNarrow tag partValueMorph groupMorphSoFar.toNarrow groupBroad
+    , toBroad =
+        \wholeNarrow ->
+            let
+                partValueBroad : Value IndexAndName
+                partValueBroad =
+                    wholeNarrow
+                        |> accessPartValue
+                        |> Morph.toBroad partValueMorph
 
-                    partBroad : Tagged IndexAndName
-                    partBroad =
-                        { tag = tag
-                        , value = partValueBroad
-                        }
-                in
-                wholeNarrow
-                    |> groupMorphSoFar.toBroad
-                    |> (::) partBroad
-        }
+                partBroad : Tagged IndexAndName
+                partBroad =
+                    { tag = tag
+                    , value = partValueBroad
+                    }
+            in
+            wholeNarrow
+                |> groupMorphSoFar.toBroad
+                |> (::) partBroad
+    }
 
 
 partValueNarrow :
@@ -471,64 +451,57 @@ partValueNarrow tag partValueMorph groupSoFarNarrow =
 
             [] ->
                 let
-                    tagsMissingSoFar : Emptiable (Stacked Int) Possibly
+                    tagsMissingSoFar : List Int
                     tagsMissingSoFar =
                         case wholeAssemblyResult of
                             Err (TagsMissing tagsMissing) ->
-                                tagsMissing |> Emptiable.emptyAdapt (\_ -> Possible)
+                                tagsMissing |> Stack.toList
 
                             Err (ValueError _) ->
-                                Emptiable.empty
+                                []
 
                             Ok _ ->
-                                Emptiable.empty
+                                []
                 in
-                TagsMissing (Stack.onTopLay tag.index tagsMissingSoFar) |> Err
+                TagsMissing ( tag.index, tagsMissingSoFar ) |> Err
 
 
 {-| Conclude the [`Value.Morph.group`](#group) [`|> Value.Morph.part`](#part) builder
 -}
-groupFinish :
-    MorphValueGroupEmptiable Never record record
-    -> MorphValue record
-groupFinish =
-    \groupMorphComplete ->
-        groupMorphComplete
-            |> partsFinish
-            |> Morph.over Value.Morph.Internal.composedToRecord
-            |> Morph.over toComposed
+groupFinish : MorphValueGroupInProgress record record -> MorphValue record
+groupFinish groupMorphComplete =
+    groupMorphComplete
+        |> partsFinish
+        |> Morph.over Value.Morph.Internal.composedToRecord
+        |> Morph.over toComposed
 
 
 partsFinish :
-    MorphValueGroupEmptiable
-        Never
-        groupNarrow
-        groupNarrow
+    MorphValueGroupInProgress groupNarrow groupNarrow
     ->
         MorphIndependently
             (Record IndexOrName -> Result Morph.Error groupNarrow)
             (groupNarrow -> Record IndexAndName)
-partsFinish =
-    \groupMorphInProgress ->
-        { description =
-            groupMorphInProgress.description |> Morph.PartsDescription
-        , toNarrow =
-            \broad_ ->
-                broad_
-                    |> groupMorphInProgress.toNarrow
-                    |> Result.mapError
-                        (\error ->
-                            case error of
-                                TagsMissing missingTags ->
-                                    "missing parts: "
-                                        ++ (missingTags |> Stack.toList |> List.map String.fromInt |> String.join ", ")
-                                        |> DeadEnd
+partsFinish groupMorphInProgress =
+    { description =
+        groupMorphInProgress.description |> Morph.PartsDescription
+    , toNarrow =
+        \broad_ ->
+            broad_
+                |> groupMorphInProgress.toNarrow
+                |> Result.mapError
+                    (\error ->
+                        case error of
+                            TagsMissing missingTags ->
+                                "missing parts: "
+                                    ++ (missingTags |> Stack.toList |> List.map String.fromInt |> String.join ", ")
+                                    |> DeadEnd
 
-                                ValueError valueError ->
-                                    valueError |> Stack.one |> Morph.PartsError
-                        )
-        , toBroad = groupMorphInProgress.toBroad
-        }
+                            ValueError valueError ->
+                                valueError |> Stack.one |> Morph.PartsError
+                    )
+    , toBroad = groupMorphInProgress.toBroad
+    }
 
 
 {-| Describe another variant [`MorphValue`](#MorphValue)
@@ -580,8 +553,7 @@ variant :
     )
     -> MorphValue possibilityNarrow
     ->
-        (ChoiceMorphEmptiable
-            noTryPossiblyOrNever_
+        (ChoiceMorphInProgress
             choiceNarrow
             (Tagged IndexOrName)
             ((possibilityNarrow
@@ -591,32 +563,28 @@ variant :
             )
             Morph.Error
          ->
-            ChoiceMorphEmptiable
-                noTryNever_
+            ChoiceMorphInProgress
                 choiceNarrow
                 (Tagged IndexOrName)
                 choiceToBroadFurther
                 Morph.Error
         )
-variant ( possibilityToChoice, possibilityTag ) possibilityMorph =
-    \choiceMorphSoFar ->
-        choiceMorphSoFar
-            |> Value.Morph.Internal.variant ( possibilityToChoice, possibilityTag ) possibilityMorph
+variant ( possibilityToChoice, possibilityTag ) possibilityMorph choiceMorphSoFar =
+    choiceMorphSoFar
+        |> Value.Morph.Internal.variant ( possibilityToChoice, possibilityTag ) possibilityMorph
 
 
 {-| Conclude a [`Morph.choice`](Morph#choice) [`|> Value.Morph.variant`](#variant) builder.
 -}
 choiceFinish :
-    ChoiceMorphEmptiable
-        Never
+    ChoiceMorphInProgress
         choiceNarrow
         (Tagged IndexOrName)
         (choiceNarrow -> Tagged IndexAndName)
         Morph.Error
     -> MorphValue choiceNarrow
-choiceFinish =
-    \choiceMorphComplete ->
-        choiceMorphComplete |> Value.Morph.Internal.choiceFinish
+choiceFinish choiceMorphComplete =
+    choiceMorphComplete |> Value.Morph.Internal.choiceFinish
 
 
 {-| [`Morph.OneToOne`](Morph#OneToOne) from [`Json`](Json#Json)
@@ -629,157 +597,163 @@ json =
     Morph.oneToOne Json.toValue Json.fromValue
 
 
-{-| [`MorphRow`](Morph#MorphRow) from [`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bit)s.
 
-Example chain converting to [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/)
+{-
+   {-| [`MorphRow`](Morph#MorphRow) from [`Bit`](https://dark.elm.dmy.fr/packages/lue-bird/elm-bits/latest/Bit)s.
 
-    yourTypeMorphValue
-        |> Morph.overRow Value.Morph.bits
-        |> Morph.over List.Morph.bytes
+   Example chain converting to [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/)
 
+       yourTypeMorphValue
+           |> Morph.overRow Value.Morph.bits
+           |> Morph.over List.Morph.bytes
+
+   -}
+   bits : MorphRowIndependently (Value IndexOrName) (Value IndexAndName) Bit
+   bits =
+       eachTag (Morph.oneToOne Value.Index .index)
+           |> Morph.overRow intTaggedBits
+
+
+   intTaggedBits : MorphRow (Value Int) Bit
+   intTaggedBits =
+       Morph.recursive "generic value"
+           (\step ->
+               Morph.choice
+                   (\atomVariant composedVariant atomOrComposed ->
+                       case atomOrComposed of
+                           Value.Atom atomValue ->
+                               atomVariant atomValue
+
+                           Value.Composed composedValue ->
+                               composedVariant composedValue
+                   )
+                   |> Morph.rowTry Value.Atom
+                       (Morph.narrow (\atom_ -> atom_)
+                           |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
+                           |> Morph.grab (\atom_ -> atom_) atomBits
+                       )
+                   |> Morph.rowTry Value.Composed
+                       (Morph.narrow (\composed_ -> composed_)
+                           |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
+                           |> Morph.grab (\composed_ -> composed_) (composedBits step)
+                       )
+                   |> Morph.choiceFinish
+           )
+
+
+
+
+      listUnnamedBits :
+          MorphRowIndependently beforeToBroad narrow Bit
+          -> MorphRowIndependently (List beforeToBroad) (List narrow) Bit
+      listUnnamedBits step =
+          List.Morph.arraySized
+              |> Morph.overRow
+                  (ArraySized.Morph.exactlyWith
+                      (N.Morph.natural
+                          |> Morph.overRow (Natural.Morph.bits Bytes.BE n32)
+                      )
+                      step
+                  )
+
+
+      stringBits : MorphRow String Bit
+      stringBits =
+          Morph.named "string"
+              (String.Morph.list
+                  |> Morph.overRow (listUnnamedBits Utf8CodePoint.charBits)
+              )
+
+
+
+   atomBits : MorphRow Value.Atom Bit
+   atomBits =
+       Morph.choice
+           (\unitVariant numberVariant stringVariant atomChoice ->
+               case atomChoice of
+                   Value.Unit unitValue ->
+                       unitVariant unitValue
+
+                   Value.Number numberValue ->
+                       numberVariant numberValue
+
+                   Value.String stringValue ->
+                       stringVariant stringValue
+           )
+           |> Morph.rowTry Value.Unit
+               (Morph.narrow ()
+                   |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
+                   |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
+               )
+           |> Morph.rowTry Value.Number
+               (Morph.narrow (\number_ -> number_)
+                   |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
+                   |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
+                   |> Morph.grab (\number_ -> number_) numberBits
+               )
+           |> Morph.rowTry Value.String
+               (Morph.narrow (\string_ -> string_)
+                   |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
+                   |> Morph.grab (\string_ -> string_) stringBits
+               )
+           |> Morph.choiceFinish
+
+
+   numberBits : MorphRow Decimal Bit
+   numberBits =
+       Morph.named "number" Decimal.Morph.bitsVariableCount
+
+
+   composedBits :
+       MorphRow (Value Int) Bit
+       -> MorphRow (Value.Composed Int) Bit
+   composedBits step =
+       Morph.choice
+           (\listVariant recordVariant taggedVariant composedChoice ->
+               case composedChoice of
+                   Value.List listValue ->
+                       listVariant listValue
+
+                   Value.Record recordValue ->
+                       recordVariant recordValue
+
+                   Value.Variant taggedValue ->
+                       taggedVariant taggedValue
+           )
+           |> Morph.rowTry Value.List (listBits step)
+           |> Morph.rowTry Value.Record (recordBits step)
+           |> Morph.rowTry Value.Variant (variantBits step)
+           |> Morph.choiceFinish
+
+
+   listBits :
+       MorphRowIndependently beforeToBroad narrow Bit
+       -> MorphRowIndependently (List beforeToBroad) (List narrow) Bit
+   listBits step =
+       Morph.named "list" (listUnnamedBits step)
+
+
+   taggedBits : MorphRow (Value Int) Bit -> MorphRow (Tagged Int) Bit
+   taggedBits step =
+       Morph.narrow (\tag value -> { tag = tag, value = value })
+           |> Morph.grab .tag
+               (Morph.named "tag"
+                   (Int.Morph.integer
+                       -- to save bits
+                       |> Morph.over (Morph.oneToOne Integer.fromNatural Integer.absolute)
+                       |> Morph.overRow Natural.Morph.bitsVariableCount
+                   )
+               )
+           |> Morph.grab .value (Morph.named "value" step)
+
+
+   recordBits : MorphRow (Value Int) Bit -> MorphRow (Record Int) Bit
+   recordBits step =
+       Morph.named "record"
+           (listUnnamedBits (taggedBits step))
+
+
+   variantBits : MorphRow (Value Int) Bit -> MorphRow (Tagged Int) Bit
+   variantBits step =
+       Morph.named "variant" (taggedBits step)
 -}
-bits : MorphRowIndependently (Value IndexOrName) (Value IndexAndName) Bit
-bits =
-    eachTag (Morph.oneToOne Value.Index .index)
-        |> Morph.overRow intTaggedBits
-
-
-intTaggedBits : MorphRow (Value Int) Bit
-intTaggedBits =
-    Morph.recursive "generic value"
-        (\step ->
-            Morph.choice
-                (\atomVariant composedVariant atomOrComposed ->
-                    case atomOrComposed of
-                        Value.Atom atomValue ->
-                            atomVariant atomValue
-
-                        Value.Composed composedValue ->
-                            composedVariant composedValue
-                )
-                |> Morph.rowTry Value.Atom
-                    (Morph.narrow (\atom_ -> atom_)
-                        |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
-                        |> Morph.grab (\atom_ -> atom_) atomBits
-                    )
-                |> Morph.rowTry Value.Composed
-                    (Morph.narrow (\composed_ -> composed_)
-                        |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
-                        |> Morph.grab (\composed_ -> composed_) (composedBits step)
-                    )
-                |> Morph.choiceFinish
-        )
-
-
-listUnnamedBits :
-    MorphRowIndependently beforeToBroad narrow Bit
-    -> MorphRowIndependently (List beforeToBroad) (List narrow) Bit
-listUnnamedBits step =
-    List.Morph.arraySized
-        |> Morph.overRow
-            (ArraySized.Morph.exactlyWith
-                (N.Morph.natural
-                    |> Morph.overRow (Natural.Morph.bits Bytes.BE n32)
-                )
-                step
-            )
-
-
-stringBits : MorphRow String Bit
-stringBits =
-    Morph.named "string"
-        (String.Morph.list
-            |> Morph.overRow (listUnnamedBits Utf8CodePoint.charBits)
-        )
-
-
-atomBits : MorphRow Value.Atom Bit
-atomBits =
-    Morph.choice
-        (\unitVariant numberVariant stringVariant atomChoice ->
-            case atomChoice of
-                Value.Unit unitValue ->
-                    unitVariant unitValue
-
-                Value.Number numberValue ->
-                    numberVariant numberValue
-
-                Value.String stringValue ->
-                    stringVariant stringValue
-        )
-        |> Morph.rowTry Value.Unit
-            (Morph.narrow ()
-                |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
-                |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
-            )
-        |> Morph.rowTry Value.Number
-            (Morph.narrow (\number_ -> number_)
-                |> Morph.match (Bit.Morph.only Bit.O |> Morph.one)
-                |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
-                |> Morph.grab (\number_ -> number_) numberBits
-            )
-        |> Morph.rowTry Value.String
-            (Morph.narrow (\string_ -> string_)
-                |> Morph.match (Bit.Morph.only Bit.I |> Morph.one)
-                |> Morph.grab (\string_ -> string_) stringBits
-            )
-        |> Morph.choiceFinish
-
-
-numberBits : MorphRow Decimal Bit
-numberBits =
-    Morph.named "number" Decimal.Morph.bitsVariableCount
-
-
-composedBits :
-    MorphRow (Value Int) Bit
-    -> MorphRow (Value.Composed Int) Bit
-composedBits step =
-    Morph.choice
-        (\listVariant recordVariant taggedVariant composedChoice ->
-            case composedChoice of
-                Value.List listValue ->
-                    listVariant listValue
-
-                Value.Record recordValue ->
-                    recordVariant recordValue
-
-                Value.Variant taggedValue ->
-                    taggedVariant taggedValue
-        )
-        |> Morph.rowTry Value.List (listBits step)
-        |> Morph.rowTry Value.Record (recordBits step)
-        |> Morph.rowTry Value.Variant (variantBits step)
-        |> Morph.choiceFinish
-
-
-listBits :
-    MorphRowIndependently beforeToBroad narrow Bit
-    -> MorphRowIndependently (List beforeToBroad) (List narrow) Bit
-listBits step =
-    Morph.named "list" (listUnnamedBits step)
-
-
-taggedBits : MorphRow (Value Int) Bit -> MorphRow (Tagged Int) Bit
-taggedBits step =
-    Morph.narrow (\tag value -> { tag = tag, value = value })
-        |> Morph.grab .tag
-            (Morph.named "tag"
-                (Int.Morph.integer
-                    -- to save bits
-                    |> Morph.over (Morph.oneToOne Integer.fromNatural Integer.absolute)
-                    |> Morph.overRow Natural.Morph.bitsVariableCount
-                )
-            )
-        |> Morph.grab .value (Morph.named "value" step)
-
-
-recordBits : MorphRow (Value Int) Bit -> MorphRow (Record Int) Bit
-recordBits step =
-    Morph.named "record"
-        (listUnnamedBits (taggedBits step))
-
-
-variantBits : MorphRow (Value Int) Bit -> MorphRow (Tagged Int) Bit
-variantBits step =
-    Morph.named "variant" (taggedBits step)

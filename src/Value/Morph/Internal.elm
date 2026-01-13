@@ -1,6 +1,6 @@
 module Value.Morph.Internal exposing
     ( MorphValue
-    , MorphValueGroupEmptiable
+    , MorphValueGroupInProgress
     , PartsError(..)
     , choiceFinish
     , composedToRecord
@@ -16,9 +16,7 @@ module Value.Morph.Internal exposing
 {-| [`Morph`](Morph#Morph) to a [`AtomOrComposed`](Value#AtomOrComposed)'s atom if possible
 -}
 
-import Emptiable exposing (Emptiable)
-import Morph exposing (ChoiceMorphEmptiable, MorphIndependently)
-import Possibly exposing (Possibly(..))
+import Morph exposing (ChoiceMorphInProgress, MorphIndependently)
 import Stack exposing (Stacked)
 import Value exposing (Atom(..), AtomOrComposed(..), Composed(..), IndexAndName, IndexOrName(..), Record, Tagged, Value)
 
@@ -93,14 +91,13 @@ unit =
 
 group :
     groupNarrowAssemble
-    -> MorphValueGroupEmptiable Possibly groupNarrow_ groupNarrowAssemble
+    -> MorphValueGroupInProgress groupNarrow_ groupNarrowAssemble
 group groupNarrowAssemble =
     Morph.parts ( groupNarrowAssemble, [] )
 
 
-type alias MorphValueGroupEmptiable noPartPossiblyOrNever groupNarrow groupNarrowFurther =
-    Morph.PartsMorphEmptiable
-        noPartPossiblyOrNever
+type alias MorphValueGroupInProgress groupNarrow groupNarrowFurther =
+    Morph.PartsMorphInProgress
         (Value.Record IndexOrName
          -> Result PartsError groupNarrowFurther
         )
@@ -110,7 +107,7 @@ type alias MorphValueGroupEmptiable noPartPossiblyOrNever groupNarrow groupNarro
 {-| What can go wrong while narrowing to a [`Record`](Value#Record)
 -}
 type PartsError
-    = TagsMissing (Emptiable (Stacked Int) Never)
+    = TagsMissing (Stacked Int)
     | ValueError { index : Int, error : Morph.Error }
 
 
@@ -120,56 +117,48 @@ Finish with [`groupFinish`](#groupFinish)
 
 -}
 part :
-    ( group -> fieldValueNarrow
-    , String
-    )
+    ( group -> fieldValueNarrow, String )
     -> MorphValue fieldValueNarrow
     ->
-        (MorphValueGroupEmptiable
-            noPartPossiblyOrNever_
+        (MorphValueGroupInProgress
             group
             (fieldValueNarrow -> groupNarrowFurther)
-         ->
-            MorphValueGroupEmptiable
-                noPartNever_
-                group
-                groupNarrowFurther
+         -> MorphValueGroupInProgress group groupNarrowFurther
         )
-part ( accessFieldValue, fieldName ) fieldValueMorph =
-    \groupMorphSoFar ->
-        let
-            tag : IndexAndName
-            tag =
-                { index = groupMorphSoFar.description |> Stack.length
-                , name = fieldName
-                }
-        in
-        { description =
-            groupMorphSoFar.description
-                |> Stack.onTopLay
-                    { tag = tag.name, value = fieldValueMorph.description }
-        , toNarrow =
-            \groupBroad ->
-                partValueNarrow tag fieldValueMorph groupMorphSoFar.toNarrow groupBroad
-        , toBroad =
-            \wholeNarrow ->
-                let
-                    fieldValueBroad : Value IndexAndName
-                    fieldValueBroad =
-                        wholeNarrow
-                            |> accessFieldValue
-                            |> Morph.toBroad fieldValueMorph
+part ( accessFieldValue, fieldName ) fieldValueMorph groupMorphSoFar =
+    let
+        tag : IndexAndName
+        tag =
+            { index = groupMorphSoFar.description |> List.length
+            , name = fieldName
+            }
+    in
+    { description =
+        groupMorphSoFar.description
+            |> (::)
+                { tag = tag.name, value = fieldValueMorph.description }
+    , toNarrow =
+        \groupBroad ->
+            partValueNarrow tag fieldValueMorph groupMorphSoFar.toNarrow groupBroad
+    , toBroad =
+        \wholeNarrow ->
+            let
+                fieldValueBroad : Value IndexAndName
+                fieldValueBroad =
+                    wholeNarrow
+                        |> accessFieldValue
+                        |> Morph.toBroad fieldValueMorph
 
-                    fieldBroad : Tagged IndexAndName
-                    fieldBroad =
-                        { tag = tag
-                        , value = fieldValueBroad
-                        }
-                in
-                wholeNarrow
-                    |> groupMorphSoFar.toBroad
-                    |> (::) fieldBroad
-        }
+                fieldBroad : Tagged IndexAndName
+                fieldBroad =
+                    { tag = tag
+                    , value = fieldValueBroad
+                    }
+            in
+            wholeNarrow
+                |> groupMorphSoFar.toBroad
+                |> (::) fieldBroad
+    }
 
 
 partValueNarrow :
@@ -186,14 +175,13 @@ partValueNarrow :
 partValueNarrow tag fieldValueMorph groupSoFarNarrow =
     let
         matches : IndexOrName -> Bool
-        matches =
-            \tagIndexOrName ->
-                case tagIndexOrName of
-                    Index index ->
-                        index == tag.index
+        matches tagIndexOrName =
+            case tagIndexOrName of
+                Index index ->
+                    index == tag.index
 
-                    Name name ->
-                        name == tag.name
+                Name name ->
+                    name == tag.name
     in
     \groupBroad ->
         let
@@ -212,72 +200,65 @@ partValueNarrow tag fieldValueMorph groupSoFarNarrow =
                             |> Result.map (\eat -> eat partNarrow)
 
                     Err innerError ->
-                        ValueError
-                            { index = tag.index
-                            , error = innerError
-                            }
-                            |> Err
+                        Err (ValueError { index = tag.index, error = innerError })
 
             [] ->
                 let
-                    tagsMissingSoFar : Emptiable (Stacked Int) Possibly
+                    tagsMissingSoFar : List Int
                     tagsMissingSoFar =
                         case wholeAssemblyResult of
                             Err (TagsMissing tagsMissing) ->
-                                tagsMissing |> Emptiable.emptyAdapt (\_ -> Possible)
+                                tagsMissing |> Stack.toList
 
                             Err (ValueError _) ->
-                                Emptiable.empty
+                                []
 
                             Ok _ ->
-                                Emptiable.empty
+                                []
                 in
-                TagsMissing (Stack.onTopLay tag.index tagsMissingSoFar) |> Err
+                Err (TagsMissing ( tag.index, tagsMissingSoFar ))
 
 
 {-| Conclude the [`group`](#group) |> [`field`](#part) chain
 -}
 groupFinish :
-    MorphValueGroupEmptiable Never record record
+    MorphValueGroupInProgress record record
     -> MorphValue record
-groupFinish =
-    \groupMorphComplete ->
-        groupMorphComplete
-            |> partsFinish
-            |> Morph.over composedToRecord
-            |> Morph.over toComposed
+groupFinish groupMorphComplete =
+    groupMorphComplete
+        |> partsFinish
+        |> Morph.over composedToRecord
+        |> Morph.over toComposed
 
 
 partsFinish :
-    MorphValueGroupEmptiable
-        Never
+    MorphValueGroupInProgress
         groupNarrow
         groupNarrow
     ->
         MorphIndependently
             (Record IndexOrName -> Result Morph.Error groupNarrow)
             (groupNarrow -> Record IndexAndName)
-partsFinish =
-    \groupMorphInProgress ->
-        { description =
-            groupMorphInProgress.description |> Morph.PartsDescription
-        , toNarrow =
-            \broad_ ->
-                broad_
-                    |> groupMorphInProgress.toNarrow
-                    |> Result.mapError
-                        (\error ->
-                            case error of
-                                TagsMissing missingTags ->
-                                    "missing parts: "
-                                        ++ (missingTags |> Stack.toList |> List.map String.fromInt |> String.join ", ")
-                                        |> Morph.DeadEnd
+partsFinish groupMorphInProgress =
+    { description =
+        groupMorphInProgress.description |> Morph.PartsDescription
+    , toNarrow =
+        \broad_ ->
+            broad_
+                |> groupMorphInProgress.toNarrow
+                |> Result.mapError
+                    (\error ->
+                        case error of
+                            TagsMissing missingTags ->
+                                "missing parts: "
+                                    ++ (missingTags |> Stack.toList |> List.map String.fromInt |> String.join ", ")
+                                    |> Morph.DeadEnd
 
-                                ValueError valueError ->
-                                    valueError |> Stack.one |> Morph.PartsError
-                        )
-        , toBroad = groupMorphInProgress.toBroad
-        }
+                            ValueError valueError ->
+                                valueError |> Stack.one |> Morph.PartsError
+                    )
+    , toBroad = groupMorphInProgress.toBroad
+    }
 
 
 composedToRecord :
@@ -328,8 +309,7 @@ variant :
     )
     -> MorphValue possibilityNarrow
     ->
-        (ChoiceMorphEmptiable
-            noTryPossiblyOrNever_
+        (ChoiceMorphInProgress
             choiceNarrow
             (Tagged IndexOrName)
             ((possibilityNarrow
@@ -339,23 +319,21 @@ variant :
             )
             Morph.Error
          ->
-            ChoiceMorphEmptiable
-                noTryNever_
+            ChoiceMorphInProgress
                 choiceNarrow
                 (Tagged IndexOrName)
                 choiceToBroadFurther
                 Morph.Error
         )
-variant ( possibilityToChoice, possibilityTag ) possibilityMorph =
-    \choiceMorphSoFar ->
-        choiceMorphSoFar
-            |> Morph.try possibilityToChoice
-                (variantTry
-                    { name = possibilityTag
-                    , index = choiceMorphSoFar.description |> Stack.length
-                    }
-                    possibilityMorph
-                )
+variant ( possibilityToChoice, possibilityTag ) possibilityMorph choiceMorphSoFar =
+    choiceMorphSoFar
+        |> Morph.try possibilityToChoice
+            (variantTry
+                { name = possibilityTag
+                , index = choiceMorphSoFar.description |> List.length
+                }
+                possibilityMorph
+            )
 
 
 variantTry :
@@ -411,19 +389,17 @@ variantStepNarrow ( variantTag, possibilityNarrow ) =
 {-| Conclude a [`Morph.choice`](Morph#choice) |> [`Value.Morph.variant`](#variant) chain
 -}
 choiceFinish :
-    ChoiceMorphEmptiable
-        Never
+    ChoiceMorphInProgress
         choiceNarrow
         (Tagged IndexOrName)
         (choiceNarrow -> Tagged IndexAndName)
         Morph.Error
     -> MorphValue choiceNarrow
-choiceFinish =
-    \choiceMorphComplete ->
-        choiceMorphComplete
-            |> Morph.choiceFinish
-            |> Morph.over variantComposed
-            |> Morph.over toComposed
+choiceFinish choiceMorphComplete =
+    choiceMorphComplete
+        |> Morph.choiceFinish
+        |> Morph.over variantComposed
+        |> Morph.over toComposed
 
 
 variantComposed :

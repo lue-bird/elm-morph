@@ -1,47 +1,41 @@
 module Util exposing
-    ( recoverTry
-    , stackInit, stackLast
+    ( onErr
+    , resultFromMaybeLazy
     )
 
 {-| Helpers
 
 Putting them in a separate `module` helps with testing as well as preventing import cycles
 
-@docs recoverTry
-@docs stackInit, stackLast
+@docs onErr
 
 -}
 
-import Emptiable exposing (Emptiable)
 import Linear exposing (Direction(..))
-import Possibly exposing (Possibly)
-import Stack exposing (Stacked)
 
 
 {-| Like `Result.andThen` but on `Err` from the attached error
 -}
-recoverTry :
+onErr :
     (error -> Result errorMapped okValue)
     ->
         (Result error okValue
          -> Result errorMapped okValue
         )
-recoverTry errorMapToResult =
-    \result ->
-        case result of
-            Ok ok ->
-                ok |> Ok
+onErr errorMapToResult result =
+    case result of
+        Ok ok ->
+            Ok ok
 
-            Err error ->
-                error |> errorMapToResult
-
-
-stackLast : Emptiable (Stacked element) Never -> element
-stackLast =
-    \stack -> stack |> Stack.fold Up (\further _ -> further)
+        Err error ->
+            error |> errorMapToResult
 
 
-stackInit : Emptiable (Stacked element) Never -> Emptiable (Stacked element) Possibly
-stackInit =
-    \stack ->
-        stack |> Stack.foldFromOne (\_ -> Emptiable.empty) Down Stack.onTopLay
+resultFromMaybeLazy : (() -> x) -> Maybe v -> Result x v
+resultFromMaybeLazy errOnNothing maybe =
+    case maybe of
+        Nothing ->
+            Err (errOnNothing ())
+
+        Just value ->
+            Ok value

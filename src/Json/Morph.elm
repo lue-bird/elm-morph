@@ -12,14 +12,10 @@ module Json.Morph exposing
 
 -}
 
-import Decimal exposing (Decimal)
-import Decimal.Morph
-import Emptiable
 import Json exposing (Json)
 import Json.Decode
 import Json.Encode
 import Morph exposing (Morph, MorphIndependently, MorphOrError)
-import Possibly exposing (Possibly(..))
 import Result.Morph
 import Stack
 import Tree
@@ -59,15 +55,14 @@ decodeErrorToMorph =
                     |> Morph.PartsError
 
             Json.Decode.OneOf possibilities ->
-                case possibilities |> Stack.fromList of
-                    Emptiable.Empty Possible ->
+                case possibilities of
+                    [] ->
                         "missing expected possibilities in Json.Decode.oneOf"
                             |> Morph.DeadEnd
 
-                    Emptiable.Filled stacked ->
-                        stacked
-                            |> Emptiable.filled
-                            |> Stack.map (\_ -> decodeErrorToMorph)
+                    possibility0 :: possibility1Up ->
+                        (possibility0 :: possibility1Up)
+                            |> List.map decodeErrorToMorph
                             |> Morph.ChoiceError
 
             Json.Decode.Failure custom jsValue ->
@@ -83,41 +78,30 @@ decodeErrorToMorph =
                     |> Morph.DeadEnd
 
 
-jsValueMagicEncode : () -> (Json -> JsValueMagic)
-jsValueMagicEncode () =
-    \jsonAny ->
-        case jsonAny of
-            Atom atom ->
-                atom |> atomJsValueMagicEncode
+jsValueMagicEncode : Json -> JsValueMagic
+jsValueMagicEncode jsonAny =
+    case jsonAny of
+        Atom atom ->
+            atom |> atomJsValueMagicEncode
 
-            Composed composed ->
-                composed |> composedJsValueMagicEncode ()
-
-
-decimalFloatMorph : Morph Decimal Float
-decimalFloatMorph =
-    Result.Morph.toOk
-        |> Morph.over Decimal.Morph.orExceptionFloat
-        |> Morph.errorMap (Morph.deadEndMap Decimal.exceptionToString)
+        Composed composed ->
+            composed |> composedJsValueMagicEncode
 
 
 atomJsValueMagicEncode : Json.Atom -> JsValueMagic
-atomJsValueMagicEncode =
-    \atom ->
-        case atom of
-            Json.Null () ->
-                Json.Encode.null
+atomJsValueMagicEncode atom =
+    case atom of
+        Json.Null () ->
+            Json.Encode.null
 
-            Json.Bool boolAtom ->
-                boolAtom |> Json.Encode.bool
+        Json.Bool boolAtom ->
+            boolAtom |> Json.Encode.bool
 
-            Json.Number floatAtom ->
-                floatAtom
-                    |> Morph.toBroad decimalFloatMorph
-                    |> Json.Encode.float
+        Json.Number floatAtom ->
+            floatAtom |> Json.Encode.float
 
-            Json.String stringAtom ->
-                stringAtom |> Json.Encode.string
+        Json.String stringAtom ->
+            stringAtom |> Json.Encode.string
 
 
 {-| Some elm functions,
@@ -141,20 +125,7 @@ jsonAtomDecoder =
     Json.Decode.oneOf
         [ Json.Null () |> Json.Decode.null
         , Json.Decode.map Json.Bool Json.Decode.bool
-        , Json.Decode.andThen
-            (\float ->
-                case float |> Morph.toNarrow decimalFloatMorph of
-                    Ok decimal ->
-                        Json.Number decimal |> Json.Decode.succeed
-
-                    Err exception ->
-                        Morph.descriptionAndErrorToTree (decimalFloatMorph |> Morph.description) exception
-                            |> Tree.map .text
-                            |> Morph.treeToLines
-                            |> String.join "\n"
-                            |> Json.Decode.fail
-            )
-            Json.Decode.float
+        , Json.Decode.map Json.Number Json.Decode.float
         , Json.Decode.map Json.String Json.Decode.string
         ]
 
@@ -185,7 +156,7 @@ jsValueMagic =
                 jsValueMagicBeforeNarrow
                     |> Json.Decode.decodeValue jsValueMagicDecoder
                     |> Result.mapError decodeErrorToMorph
-        , toBroad = jsValueMagicEncode ()
+        , toBroad = jsValueMagicEncode
         }
 
 
@@ -219,28 +190,27 @@ stringBroadWith { indentation } =
         , toBroad =
             \json ->
                 json
-                    |> jsValueMagicEncode ()
+                    |> jsValueMagicEncode
                     |> Json.Encode.encode indentation
         }
 
 
-composedJsValueMagicEncode : () -> (Json.Composed -> JsValueMagic)
-composedJsValueMagicEncode () =
-    \composedAny ->
-        case composedAny of
-            Json.Array arrayAny ->
-                arrayAny
-                    |> Json.Encode.array (jsValueMagicEncode ())
+composedJsValueMagicEncode : Json.Composed -> JsValueMagic
+composedJsValueMagicEncode composedAny =
+    case composedAny of
+        Json.Array arrayAny ->
+            arrayAny
+                |> Json.Encode.array jsValueMagicEncode
 
-            Json.Object objectAny ->
-                objectAny
-                    |> List.map
-                        (\field ->
-                            ( field.tag
-                            , field.value |> jsValueMagicEncode ()
-                            )
+        Json.Object objectAny ->
+            objectAny
+                |> List.map
+                    (\field ->
+                        ( field.tag
+                        , field.value |> jsValueMagicEncode
                         )
-                    |> Json.Encode.object
+                    )
+                |> Json.Encode.object
 
 
 jsonComposedDecoder : Json.Decode.Decoder Json.Composed

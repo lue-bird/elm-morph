@@ -27,13 +27,11 @@ module NaturalAtLeast1 exposing
 
 -}
 
-import ArraySized exposing (ArraySized)
 import Bit exposing (Bit)
 import Bit.Morph.Internal
 import BitArray.Extra
 import Linear exposing (Direction(..))
 import Morph exposing (Morph, MorphRow)
-import N exposing (In, Min, N, N1, On, To, Up)
 import Natural
 import NaturalAtLeast1Base10 exposing (NaturalAtLeast1Base10)
 
@@ -45,29 +43,26 @@ n1 =
     { bitsAfterI = [] }
 
 
-add :
-    Natural.AtLeast1
-    -> (Natural.AtLeast1 -> Natural.AtLeast1)
-add toAdd =
-    \naturalPositive ->
-        let
-            bitsSum : { inRange : ArraySized Bit (Min (On N1)), overflow : Bit }
-            bitsSum =
-                naturalPositive |> addBits toAdd
+add : Natural.AtLeast1 -> Natural.AtLeast1 -> Natural.AtLeast1
+add toAdd naturalPositive =
+    let
+        bitsSum : { inRange : ArraySized Bit (Min (On N1)), overflow : Bit }
+        bitsSum =
+            naturalPositive |> addBits toAdd
 
-            sumBitsAfterI : List Bit
-            sumBitsAfterI =
-                case bitsSum.overflow of
-                    Bit.I ->
-                        bitsSum.inRange
-                            |> ArraySized.toList
+        sumBitsAfterI : List Bit
+        sumBitsAfterI =
+            case bitsSum.overflow of
+                Bit.I ->
+                    bitsSum.inRange
+                        |> ArraySized.toList
 
-                    Bit.O ->
-                        bitsSum.inRange
-                            |> ArraySized.removeMin ( Up, N.n1 )
-                            |> ArraySized.toList
-        in
-        { bitsAfterI = sumBitsAfterI }
+                Bit.O ->
+                    bitsSum.inRange
+                        |> ArraySized.removeMin ( Up, N.n1 )
+                        |> ArraySized.toList
+    in
+    { bitsAfterI = sumBitsAfterI }
 
 
 addBits :
@@ -130,22 +125,16 @@ bitsVariableCount =
             )
 
 
-toBitArrayOfSize :
-    N (In (Up newMinX To newMinPlusX) newMax)
-    ->
-        (Natural.AtLeast1
-         -> ArraySized Bit (In (Up newMinX To newMinPlusX) newMax)
-        )
-toBitArrayOfSize bitCount =
-    \atLeast1 ->
-        let
-            withI =
-                Bit.I
-                    :: atLeast1.bitsAfterI
-                    |> ArraySized.fromList
-        in
-        if (withI |> ArraySized.length |> N.toInt) <= (bitCount |> N.toInt) then
-            withI |> ArraySized.toSize Down bitCount (\_ -> Bit.O)
+toBitArrayOfSize : Int -> Natural.AtLeast1 -> List Bit
+toBitArrayOfSize bitCount atLeast1 =
+    let
+        withI =
+            Bit.I
+                :: atLeast1.bitsAfterI
+                |> ArraySized.fromList
+    in
+    if (withI |> ArraySized.length |> N.toInt) <= (bitCount |> N.toInt) then
+        withI |> ArraySized.toSize Down bitCount (\_ -> Bit.O)
 
-        else
-            ArraySized.repeat Bit.I bitCount
+    else
+        ArraySized.repeat Bit.I bitCount

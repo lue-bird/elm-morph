@@ -3,46 +3,44 @@ module Morph.Internal exposing (inSequenceErrorWith, sequenceDescriptionFromStac
 {-| Morph helpers that can be used inside the package but aren't exposed to the public.
 -}
 
-import Emptiable exposing (Emptiable)
 import Morph
 import Stack exposing (Stacked)
 
 
-sequenceDescriptionFromStack : Emptiable (Stacked Morph.Description) Never -> Morph.Description
-sequenceDescriptionFromStack =
-    \stack ->
-        case stack |> Stack.removeTop of
-            Emptiable.Empty _ ->
-                stack |> Stack.top
+sequenceDescriptionFromStack : Stacked Morph.Description -> Morph.Description
+sequenceDescriptionFromStack stack =
+    case stack |> Stack.tail of
+        [] ->
+            stack |> Stack.head
 
-            Emptiable.Filled stacked ->
-                Morph.SequenceDescription
-                    { early = stack |> Stack.top
-                    , late = stacked |> Emptiable.filled |> sequenceDescriptionFromStack
-                    }
+        el1 :: el2Up ->
+            Morph.SequenceDescription
+                { early = stack |> Stack.head
+                , late = ( el1, el2Up ) |> sequenceDescriptionFromStack
+                }
 
 
 inSequenceErrorWith :
-    { startsDown : Emptiable (Stacked Int) Never
-    , error : Morph.ErrorWithDeadEnd deadEnd
+    { startsDown : Stacked Int
+    , error : Morph.Error
     }
-    -> Morph.ErrorWithDeadEnd deadEnd
+    -> Morph.Error
 inSequenceErrorWith { startsDown, error } =
-    case startsDown |> Stack.removeTop of
-        Emptiable.Empty _ ->
+    case startsDown |> Stack.tail of
+        [] ->
             Morph.SequenceError
                 { place = Morph.SequencePlaceEarly
-                , startDownInBroadList = startsDown |> Stack.top
+                , startDownInBroadList = startsDown |> Stack.head
                 , error = error
                 }
 
-        Emptiable.Filled startsDownStacked ->
+        startsDown0 :: startsDown1Up ->
             Morph.SequenceError
                 { place = Morph.SequencePlaceLate
-                , startDownInBroadList = startsDown |> Stack.top
+                , startDownInBroadList = startsDown |> Stack.head
                 , error =
                     inSequenceErrorWith
-                        { startsDown = startsDownStacked |> Emptiable.filled
+                        { startsDown = ( startsDown0, startsDown1Up )
                         , error = error
                         }
                 }

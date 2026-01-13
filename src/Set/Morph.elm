@@ -17,12 +17,11 @@ module Set.Morph exposing
 
 -}
 
-import Emptiable
 import List.Morph
 import Morph exposing (MorphIndependently)
-import Possibly exposing (Possibly(..))
 import Set exposing (Set)
 import Stack
+import Value.Morph exposing (MorphValue)
 import Value.Morph.Internal exposing (MorphValue)
 
 
@@ -63,7 +62,7 @@ If the given element [`Morph`](Morph#Morph) is [`OneToOne`](Morph#OneToOne),
 each :
     MorphIndependently
         (comparableBeforeNarrow
-         -> Result (Morph.ErrorWithDeadEnd deadEnd) comparableNarrow
+         -> Result Morph.Error comparableNarrow
         )
         (comparableBeforeToBroad -> comparableBroad)
     ->
@@ -71,12 +70,12 @@ each :
             (Set comparableBeforeNarrow
              ->
                 Result
-                    (Morph.ErrorWithDeadEnd deadEnd)
+                    Morph.Error
                     (Set comparableNarrow)
             )
             (Set comparableBeforeToBroad -> Set comparableBroad)
 each elementMorph =
-    Morph.named "all"
+    Morph.named "each"
         { description =
             Morph.ElementsDescription (elementMorph |> Morph.description)
         , toNarrow =
@@ -95,17 +94,17 @@ each elementMorph =
                                             errorsSoFar =
                                                 case collected of
                                                     Ok _ ->
-                                                        Emptiable.empty
+                                                        []
 
                                                     Err elementsAtIndexes ->
-                                                        elementsAtIndexes |> Emptiable.emptyAdapt (\_ -> Possible)
+                                                        elementsAtIndexes |> Stack.toList
                                         in
-                                        errorsSoFar
-                                            |> Stack.onTopLay
-                                                { index = index
-                                                , error = elementError
-                                                }
-                                            |> Err
+                                        Err
+                                            ( { index = index
+                                              , error = elementError
+                                              }
+                                            , errorsSoFar
+                                            )
                             , index = index - 1
                             }
                         )

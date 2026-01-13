@@ -326,10 +326,10 @@ floatToFraction =
                 let
                     digitsReverse : Emptiable (Stacked (N (In N0 N9))) never_
                     digitsReverse =
-                        Stack.topBelow first afterFirst |> Stack.reverse
+                        (::) first afterFirst |> Stack.reverse
                 in
-                { beforeEnd = digitsReverse |> Stack.removeTop |> Stack.toList |> List.reverse
-                , end = digitsReverse |> Stack.top |> N.inToOn |> N.toIn ( n1, n9 ) |> N.inToNumber
+                { beforeEnd = digitsReverse |> Stack.removeTop |> List.reverse
+                , end = digitsReverse |> Stack.head |> N.inToOn |> N.toIn ( n1, n9 ) |> N.inToNumber
                 }
 
 

@@ -21,7 +21,6 @@ module Json exposing
 -}
 
 import Array
-import Decimal exposing (Decimal)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Value exposing (AtomOrComposed(..))
 
@@ -33,12 +32,12 @@ type alias Json =
     AtomOrComposed Atom Composed
 
 
-{-| json atom. null/bool/[number](Decimal#Decimal) or string
+{-| json atom. null/bool/number/string
 -}
 type Atom
     = Null ()
     | Bool Bool
-    | Number Decimal
+    | Number Float
     | String String
 
 
@@ -59,28 +58,26 @@ type alias Tagged =
 {-| Convert from a [generic representation of an elm value](Value#Value)
 -}
 fromValue : Value.Value String -> Json
-fromValue =
-    \json ->
-        case json of
-            Atom atom ->
-                atom |> atomFromValue |> Atom
+fromValue json =
+    case json of
+        Atom atom ->
+            atom |> atomFromValue |> Atom
 
-            Composed composed ->
-                composed |> composedFromValue |> Composed
+        Composed composed ->
+            composed |> composedFromValue |> Composed
 
 
 atomFromValue : Value.Atom -> Atom
-atomFromValue =
-    \atom ->
-        case atom of
-            Value.Unit () ->
-                Null ()
+atomFromValue atom =
+    case atom of
+        Value.Unit () ->
+            Null ()
 
-            Value.String stringAtom ->
-                stringAtom |> String
+        Value.String stringAtom ->
+            stringAtom |> String
 
-            Value.Number decimal ->
-                decimal |> Number
+        Value.Number decimal ->
+            decimal |> Number
 
 
 composedFromValue : Value.Composed String -> Composed

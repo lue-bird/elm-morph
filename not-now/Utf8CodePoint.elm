@@ -1,15 +1,11 @@
 module Utf8CodePoint exposing (charBits)
 
-import ArraySized exposing (ArraySized)
-import ArraySized.Morph
 import Bit exposing (Bit)
 import Bit.Morph
 import BitArray
 import Bitwise
 import Linear exposing (Direction(..))
 import Morph exposing (MorphOrError, MorphRow)
-import N exposing (Exactly, N3, N4, N5, N6, N7, On, n0, n11, n16, n3, n4, n5, n6, n7)
-import N.Local exposing (n21)
 
 
 type Utf8CodePoint

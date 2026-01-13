@@ -2,13 +2,10 @@ module Email exposing (Email, chars)
 
 import AToZ exposing (AToZ)
 import AToZ.Morph
-import ArraySized exposing (ArraySized)
-import ArraySized.Morph exposing (atLeast)
 import Char.Morph
 import Linear exposing (Direction(..))
 import Morph exposing (Morph, MorphRow, grab, match, whilePossible)
-import N exposing (In, Min, N, N0, N1, N2, N9, On, n0, n1, n9)
-import N.Morph
+import N1To9 exposing (N1To9)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import String.Morph
 
@@ -36,14 +33,13 @@ local : MorphRow Local Char
 local =
     Morph.named "local"
         (Morph.narrow
-            (\first afterFirst ->
-                ArraySized.one first
-                    |> ArraySized.attachMin Up
-                        (afterFirst |> ArraySized.minTo n1)
+            (\part0 part1 part2Up ->
+                { part0 = part0, part1 = part1, part2Up = part2Up }
             )
-            |> grab (ArraySized.element ( Up, n1 )) localPart
-            |> grab (ArraySized.removeMin ( Up, n1 ))
-                (atLeast n1
+            |> grab .part0 localPart
+            |> grab .part1 localPart
+            |> grab .part2Up
+                (whilePossible
                     (Morph.narrow (\part -> part)
                         |> match (String.Morph.only ".")
                         |> grab (\part -> part) localPart
@@ -54,7 +50,12 @@ local =
 
 localPart : MorphRow LocalPart Char
 localPart =
-    atLeast n1 (localSymbol |> Morph.one)
+    Morph.named "local part"
+        (Morph.narrow
+            (\symbol0 symbol1Up -> { symbol0 = symbol0, symbol1Up = symbol1Up })
+            |> grab .symbol0 (Morph.one localSymbol)
+            |> grab .symbol1Up (whilePossible (Morph.one localSymbol))
+        )
 
 
 localSymbol : Morph LocalSymbol Char
@@ -77,7 +78,7 @@ localSymbol =
                 (AToZ.Morph.broadCase AToZ.CaseLower
                     |> Morph.over AToZ.Morph.char
                 )
-            |> Morph.try LocalSymbol0To9 (N.Morph.inChar ( n0, n9 ))
+            |> Morph.try LocalSymbol0To9 N1To9.morphChar
             |> Morph.choiceFinish
         )
 
@@ -191,7 +192,7 @@ hostLabelSideableSymbol =
             (AToZ.Morph.broadCase AToZ.CaseLower
                 |> Morph.over AToZ.Morph.char
             )
-        |> Morph.try HostLabelSideSymbol0To9 (N.Morph.inChar ( n0, n9 ))
+        |> Morph.try HostLabelSideSymbol0To9 N1To9.morphChar
         |> Morph.choiceFinish
 
 
@@ -250,7 +251,7 @@ domainTopLevel =
                 }
             )
             |> grab .startDigits
-                (whilePossible (N.Morph.inChar ( n0, n9 ) |> Morph.one))
+                (whilePossible (N1To9.morphChar |> Morph.one))
             |> -- guarantees it can't be numeric only
                grab .firstAToZ
                 (AToZ.Morph.broadCase AToZ.CaseLower
@@ -282,7 +283,7 @@ domainTopLevelAfterFirstAToZSymbol =
                 |> Morph.over AToZ.Morph.char
             )
         |> Morph.try DomainTopLevelSymbol0To9
-            (N.Morph.inChar ( n0, n9 ))
+            N1To9.morphChar
         |> Morph.choiceFinish
 
 
@@ -294,17 +295,17 @@ type alias Email =
 
 
 type alias Local =
-    ArraySized LocalPart (Min (On N2))
+    { part0 : LocalPart, part1 : LocalPart, part2Up : List LocalPart }
 
 
 type alias LocalPart =
-    ArraySized LocalSymbol (Min (On N1))
+    { symbol0 : LocalSymbol, symbol1Up : List LocalSymbol }
 
 
 type LocalSymbol
     = LocalSymbolPrintable LocalSymbolPrintable
     | LocalSymbolAToZ AToZ
-    | LocalSymbol0To9 (N (In (On N0) (On N9)))
+    | LocalSymbol0To9 N1To9
 
 
 type LocalSymbolPrintable
@@ -342,7 +343,7 @@ type alias HostLabel =
 
 type HostLabelSideableSymbol
     = HostLabelSideSymbolAToZ AToZ
-    | HostLabelSideSymbol0To9 (N (In (On N0) (On N9)))
+    | HostLabelSideSymbol0To9 N1To9
 
 
 type HostLabelSection
@@ -354,7 +355,7 @@ type HostLabelSection
 -}
 type alias DomainTopLevel =
     RecordWithoutConstructorFunction
-        { startDigits : List (N (In (On N0) (On N9)))
+        { startDigits : List N1To9
         , firstAToZ : AToZ
         , afterFirstAToZ : List DomainTopLevelAfterFirstAToZSymbol
         }
@@ -362,4 +363,4 @@ type alias DomainTopLevel =
 
 type DomainTopLevelAfterFirstAToZSymbol
     = DomainTopLevelSymbolAToZ AToZ
-    | DomainTopLevelSymbol0To9 (N (In (On N0) (On N9)))
+    | DomainTopLevelSymbol0To9 N1To9

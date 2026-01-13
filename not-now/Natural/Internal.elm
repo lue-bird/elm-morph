@@ -1,13 +1,10 @@
-module Natural.Internal exposing (bits, fromBitArray, integer)
+module Natural.Internal exposing (bits, integer)
 
-import ArraySized exposing (ArraySized)
-import ArraySized.Morph
 import Bit exposing (Bit)
 import BitArray.Extra
 import Bytes
 import Integer exposing (Integer)
 import Morph exposing (Morph, MorphIndependently, MorphRow)
-import N exposing (In, N, To, Up)
 import Natural exposing (Natural)
 import NaturalAtLeast1
 import Sign exposing (Sign(..))
@@ -59,7 +56,7 @@ integer =
 
 bits :
     Bytes.Endianness
-    -> N (In (Up bitCountMinX_ To bitCountMinPlusX_) (Up bitCountMaxX_ To bitCountMaxPlusX_))
+    -> Int
     -> MorphRow Natural Bit
 bits endianness bitCount =
     bitArrayOfSize bitCount
@@ -72,53 +69,4 @@ bits endianness bitCount =
                         (Morph.oneToOne BitArray.Extra.reverseEndian BitArray.Extra.reverseEndian)
            )
         |> Morph.overRow
-            (ArraySized.Morph.exactly bitCount (Morph.keep |> Morph.one))
-
-
-{-| Convert from an `ArraySized` of bits.
-
-When converting back:
-If the number is greater than the capacity possible with the given bit count,
-the greatest possible value will be returned instead.
-
--}
-bitArrayOfSize :
-    N (In (Up minX To minPlusX) max)
-    ->
-        MorphIndependently
-            (ArraySized Bit (In beforeToNarrowMin_ beforeToNarrowMax_)
-             -> Result error_ Natural
-            )
-            (Natural -> ArraySized Bit (In (Up minX To minPlusX) max))
-bitArrayOfSize bitCount =
-    Morph.oneToOne
-        fromBitArray
-        (toBitArrayOfSize bitCount)
-
-
-toBitArrayOfSize :
-    N (In (Up minX To minPlusX) max)
-    ->
-        (Natural
-         -> ArraySized Bit (In (Up minX To minPlusX) max)
-        )
-toBitArrayOfSize bitCount =
-    \natural ->
-        case natural of
-            Natural.N0 ->
-                ArraySized.repeat Bit.O bitCount
-
-            Natural.AtLeast1 atLeast1 ->
-                atLeast1 |> NaturalAtLeast1.toBitArrayOfSize bitCount
-
-
-fromBitArray : ArraySized Bit (In min_ max_) -> Natural
-fromBitArray =
-    \arraySized ->
-        case arraySized |> BitArray.Extra.unpad |> ArraySized.toList of
-            [] ->
-                Natural.N0
-
-            _ :: unpaddedAtLeast1AfterI ->
-                Natural.AtLeast1
-                    { bitsAfterI = unpaddedAtLeast1AfterI }
+            (List.Morph.exactly bitCount (Morph.keep |> Morph.one))

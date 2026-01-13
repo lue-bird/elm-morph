@@ -1,6 +1,6 @@
 module Array.Morph exposing
     ( each
-    , list, stack, arraySized, string
+    , list, string
     , value
     )
 
@@ -14,19 +14,16 @@ module Array.Morph exposing
 
 ## transform
 
-@docs list, stack, arraySized, string
+@docs list, string
 @docs value
 
 -}
 
 import Array exposing (Array)
-import ArraySized exposing (ArraySized)
-import Emptiable exposing (Emptiable)
 import Morph exposing (MorphIndependently, MorphOrError)
-import N exposing (Min, Up0)
-import Possibly exposing (Possibly(..))
-import Stack exposing (Stacked)
+import Stack
 import Value
+import Value.Morph exposing (MorphValue)
 import Value.Morph.Internal exposing (MorphValue)
 
 
@@ -50,31 +47,6 @@ list =
     Morph.oneToOne Array.fromList Array.toList
 
 
-{-| [`Morph.OneToOne`](Morph#OneToOne) from a [stack](https://dark.elm.dmy.fr/packages/lue-bird/elm-emptiness-typed/latest/Stack)
-
-    import Morph
-    import Array
-    import Stack
-
-    Stack.topBelow 0 [ 1, 2, 3 ]
-        |> Morph.mapTo Array.Morph.stack
-    --> Array.fromList [ 0, 1, 2, 3 ]
-
-[Inverse](Morph#invert) of [`Stack.Morph.array`](Stack-Morph#array)
-
--}
-stack :
-    MorphIndependently
-        (Emptiable (Stacked narrowElement) possiblyOrNever_
-         -> Result error_ (Array narrowElement)
-        )
-        (Array broadElement -> Emptiable (Stacked broadElement) Possibly)
-stack =
-    list
-        |> Morph.over (Morph.oneToOne Stack.toList Stack.fromList)
-        |> Morph.errorMap Morph.deadEndNever
-
-
 {-| [`Morph.OneToOne`](Morph#OneToOne) from a `String` to `Array Char`
 
     import Array
@@ -90,33 +62,7 @@ stack =
 string : MorphOrError (Array Char) String error_
 string =
     list
-        |> Morph.over (Morph.oneToOne String.toList String.fromList)
-        |> Morph.errorMap Morph.deadEndNever
-
-
-{-| [`Morph.OneToOne`](Morph#OneToOne) from an [`ArraySized`](https://dark.elm.dmy.fr/packages/lue-bird/elm-typesafe-array/latest/)
-
-    import ArraySized
-    import Array
-    import Morph
-
-    ArraySized.l4 0 1 2 3
-        |> Morph.mapTo Array.Morph.arraySized
-    --> Array.fromList [ 0, 1, 2, 3 ]
-
-[Inverse](Morph#invert) of [`ArraySized.Morph.array`](ArraySized-Morph#array)
-
--}
-arraySized :
-    MorphIndependently
-        (ArraySized narrowElement narrowRange_
-         -> Result error_ (Array narrowElement)
-        )
-        (Array broadElement
-         -> ArraySized broadElement (Min (Up0 broadX_))
-        )
-arraySized =
-    Morph.oneToOne ArraySized.toArray ArraySized.fromArray
+        |> Morph.overOneToOne (Morph.oneToOne String.toList String.fromList)
 
 
 
@@ -155,7 +101,7 @@ If the element [`Morph`](Morph#Morph) is [`OneToOne`](Morph#OneToOne),
 each :
     MorphIndependently
         (beforeToNarrow
-         -> Result (Morph.ErrorWithDeadEnd deadEnd) narrow
+         -> Result Morph.Error narrow
         )
         (beforeToBroad -> broad)
     ->
@@ -163,12 +109,12 @@ each :
             (Array beforeToNarrow
              ->
                 Result
-                    (Morph.ErrorWithDeadEnd deadEnd)
+                    Morph.Error
                     (Array narrow)
             )
             (Array beforeToBroad -> Array broad)
 each elementMorph =
-    Morph.named "all"
+    Morph.named "each"
         { description =
             Morph.ElementsDescription (elementMorph |> Morph.description)
         , toNarrow =
@@ -187,16 +133,16 @@ each elementMorph =
                                             errorsSoFar =
                                                 case collected of
                                                     Ok _ ->
-                                                        Emptiable.empty
+                                                        []
 
                                                     Err elementsAtIndexes ->
-                                                        elementsAtIndexes |> Emptiable.emptyAdapt (\_ -> Possible)
+                                                        elementsAtIndexes |> Stack.toList
                                         in
-                                        errorsSoFar
-                                            |> Stack.onTopLay
-                                                { location = index |> String.fromInt
-                                                , error = elementError
-                                                }
+                                        ( { location = index |> String.fromInt
+                                          , error = elementError
+                                          }
+                                        , errorsSoFar
+                                        )
                                             |> Err
                             , index = index - 1
                             }
